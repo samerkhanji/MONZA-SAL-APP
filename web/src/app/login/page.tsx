@@ -1,14 +1,12 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
-import Link from "next/link";
+import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { SignOutButton } from "@/components/sign-out-button";
 import {
   Dialog,
   DialogContent,
@@ -18,35 +16,25 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-function HomePageContent() {
+function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirectTo") ?? "/dashboard";
-  const [user, setUser] = useState<{ id: string } | null>(null);
-  const [loading, setLoading] = useState(true);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [forgotOpen, setForgotOpen] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotLoading, setForgotLoading] = useState(false);
   const [forgotError, setForgotError] = useState<string | null>(null);
   const [forgotSuccess, setForgotSuccess] = useState(false);
 
-  useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user: u } }) => {
-      setUser(u ?? null);
-      setLoading(false);
-    });
-  }, []);
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    setSubmitting(true);
+    setLoading(true);
 
     const supabase = createClient();
     const { error: signInError } = await supabase.auth.signInWithPassword({
@@ -54,14 +42,13 @@ function HomePageContent() {
       password,
     });
 
-    setSubmitting(false);
+    setLoading(false);
 
     if (signInError) {
       setError(signInError.message);
       return;
     }
 
-    setUser({ id: "ok" });
     router.push(redirectTo);
     router.refresh();
   }
@@ -94,31 +81,6 @@ function HomePageContent() {
     setForgotSuccess(false);
   }
 
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background via-muted/20 to-background">
-        <p className="text-muted-foreground">Loading...</p>
-      </div>
-    );
-  }
-
-  if (user) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-gradient-to-br from-background via-muted/20 to-background p-8">
-        <div className="absolute right-4 top-4">
-          <SignOutButton />
-        </div>
-        <h1 className="text-3xl font-bold tracking-tight">Monza Tech CRM</h1>
-        <p className="text-center text-muted-foreground">
-          Internal system — car inventory & operations
-        </p>
-        <Button asChild size="lg">
-          <Link href="/cars">Go to Cars</Link>
-        </Button>
-      </div>
-    );
-  }
-
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-background via-muted/30 to-background p-4">
       <Card className="w-full max-w-sm border-border/80 shadow-lg">
@@ -145,7 +107,7 @@ function HomePageContent() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 autoComplete="email"
-                disabled={submitting}
+                disabled={loading}
               />
             </div>
             <div className="space-y-2">
@@ -157,11 +119,11 @@ function HomePageContent() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 autoComplete="current-password"
-                disabled={submitting}
+                disabled={loading}
               />
             </div>
-            <Button type="submit" className="w-full" disabled={submitting}>
-              {submitting ? "Signing in..." : "Sign in"}
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Signing in..." : "Sign in"}
             </Button>
           </form>
           <button
@@ -226,10 +188,10 @@ function HomePageContent() {
   );
 }
 
-export default function HomePage() {
+export default function LoginPage() {
   return (
     <Suspense fallback={<div className="flex min-h-screen items-center justify-center">Loading...</div>}>
-      <HomePageContent />
+      <LoginForm />
     </Suspense>
   );
 }

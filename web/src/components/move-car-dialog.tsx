@@ -26,7 +26,6 @@ import {
 interface MoveCarDialogProps {
   carId: string;
   currentLocationType: LocationType;
-  currentLocationSlot: string | null;
   currentStatus: CarStatus;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -36,14 +35,12 @@ interface MoveCarDialogProps {
 export function MoveCarDialog({
   carId,
   currentLocationType,
-  currentLocationSlot,
   currentStatus,
   open,
   onOpenChange,
   onSuccess,
 }: MoveCarDialogProps) {
   const [locationType, setLocationType] = useState<LocationType>(currentLocationType);
-  const [locationSlot, setLocationSlot] = useState(currentLocationSlot ?? "");
   const [status, setStatus] = useState<CarStatus | "">(currentStatus);
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -59,7 +56,8 @@ export function MoveCarDialog({
     const { error: rpcError } = await supabase.rpc("move_car", {
       p_car_id: carId,
       p_new_location_type: locationType,
-      p_new_location_slot: locationSlot.trim() || null,
+      p_new_location_slot: null,
+      p_new_location_floor: null,
       p_new_status: status || null,
       p_note: note.trim() || null,
       p_user_id: null,
@@ -74,7 +72,6 @@ export function MoveCarDialog({
 
     onSuccess();
     onOpenChange(false);
-    setLocationSlot("");
     setNote("");
     setStatus(currentStatus);
     setLocationType(currentLocationType);
@@ -83,7 +80,6 @@ export function MoveCarDialog({
   function handleOpenChange(next: boolean) {
     if (!next) {
       setLocationType(currentLocationType);
-      setLocationSlot(currentLocationSlot ?? "");
       setStatus(currentStatus);
       setNote("");
       setError(null);
@@ -123,15 +119,6 @@ export function MoveCarDialog({
                 ))}
               </SelectContent>
             </Select>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="slot">Slot</Label>
-            <Input
-              id="slot"
-              value={locationSlot}
-              onChange={(e) => setLocationSlot(e.target.value)}
-              placeholder="e.g. S1-R3-C12"
-            />
           </div>
           <div className="space-y-2">
             <Label>Status (optional)</Label>

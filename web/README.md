@@ -9,8 +9,8 @@ Internal-only Next.js app for car inventory. No external customers; staff use on
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 
-2. **RLS**  
-   Current Supabase policies use `TO authenticated`. To use this app **without login** (e.g. internal testing), run the optional SQL in the repo root: `supabase/migrations/` or add policies that allow `anon` for `cars`, `car_events`, and the views. For production, use Supabase Auth so staff sign in and are `authenticated`.
+2. **Auth**  
+   All users must sign in before accessing the CRM. Create staff users in the [Supabase Dashboard](https://supabase.com/dashboard) → Authentication → Users, or enable email signup if needed. RLS policies use `TO authenticated` — signed-in users have full access.
 
 3. **Run**
 
@@ -20,7 +20,7 @@ Internal-only Next.js app for car inventory. No external customers; staff use on
    npm run dev
    ```
 
-   Open [http://localhost:3000](http://localhost:3000). Go to **Cars** to use the inventory loop.
+   Open [http://localhost:3000](http://localhost:3000). You will be redirected to **Login** — sign in with your Supabase Auth credentials, then access the car inventory.
 
 ## Loop
 

@@ -6,11 +6,15 @@ export type CarStatus =
   | "reserved"
   | "sold"
   | "delivered"
-  | "service";
+  | "service"
+  | "sent_to_sub_dealer"
+  | "demo";
 
-export type LocationType = "showroom1" | "showroom2" | "garage" | "storage";
+export type LocationType = "showroom1" | "showroom2" | "garage" | "storage" | "inventory";
 
 export type PdiStatus = "pending" | "in_progress" | "done";
+
+export type CustomsStatus = "pending" | "in_progress" | "cleared" | "exempt";
 
 export type CarEventType =
   | "created"
@@ -25,6 +29,7 @@ export interface Car {
   id: string;
   vin: string;
   plate_number: string | null;
+  sub_dealer_name: string | null;
   brand: string;
   model: string;
   model_year: number | null;
@@ -33,6 +38,7 @@ export interface Car {
   status: CarStatus;
   location_type: LocationType;
   location_slot: string | null;
+  location_floor: string | null;
   battery_percent: number | null;
   ev_range_km: number | null;
   motor: string | null;
@@ -42,6 +48,14 @@ export interface Car {
   date_arrived: string | null;
   location_changed_at: string | null;
   status_changed_at: string | null;
+  price: number | null;
+  price_currency: string | null;
+  warranty_expiry: string | null;
+  warranty_per_dms: string | null;
+  warranty_monza_start_date: string | null;
+  customs_status: CustomsStatus;
+  customs_amount_paid: number | null;
+  customs_amount_currency: string | null;
   deleted_at: string | null;
   notes: string | null;
   created_at: string;
@@ -56,6 +70,22 @@ export interface CarDisplay extends Car {
   battery_display?: string;
   km_display?: string;
   days_in_inventory?: number | null;
+  price_display?: string;
+  warranty_display?: string;
+  customs_display?: string;
+}
+
+export type CarDocumentType = "pdi" | "job_card";
+
+export interface CarDocument {
+  id: string;
+  car_id: string;
+  document_type: CarDocumentType;
+  file_name: string;
+  storage_path: string;
+  file_size_bytes: number | null;
+  uploaded_at: string;
+  uploaded_by: string | null;
 }
 
 export interface CarEvent {
@@ -78,6 +108,8 @@ export const CAR_STATUS_LABELS: Record<CarStatus, string> = {
   sold: "Sold",
   delivered: "Delivered",
   service: "Service",
+  sent_to_sub_dealer: "Sent to Sub Dealer",
+  demo: "Demo",
 };
 
 export const LOCATION_LABELS: Record<LocationType, string> = {
@@ -85,10 +117,18 @@ export const LOCATION_LABELS: Record<LocationType, string> = {
   showroom2: "Showroom 2",
   garage: "Garage",
   storage: "Storage",
+  inventory: "Inventory",
 };
 
 export const PDI_LABELS: Record<PdiStatus, string> = {
-  pending: "Pending",
+  pending: "Incomplete",
   in_progress: "In Progress",
   done: "Done",
+};
+
+export const CUSTOMS_STATUS_LABELS: Record<CustomsStatus, string> = {
+  pending: "Pending",
+  in_progress: "In Progress",
+  cleared: "Cleared",
+  exempt: "Exempt",
 };
