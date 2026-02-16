@@ -1,9 +1,9 @@
 "use client";
 
 /**
- * Car Documents - All storage is in Supabase.
- * - Files: Supabase Storage bucket "car-documents"
- * - Metadata: Supabase table "car_documents"
+ * Customer Documents - All storage is in Supabase.
+ * - Files: Supabase Storage bucket "customer-documents"
+ * - Metadata: Supabase table "customer_documents"
  * - No localStorage, sessionStorage, or local file writes.
  */
 
@@ -32,86 +32,46 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Upload, Trash2, Download, Eye } from "lucide-react";
 
-const DOCUMENT_TYPES = [
-  { value: "pdi_report", label: "PDI Report" },
-  { value: "job_card", label: "Job Card" },
-  { value: "inspection_photo", label: "Inspection Photo" },
-  { value: "customer_document", label: "Customer Document" },
-  { value: "insurance_document", label: "Insurance Document" },
-  { value: "customs_document", label: "Customs Document" },
-  { value: "other_document", label: "Other PDF / Document" },
+const CUSTOMER_DOCUMENT_TYPES = [
+  { value: "id_passport", label: "ID / Passport" },
+  { value: "contract", label: "Contract" },
+  { value: "payment_receipt", label: "Payment Receipt" },
+  { value: "insurance", label: "Insurance" },
+  { value: "drivers_license", label: "Driver's License" },
+  { value: "power_of_attorney", label: "Power of Attorney" },
+  { value: "other", label: "Other" },
 ] as const;
 
-const DOCUMENT_TYPE_ICONS: Record<string, string> = {
-  pdi_report: "📄",
-  job_card: "🔧",
-  inspection_photo: "📸",
-  customer_document: "👤",
-  insurance_document: "🛡️",
-  customs_document: "📦",
-  other_document: "📄",
+const CUSTOMER_DOC_TYPE_ICONS: Record<string, string> = {
+  id_passport: "🪪",
+  contract: "📋",
+  payment_receipt: "🧾",
+  insurance: "🛡️",
+  drivers_license: "🪪",
+  power_of_attorney: "📜",
+  other: "📎",
 };
 
-const DOCUMENT_TYPE_LABELS: Record<string, string> = Object.fromEntries(
-  DOCUMENT_TYPES.map((t) => [t.value, t.label])
+const CUSTOMER_DOC_TYPE_LABELS: Record<string, string> = Object.fromEntries(
+  CUSTOMER_DOCUMENT_TYPES.map((t) => [t.value, t.label])
 );
 
-function ThumbnailPreview({
-  filePath,
-  fileName,
-  getUrl,
-  onView,
-}: {
-  filePath: string;
-  fileName: string;
-  getUrl: (path: string) => Promise<string | null>;
-  onView: () => void;
-}) {
-  const [src, setSrc] = useState<string | null>(null);
-  useEffect(() => {
-    getUrl(filePath).then(setSrc);
-  }, [filePath, getUrl]);
-  return (
-    <button
-      type="button"
-      onClick={onView}
-      className="shrink-0 overflow-hidden rounded border"
-    >
-      {src ? (
-        <img
-          src={src}
-          alt={fileName}
-          className="size-16 object-cover"
-        />
-      ) : (
-        <div className="flex size-16 items-center justify-center bg-muted text-2xl">
-          📸
-        </div>
-      )}
-    </button>
-  );
-}
-
-interface CarDocumentRow {
+interface CustomerDocumentRow {
   id: string;
-  car_id: string;
+  customer_id: string;
   document_type: string;
   file_name: string;
-  file_path?: string;
-  storage_path?: string; // legacy column name
-  file_size?: number | null;
-  file_size_bytes?: number | null; // legacy column name
-  mime_type?: string | null;
-  notes?: string | null;
+  file_path: string;
+  file_size: number | null;
+  mime_type: string | null;
+  notes: string | null;
   uploaded_by: string | null;
-  created_at?: string;
-  uploaded_at?: string; // legacy column name
+  created_at: string;
   profiles?: { full_name: string | null } | null;
 }
 
-interface CarDocumentsProps {
-  carId: string;
-  carVin?: string | null;
+interface CustomerDocumentsProps {
+  customerId: string;
 }
 
 function formatFileSize(bytes: number): string {
@@ -120,42 +80,15 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function getDocPath(doc: CarDocumentRow): string {
-  return doc.file_path ?? doc.storage_path ?? "";
-}
-
-function getDocSize(doc: CarDocumentRow): number | null {
-  return doc.file_size ?? doc.file_size_bytes ?? null;
-}
-
-function getDocDate(doc: CarDocumentRow): string {
-  return doc.created_at ?? doc.uploaded_at ?? "";
-}
-
-function getDocTypeLabel(doc: CarDocumentRow): string {
-  const type = doc.document_type;
-  if (type === "pdi") return "PDI Report";
-  if (type === "job_card") return "Job Card";
-  if (type === "other_document") return "Other PDF / Document";
-  return DOCUMENT_TYPE_LABELS[type] ?? type;
-}
-
-function getDocTypeIcon(doc: CarDocumentRow): string {
-  const type = doc.document_type;
-  if (type === "pdi") return "📄";
-  if (type === "job_card") return "🔧";
-  if (type === "other_document") return "📄";
-  return DOCUMENT_TYPE_ICONS[type] ?? "📄";
-}
-
-export function CarDocuments({ carId, carVin }: CarDocumentsProps) {
-  const { canUploadDocuments, canDelete } = useUser();
+export function CustomerDocuments({ customerId }: CustomerDocumentsProps) {
+  const { canEditInventory, canDelete } = useUser();
+  const canUpload = canEditInventory; // Owner or Sales
   const supabase = createClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [documents, setDocuments] = useState<CarDocumentRow[]>([]);
+  const [documents, setDocuments] = useState<CustomerDocumentRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploadOpen, setUploadOpen] = useState(false);
-  const [uploadType, setUploadType] = useState<string>("pdi_report");
+  const [uploadType, setUploadType] = useState<string>("id_passport");
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadNotes, setUploadNotes] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -164,48 +97,37 @@ export function CarDocuments({ carId, carVin }: CarDocumentsProps) {
   async function fetchDocuments() {
     setLoading(true);
     const { data, error } = await supabase
-      .from("car_documents")
+      .from("customer_documents")
       .select("*, profiles:uploaded_by(full_name)")
-      .eq("car_id", carId)
+      .eq("customer_id", customerId)
       .order("created_at", { ascending: false });
 
     if (error) {
-      // Fallback: try without profiles join (if FK to profiles doesn't exist)
-      const { data: fallbackData, error: fallbackError } = await supabase
-        .from("car_documents")
+      const { data: fallback } = await supabase
+        .from("customer_documents")
         .select("*")
-        .eq("car_id", carId)
-        .order("uploaded_at", { ascending: false });
-
-      if (fallbackError) {
-        toast.error("Failed to load documents");
-        setDocuments([]);
-      } else {
-        setDocuments((fallbackData as CarDocumentRow[]) ?? []);
-      }
+        .eq("customer_id", customerId)
+        .order("created_at", { ascending: false });
+      setDocuments((fallback as CustomerDocumentRow[]) ?? []);
     } else {
-      setDocuments((data as CarDocumentRow[]) ?? []);
+      setDocuments((data as CustomerDocumentRow[]) ?? []);
     }
     setLoading(false);
   }
 
   useEffect(() => {
-    if (!carId) return;
+    if (!customerId) return;
     fetchDocuments();
-  }, [carId]);
+  }, [customerId]);
 
   const filteredDocs =
     typeFilter === "all"
       ? documents
-      : documents.filter((d) => {
-          const t = d.document_type;
-          if (typeFilter === "pdi_report") return t === "pdi_report" || t === "pdi";
-          return t === typeFilter;
-        });
+      : documents.filter((d) => d.document_type === typeFilter);
 
   const getDocumentUrl = useCallback(async (filePath: string): Promise<string | null> => {
     const { data, error } = await supabase.storage
-      .from("car-documents")
+      .from("customer-documents")
       .createSignedUrl(filePath, 3600);
 
     if (error || !data?.signedUrl) {
@@ -220,9 +142,8 @@ export function CarDocuments({ carId, carVin }: CarDocumentsProps) {
     if (url) window.open(url, "_blank");
   }
 
-  async function handleDownload(doc: CarDocumentRow) {
-    const path = getDocPath(doc);
-    const url = await getDocumentUrl(path);
+  async function handleDownload(doc: CustomerDocumentRow) {
+    const url = await getDocumentUrl(doc.file_path);
     if (url) {
       const a = document.createElement("a");
       a.href = url;
@@ -231,14 +152,13 @@ export function CarDocuments({ carId, carVin }: CarDocumentsProps) {
     }
   }
 
-  async function handleDelete(doc: CarDocumentRow) {
+  async function handleDelete(doc: CustomerDocumentRow) {
     if (!canDelete) return;
     if (!confirm(`Delete "${doc.file_name}"?`)) return;
 
-    const path = getDocPath(doc);
     const { error: storageError } = await supabase.storage
-      .from("car-documents")
-      .remove([path]);
+      .from("customer-documents")
+      .remove([doc.file_path]);
 
     if (storageError) {
       toast.error(`Failed to delete file: ${storageError.message}`);
@@ -246,7 +166,7 @@ export function CarDocuments({ carId, carVin }: CarDocumentsProps) {
     }
 
     const { error: metaError } = await supabase
-      .from("car_documents")
+      .from("customer_documents")
       .delete()
       .eq("id", doc.id);
 
@@ -260,7 +180,7 @@ export function CarDocuments({ carId, carVin }: CarDocumentsProps) {
   }
 
   async function handleUpload() {
-    if (!uploadFile || !canUploadDocuments) return;
+    if (!uploadFile || !canUpload) return;
 
     const isPdf = uploadFile.type === "application/pdf";
     const isImage = ["image/jpeg", "image/png", "image/webp"].includes(uploadFile.type);
@@ -283,13 +203,10 @@ export function CarDocuments({ carId, carVin }: CarDocumentsProps) {
     }
 
     const timestamp = Date.now();
-    const filePath = `${carId}/${uploadType}/${timestamp}_${uploadFile.name}`;
-
-    // Map to legacy enum if needed (pdi_report -> pdi)
-    const legacyType = uploadType === "pdi_report" ? "pdi" : uploadType;
+    const filePath = `${customerId}/${uploadType}/${timestamp}_${uploadFile.name}`;
 
     const { error: uploadError } = await supabase.storage
-      .from("car-documents")
+      .from("customer-documents")
       .upload(filePath, uploadFile, {
         contentType: uploadFile.type,
         upsert: false,
@@ -301,10 +218,10 @@ export function CarDocuments({ carId, carVin }: CarDocumentsProps) {
       return;
     }
 
-    // Try new schema first (file_path, file_size, mime_type, notes, created_at)
-    let metaError = (
-      await supabase.from("car_documents").insert({
-        car_id: carId,
+    const { error: metaError } = await supabase
+      .from("customer_documents")
+      .insert({
+        customer_id: customerId,
         document_type: uploadType,
         file_name: uploadFile.name,
         file_path: filePath,
@@ -312,28 +229,13 @@ export function CarDocuments({ carId, carVin }: CarDocumentsProps) {
         mime_type: uploadFile.type,
         notes: uploadNotes.trim() || null,
         uploaded_by: user.id,
-      })
-    ).error;
-
-    // Fallback: legacy schema (storage_path, file_size_bytes, document_type enum)
-    if (metaError && (uploadType === "pdi_report" || uploadType === "job_card")) {
-      metaError = (
-        await supabase.from("car_documents").insert({
-          car_id: carId,
-          document_type: legacyType,
-          file_name: uploadFile.name,
-          storage_path: filePath,
-          file_size_bytes: uploadFile.size,
-          uploaded_by: user.id,
-        })
-      ).error;
-    }
+      });
 
     setUploading(false);
 
     if (metaError) {
       toast.error(`File uploaded but failed to save metadata: ${metaError.message}`);
-      await supabase.storage.from("car-documents").remove([filePath]);
+      await supabase.storage.from("customer-documents").remove([filePath]);
       return;
     }
 
@@ -345,13 +247,10 @@ export function CarDocuments({ carId, carVin }: CarDocumentsProps) {
     fetchDocuments();
   }
 
-  function getUploaderName(doc: CarDocumentRow): string {
+  function getUploaderName(doc: CustomerDocumentRow): string {
     const profiles = doc.profiles as { full_name?: string } | undefined;
     return profiles?.full_name ?? "Unknown";
   }
-
-  const isImageType = (mime: string | null) =>
-    mime?.startsWith("image/") ?? false;
 
   return (
     <>
@@ -361,13 +260,11 @@ export function CarDocuments({ carId, carVin }: CarDocumentsProps) {
             <div>
               <CardTitle>Documents</CardTitle>
               <CardDescription>
-                {carVin
-                  ? `PDFs and documents for VIN ${carVin}`
-                  : "PDI reports, job cards, PDFs, and more"}
+                ID, contracts, receipts, insurance, and more
               </CardDescription>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              {canUploadDocuments && (
+              {canUpload && (
                 <Button size="sm" onClick={() => setUploadOpen(true)}>
                   <Upload className="mr-2 size-4" />
                   Upload Document
@@ -379,7 +276,7 @@ export function CarDocuments({ carId, carVin }: CarDocumentsProps) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Types</SelectItem>
-                  {DOCUMENT_TYPES.map((t) => (
+                  {CUSTOMER_DOCUMENT_TYPES.map((t) => (
                     <SelectItem key={t.value} value={t.value}>
                       {t.label}
                     </SelectItem>
@@ -394,8 +291,8 @@ export function CarDocuments({ carId, carVin }: CarDocumentsProps) {
             <p className="text-muted-foreground text-sm">Loading...</p>
           ) : filteredDocs.length === 0 ? (
             <p className="text-muted-foreground text-sm">
-              No documents uploaded yet. Upload PDI reports, job cards, and
-              other documents for this vehicle.
+              No documents uploaded yet. Upload ID, contracts, receipts, and
+              other documents for this customer.
             </p>
           ) : (
             <ul className="space-y-4">
@@ -406,31 +303,20 @@ export function CarDocuments({ carId, carVin }: CarDocumentsProps) {
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex min-w-0 flex-1 gap-3">
-                      {doc.document_type === "inspection_photo" &&
-                      isImageType(doc.mime_type) ? (
-                        <ThumbnailPreview
-                          filePath={getDocPath(doc)}
-                          fileName={doc.file_name}
-                          getUrl={getDocumentUrl}
-                          onView={() => handleView(getDocPath(doc))}
-                        />
-                      ) : (
-                        <span className="flex size-12 shrink-0 items-center justify-center rounded border bg-muted/50 text-2xl">
-                          {getDocTypeIcon(doc)}
-                        </span>
-                      )}
+                      <span className="flex size-12 shrink-0 items-center justify-center rounded border bg-muted/50 text-2xl">
+                        {CUSTOMER_DOC_TYPE_ICONS[doc.document_type] ?? "📎"}
+                      </span>
                       <div className="min-w-0 flex-1">
                         <p className="font-medium">
-                          {getDocTypeLabel(doc)}
+                          {CUSTOMER_DOC_TYPE_LABELS[doc.document_type] ?? doc.document_type}
                         </p>
                         <p className="text-muted-foreground text-sm">
                           {doc.file_name}
-                          {getDocSize(doc) != null &&
-                            ` · ${formatFileSize(getDocSize(doc)!)}`}
+                          {doc.file_size != null && ` · ${formatFileSize(doc.file_size)}`}
                         </p>
                         <p className="text-muted-foreground text-xs">
                           Uploaded by {getUploaderName(doc)} ·{" "}
-                          {new Date(getDocDate(doc)).toLocaleDateString("en-US", {
+                          {new Date(doc.created_at).toLocaleDateString("en-US", {
                             month: "short",
                             day: "numeric",
                             year: "numeric",
@@ -447,7 +333,7 @@ export function CarDocuments({ carId, carVin }: CarDocumentsProps) {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleView(getDocPath(doc))}
+                        onClick={() => handleView(doc.file_path)}
                       >
                         <Eye className="mr-1 size-3.5" />
                         View
@@ -494,21 +380,18 @@ export function CarDocuments({ carId, carVin }: CarDocumentsProps) {
           <DialogHeader>
             <DialogTitle>Upload Document</DialogTitle>
             <DialogDescription>
-              Add a document to this vehicle&apos;s file
+              Add a document to this customer&apos;s file
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label>Document Type *</Label>
-              <Select
-                value={uploadType}
-                onValueChange={setUploadType}
-              >
+              <Select value={uploadType} onValueChange={setUploadType}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {DOCUMENT_TYPES.map((t) => (
+                  {CUSTOMER_DOCUMENT_TYPES.map((t) => (
                     <SelectItem key={t.value} value={t.value}>
                       {t.label}
                     </SelectItem>
@@ -564,10 +447,7 @@ export function CarDocuments({ carId, carVin }: CarDocumentsProps) {
             >
               Cancel
             </Button>
-            <Button
-              onClick={handleUpload}
-              disabled={!uploadFile || uploading}
-            >
+            <Button onClick={handleUpload} disabled={!uploadFile || uploading}>
               {uploading ? "Uploading..." : "Upload"}
             </Button>
           </DialogFooter>

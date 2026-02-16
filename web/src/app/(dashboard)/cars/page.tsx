@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { MoreHorizontal } from "lucide-react";
+import { MoreHorizontal, FileText } from "lucide-react";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
 import type { CarDisplay } from "@/types/database";
@@ -125,7 +125,12 @@ export default function CarsListPage() {
       .order("created_at", { ascending: false });
 
     if (error) {
-      console.error(error);
+      if (error.name === "AbortError" || error.message?.includes("aborted")) {
+        setLoading(false);
+        return;
+      }
+      console.error("Failed to fetch cars:", error.message ?? error.code ?? error);
+      toast.error(error.message ?? "Failed to load cars");
       setCars([]);
     } else {
       setCars((data as CarDisplay[]) ?? []);
@@ -167,12 +172,12 @@ export default function CarsListPage() {
         <CardHeader>
           <CardTitle>Filters</CardTitle>
           <CardDescription>
-            Search VIN, plate, brand, model · Status · Location · Brand · PDI
+            Search by VIN, plate, brand, model · Status · Location · Brand · PDI
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-4">
           <Input
-            placeholder="Search VIN, plate, brand, model..."
+            placeholder="Search by VIN (primary), plate, brand, model..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="max-w-xs"
@@ -247,21 +252,25 @@ export default function CarsListPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>VIN</TableHead>
+                    <TableHead>Brand</TableHead>
                     <TableHead>Model</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Color</TableHead>
-                    <TableHead>Interior Color</TableHead>
+                    <TableHead>Year</TableHead>
+                    <TableHead>Exterior</TableHead>
+                    <TableHead>Interior</TableHead>
+                    <TableHead>Plate</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Location</TableHead>
-                    <TableHead>Year</TableHead>
                     <TableHead>Price</TableHead>
                     <TableHead>Warranty (DMS)</TableHead>
-                    <TableHead>Warranty (Monza Start)</TableHead>
+                    <TableHead>Warranty (Monza)</TableHead>
                     <TableHead>Battery %</TableHead>
-                    <TableHead>KM Driven</TableHead>
+                    <TableHead>KM</TableHead>
+                    <TableHead>EV Range</TableHead>
+                    <TableHead>Motor</TableHead>
                     <TableHead>PDI</TableHead>
                     <TableHead>Customs</TableHead>
-                    <TableHead>Software Model</TableHead>
+                    <TableHead>Date Arrived</TableHead>
+                    <TableHead>Software</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -282,23 +291,28 @@ export default function CarsListPage() {
                       <TableRow
                         key={car.id}
                         className="cursor-pointer"
-                        onClick={() => router.push(`/cars/${car.id}`)}
+                        onClick={() => router.push(`/cars/${encodeURIComponent(car.vin ?? car.id)}`)}
                       >
-                        <TableCell className="font-mono text-sm">
-                          {car.vin_short ?? car.vin?.slice(-8) ?? "—"}
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {car.model}
-                          {car.model_year ? ` (${car.model_year})` : ""}
+                        <TableCell className="font-mono text-sm font-medium">
+                          {car.vin ?? "—"}
                         </TableCell>
                         <TableCell className="text-sm">
                           {car.brand ?? "—"}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {car.model}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {car.model_year ?? "—"}
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {car.exterior_color ?? "—"}
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {car.interior_color ?? "—"}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {car.plate_number ?? car.sub_dealer_name ?? "—"}
                         </TableCell>
                         <TableCell
                           className="cursor-pointer"
@@ -314,9 +328,6 @@ export default function CarsListPage() {
                         </TableCell>
                         <TableCell className="text-sm">
                           {car.location_full || "—"}
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {car.model_year ?? "—"}
                         </TableCell>
                         <TableCell className="text-sm">
                           {car.price_display && car.price_display !== "-"
@@ -355,6 +366,12 @@ export default function CarsListPage() {
                         <TableCell className="text-sm">
                           {car.km_display ?? (car.current_km != null ? `${car.current_km} km` : "—")}
                         </TableCell>
+                        <TableCell className="text-sm">
+                          {car.ev_range_km != null ? `${car.ev_range_km} km` : "—"}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {car.motor ?? "—"}
+                        </TableCell>
                         <TableCell
                           className="cursor-pointer"
                           onClick={(e) => {
@@ -384,29 +401,54 @@ export default function CarsListPage() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-sm">
+                          {car.date_arrived
+                            ? new Date(car.date_arrived).toLocaleDateString()
+                            : "—"}
+                        </TableCell>
+                        <TableCell className="text-sm">
                           {car.software_version ?? "—"}
                         </TableCell>
                         <TableCell
                           className="text-right"
                           onClick={(e) => e.stopPropagation()}
                         >
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="size-8"
-                              >
-                                <MoreHorizontal className="size-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                onClick={() => router.push(`/cars/${car.id}`)}
-                              >
-                                View
-                              </DropdownMenuItem>
-                              {canEditInventory && (
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="size-8"
+                              title="Open documents & files"
+                              onClick={() =>
+                                router.push(`/cars/${encodeURIComponent(car.vin ?? car.id)}`)
+                              }
+                            >
+                              <FileText className="size-4" />
+                            </Button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="size-8"
+                                >
+                                  <MoreHorizontal className="size-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  onClick={() => router.push(`/cars/${encodeURIComponent(car.vin ?? car.id)}`)}
+                                >
+                                  View profile
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() =>
+                                    router.push(`/cars/${encodeURIComponent(car.vin ?? car.id)}`)
+                                  }
+                                >
+                                  <FileText className="mr-2 size-4" />
+                                  Documents & PDFs
+                                </DropdownMenuItem>
+                                {canEditInventory && (
                                 <>
                                   <DropdownMenuItem
                                     onClick={() => {
@@ -434,6 +476,7 @@ export default function CarsListPage() {
                               )}
                             </DropdownMenuContent>
                           </DropdownMenu>
+                          </div>
                         </TableCell>
                       </TableRow>
                     );

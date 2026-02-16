@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
@@ -26,6 +26,8 @@ import { MoveCarDialog } from "@/components/move-car-dialog";
 import { EditCarDialog } from "@/components/edit-car-dialog";
 import { PdiStatusDialog } from "@/components/pdi-status-dialog";
 import { CarDocuments } from "@/components/car-documents";
+import { DayDetailDialog } from "@/components/car-day-detail-dialog";
+import { VisitsMaintenanceDialog } from "@/components/visits-maintenance-dialog";
 import { STATUS_BADGE_COLORS, PDI_BADGE_COLORS } from "@/lib/constants/badges";
 
 const EVENT_LABELS: Record<CarEventType, string> = {
@@ -41,8 +43,11 @@ const EVENT_LABELS: Record<CarEventType, string> = {
 export default function CarProfilePage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { canEditInventory, canDelete } = useUser();
-  const id = params.id as string;
+  const param = params.id as string;
+  // Support lookup by VIN (17 alphanumeric) or by UUID
+  const isVin = /^[A-HJ-NPR-Z0-9]{17}$/i.test(param);
   const [car, setCar] = useState<CarDisplay | null>(null);
   const [events, setEvents] = useState<CarEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,6 +59,12 @@ export default function CarProfilePage() {
   const [noteText, setNoteText] = useState("");
   const [noteSubmitting, setNoteSubmitting] = useState(false);
   const [createdByName, setCreatedByName] = useState<string | null>(null);
+  const [dayDetailOpen, setDayDetailOpen] = useState(false);
+  const [selectedDateStr, setSelectedDateStr] = useState<string | null>(null);
+  const [visitsMaintenanceOpen, setVisitsMaintenanceOpen] = useState(false);
+  const [visitsMaintenanceMode, setVisitsMaintenanceMode] = useState<
+    "garage" | "maintenance"
+  >("garage");
 
   const supabase = createClient();
 
@@ -64,11 +75,10 @@ export default function CarProfilePage() {
   }
 
   async function fetchCar() {
-    const { data, error } = await supabase
-      .from("cars_display")
-      .select("*")
-      .eq("id", id)
-      .single();
+    const query = supabase.from("cars_display").select("*");
+    const { data, error } = isVin
+      ? await query.eq("vin", param.toUpperCase()).maybeSingle()
+      : await query.eq("id", param).single();
 
     if (error || !data) {
       setCar(null);
@@ -78,10 +88,11 @@ export default function CarProfilePage() {
   }
 
   async function fetchEvents() {
+    if (!car?.id) return;
     const { data, error } = await supabase
       .from("car_events")
       .select("*")
-      .eq("car_id", id)
+      .eq("car_id", car.id)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -92,10 +103,24 @@ export default function CarProfilePage() {
   }
 
   useEffect(() => {
-    if (!id) return;
+    if (!param) return;
     setLoading(true);
-    Promise.all([fetchCar(), fetchEvents()]).finally(() => setLoading(false));
-  }, [id]);
+    fetchCar().finally(() => setLoading(false));
+  }, [param]);
+
+  useEffect(() => {
+    if (!car?.id) return;
+    fetchEvents();
+  }, [car?.id]);
+
+  useEffect(() => {
+    const open = searchParams.get("open");
+    if (open === "garage" || open === "maintenance") {
+      setVisitsMaintenanceMode(open);
+      setVisitsMaintenanceOpen(true);
+      router.replace(`/cars/${encodeURIComponent(param)}`, { scroll: false });
+    }
+  }, [searchParams, param, router]);
 
   useEffect(() => {
     if (!car?.created_by) {
@@ -148,13 +173,13 @@ export default function CarProfilePage() {
 
   async function handleAddNote(e: React.FormEvent) {
     e.preventDefault();
-    if (!noteText.trim()) return;
+    if (!car || !noteText.trim()) return;
 
     setNoteSubmitting(true);
     const { data: { user } } = await supabase.auth.getUser();
 
     const { error } = await supabase.from("car_events").insert({
-      car_id: id,
+      car_id: car.id,
       event_type: "note_added",
       note: noteText.trim(),
       created_by: user?.id ?? null,
@@ -197,6 +222,40 @@ export default function CarProfilePage() {
   const pdiBadgeClass =
     PDI_BADGE_COLORS[car.pdi_status] ?? "bg-muted text-muted-foreground";
 
+  const movedEvents = events.filter((e) => e.event_type === "moved");
+  const visitEvents = movedEvents.map((ev) => {
+    const toVal = (ev.to_value ?? "").toLowerCase();
+    return {
+      ...ev,
+      visitType: toVal.includes("garage") ? "garage" as const : "company_entry" as const,
+    };
+  });
+  const garageEvents = visitEvents.filter((v) => v.visitType === "garage");
+  const maintenanceEvents = events.filter(
+    (e) => e.event_type === "status_changed" && e.to_value === "service"
+  );
+  const garageVisitsCount = garageEvents.length;
+  const maintenanceCount = maintenanceEvents.length;
+
+  const eventsByDate = events.reduce<Record<string, CarEvent[]>>((acc, ev) => {
+    const d = new Date(ev.created_at);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(ev);
+    return acc;
+  }, {});
+  const sortedDates = Object.keys(eventsByDate).sort((a, b) => b.localeCompare(a));
+
+  function formatDateLabel(dateStr: string) {
+    const d = new Date(dateStr + "T12:00:00");
+    return d.toLocaleDateString(undefined, {
+      weekday: "short",
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  }
+
   return (
     <div className="container mx-auto space-y-6 py-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -205,11 +264,11 @@ export default function CarProfilePage() {
             <Link href="/cars">← Back</Link>
           </Button>
           <div>
-            <h1 className="text-2xl font-semibold">
-              {car.model} {car.model_year ? `(${car.model_year})` : ""}
+            <h1 className="font-mono text-xl font-semibold">
+              VIN: {car.vin}
             </h1>
-            <p className="font-mono text-muted-foreground text-sm">
-              VIN: {car.vin_short ?? car.vin.slice(-8)}
+            <p className="text-muted-foreground text-sm">
+              {car.brand} {car.model} {car.model_year ? `(${car.model_year})` : ""}
             </p>
           </div>
         </div>
@@ -281,7 +340,38 @@ export default function CarProfilePage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <Tabs defaultValue="overview">
+      {selectedDateStr && (
+        <DayDetailDialog
+          open={dayDetailOpen}
+          onOpenChange={setDayDetailOpen}
+          dateStr={selectedDateStr}
+          dayEvents={eventsByDate[selectedDateStr] ?? []}
+          carId={car.id}
+          carVin={car.vin}
+          eventLabels={EVENT_LABELS}
+          onRefresh={() => {
+            fetchEvents();
+          }}
+        />
+      )}
+
+      <VisitsMaintenanceDialog
+        open={visitsMaintenanceOpen}
+        onOpenChange={setVisitsMaintenanceOpen}
+        mode={visitsMaintenanceMode}
+        events={
+          visitsMaintenanceMode === "garage"
+            ? (garageEvents as CarEvent[])
+            : maintenanceEvents
+        }
+        eventLabels={EVENT_LABELS}
+        onOpenDay={(dateStr) => {
+          setSelectedDateStr(dateStr);
+          setDayDetailOpen(true);
+        }}
+      />
+
+      <Tabs defaultValue="documents">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="documents">Documents</TabsTrigger>
@@ -371,6 +461,93 @@ export default function CarProfilePage() {
                 <p className="text-muted-foreground text-sm">Days in Inventory</p>
                 <p>{car.days_in_inventory != null ? car.days_in_inventory : "—"}</p>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Section 2b: Visits & Maintenance */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Visits & Maintenance</CardTitle>
+              <CardDescription>Garage visits, company entries, service history</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setVisitsMaintenanceMode("garage");
+                    setVisitsMaintenanceOpen(true);
+                  }}
+                  className="cursor-pointer transition-opacity hover:opacity-90"
+                >
+                  <Badge
+                    variant="outline"
+                    className="bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300"
+                  >
+                    Garage visits: {garageVisitsCount}
+                  </Badge>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setVisitsMaintenanceMode("maintenance");
+                    setVisitsMaintenanceOpen(true);
+                  }}
+                  className="cursor-pointer transition-opacity hover:opacity-90"
+                >
+                  <Badge
+                    variant="outline"
+                    className="bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300"
+                  >
+                    Maintenance: {maintenanceCount}
+                  </Badge>
+                </button>
+              </div>
+              {visitEvents.length > 0 && (
+                <div>
+                  <p className="mb-2 text-sm font-medium text-muted-foreground">
+                    Visitation history (click date to open full history & files)
+                  </p>
+                  <div className="space-y-2">
+                    {sortedDates
+                      .filter((d) =>
+                        eventsByDate[d].some((e) => e.event_type === "moved")
+                      )
+                      .map((dateStr) => {
+                        const dayEvents = eventsByDate[dateStr];
+                        const dayVisits = dayEvents.filter((e) => e.event_type === "moved");
+                        return (
+                          <button
+                            key={dateStr}
+                            type="button"
+                            className="flex w-full items-center justify-between rounded-lg border px-4 py-3 text-left transition-colors hover:bg-muted/50 hover:border-primary/50"
+                            onClick={() => {
+                              setSelectedDateStr(dateStr);
+                              setDayDetailOpen(true);
+                            }}
+                          >
+                            <span className="font-medium">
+                              {formatDateLabel(dateStr)}
+                            </span>
+                            <span className="text-muted-foreground text-sm">
+                              {dayVisits.length} visit
+                              {dayVisits.length !== 1 ? "s" : ""}
+                              {dayEvents.length > dayVisits.length
+                                ? ` · ${dayEvents.length} total events`
+                                : ""}
+                            </span>
+                            <span className="text-muted-foreground">→</span>
+                          </button>
+                        );
+                      })}
+                  </div>
+                </div>
+              )}
+              {visitEvents.length === 0 && (
+                <p className="text-muted-foreground text-sm">
+                  No visitation history yet.
+                </p>
+              )}
             </CardContent>
           </Card>
 
@@ -467,7 +644,7 @@ export default function CarProfilePage() {
         </TabsContent>
 
         <TabsContent value="documents" className="space-y-4">
-          <CarDocuments carId={car.id} />
+          <CarDocuments carId={car.id} carVin={car.vin} />
         </TabsContent>
 
         <TabsContent value="history" className="space-y-4">
@@ -525,33 +702,34 @@ export default function CarProfilePage() {
               {events.length === 0 ? (
                 <p className="text-muted-foreground">No events yet.</p>
               ) : (
-                <ul className="space-y-4">
-                  {events.map((ev) => (
-                    <li
-                      key={ev.id}
-                      className="flex flex-col gap-1 border-b border-border pb-4 last:border-0 last:pb-0"
-                    >
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline">
-                          {EVENT_LABELS[ev.event_type]}
-                        </Badge>
-                        <span className="text-muted-foreground text-sm">
-                          {new Date(ev.created_at).toLocaleString()}
+                <div className="space-y-2">
+                  <p className="text-muted-foreground text-sm">
+                    Click a date to open full history and attach files for that day.
+                  </p>
+                  {sortedDates.map((dateStr) => {
+                    const dayEvents = eventsByDate[dateStr];
+                    return (
+                      <button
+                        key={dateStr}
+                        type="button"
+                        className="flex w-full items-center justify-between rounded-lg border px-4 py-3 text-left transition-colors hover:bg-muted/50 hover:border-primary/50"
+                        onClick={() => {
+                          setSelectedDateStr(dateStr);
+                          setDayDetailOpen(true);
+                        }}
+                      >
+                        <span className="font-medium">
+                          {formatDateLabel(dateStr)}
                         </span>
-                      </div>
-                      {(ev.from_value || ev.to_value) && (
-                        <p className="text-muted-foreground text-sm">
-                          {ev.from_value && <span>{ev.from_value}</span>}
-                          {ev.from_value && ev.to_value && " → "}
-                          {ev.to_value && <span>{ev.to_value}</span>}
-                        </p>
-                      )}
-                      {ev.note && (
-                        <p className="text-sm">{ev.note}</p>
-                      )}
-                    </li>
-                  ))}
-                </ul>
+                        <span className="text-muted-foreground text-sm">
+                          {dayEvents.length} event
+                          {dayEvents.length !== 1 ? "s" : ""}
+                        </span>
+                        <span className="text-muted-foreground">→</span>
+                      </button>
+                    );
+                  })}
+                </div>
               )}
             </CardContent>
           </Card>

@@ -47,8 +47,14 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (user && (isLoginPage || isRootPage)) {
+    const redirectTo = request.nextUrl.searchParams.get("redirectTo");
+    const target =
+      redirectTo && redirectTo.startsWith("/") && !redirectTo.startsWith("//")
+        ? redirectTo
+        : "/cars";
     const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
+    url.pathname = target;
+    url.search = "";
     const redirectResponse = NextResponse.redirect(url);
     response.cookies.getAll().forEach((cookie) =>
       redirectResponse.cookies.set(cookie.name, cookie.value)

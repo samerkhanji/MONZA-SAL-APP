@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,9 +17,8 @@ import {
 } from "@/components/ui/dialog";
 
 function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get("redirectTo") ?? "/dashboard";
+  const redirectTo = searchParams.get("redirectTo") ?? "/cars";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -49,8 +48,7 @@ function LoginForm() {
       return;
     }
 
-    router.push(redirectTo);
-    router.refresh();
+    window.location.href = redirectTo.startsWith("/") ? redirectTo : `/${redirectTo}`;
   }
 
   async function handleForgotPassword(e: React.FormEvent) {

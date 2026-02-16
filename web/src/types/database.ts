@@ -132,3 +132,62 @@ export const CUSTOMS_STATUS_LABELS: Record<CustomsStatus, string> = {
   cleared: "Cleared",
   exempt: "Exempt",
 };
+
+export type LeadStatus =
+  | "new_lead"
+  | "contacted"
+  | "interested"
+  | "test_drive"
+  | "negotiation"
+  | "converted"
+  | "lost";
+
+export type LeadSource =
+  | "walk_in"
+  | "phone"
+  | "whatsapp"
+  | "instagram"
+  | "facebook"
+  | "website"
+  | "referral"
+  | "event"
+  | "other";
+
+export interface Customer {
+  id: string;
+  first_name: string;
+  last_name: string | null;
+  phone_primary: string;
+  phone_secondary: string | null;
+  email: string | null;
+  preferred_language: string | null;
+  lead_status: LeadStatus;
+  lead_source: LeadSource | null;
+  company: string | null;
+  address: string | null;
+  date_of_birth: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by: string | null;
+  last_visit_date: string | null;
+  deleted_at: string | null;
+}
+
+export interface CustomerDisplay extends Customer {
+  full_name?: string;
+  status_display?: string;
+  source_display?: string;
+  language_display?: string;
+  total_orders?: number;
+  total_notes?: number;
+}
+
+export interface CustomerNote {
+  id: string;
+  customer_id: string;
+  note_type: string;
+  content: string;
+  created_by: string | null;
+  created_at: string;
+}

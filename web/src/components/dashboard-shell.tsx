@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   Car,
+  FileText,
   Users,
   Wrench,
   Settings,
@@ -32,6 +33,7 @@ const BASE_NAV_ITEMS: Array<{
 }> = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/cars", label: "Inventory", icon: Car },
+  { href: "/documents", label: "Documents", icon: FileText },
   { href: "/customers", label: "Customers", icon: Users },
   { href: "/garage", label: "Garage", icon: Wrench },
   { href: "/settings", label: "Settings", icon: Settings, ownerOnly: true },
@@ -42,6 +44,7 @@ function getPageTitle(pathname: string): string {
   if (pathname.startsWith("/cars/add")) return "Add Car";
   if (pathname.startsWith("/cars/") && pathname !== "/cars") return "Car Details";
   if (pathname.startsWith("/cars")) return "Car Inventory";
+  if (pathname.startsWith("/documents")) return "Documents";
   if (pathname.startsWith("/customers")) return "Customers";
   if (pathname.startsWith("/garage")) return "Garage";
   if (pathname.startsWith("/settings")) return "Settings";

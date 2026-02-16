@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,9 +19,8 @@ import {
 } from "@/components/ui/dialog";
 
 function HomePageContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get("redirectTo") ?? "/dashboard";
+  const redirectTo = searchParams.get("redirectTo") ?? "/cars";
   const [user, setUser] = useState<{ id: string } | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -61,9 +60,7 @@ function HomePageContent() {
       return;
     }
 
-    setUser({ id: "ok" });
-    router.push(redirectTo);
-    router.refresh();
+    window.location.href = redirectTo.startsWith("/") ? redirectTo : `/${redirectTo}`;
   }
 
   async function handleForgotPassword(e: React.FormEvent) {
