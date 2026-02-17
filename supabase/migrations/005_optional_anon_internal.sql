@@ -1,8 +1,10 @@
 -- ============================================
 -- OPTIONAL: Allow anon access for internal app
 -- ============================================
--- Run this ONLY if you use the web app without Supabase Auth
--- (internal system, no public URL). Otherwise use Auth and keep "authenticated" only.
+-- ⚠️ DO NOT RUN THIS MIGRATION if you use Supabase Auth (login/signup).
+-- This migration REPLACES authenticated policies with anon policies, allowing
+-- unauthenticated access to cars and car_events. Only use for internal apps
+-- without auth. The Monza CRM app uses Auth - skip this migration.
 
 -- Cars: anon can read/insert/update (for list, add, move)
 DROP POLICY IF EXISTS "Authenticated users can view all cars" ON cars;

@@ -321,8 +321,6 @@ export default function CarProfilePage() {
   const maintenanceEvents = events.filter(
     (e) => e.event_type === "status_changed" && e.to_value === "service"
   );
-  const garageVisitsCount = garageEvents.length;
-  const maintenanceCount = maintenanceEvents.length;
 
   const eventsByDate = events.reduce<Record<string, CarEvent[]>>((acc, ev) => {
     const d = new Date(ev.created_at);
