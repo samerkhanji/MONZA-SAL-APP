@@ -2,6 +2,16 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function updateSession(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
+  const isPublicAsset =
+    pathname === "/manifest.json" ||
+    pathname === "/sw.js" ||
+    pathname.startsWith("/icons/") ||
+    pathname.startsWith("/images/");
+  if (isPublicAsset) {
+    return NextResponse.next({ request });
+  }
+
   let response = NextResponse.next({ request });
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -31,9 +41,9 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const isLoginPage = request.nextUrl.pathname === "/login";
-  const isRootPage = request.nextUrl.pathname === "/";
-  const isResetPasswordPage = request.nextUrl.pathname === "/reset-password";
+  const isLoginPage = pathname === "/login";
+  const isRootPage = pathname === "/";
+  const isResetPasswordPage = pathname === "/reset-password";
   const isPublicPage = isLoginPage || isRootPage || isResetPasswordPage;
 
   if (!user && isLoginPage) {
