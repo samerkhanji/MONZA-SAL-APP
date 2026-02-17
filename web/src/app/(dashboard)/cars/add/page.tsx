@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
-import { Car, Users, Zap } from "lucide-react";
+import { Car, Users, Zap, ScanLine } from "lucide-react";
+import { ScannerDialog } from "@/components/scanner/ScannerDialog";
 import { createClient } from "@/lib/supabase";
 import type { CarStatus, LocationType, CustomsStatus } from "@/types/database";
 import {
@@ -66,6 +67,7 @@ function currentYear(): number {
 export default function AddCarPage() {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
+  const [scanVinOpen, setScanVinOpen] = useState(false);
 
   // Section 1: Vehicle Information
   const [vin, setVin] = useState("");
@@ -310,13 +312,13 @@ export default function AddCarPage() {
   }
 
   return (
-    <div className="container mx-auto max-w-2xl space-y-6 py-8">
+    <div className="container mx-auto max-w-2xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="sm" asChild>
           <Link href="/cars">← Back</Link>
         </Button>
         <div>
-          <h1 className="text-2xl font-semibold">Add Car</h1>
+          <h1 className="text-xl font-semibold sm:text-2xl">Add Car</h1>
           <p className="text-muted-foreground">Add a new car to inventory</p>
         </div>
       </div>
@@ -332,18 +334,29 @@ export default function AddCarPage() {
             <CardDescription>VIN, brand, model, location, status</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="vin">VIN *</Label>
-                <Input
-                  id="vin"
-                  value={vin}
-                  onChange={(e) => setVin(e.target.value.toUpperCase())}
-                  placeholder="17 characters"
-                  maxLength={17}
-                  required
-                  className="font-mono"
-                />
+                <div className="flex gap-2">
+                  <Input
+                    id="vin"
+                    value={vin}
+                    onChange={(e) => setVin(e.target.value.toUpperCase())}
+                    placeholder="17 characters"
+                    maxLength={17}
+                    required
+                    className="font-mono"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setScanVinOpen(true)}
+                    title="Scan VIN"
+                  >
+                    <ScanLine className="size-4" />
+                  </Button>
+                </div>
                 <p className="text-xs text-muted-foreground">
                   Exactly 17 uppercase letters and numbers
                 </p>
@@ -369,7 +382,7 @@ export default function AddCarPage() {
               </div>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="model">Model *</Label>
                 <Input
@@ -394,7 +407,7 @@ export default function AddCarPage() {
               </div>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="exteriorColor">Exterior Color</Label>
                 <Input
@@ -434,7 +447,7 @@ export default function AddCarPage() {
               </Select>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label>Status</Label>
                 <Select
@@ -568,7 +581,7 @@ export default function AddCarPage() {
             <CardDescription>Battery, range, KM, software, PDI</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="batteryPercent">Battery %</Label>
                 <Input
@@ -641,7 +654,7 @@ export default function AddCarPage() {
                     placeholder="e.g. 1.5T"
                   />
                 </div>
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="evKm">EV KM</Label>
                     <Input
@@ -684,7 +697,7 @@ export default function AddCarPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="clientFirstName">Client First Name *</Label>
                     <Input
@@ -706,7 +719,7 @@ export default function AddCarPage() {
                   </div>
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="clientPhone">Client Phone *</Label>
                     <Input
@@ -730,7 +743,7 @@ export default function AddCarPage() {
                   </div>
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="clientEmail">Client Email</Label>
                     <Input
@@ -771,7 +784,7 @@ export default function AddCarPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="sellingPrice">Selling Price</Label>
                     <Input
@@ -804,7 +817,7 @@ export default function AddCarPage() {
                   </div>
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="saleDate">Sale / Reserved Date</Label>
                     <Input
@@ -827,7 +840,7 @@ export default function AddCarPage() {
                 </div>
 
                 {status === "reserved" && (
-                  <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
                       <Label htmlFor="depositAmount">Deposit Amount</Label>
                       <Input
@@ -877,6 +890,18 @@ export default function AddCarPage() {
           </Button>
         </div>
       </form>
+
+      <ScannerDialog
+        open={scanVinOpen}
+        onClose={() => setScanVinOpen(false)}
+        onScan={(value) => {
+          setVin(value.toUpperCase());
+          setScanVinOpen(false);
+        }}
+        title="Scan VIN"
+        placeholder="17-character VIN..."
+        scanType="vin"
+      />
     </div>
   );
 }

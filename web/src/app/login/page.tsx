@@ -15,10 +15,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { useTheme } from "@/lib/contexts/ThemeContext";
 
 function LoginForm() {
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirectTo") ?? "/cars";
+  const { theme } = useTheme();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -80,10 +83,18 @@ function LoginForm() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-background via-muted/30 to-background p-4">
-      <Card className="w-full max-w-sm border-border/80 shadow-lg">
+    <div className="relative flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-background via-muted/30 to-background p-4">
+      <div className="absolute right-4 top-4">
+        <ThemeToggle />
+      </div>
+      <img
+        src={theme === "dark" ? "/images/login-hero-dark.png" : "/images/login-hero-light.png"}
+        alt="Monza S.A.L."
+        className="mb-6 max-w-[300px] w-auto"
+      />
+      <Card className="w-full max-w-sm border-border shadow-lg">
         <CardHeader className="space-y-1 text-center">
-          <CardTitle className="text-2xl font-bold">Monza Tech CRM</CardTitle>
+          <CardTitle className="text-2xl font-bold">Monza S.A.L.</CardTitle>
           <CardDescription>
             Sign in to access the car inventory system
           </CardDescription>

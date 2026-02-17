@@ -40,6 +40,51 @@ const EVENT_LABELS: Record<CarEventType, string> = {
   note_added: "Note added",
 };
 
+function getEventActor(ev: CarEvent): string {
+  const name = (ev.profiles as { full_name?: string } | undefined)?.full_name;
+  return (name?.trim() && ev.created_by) ? name : "System";
+}
+
+function formatEventDisplay(ev: CarEvent): string {
+  const actor = getEventActor(ev);
+  const from = ev.from_value ?? "";
+  const to = ev.to_value ?? "";
+  switch (ev.event_type) {
+    case "status_changed":
+      return from && to
+        ? `${actor} changed status from ${from} to ${to}`
+        : to
+          ? `${actor} changed status to ${to}`
+          : `${actor} changed status`;
+    case "moved":
+      return from && to
+        ? `${actor} moved from ${from} to ${to}`
+        : to
+          ? `${actor} moved to ${to}`
+          : from
+            ? `${actor} moved from ${from}`
+            : `${actor} moved`;
+    case "created":
+      return `${actor} created the car`;
+    case "battery_updated":
+      return from && to
+        ? `${actor} updated battery from ${from} to ${to}`
+        : `${actor} updated battery`;
+    case "pdi_updated":
+      return from && to
+        ? `${actor} updated PDI from ${from} to ${to}`
+        : `${actor} updated PDI`;
+    case "details_updated":
+      return `${actor} updated details`;
+    case "note_added":
+      return `${actor} added a note`;
+    default:
+      return from && to
+        ? `${actor}: ${from} → ${to}`
+        : `${actor}: ${ev.event_type}`;
+  }
+}
+
 export default function CarProfilePage() {
   const params = useParams();
   const router = useRouter();
@@ -50,6 +95,9 @@ export default function CarProfilePage() {
   const isVin = /^[A-HJ-NPR-Z0-9]{17}$/i.test(param);
   const [car, setCar] = useState<CarDisplay | null>(null);
   const [events, setEvents] = useState<CarEvent[]>([]);
+  const [partsUsed, setPartsUsed] = useState<
+    { part_name: string; oe_number: string | null; quantity: number; job_title: string; job_id: string }[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [moveOpen, setMoveOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -91,12 +139,17 @@ export default function CarProfilePage() {
     if (!car?.id) return;
     const { data, error } = await supabase
       .from("car_events")
-      .select("*")
+      .select("*, profiles:created_by(full_name)")
       .eq("car_id", car.id)
       .order("created_at", { ascending: false });
 
     if (error) {
-      setEvents([]);
+      const { data: fallback } = await supabase
+        .from("car_events")
+        .select("*")
+        .eq("car_id", car.id)
+        .order("created_at", { ascending: false });
+      setEvents((fallback as CarEvent[]) ?? []);
       return;
     }
     setEvents((data as CarEvent[]) ?? []);
@@ -111,6 +164,40 @@ export default function CarProfilePage() {
   useEffect(() => {
     if (!car?.id) return;
     fetchEvents();
+  }, [car?.id]);
+
+  useEffect(() => {
+    if (!car?.id) return;
+    (async () => {
+      const { data: jobs } = await supabase
+        .from("garage_jobs")
+        .select("id, title")
+        .eq("car_id", car.id)
+        .is("deleted_at", null);
+      const jobIds = jobs?.map((j) => j.id) ?? [];
+      if (jobIds.length === 0) {
+        setPartsUsed([]);
+        return;
+      }
+      const { data } = await supabase
+        .from("job_parts")
+        .select("job_id, quantity, parts:part_id(part_name, oe_number)")
+        .in("job_id", jobIds);
+      const jobMap = Object.fromEntries((jobs ?? []).map((j) => [j.id, j.title ?? ""]));
+      const rows = (data as { job_id: string; quantity: number; parts: { part_name: string; oe_number: string | null } | null }[] | null) ?? [];
+      setPartsUsed(
+        rows.map((r) => {
+          const part = r.parts;
+          return {
+            part_name: part?.part_name ?? "—",
+            oe_number: part?.oe_number ?? null,
+            quantity: r.quantity,
+            job_title: jobMap[r.job_id] ?? "—",
+            job_id: r.job_id,
+          };
+        })
+      );
+    })();
   }, [car?.id]);
 
   useEffect(() => {
@@ -200,7 +287,7 @@ export default function CarProfilePage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto py-8">
+      <div className="container mx-auto px-4 py-8">
         <p className="text-muted-foreground">Loading...</p>
       </div>
     );
@@ -208,7 +295,7 @@ export default function CarProfilePage() {
 
   if (!car) {
     return (
-      <div className="container mx-auto space-y-4 py-8">
+      <div className="container mx-auto space-y-4 px-4 py-8">
         <Button variant="ghost" asChild>
           <Link href="/cars">← Back to Cars</Link>
         </Button>
@@ -257,14 +344,14 @@ export default function CarProfilePage() {
   }
 
   return (
-    <div className="container mx-auto space-y-6 py-8">
+    <div className="container mx-auto space-y-6 px-4 py-6 sm:px-6 sm:py-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
           <Button variant="ghost" size="sm" asChild>
             <Link href="/cars">← Back</Link>
           </Button>
           <div>
-            <h1 className="font-mono text-xl font-semibold">
+            <h1 className="break-all font-mono text-lg font-semibold sm:text-xl">
               VIN: {car.vin}
             </h1>
             <p className="text-muted-foreground text-sm">
@@ -272,7 +359,7 @@ export default function CarProfilePage() {
             </p>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {canEditInventory && (
             <Button variant="outline" onClick={() => setEditOpen(true)}>
               Edit
@@ -349,6 +436,7 @@ export default function CarProfilePage() {
           carId={car.id}
           carVin={car.vin}
           eventLabels={EVENT_LABELS}
+          formatEventDisplay={formatEventDisplay}
           onRefresh={() => {
             fetchEvents();
           }}
@@ -365,6 +453,7 @@ export default function CarProfilePage() {
             : maintenanceEvents
         }
         eventLabels={EVENT_LABELS}
+        formatEventDisplay={formatEventDisplay}
         onOpenDay={(dateStr) => {
           setSelectedDateStr(dateStr);
           setDayDetailOpen(true);
@@ -429,25 +518,40 @@ export default function CarProfilePage() {
                   {car.status_display ?? car.status}
                 </Badge>
               </div>
-              {createdByName && (
-                <div className="space-y-1">
-                  <p className="text-muted-foreground text-sm">Created by</p>
-                  <p>{createdByName}</p>
-                </div>
-              )}
+              <div className="space-y-1">
+                <p className="text-muted-foreground text-sm">Vehicle Type</p>
+                <Badge
+                  className={
+                    (car as { is_erev?: boolean }).is_erev
+                      ? "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300"
+                      : "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300"
+                  }
+                >
+                  {(car as { is_erev?: boolean }).is_erev ? "EREV" : "Pure EV"}
+                </Badge>
+              </div>
             </CardContent>
           </Card>
 
-          {/* Section 2: Location */}
+          {/* Section 2: Location & Status */}
           <Card>
             <CardHeader>
-              <CardTitle>Location</CardTitle>
+              <CardTitle>Location & Status</CardTitle>
               <CardDescription>Where the vehicle is stored</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-6 sm:grid-cols-2">
               <div className="space-y-1">
                 <p className="text-muted-foreground text-sm">Location</p>
-                <p>{car.location_full ?? `${car.location_type}${car.location_slot ? ` · ${car.location_slot}` : ""}`}</p>
+                <p>
+                  {car.location_full ??
+                    (car.location_type
+                      ? `${car.location_type}${car.location_slot ? ` · ${car.location_slot}` : ""}`
+                      : "—")}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-muted-foreground text-sm">Location Slot</p>
+                <p>{car.location_slot ?? "—"}</p>
               </div>
               <div className="space-y-1">
                 <p className="text-muted-foreground text-sm">Date Arrived</p>
@@ -461,93 +565,22 @@ export default function CarProfilePage() {
                 <p className="text-muted-foreground text-sm">Days in Inventory</p>
                 <p>{car.days_in_inventory != null ? car.days_in_inventory : "—"}</p>
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Section 2b: Visits & Maintenance */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Visits & Maintenance</CardTitle>
-              <CardDescription>Garage visits, company entries, service history</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setVisitsMaintenanceMode("garage");
-                    setVisitsMaintenanceOpen(true);
-                  }}
-                  className="cursor-pointer transition-opacity hover:opacity-90"
-                >
-                  <Badge
-                    variant="outline"
-                    className="bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300"
-                  >
-                    Garage visits: {garageVisitsCount}
-                  </Badge>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setVisitsMaintenanceMode("maintenance");
-                    setVisitsMaintenanceOpen(true);
-                  }}
-                  className="cursor-pointer transition-opacity hover:opacity-90"
-                >
-                  <Badge
-                    variant="outline"
-                    className="bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300"
-                  >
-                    Maintenance: {maintenanceCount}
-                  </Badge>
-                </button>
-              </div>
-              {visitEvents.length > 0 && (
-                <div>
-                  <p className="mb-2 text-sm font-medium text-muted-foreground">
-                    Visitation history (click date to open full history & files)
-                  </p>
-                  <div className="space-y-2">
-                    {sortedDates
-                      .filter((d) =>
-                        eventsByDate[d].some((e) => e.event_type === "moved")
-                      )
-                      .map((dateStr) => {
-                        const dayEvents = eventsByDate[dateStr];
-                        const dayVisits = dayEvents.filter((e) => e.event_type === "moved");
-                        return (
-                          <button
-                            key={dateStr}
-                            type="button"
-                            className="flex w-full items-center justify-between rounded-lg border px-4 py-3 text-left transition-colors hover:bg-muted/50 hover:border-primary/50"
-                            onClick={() => {
-                              setSelectedDateStr(dateStr);
-                              setDayDetailOpen(true);
-                            }}
-                          >
-                            <span className="font-medium">
-                              {formatDateLabel(dateStr)}
-                            </span>
-                            <span className="text-muted-foreground text-sm">
-                              {dayVisits.length} visit
-                              {dayVisits.length !== 1 ? "s" : ""}
-                              {dayEvents.length > dayVisits.length
-                                ? ` · ${dayEvents.length} total events`
-                                : ""}
-                            </span>
-                            <span className="text-muted-foreground">→</span>
-                          </button>
-                        );
-                      })}
-                  </div>
-                </div>
-              )}
-              {visitEvents.length === 0 && (
-                <p className="text-muted-foreground text-sm">
-                  No visitation history yet.
+              <div className="space-y-1">
+                <p className="text-muted-foreground text-sm">Location Changed</p>
+                <p>
+                  {car.location_changed_at
+                    ? new Date(car.location_changed_at).toLocaleString()
+                    : "—"}
                 </p>
-              )}
+              </div>
+              <div className="space-y-1">
+                <p className="text-muted-foreground text-sm">Status Changed</p>
+                <p>
+                  {car.status_changed_at
+                    ? new Date(car.status_changed_at).toLocaleString()
+                    : "—"}
+                </p>
+              </div>
             </CardContent>
           </Card>
 
@@ -577,8 +610,15 @@ export default function CarProfilePage() {
                 </div>
               </div>
               <div className="space-y-1">
+                <p className="text-muted-foreground text-sm">EV Range (km)</p>
+                <p>{car.ev_range_km != null ? `${car.ev_range_km} km` : "—"}</p>
+              </div>
+              <div className="space-y-1">
                 <p className="text-muted-foreground text-sm">Current KM</p>
-                <p>{car.km_display ?? (car.current_km != null ? `${car.current_km} km` : "—")}</p>
+                <p>
+                  {car.km_display ??
+                    (car.current_km != null ? `${car.current_km} km` : "—")}
+                </p>
               </div>
               <div className="space-y-1">
                 <p className="text-muted-foreground text-sm">Software Version</p>
@@ -594,12 +634,6 @@ export default function CarProfilePage() {
                 <p className="text-muted-foreground text-sm">PDI Status</p>
                 <Badge className={`${pdiBadgeClass} hover:opacity-80`}>
                   {PDI_LABELS[car.pdi_status]}
-                </Badge>
-              </div>
-              <div className="space-y-1">
-                <p className="text-muted-foreground text-sm">Vehicle Type</p>
-                <Badge variant="outline">
-                  {(car as { is_erev?: boolean }).is_erev ? "EREV" : "Pure EV"}
                 </Badge>
               </div>
               {(car as { is_erev?: boolean }).is_erev && (
@@ -629,6 +663,46 @@ export default function CarProfilePage() {
             </CardContent>
           </Card>
 
+          {/* Part Numbers Used */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Part Numbers Used</CardTitle>
+              <CardDescription>
+                Parts used on garage jobs for this vehicle
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {partsUsed.length === 0 ? (
+                <p className="text-muted-foreground text-sm">No parts used yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-4 gap-2 text-sm font-medium text-muted-foreground">
+                    <span>Part Name</span>
+                    <span>OE Number</span>
+                    <span>Qty</span>
+                    <span>Job</span>
+                  </div>
+                  {partsUsed.map((p, i) => (
+                    <div
+                      key={i}
+                      className="grid grid-cols-4 gap-2 rounded border p-2 text-sm"
+                    >
+                      <span>{p.part_name}</span>
+                      <span className="font-mono">{p.oe_number ?? "—"}</span>
+                      <span>{p.quantity}</span>
+                      <Link
+                        href={`/garage/jobs/${p.job_id}`}
+                        className="text-primary hover:underline"
+                      >
+                        {p.job_title}
+                      </Link>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Section 4: Notes */}
           <Card>
             <CardHeader>
@@ -639,6 +713,34 @@ export default function CarProfilePage() {
               <p className="whitespace-pre-wrap text-sm">
                 {car.notes?.trim() ?? "—"}
               </p>
+            </CardContent>
+          </Card>
+
+          {/* Section 5: Record Info */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Record Info
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-muted-foreground text-sm">
+              <div className="flex flex-wrap gap-x-6 gap-y-1">
+                <span>
+                  Created by: {createdByName ?? "—"}
+                </span>
+                <span>
+                  Created at:{" "}
+                  {car.created_at
+                    ? new Date(car.created_at).toLocaleString()
+                    : "—"}
+                </span>
+                <span>
+                  Updated at:{" "}
+                  {car.updated_at
+                    ? new Date(car.updated_at).toLocaleString()
+                    : "—"}
+                </span>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

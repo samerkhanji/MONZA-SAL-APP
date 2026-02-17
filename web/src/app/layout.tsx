@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { Toaster } from "sonner";
+import { ThemeProvider } from "@/lib/contexts/ThemeContext";
+import { ThemeToaster } from "@/components/theme-toaster";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -14,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Monza Tech CRM",
-  description: "Internal car inventory & operations",
+  title: "Monza S.A.L.",
+  description: "Monza S.A.L. - Vehicle & Business Management",
 };
 
 export default function RootLayout({
@@ -24,12 +25,34 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="theme-color" content="#000000" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="Monza S.A.L." />
+        <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                var saved = localStorage.getItem('monza-theme');
+                var theme = saved === 'light' ? 'light' : 'dark';
+                document.documentElement.classList.toggle('dark', theme === 'dark');
+              })();
+            `,
+          }}
+        />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {children}
-        <Toaster position="top-right" richColors />
+        <ThemeProvider>
+          {children}
+          <ThemeToaster />
+        </ThemeProvider>
       </body>
     </html>
   );

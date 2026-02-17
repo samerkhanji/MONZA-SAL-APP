@@ -2,9 +2,11 @@
 
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { MoreHorizontal, FileText } from "lucide-react";
+import { MoreHorizontal, FileText, ScanLine } from "lucide-react";
+import { ScannerDialog } from "@/components/scanner/ScannerDialog";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
 import type { CarDisplay } from "@/types/database";
@@ -75,12 +77,25 @@ function matchesSearch(
 
 export default function CarsListPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const statusFromUrl = searchParams.get("status");
   const { canEditInventory, canDelete } = useUser();
   const [cars, setCars] = useState<CarDisplay[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [locationFilter, setLocationFilter] = useState<string>("all");
+
+  useEffect(() => {
+    if (
+      statusFromUrl &&
+      /^(inbound|in_stock|showroom|reserved|sold|delivered|service|sent_to_sub_dealer|demo)$/.test(
+        statusFromUrl
+      )
+    ) {
+      setStatusFilter(statusFromUrl);
+    }
+  }, [statusFromUrl]);
   const [brandFilter, setBrandFilter] = useState<string>("all");
   const [pdiFilter, setPdiFilter] = useState<string>("all");
   const [statusDialogCar, setStatusDialogCar] = useState<CarDisplay | null>(null);
@@ -92,8 +107,26 @@ export default function CarsListPage() {
   const [moveCar, setMoveCar] = useState<CarDisplay | null>(null);
   const [editCar, setEditCar] = useState<CarDisplay | null>(null);
   const [deleteCar, setDeleteCar] = useState<CarDisplay | null>(null);
+  const [scanVinOpen, setScanVinOpen] = useState(false);
 
   const supabase = createClient();
+
+  async function handleVinScan(vin: string) {
+    const { data: car } = await supabase
+      .from("cars")
+      .select("id, vin, brand, model")
+      .eq("vin", vin.trim().toUpperCase())
+      .is("deleted_at", null)
+      .single();
+
+    if (!car) {
+      toast.error(`No car found with VIN: ${vin}`);
+      return;
+    }
+    toast.success(`Found: ${(car as { brand: string }).brand} ${(car as { model: string }).model}`);
+    router.push(`/cars/${(car as { id: string }).id}`);
+    setScanVinOpen(false);
+  }
 
   async function handleDeleteCar() {
     if (!deleteCar) return;
@@ -155,14 +188,14 @@ export default function CarsListPage() {
   }, [cars, search, statusFilter, locationFilter, brandFilter, pdiFilter]);
 
   return (
-    <div className="container mx-auto max-w-[1800px] space-y-6 py-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="container mx-auto max-w-[1800px] space-y-6 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
         <div>
-          <h1 className="text-2xl font-semibold">Car Inventory</h1>
+          <h1 className="text-xl font-semibold sm:text-2xl">Car Inventory</h1>
           <p className="text-muted-foreground">View and manage all cars</p>
         </div>
         {canEditInventory && (
-          <Button asChild>
+          <Button asChild className="shrink-0">
             <Link href="/cars/add">Add Car</Link>
           </Button>
         )}
@@ -175,13 +208,24 @@ export default function CarsListPage() {
             Search by VIN, plate, brand, model · Status · Location · Brand · PDI
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-wrap gap-4">
-          <Input
-            placeholder="Search by VIN (primary), plate, brand, model..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="max-w-xs"
-          />
+        <CardContent className="flex flex-wrap gap-3 sm:gap-4">
+          <div className="flex w-full gap-2 sm:w-auto sm:max-w-xs">
+            <Input
+              placeholder="Search by VIN, plate, brand, model..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="min-h-11 flex-1 text-base sm:text-sm"
+            />
+            <Button
+              variant="outline"
+              size="icon"
+              className="size-11 min-h-11 min-w-11 shrink-0"
+              onClick={() => setScanVinOpen(true)}
+              title="Scan VIN"
+            >
+              <ScanLine className="size-4" />
+            </Button>
+          </div>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Status" />
@@ -247,30 +291,63 @@ export default function CarsListPage() {
           ) : filteredCars.length === 0 ? (
             <p className="text-muted-foreground">No cars found.</p>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
+            <>
+              {/* Mobile: card layout */}
+              <div className="space-y-3 md:hidden">
+                {filteredCars.map((car) => {
+                  const statusClass =
+                    STATUS_BADGE_COLORS[car.status] ??
+                    "bg-muted text-muted-foreground";
+                  return (
+                    <button
+                      key={car.id}
+                      type="button"
+                      className="flex w-full flex-col gap-2 rounded-lg border border-border/50 bg-card p-4 text-left transition-colors hover:bg-muted/50 active:bg-muted/70"
+                      onClick={() => router.push(`/cars/${encodeURIComponent(car.vin ?? car.id)}`)}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="font-mono text-sm font-medium text-muted-foreground">
+                          {car.vin ?? "—"}
+                        </span>
+                        <Badge className={`shrink-0 ${statusClass}`}>
+                          {CAR_STATUS_LABELS[car.status]}
+                        </Badge>
+                      </div>
+                      <p className="text-base font-medium">
+                        {car.brand ?? "—"} {car.model ?? "—"}
+                      </p>
+                      {car.model_year && (
+                        <p className="text-sm text-muted-foreground">{car.model_year}</p>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Tablet/Desktop: table */}
+              <div className="scrollbar-thick hidden overflow-x-auto rounded-lg border border-border/50 md:block">
+              <Table className="w-full min-w-[900px] xl:min-w-[1200px]">
                 <TableHeader>
                   <TableRow>
-                    <TableHead>VIN</TableHead>
-                    <TableHead>Brand</TableHead>
-                    <TableHead>Model</TableHead>
-                    <TableHead>Year</TableHead>
-                    <TableHead>Exterior</TableHead>
-                    <TableHead>Interior</TableHead>
-                    <TableHead>Plate</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Location</TableHead>
-                    <TableHead>Price</TableHead>
-                    <TableHead>Warranty (DMS)</TableHead>
-                    <TableHead>Warranty (Monza)</TableHead>
-                    <TableHead>Battery %</TableHead>
-                    <TableHead>KM</TableHead>
-                    <TableHead>EV Range</TableHead>
-                    <TableHead>Motor</TableHead>
-                    <TableHead>PDI</TableHead>
-                    <TableHead>Customs</TableHead>
-                    <TableHead>Date Arrived</TableHead>
-                    <TableHead>Software</TableHead>
+                    <TableHead className="min-w-[140px] whitespace-nowrap">VIN</TableHead>
+                    <TableHead className="whitespace-nowrap">Brand</TableHead>
+                    <TableHead className="whitespace-nowrap">Model</TableHead>
+                    <TableHead className="whitespace-nowrap">Year</TableHead>
+                    <TableHead className="hidden whitespace-nowrap xl:table-cell">Exterior</TableHead>
+                    <TableHead className="hidden whitespace-nowrap xl:table-cell">Interior</TableHead>
+                    <TableHead className="whitespace-nowrap">Plate</TableHead>
+                    <TableHead className="whitespace-nowrap">Status</TableHead>
+                    <TableHead className="hidden whitespace-nowrap lg:table-cell">Location</TableHead>
+                    <TableHead className="min-w-[80px] whitespace-nowrap">Price</TableHead>
+                    <TableHead className="hidden min-w-[100px] whitespace-nowrap xl:table-cell">Warranty (DMS)</TableHead>
+                    <TableHead className="hidden min-w-[110px] whitespace-nowrap xl:table-cell">Warranty (Monza)</TableHead>
+                    <TableHead className="whitespace-nowrap">Battery %</TableHead>
+                    <TableHead className="whitespace-nowrap">KM</TableHead>
+                    <TableHead className="hidden whitespace-nowrap xl:table-cell">EV Range</TableHead>
+                    <TableHead className="hidden whitespace-nowrap xl:table-cell">Motor</TableHead>
+                    <TableHead className="whitespace-nowrap">PDI</TableHead>
+                    <TableHead className="hidden whitespace-nowrap xl:table-cell">Customs</TableHead>
+                    <TableHead className="whitespace-nowrap">Date Arrived</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -293,22 +370,22 @@ export default function CarsListPage() {
                         className="cursor-pointer"
                         onClick={() => router.push(`/cars/${encodeURIComponent(car.vin ?? car.id)}`)}
                       >
-                        <TableCell className="font-mono text-sm font-medium">
+                        <TableCell className="min-w-[180px] font-mono text-sm font-medium whitespace-nowrap">
                           {car.vin ?? "—"}
                         </TableCell>
-                        <TableCell className="text-sm">
+                        <TableCell className="max-w-[80px] truncate text-sm" title={car.brand ?? undefined}>
                           {car.brand ?? "—"}
                         </TableCell>
-                        <TableCell className="text-sm">
+                        <TableCell className="max-w-[90px] truncate text-sm" title={car.model ?? undefined}>
                           {car.model}
                         </TableCell>
                         <TableCell className="text-sm">
                           {car.model_year ?? "—"}
                         </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
+                        <TableCell className="hidden text-sm text-muted-foreground xl:table-cell">
                           {car.exterior_color ?? "—"}
                         </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
+                        <TableCell className="hidden text-sm text-muted-foreground xl:table-cell">
                           {car.interior_color ?? "—"}
                         </TableCell>
                         <TableCell className="text-sm">
@@ -326,7 +403,7 @@ export default function CarsListPage() {
                             {CAR_STATUS_LABELS[car.status]}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-sm">
+                        <TableCell className="hidden max-w-[100px] truncate text-sm lg:table-cell" title={car.location_full ?? undefined}>
                           {car.location_full || "—"}
                         </TableCell>
                         <TableCell className="text-sm">
@@ -336,12 +413,12 @@ export default function CarsListPage() {
                               ? `${Number(car.price).toLocaleString()} ${car.price_currency ?? "USD"}`
                               : "—"}
                         </TableCell>
-                        <TableCell className="text-sm">
+                        <TableCell className="hidden text-sm xl:table-cell">
                           {car.warranty_per_dms
                             ? new Date(car.warranty_per_dms).toLocaleDateString()
                             : "—"}
                         </TableCell>
-                        <TableCell className="text-sm">
+                        <TableCell className="hidden text-sm xl:table-cell">
                           {car.warranty_monza_start_date
                             ? new Date(car.warranty_monza_start_date).toLocaleDateString()
                             : "—"}
@@ -366,10 +443,10 @@ export default function CarsListPage() {
                         <TableCell className="text-sm">
                           {car.km_display ?? (car.current_km != null ? `${car.current_km} km` : "—")}
                         </TableCell>
-                        <TableCell className="text-sm">
+                        <TableCell className="hidden text-sm xl:table-cell">
                           {car.ev_range_km != null ? `${car.ev_range_km} km` : "—"}
                         </TableCell>
-                        <TableCell className="text-sm">
+                        <TableCell className="hidden text-sm xl:table-cell">
                           {car.motor ?? "—"}
                         </TableCell>
                         <TableCell
@@ -385,7 +462,7 @@ export default function CarsListPage() {
                           </Badge>
                         </TableCell>
                         <TableCell
-                          className="cursor-pointer"
+                          className="hidden cursor-pointer xl:table-cell"
                           onClick={(e) => {
                             e.stopPropagation();
                             setCustomsDialogCar(car);
@@ -404,9 +481,6 @@ export default function CarsListPage() {
                           {car.date_arrived
                             ? new Date(car.date_arrived).toLocaleDateString()
                             : "—"}
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {car.software_version ?? "—"}
                         </TableCell>
                         <TableCell
                           className="text-right"
@@ -484,6 +558,7 @@ export default function CarsListPage() {
                 </TableBody>
               </Table>
             </div>
+            </>
           )}
         </CardContent>
       </Card>
@@ -531,6 +606,15 @@ export default function CarsListPage() {
           setEditCar(null);
           fetchCars();
         }}
+      />
+
+      <ScannerDialog
+        open={scanVinOpen}
+        onClose={() => setScanVinOpen(false)}
+        onScan={handleVinScan}
+        title="Scan VIN"
+        placeholder="17-character VIN..."
+        scanType="vin"
       />
 
       <AlertDialog

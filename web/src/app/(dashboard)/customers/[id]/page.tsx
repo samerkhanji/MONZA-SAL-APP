@@ -121,7 +121,7 @@ export default function CustomerDetailPage() {
     }
 
     const enrichedOrders: EnrichedSaleOrder[] = await Promise.all(
-      (orders as EnrichedSaleOrder[]).map(async (order) => {
+      (orders as unknown as EnrichedSaleOrder[]).map(async (order) => {
         const carId = (order.cars as { id?: string } | null)?.id;
         if (!carId) {
           return { ...order, visits: 0, maintenance: 0, visitEvents: [] };
@@ -203,7 +203,7 @@ export default function CustomerDetailPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto py-8">
+      <div className="container mx-auto px-4 py-8">
         <p className="text-muted-foreground">Loading...</p>
       </div>
     );
@@ -211,7 +211,7 @@ export default function CustomerDetailPage() {
 
   if (!customer) {
     return (
-      <div className="container mx-auto space-y-4 py-8">
+      <div className="container mx-auto space-y-4 px-4 py-8">
         <Button variant="ghost" asChild>
           <Link href="/customers">← Customers</Link>
         </Button>
@@ -238,7 +238,7 @@ export default function CustomerDetailPage() {
     "—";
 
   return (
-    <div className="container mx-auto space-y-6 py-8">
+    <div className="container mx-auto space-y-6 px-4 py-6 sm:px-6 sm:py-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="sm" asChild>

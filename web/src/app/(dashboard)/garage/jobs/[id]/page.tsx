@@ -1,0 +1,666 @@
+"use client";
+
+import { useEffect, useState, useRef } from "react";
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { createClient } from "@/lib/supabase";
+import { useUser } from "@/lib/contexts/UserContext";
+import type { GarageJob, JobPart } from "@/types/database";
+import {
+  JOB_STATUS_COLORS,
+  JOB_STATUS_LABELS,
+  JOB_PRIORITY_COLORS,
+  JOB_PRIORITY_LABELS,
+} from "@/lib/constants/jobs";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { ArrowLeft, Plus, Play, Square, Check, Trash2, ScanLine } from "lucide-react";
+import { JobDocuments } from "@/components/garage/JobDocuments";
+import { ScannerDialog } from "@/components/scanner/ScannerDialog";
+
+interface JobWithCar extends GarageJob {
+  cars?: {
+    id: string;
+    vin: string;
+    brand: string;
+    model: string;
+    model_year: number | null;
+    exterior_color: string | null;
+    status: string;
+  } | null;
+}
+
+interface JobPartWithPart extends JobPart {
+  parts?: {
+    part_name: string;
+    oe_number: string | null;
+    unit_cost: number | null;
+    currency: string | null;
+  } | null;
+}
+
+export default function JobDetailPage() {
+  const params = useParams();
+  const router = useRouter();
+  const id = params.id as string;
+  const { canManageGarage, canDelete } = useUser();
+  const [job, setJob] = useState<JobWithCar | null>(null);
+  const [parts, setParts] = useState<JobPartWithPart[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [addPartOpen, setAddPartOpen] = useState(false);
+  const [partSearch, setPartSearch] = useState("");
+  const [partsList, setPartsList] = useState<{ id: string; part_name: string; oe_number: string | null }[]>([]);
+  const [selectedPartId, setSelectedPartId] = useState<string | null>(null);
+  const [partQuantity, setPartQuantity] = useState("1");
+  const [partNote, setPartNote] = useState("");
+  const [partSubmitting, setPartSubmitting] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [scanPartOpen, setScanPartOpen] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [elapsed, setElapsed] = useState(0);
+
+  const supabase = createClient();
+
+  useEffect(() => {
+    const handler = (e: CustomEvent<{ id: string; part_name: string; oe_number: string | null; quantity: number }>) => {
+      const part = e.detail;
+      if (!part || part.quantity <= 0) {
+        toast.error(`${part?.part_name ?? "Part"} is out of stock!`);
+        return;
+      }
+      setPartsList([{ id: part.id, part_name: part.part_name, oe_number: part.oe_number }]);
+      setSelectedPartId(part.id);
+      setPartQuantity("1");
+      setPartNote("");
+      setAddPartOpen(true);
+      toast.success(`Found: ${part.part_name} · Stock: ${part.quantity}`);
+    };
+    window.addEventListener("scan-part", handler as EventListener);
+    return () => window.removeEventListener("scan-part", handler as EventListener);
+  }, []);
+
+  async function fetchJob() {
+    const { data, error } = await supabase
+      .from("garage_jobs")
+      .select("*, cars:car_id(id, vin, brand, model, model_year, exterior_color, status)")
+      .eq("id", id)
+      .is("deleted_at", null)
+      .single();
+
+    if (error || !data) {
+      toast.error("Job not found");
+      router.push("/garage");
+      return;
+    }
+    setJob(data as JobWithCar);
+  }
+
+  async function fetchParts() {
+    const { data } = await supabase
+      .from("job_parts")
+      .select("*, parts:part_id(part_name, oe_number, unit_cost, currency)")
+      .eq("job_id", id)
+      .order("created_at", { ascending: false });
+    setParts((data as JobPartWithPart[]) ?? []);
+  }
+
+  useEffect(() => {
+    if (!id) return;
+    setLoading(true);
+    fetchJob().finally(() => setLoading(false));
+  }, [id]);
+
+  useEffect(() => {
+    if (job?.id) fetchParts();
+  }, [job?.id]);
+
+  useEffect(() => {
+    if (!job?.started_at || job.status !== "in_progress") return;
+    const start = new Date(job.started_at).getTime();
+    const update = () =>
+      setElapsed(Math.floor((Date.now() - start) / 1000 / 60));
+    update();
+    timerRef.current = setInterval(update, 60000);
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [job?.started_at, job?.status]);
+
+  useEffect(() => {
+    if (!addPartOpen || !partSearch.trim() || partSearch.length < 2) {
+      setPartsList([]);
+      return;
+    }
+    const q = partSearch.trim();
+    supabase
+      .from("parts")
+      .select("id, part_name, oe_number")
+      .is("deleted_at", null)
+      .or(`part_name.ilike.%${q}%,oe_number.ilike.%${q}%`)
+      .limit(10)
+      .then(({ data }) =>
+        setPartsList(
+          (data as { id: string; part_name: string; oe_number: string | null }[]) ?? []
+        )
+      );
+  }, [addPartOpen, partSearch]);
+
+  async function handleStartTimer() {
+    if (!job) return;
+    const { error } = await supabase
+      .from("garage_jobs")
+      .update({
+        status: "in_progress",
+        started_at: new Date().toISOString(),
+      })
+      .eq("id", job.id);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success("Timer started");
+    fetchJob();
+  }
+
+  async function handleStopTimer() {
+    if (!job) return;
+    const start = job.started_at ? new Date(job.started_at).getTime() : Date.now();
+    const mins = Math.floor((Date.now() - start) / 60000);
+    const addHours = mins / 60;
+    const current = job.actual_hours ?? 0;
+    const { error } = await supabase
+      .from("garage_jobs")
+      .update({
+        actual_hours: current + addHours,
+        started_at: null,
+      })
+      .eq("id", job.id);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success(`Added ${(addHours).toFixed(1)}h`);
+    fetchJob();
+    setElapsed(0);
+  }
+
+  async function handleCompleteJob() {
+    if (!job) return;
+    const { error } = await supabase
+      .from("garage_jobs")
+      .update({
+        status: "done",
+        completed_at: new Date().toISOString(),
+      })
+      .eq("id", job.id);
+
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+
+    if (job.cars) {
+      await supabase
+        .from("cars")
+        .update({ status: "in_stock" })
+        .eq("id", job.cars.id);
+      const { data: { user } } = await supabase.auth.getUser();
+      await supabase.from("car_events").insert({
+        car_id: job.cars.id,
+        event_type: "status_changed",
+        from_value: "service",
+        to_value: "in_stock",
+        note: `Job completed: ${job.title}`,
+        created_by: user?.id ?? null,
+      });
+    }
+
+    toast.success("Job completed! Car moved back to stock.");
+    fetchJob();
+  }
+
+  async function handleAddPart() {
+    if (!selectedPartId || !job) return;
+    const qty = parseInt(partQuantity, 10);
+    if (isNaN(qty) || qty < 1) {
+      toast.error("Enter valid quantity");
+      return;
+    }
+    setPartSubmitting(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    const { error } = await supabase.rpc("use_part_on_job", {
+      p_job_id: job.id,
+      p_part_id: selectedPartId,
+      p_quantity: qty,
+      p_note: partNote.trim() || null,
+      p_user_id: user?.id ?? null,
+    });
+    setPartSubmitting(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    const partName = partsList.find((p) => p.id === selectedPartId)?.part_name ?? "Part";
+    const c = job?.cars;
+    const vinShort = c?.vin ? (c.vin.length >= 8 ? `...${c.vin.slice(-8)}` : c.vin) : "";
+    const { data: partAfter } = await supabase
+      .from("parts")
+      .select("quantity")
+      .eq("id", selectedPartId)
+      .single();
+    const remaining = (partAfter as { quantity?: number } | null)?.quantity ?? "?";
+    toast.success(
+      `${partName} ×${qty} added${vinShort ? ` · Used on VIN ${vinShort}` : ""} · Stock: ${remaining} remaining`
+    );
+    setAddPartOpen(false);
+    setSelectedPartId(null);
+    setPartQuantity("1");
+    setPartNote("");
+    fetchParts();
+    fetchJob();
+  }
+
+  async function handlePartScan(oeNumber: string) {
+    const { data: part } = await supabase
+      .from("parts")
+      .select("id, part_name, oe_number, quantity")
+      .eq("oe_number", oeNumber.trim().toUpperCase())
+      .is("deleted_at", null)
+      .single();
+
+    if (!part) {
+      toast.error(`Part not found: ${oeNumber}`);
+      return;
+    }
+    const p = part as { id: string; part_name: string; oe_number: string | null; quantity: number };
+    if (p.quantity <= 0) {
+      toast.error(`${p.part_name} is out of stock!`);
+      return;
+    }
+    setPartsList([{ id: p.id, part_name: p.part_name, oe_number: p.oe_number }]);
+    setSelectedPartId(p.id);
+    setPartQuantity("1");
+    setPartNote("");
+    setAddPartOpen(true);
+    setScanPartOpen(false);
+    toast.success(`Found: ${p.part_name} · Stock: ${p.quantity}`);
+  }
+
+  async function handleUpdateField(
+    field: keyof GarageJob,
+    value: string | number | null
+  ) {
+    if (!job) return;
+    const { error } = await supabase
+      .from("garage_jobs")
+      .update({ [field]: value })
+      .eq("id", job.id);
+    if (error) toast.error(error.message);
+    else fetchJob();
+  }
+
+  async function handleDelete() {
+    if (!job) return;
+    const { error } = await supabase
+      .from("garage_jobs")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", job.id);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success("Job removed");
+    setDeleteOpen(false);
+    router.push("/garage");
+  }
+
+  const totalPartsCost = parts.reduce((sum, p) => {
+    const part = p.parts;
+    const cost = part?.unit_cost ?? 0;
+    const qty = p.quantity;
+    return sum + cost * qty;
+  }, 0);
+
+  const runningMins = job?.started_at && job?.status === "in_progress"
+    ? Math.floor((Date.now() - new Date(job.started_at).getTime()) / 60000)
+    : 0;
+
+  if (loading || !job) {
+    return (
+      <div className="container py-12">
+        <p className="text-muted-foreground">Loading...</p>
+      </div>
+    );
+  }
+
+  const car = job.cars;
+  const isOverdue =
+    job.due_date &&
+    new Date(job.due_date) < new Date(new Date().toDateString());
+
+  return (
+    <div className="container mx-auto max-w-4xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
+      <div className="flex flex-wrap items-center gap-4">
+        <Button variant="ghost" size="sm" asChild>
+          <Link href="/garage">
+            <ArrowLeft className="mr-2 size-4" />
+            Garage Jobs
+          </Link>
+        </Button>
+        <h1 className="text-2xl font-semibold">{job.title}</h1>
+        <Badge className={JOB_PRIORITY_COLORS[job.priority]}>
+          {JOB_PRIORITY_LABELS[job.priority]}
+        </Badge>
+        <Badge className={JOB_STATUS_COLORS[job.status]}>
+          {JOB_STATUS_LABELS[job.status]}
+        </Badge>
+      </div>
+
+      {car && (
+        <p>
+          <Link
+            href={`/cars/${encodeURIComponent(car.vin ?? car.id)}`}
+            className="text-primary hover:underline"
+          >
+            {car.brand} {car.model} · VIN: {car.vin}
+          </Link>
+        </p>
+      )}
+
+      <div className="flex flex-wrap gap-2">
+        {canManageGarage && (
+          <>
+            {job.status === "pending" && (
+              <Button size="lg" onClick={handleStartTimer}>
+                <Play className="mr-2 size-4" />
+                Start Timer
+              </Button>
+            )}
+            {job.status === "in_progress" && (
+              <Button size="lg" variant="outline" onClick={handleStopTimer}>
+                <Square className="mr-2 size-4" />
+                Stop Timer
+              </Button>
+            )}
+            {job.status !== "done" && job.status !== "cancelled" && (
+              <Button size="lg" onClick={handleCompleteJob}>
+                <Check className="mr-2 size-4" />
+                Complete Job
+              </Button>
+            )}
+          </>
+        )}
+        {canDelete && (
+          <Button
+            size="lg"
+            variant="destructive"
+            onClick={() => setDeleteOpen(true)}
+          >
+            <Trash2 className="mr-2 size-4" />
+            Delete
+          </Button>
+        )}
+      </div>
+
+      {/* Section 1: Job Info */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Job Info</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <Label>Assigned To</Label>
+              <p>{job.assigned_to ?? "—"}</p>
+            </div>
+            <div>
+              <Label>Due Date</Label>
+              <p className={isOverdue ? "text-red-600" : ""}>
+                {job.due_date
+                  ? new Date(job.due_date).toLocaleDateString()
+                  : "—"}
+              </p>
+            </div>
+            <div>
+              <Label>Estimated / Actual Hours</Label>
+              <p>
+                {job.estimated_hours ?? "—"}h / {job.actual_hours ?? "—"}h
+              </p>
+            </div>
+            <div>
+              <Label>Created</Label>
+              <p>{new Date(job.created_at).toLocaleString()}</p>
+            </div>
+          </div>
+          {job.status === "in_progress" && job.started_at && (
+            <p className="text-muted-foreground text-sm">
+              Started: {new Date(job.started_at).toLocaleString()} · Running:{" "}
+              {Math.floor(runningMins / 60)}h {runningMins % 60}m
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Section 2: Diagnosis & Work */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Diagnosis & Work</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Label>Diagnosis</Label>
+            <Textarea
+              value={job.diagnosis ?? ""}
+              onChange={(e) => setJob({ ...job, diagnosis: e.target.value })}
+              onBlur={(e) =>
+                handleUpdateField("diagnosis", e.target.value || null)
+              }
+              placeholder="Enter diagnosis..."
+              rows={4}
+              disabled={!canManageGarage}
+            />
+          </div>
+          <div>
+            <Label>Work Done</Label>
+            <Textarea
+              value={job.work_done ?? ""}
+              onChange={(e) => setJob({ ...job, work_done: e.target.value })}
+              onBlur={(e) =>
+                handleUpdateField("work_done", e.target.value || null)
+              }
+              placeholder="Describe work performed..."
+              rows={4}
+              disabled={!canManageGarage}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Section 3: Parts Used */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>Parts Used</CardTitle>
+            {canManageGarage && (
+              <div className="flex gap-2">
+                <Button size="sm" onClick={() => setAddPartOpen(true)}>
+                  <Plus className="mr-2 size-4" />
+                  Add Part
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setScanPartOpen(true)}
+                >
+                  <ScanLine className="mr-2 size-4" />
+                  Scan Part
+                </Button>
+              </div>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {parts.length === 0 ? (
+            <p className="text-muted-foreground">No parts used yet.</p>
+          ) : (
+            <div className="space-y-2">
+              <div className="grid grid-cols-4 gap-2 text-sm font-medium text-muted-foreground">
+                <span>Part Name</span>
+                <span>OE Number</span>
+                <span>Quantity</span>
+                <span>Note</span>
+              </div>
+              {parts.map((p) => (
+                <div
+                  key={p.id}
+                  className="grid grid-cols-4 gap-2 rounded border p-2 text-sm"
+                >
+                  <span>{p.parts?.part_name ?? "—"}</span>
+                  <span className="font-mono">{p.parts?.oe_number ?? "—"}</span>
+                  <span>{p.quantity}</span>
+                  <span>{p.note ?? "—"}</span>
+                </div>
+              ))}
+              {totalPartsCost > 0 && (
+                <p className="mt-2 font-medium">
+                  Total parts cost: {totalPartsCost.toFixed(2)}
+                </p>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Section 4: Documents */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Documents</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <JobDocuments jobId={job.id} />
+        </CardContent>
+      </Card>
+
+      {/* Section 5: Time - inline in Job Info */}
+
+      {/* Add Part Dialog */}
+      {addPartOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-lg bg-background p-6">
+            <h3 className="mb-4 text-lg font-semibold">Add Part to Job</h3>
+            <div className="space-y-4">
+              <div>
+                <Label>Search Part</Label>
+                <Input
+                  placeholder="Part name or OE number..."
+                  value={partSearch}
+                  onChange={(e) => setPartSearch(e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+              {partsList.length > 0 && (
+                <div className="space-y-1">
+                  {partsList.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => setSelectedPartId(p.id)}
+                      className={`flex w-full justify-between rounded border p-2 text-left text-sm ${
+                        selectedPartId === p.id ? "border-primary" : ""
+                      }`}
+                    >
+                      {p.part_name}
+                      <span className="font-mono text-muted-foreground">
+                        {p.oe_number}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {selectedPartId && (
+                <>
+                  <div>
+                    <Label>Quantity</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={partQuantity}
+                      onChange={(e) => setPartQuantity(e.target.value)}
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label>Note</Label>
+                    <Input
+                      value={partNote}
+                      onChange={(e) => setPartNote(e.target.value)}
+                      placeholder="Optional"
+                      className="mt-1"
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="mt-6 flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setAddPartOpen(false);
+                  setSelectedPartId(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleAddPart}
+                disabled={!selectedPartId || partSubmitting}
+              >
+                {partSubmitting ? "Adding..." : "Add Part"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <ScannerDialog
+        open={scanPartOpen}
+        onClose={() => setScanPartOpen(false)}
+        onScan={handlePartScan}
+        title="Scan Part OE Number"
+        placeholder="OE number..."
+        scanType="part"
+      />
+
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete job?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove the job. This action can be undone by an admin.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <Button variant="destructive" onClick={handleDelete}>
+              Delete
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}

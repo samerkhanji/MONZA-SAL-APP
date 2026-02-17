@@ -98,6 +98,7 @@ export interface CarEvent {
   meta: Record<string, unknown> | null;
   created_by: string | null;
   created_at: string;
+  profiles?: { full_name: string | null } | null;
 }
 
 export const CAR_STATUS_LABELS: Record<CarStatus, string> = {
@@ -189,5 +190,106 @@ export interface CustomerNote {
   note_type: string;
   content: string;
   created_by: string | null;
+  created_at: string;
+}
+
+export type PartStatus =
+  | "in_stock"
+  | "low_stock"
+  | "out_of_stock"
+  | "discontinued";
+
+export type MovementType =
+  | "stock_in"
+  | "stock_out"
+  | "adjustment"
+  | "return";
+
+export interface Part {
+  id: string;
+  part_name: string;
+  oe_number: string | null;
+  car_model: string | null;
+  description: string | null;
+  quantity: number;
+  min_quantity: number;
+  storage_zone: string | null;
+  supplier: string | null;
+  supplier_contact: string | null;
+  unit_cost: number | null;
+  currency: string | null;
+  order_date: string | null;
+  status: PartStatus;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+export interface PartMovement {
+  id: string;
+  part_id: string;
+  movement_type: MovementType;
+  quantity: number;
+  car_id: string | null;
+  job_description: string | null;
+  note: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+export type JobStatus =
+  | "pending"
+  | "in_progress"
+  | "waiting_parts"
+  | "done"
+  | "cancelled";
+
+export type JobPriority = "low" | "normal" | "urgent";
+
+export interface GarageJob {
+  id: string;
+  car_id: string;
+  title: string;
+  description: string | null;
+  priority: JobPriority;
+  status: JobStatus;
+  assigned_to: string | null;
+  diagnosis: string | null;
+  work_done: string | null;
+  estimated_hours: number | null;
+  actual_hours: number | null;
+  started_at: string | null;
+  completed_at: string | null;
+  due_date: string | null;
+  customer_id: string | null;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+export interface JobPart {
+  id: string;
+  job_id: string;
+  part_id: string;
+  quantity: number;
+  note: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface JobDocument {
+  id: string;
+  job_id: string;
+  document_type: string;
+  file_name: string;
+  file_path: string;
+  file_size: number | null;
+  mime_type: string | null;
+  notes: string | null;
+  uploaded_by: string | null;
   created_at: string;
 }

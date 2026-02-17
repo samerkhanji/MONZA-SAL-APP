@@ -139,10 +139,10 @@ export default function CustomersPage() {
   }
 
   return (
-    <div className="container mx-auto max-w-[1600px] space-y-6 py-8">
+    <div className="container mx-auto max-w-[1600px] space-y-6 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Customers & Leads</h1>
+          <h1 className="text-xl font-semibold sm:text-2xl">Customers & Leads</h1>
           <p className="text-muted-foreground">
             {loading ? "Loading..." : `${filteredCustomers.length} contact(s)`}
           </p>
@@ -166,7 +166,7 @@ export default function CustomersPage() {
             placeholder="Search name, phone, email, company..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="max-w-xs"
+            className="min-h-11 w-full text-base sm:max-w-xs sm:text-sm"
           />
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-[160px]">
@@ -225,7 +225,54 @@ export default function CustomersPage() {
               No customers or leads found. Add your first contact.
             </p>
           ) : (
-            <div className="overflow-x-auto">
+            <>
+              {/* Mobile: card layout */}
+              <div className="space-y-3 md:hidden">
+                {filteredCustomers.map((customer) => {
+                  const fullName =
+                    customer.full_name ??
+                    `${customer.first_name} ${customer.last_name ?? ""}`.trim();
+                  const statusClass =
+                    LEAD_STATUS_COLORS[customer.lead_status] ??
+                    "bg-muted text-muted-foreground";
+                  return (
+                    <button
+                      key={customer.id}
+                      type="button"
+                      className="flex w-full flex-col gap-2 rounded-lg border border-border/50 bg-card p-4 text-left transition-colors hover:bg-muted/50 active:bg-muted/70"
+                      onClick={() => router.push(`/customers/${customer.id}`)}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="font-medium">{fullName || "—"}</p>
+                        <Badge className={`shrink-0 ${statusClass}`}>
+                          {getStatusLabel(customer)}
+                        </Badge>
+                      </div>
+                      {customer.phone_primary && (
+                        <a
+                          href={`tel:${customer.phone_primary}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-sm text-primary hover:underline"
+                        >
+                          {customer.phone_primary}
+                        </a>
+                      )}
+                      {customer.email && (
+                        <a
+                          href={`mailto:${customer.email}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-sm text-primary hover:underline"
+                        >
+                          {customer.email}
+                        </a>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Tablet/Desktop: table */}
+              <div className="hidden overflow-x-auto md:block">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -349,6 +396,7 @@ export default function CustomersPage() {
                 </TableBody>
               </Table>
             </div>
+            </>
           )}
         </CardContent>
       </Card>

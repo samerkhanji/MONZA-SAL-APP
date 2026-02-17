@@ -229,12 +229,15 @@ export function EditCustomerDialog({
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-source">Lead Source</Label>
-              <Select value={leadSource} onValueChange={setLeadSource}>
+              <Select
+                value={leadSource || "_"}
+                onValueChange={(v) => setLeadSource(v === "_" ? "" : v)}
+              >
                 <SelectTrigger id="edit-source">
                   <SelectValue placeholder="Select" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">—</SelectItem>
+                  <SelectItem value="_">—</SelectItem>
                   {Object.entries(LEAD_SOURCE_LABELS).map(([value, label]) => (
                     <SelectItem key={value} value={value}>
                       {label}

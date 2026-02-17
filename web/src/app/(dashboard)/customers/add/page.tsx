@@ -103,7 +103,7 @@ export default function AddCustomerPage() {
   }
 
   return (
-    <div className="container mx-auto max-w-2xl space-y-6 py-8">
+    <div className="container mx-auto max-w-2xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="sm" asChild>
           <Link href="/customers">← Customers</Link>
@@ -227,12 +227,15 @@ export default function AddCustomerPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="leadSource">Lead Source</Label>
-                <Select value={leadSource} onValueChange={setLeadSource}>
+                <Select
+                  value={leadSource || "_"}
+                  onValueChange={(v) => setLeadSource(v === "_" ? "" : v)}
+                >
                   <SelectTrigger id="leadSource">
                     <SelectValue placeholder="Select" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">—</SelectItem>
+                    <SelectItem value="_">—</SelectItem>
                     {Object.entries(LEAD_SOURCE_LABELS).map(([value, label]) => (
                       <SelectItem key={value} value={value}>
                         {label}

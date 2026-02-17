@@ -350,8 +350,8 @@ export function CarDocuments({ carId, carVin }: CarDocumentsProps) {
     return profiles?.full_name ?? "Unknown";
   }
 
-  const isImageType = (mime: string | null) =>
-    mime?.startsWith("image/") ?? false;
+  const isImageType = (mime: string | null | undefined) =>
+    (mime ?? "").startsWith("image/");
 
   return (
     <>

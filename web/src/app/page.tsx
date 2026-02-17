@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { SignOutButton } from "@/components/sign-out-button";
+import { ThemeToggle } from "@/components/theme-toggle";
 import {
   Dialog,
   DialogContent,
@@ -102,10 +103,11 @@ function HomePageContent() {
   if (user) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-gradient-to-br from-background via-muted/20 to-background p-8">
-        <div className="absolute right-4 top-4">
+        <div className="absolute right-4 top-4 flex items-center gap-2">
+          <ThemeToggle />
           <SignOutButton />
         </div>
-        <h1 className="text-3xl font-bold tracking-tight">Monza Tech CRM</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Monza S.A.L.</h1>
         <p className="text-center text-muted-foreground">
           Internal system — car inventory & operations
         </p>
@@ -117,10 +119,13 @@ function HomePageContent() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-background via-muted/30 to-background p-4">
-      <Card className="w-full max-w-sm border-border/80 shadow-lg">
+    <div className="relative flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-background via-muted/30 to-background p-4">
+      <div className="absolute right-4 top-4">
+        <ThemeToggle />
+      </div>
+      <Card className="w-full max-w-sm border-border shadow-lg">
         <CardHeader className="space-y-1 text-center">
-          <CardTitle className="text-2xl font-bold">Monza Tech CRM</CardTitle>
+          <CardTitle className="text-2xl font-bold">Monza S.A.L.</CardTitle>
           <CardDescription>
             Sign in to access the car inventory system
           </CardDescription>

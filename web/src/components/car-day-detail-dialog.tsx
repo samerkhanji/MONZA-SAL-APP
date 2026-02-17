@@ -72,6 +72,7 @@ interface DayDetailDialogProps {
   carId: string;
   carVin?: string | null;
   eventLabels: Record<string, string>;
+  formatEventDisplay?: (ev: CarEvent) => string;
   onRefresh?: () => void;
 }
 
@@ -83,6 +84,7 @@ export function DayDetailDialog({
   carId,
   carVin,
   eventLabels,
+  formatEventDisplay,
   onRefresh,
 }: DayDetailDialogProps) {
   const { canUploadDocuments, canDelete } = useUser();
@@ -313,14 +315,14 @@ export function DayDetailDialog({
                         {new Date(ev.created_at).toLocaleTimeString()}
                       </span>
                     </div>
-                    {(ev.from_value || ev.to_value) && (
-                      <p className="text-muted-foreground">
-                        {ev.from_value && ev.to_value
+                    <p>
+                      {formatEventDisplay
+                        ? formatEventDisplay(ev)
+                        : ev.from_value && ev.to_value
                           ? `${ev.from_value} → ${ev.to_value}`
-                          : ev.to_value ?? ev.from_value ?? ""}
-                      </p>
-                    )}
-                    {ev.note && <p>{ev.note}</p>}
+                          : ev.to_value ?? ev.from_value ?? ev.event_type}
+                    </p>
+                    {ev.note && <p className="text-muted-foreground">{ev.note}</p>}
                   </li>
                 ))}
               </ul>

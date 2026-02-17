@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CarDocuments } from "@/components/car-documents";
-import { Search, FileText } from "lucide-react";
+import { Search, FileText, ScanLine } from "lucide-react";
+import { ScannerDialog } from "@/components/scanner/ScannerDialog";
 
 const VIN_REGEX = /^[A-HJ-NPR-Z0-9]{17}$/i;
 
@@ -25,6 +26,7 @@ export default function DocumentsPage() {
   const [car, setCar] = useState<CarDisplay | null>(null);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
+  const [scanVinOpen, setScanVinOpen] = useState(false);
 
   useEffect(() => {
     if (vinFromUrl && isValidVin(vinFromUrl)) {
@@ -45,9 +47,9 @@ export default function DocumentsPage() {
     }
   }, [vinFromUrl]);
 
-  async function handleSearch(e?: React.FormEvent) {
+  async function handleSearch(e?: React.FormEvent, overrideVin?: string) {
     e?.preventDefault();
-    const vin = vinSearch.trim().toUpperCase();
+    const vin = (overrideVin ?? vinSearch).trim().toUpperCase();
     if (!vin) return;
     if (!isValidVin(vin)) {
       setCar(null);
@@ -79,7 +81,7 @@ export default function DocumentsPage() {
   }
 
   return (
-    <div className="container mx-auto space-y-6 py-8">
+    <div className="container mx-auto space-y-6 px-4 py-6 sm:px-6 sm:py-8">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -92,17 +94,30 @@ export default function DocumentsPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSearch} className="flex flex-col gap-4 sm:flex-row sm:items-center">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Enter VIN (17 characters)"
-                value={vinSearch}
-                onChange={(e) => setVinSearch(e.target.value.toUpperCase())}
-                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                className="pl-9 font-mono"
-                maxLength={17}
+            <div className="relative flex flex-1 gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Enter VIN (17 characters)"
+                  value={vinSearch}
+                  onChange={(e) => setVinSearch(e.target.value.toUpperCase())}
+                  onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                  className="pl-9 font-mono"
+                  maxLength={17}
+                  disabled={loading}
+                />
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={() => setScanVinOpen(true)}
+                title="Scan VIN"
                 disabled={loading}
-              />
+                className="shrink-0"
+              >
+                <ScanLine className="size-4" />
+              </Button>
             </div>
             <Button type="submit" disabled={loading || !vinSearch.trim()}>
               {loading ? "Searching..." : "Search"}
@@ -156,6 +171,20 @@ export default function DocumentsPage() {
           </CardContent>
         </Card>
       )}
+
+      <ScannerDialog
+        open={scanVinOpen}
+        onClose={() => setScanVinOpen(false)}
+        onScan={(value) => {
+          const v = value.toUpperCase();
+          setVinSearch(v);
+          setScanVinOpen(false);
+          handleSearch(undefined, v);
+        }}
+        title="Scan VIN"
+        placeholder="17-character VIN..."
+        scanType="vin"
+      />
     </div>
   );
 }

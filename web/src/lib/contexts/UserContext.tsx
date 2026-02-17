@@ -37,6 +37,8 @@ export interface UserContextType {
   canDelete: boolean;
   canSeeSettings: boolean;
   canUploadDocuments: boolean;
+  canManageParts: boolean;
+  canManageGarage: boolean;
   noProfile: boolean;
 }
 
@@ -47,6 +49,8 @@ const UserContext = createContext<UserContextType>({
   canDelete: false,
   canSeeSettings: false,
   canUploadDocuments: false,
+  canManageParts: false,
+  canManageGarage: false,
   noProfile: false,
 });
 
@@ -98,6 +102,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     role === "sales" ||
     role === "garage_manager" ||
     capabilities.includes("garage");
+  const canManageParts =
+    role === "owner" ||
+    role === "garage_manager" ||
+    capabilities.includes("garage");
+  const canManageGarage =
+    role === "owner" ||
+    role === "garage_manager" ||
+    capabilities.includes("garage");
 
   return (
     <UserContext.Provider
@@ -108,6 +120,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         canDelete,
         canSeeSettings,
         canUploadDocuments,
+        canManageParts,
+        canManageGarage,
         noProfile,
       }}
     >

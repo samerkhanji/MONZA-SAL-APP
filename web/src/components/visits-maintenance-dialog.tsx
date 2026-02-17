@@ -20,6 +20,7 @@ interface VisitsMaintenanceDialogProps {
   mode: "garage" | "maintenance";
   events: CarEvent[];
   eventLabels: Record<string, string>;
+  formatEventDisplay?: (ev: CarEvent) => string;
   onOpenDay: (dateStr: string) => void;
 }
 
@@ -39,6 +40,7 @@ export function VisitsMaintenanceDialog({
   mode,
   events,
   eventLabels,
+  formatEventDisplay,
   onOpenDay,
 }: VisitsMaintenanceDialogProps) {
   const eventsByDate = events.reduce<Record<string, CarEvent[]>>((acc, ev) => {
@@ -95,13 +97,13 @@ export function VisitsMaintenanceDialog({
                         <Badge variant="outline" className="text-xs">
                           {eventLabels[ev.event_type] ?? ev.event_type}
                         </Badge>
-                        {(ev.from_value || ev.to_value) && (
-                          <span className="text-muted-foreground">
-                            {ev.from_value && ev.to_value
+                        <span className="text-muted-foreground">
+                          {formatEventDisplay
+                            ? formatEventDisplay(ev)
+                            : ev.from_value && ev.to_value
                               ? `${ev.from_value} → ${ev.to_value}`
                               : ev.to_value ?? ev.from_value ?? ""}
-                          </span>
-                        )}
+                        </span>
                         <span className="text-muted-foreground text-xs">
                           {new Date(ev.created_at).toLocaleTimeString()}
                         </span>
