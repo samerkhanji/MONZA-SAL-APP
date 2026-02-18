@@ -36,6 +36,7 @@ import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { NotificationBell } from "@/components/NotificationBell";
 import { useInstall } from "@/lib/contexts/InstallContext";
+import { clearAuthSessionMarkers } from "@/lib/auth-session";
 import { cn } from "@/lib/utils";
 
 const BASE_NAV_ITEMS: Array<{
@@ -87,7 +88,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const {
     profile,
     loading,
-    canSeeSettings,
     noProfile,
     connectionError,
     retryConnection,
@@ -96,7 +96,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     canSeeDocuments,
     canSeePartsInventory,
     canSeeGarageJobs,
-    canSeeGarageHistory,
     isRequestAssistant,
     isOwner,
   } = useUser();
@@ -135,12 +134,12 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     canSeeDocuments,
     canSeePartsInventory,
     canSeeGarageJobs,
-    canSeeGarageHistory,
   ]);
 
   async function handleSignOut() {
     const supabase = createClient();
     await supabase.auth.signOut();
+    clearAuthSessionMarkers();
     window.location.href = "/";
   }
 

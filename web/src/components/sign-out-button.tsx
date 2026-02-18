@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
+import { clearAuthSessionMarkers } from "@/lib/auth-session";
 import { Button } from "@/components/ui/button";
 
 export function SignOutButton() {
@@ -10,6 +11,7 @@ export function SignOutButton() {
   async function handleSignOut() {
     const supabase = createClient();
     await supabase.auth.signOut();
+    clearAuthSessionMarkers();
     router.push("/");
     router.refresh();
   }

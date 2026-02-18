@@ -1,15 +1,17 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { isConnectionError } from "@/lib/auth-utils";
+import {
+  clearAuthSessionMarkers,
+  markAuthSessionUnlocked,
+} from "@/lib/auth-session";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { SignOutButton } from "@/components/sign-out-button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import {
   Dialog,
@@ -23,8 +25,7 @@ import {
 function HomePageContent() {
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirectTo") ?? "/dashboard";
-  const [user, setUser] = useState<{ id: string } | null>(null);
-  const [loading, setLoading] = useState(true);
+  const reason = searchParams.get("reason");
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -38,16 +39,8 @@ function HomePageContent() {
 
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth
-      .getUser()
-      .then(({ data: { user: u } }) => {
-        setUser(u ?? null);
-        setLoading(false);
-      })
-      .catch(() => {
-        setUser(null);
-        setLoading(false);
-      });
+    clearAuthSessionMarkers();
+    void supabase.auth.signOut();
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -72,6 +65,7 @@ function HomePageContent() {
       return;
     }
 
+    markAuthSessionUnlocked();
     window.location.href = redirectTo.startsWith("/") ? redirectTo : `/${redirectTo}`;
   }
 
@@ -103,31 +97,12 @@ function HomePageContent() {
     setForgotSuccess(false);
   }
 
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background via-muted/20 to-background">
-        <p className="text-muted-foreground">Loading...</p>
-      </div>
-    );
-  }
-
-  if (user) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-gradient-to-br from-background via-muted/20 to-background p-8">
-        <div className="absolute right-4 top-4 flex items-center gap-2">
-          <ThemeToggle />
-          <SignOutButton />
-        </div>
-        <h1 className="text-3xl font-bold tracking-tight">Monza S.A.L.</h1>
-        <p className="text-center text-muted-foreground">
-          Internal system — car inventory & operations
-        </p>
-        <Button asChild size="lg">
-          <Link href="/dashboard">Go to App</Link>
-        </Button>
-      </div>
-    );
-  }
+  const reasonMessage =
+    reason === "inactive"
+      ? "You were logged out after 15 minutes of inactivity."
+      : reason === "reauth"
+        ? "Please sign in again to continue."
+        : null;
 
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-background via-muted/30 to-background p-4">
@@ -143,6 +118,11 @@ function HomePageContent() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            {reasonMessage && !error && (
+              <p className="rounded-md bg-primary/10 p-3 text-sm text-foreground">
+                {reasonMessage}
+              </p>
+            )}
             {error && (
               <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
                 {error}
