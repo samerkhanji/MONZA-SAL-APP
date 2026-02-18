@@ -23,3 +23,4 @@ web/.vercel
 
 # Optional: keep .env.example so others know what vars to set
 !.env.example
+.vercel
