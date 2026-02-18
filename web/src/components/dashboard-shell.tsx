@@ -32,7 +32,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { NotificationBell } from "@/components/NotificationBell";
 import { useInstall } from "@/lib/contexts/InstallContext";
@@ -77,7 +77,7 @@ function getPageTitle(pathname: string): string {
   if (pathname.startsWith("/garage/jobs/")) return "Job Details";
   if (pathname.startsWith("/garage/inventory")) return "Parts Inventory";
   if (pathname.startsWith("/garage/history")) return "Garage History";
-  if (pathname.startsWith("/garage")) return "Garage Jobs";
+  if (pathname.startsWith("/garage")) return "Garage";
   if (pathname.startsWith("/settings")) return "Settings";
   return "Monza S.A.L.";
 }
@@ -152,7 +152,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
   const { showInstallOption, triggerInstall } = useInstall();
 
-  const SidebarContent = () => (
+  const renderSidebarContent = () => (
     <div className="flex h-full w-full min-w-0 flex-col">
       <div className="flex h-14 items-center border-b shrink-0 px-4 md:justify-center md:px-0 md:group-hover:justify-start md:group-hover:px-4 lg:justify-start lg:px-4">
         <Link href="/dashboard" className="flex items-center justify-center md:justify-center lg:justify-start">
@@ -233,7 +233,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               title={item.label}
             >
               <item.icon className="size-4 shrink-0" />
-              <span className="hidden lg:inline">{item.label}</span>
+              <span className="md:hidden md:group-hover:inline lg:inline">
+                {item.label}
+              </span>
             </Link>
           );
         })}
@@ -295,29 +297,44 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen">
       {/* Tablet: collapsed icon-only, expand on hover (md) | Desktop: full sidebar (lg) */}
       <aside className="group hidden shrink-0 border-r border-sidebar-border bg-sidebar transition-[width] duration-200 md:block md:w-16 md:hover:w-56 lg:w-56">
-        <SidebarContent />
+        {renderSidebarContent()}
       </aside>
+
+      {/* Mobile menu button pinned top-left */}
+      <Button
+        variant="outline"
+        size="sm"
+        className={cn(
+          "fixed left-3 top-3 z-[80] h-10 gap-1 rounded-full border-border/80 bg-background/95 px-3 shadow-sm backdrop-blur md:hidden",
+          sidebarOpen && "hidden"
+        )}
+        style={{
+          top: "calc(env(safe-area-inset-top) + 0.5rem)",
+          left: "calc(env(safe-area-inset-left) + 0.5rem)",
+        }}
+        onClick={() => setSidebarOpen(true)}
+        aria-label="Open menu"
+        aria-controls="mobile-sidebar"
+        aria-expanded={sidebarOpen}
+      >
+        <Menu className="size-4" />
+        <span>Menu</span>
+      </Button>
 
       {/* Mobile sidebar */}
       <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-        <SheetTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute left-4 top-4 size-11 min-h-11 min-w-11 md:hidden"
-            aria-label="Open menu"
-          >
-            <Menu className="size-5" />
-          </Button>
-        </SheetTrigger>
-        <SheetContent side="left" className="w-72 max-w-[85vw] border-sidebar-border bg-sidebar p-0 sm:max-w-sm">
-          <SidebarContent />
+        <SheetContent
+          id="mobile-sidebar"
+          side="left"
+          className="w-72 max-w-[85vw] border-sidebar-border bg-sidebar p-0 sm:max-w-sm"
+        >
+          {renderSidebarContent()}
         </SheetContent>
       </Sheet>
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Topbar */}
-        <header className="sticky top-0 z-10 flex h-14 min-h-14 items-center justify-between border-b border-border bg-background pl-14 pr-4 md:pl-4 md:pr-4 lg:pl-6 lg:pr-6">
+        <header className="sticky top-0 z-20 flex h-14 min-h-14 items-center justify-between border-b border-border bg-background pl-24 pr-4 md:pl-4 md:pr-4 lg:pl-6 lg:pr-6">
           <h1 className="text-lg font-semibold">
             {getPageTitle(pathname)}
           </h1>
