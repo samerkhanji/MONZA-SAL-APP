@@ -131,9 +131,10 @@ export function EditTeamMemberDialog({
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <Label htmlFor="full_name">Full Name *</Label>
+            <Label htmlFor="team-member-full-name">Full Name *</Label>
             <Input
-              id="full_name"
+              id="team-member-full-name"
+              name="team-member-full-name"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               className="mt-2"
@@ -141,9 +142,10 @@ export function EditTeamMemberDialog({
             />
           </div>
           <div>
-            <Label htmlFor="phone">Phone</Label>
+            <Label htmlFor="team-member-phone">Phone</Label>
             <Input
-              id="phone"
+              id="team-member-phone"
+              name="team-member-phone"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               className="mt-2"

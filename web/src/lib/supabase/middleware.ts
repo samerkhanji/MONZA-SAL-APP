@@ -17,6 +17,11 @@ export async function updateSession(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!supabaseUrl || !supabaseKey) {
+    if (process.env.NODE_ENV === "development") {
+      console.warn(
+        "[Supabase] Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY. Auth redirects disabled."
+      );
+    }
     return response;
   }
 
@@ -37,9 +42,16 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  let user: { id: string } | null = null;
+  try {
+    const { data } = await supabase.auth.getUser();
+    user = data?.user ?? null;
+  } catch (err) {
+    if (process.env.NODE_ENV === "development") {
+      console.warn("[Supabase] Auth getUser failed:", err);
+    }
+    user = null;
+  }
 
   const isLoginPage = pathname === "/login";
   const isRootPage = pathname === "/";

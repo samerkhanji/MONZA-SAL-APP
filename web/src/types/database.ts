@@ -42,6 +42,9 @@ export interface Car {
   battery_percent: number | null;
   ev_range_km: number | null;
   motor: string | null;
+  is_erev?: boolean;
+  ev_km?: number | null;
+  motor_km?: number | null;
   software_version: string | null;
   pdi_status: PdiStatus;
   current_km: number | null;
@@ -244,6 +247,7 @@ export type JobStatus =
   | "in_progress"
   | "waiting_parts"
   | "done"
+  | "delivered"
   | "cancelled";
 
 export type JobPriority = "low" | "normal" | "urgent";
@@ -262,6 +266,8 @@ export interface GarageJob {
   actual_hours: number | null;
   started_at: string | null;
   completed_at: string | null;
+  delivered_at: string | null;
+  overtime_notified: boolean | null;
   due_date: string | null;
   customer_id: string | null;
   notes: string | null;
@@ -292,4 +298,33 @@ export interface JobDocument {
   notes: string | null;
   uploaded_by: string | null;
   created_at: string;
+}
+
+export type RequestStatus =
+  | "submitted"
+  | "awaiting_approval"
+  | "approved"
+  | "rejected"
+  | "needs_more_info";
+
+export type RequestPriority = "low" | "normal" | "urgent";
+
+export interface Request {
+  id: string;
+  subject: string;
+  description: string | null;
+  category: string | null;
+  status: RequestStatus;
+  priority: RequestPriority;
+  assistant_notes: string | null;
+  management_comments: string | null;
+  submitted_by: string;
+  assigned_to: string | null;
+  send_to: string | null;
+  send_to_user_id: string | null;
+  reviewed_by: string | null;
+  forwarded_at: string | null;
+  resolved_at: string | null;
+  created_at: string;
+  updated_at: string;
 }

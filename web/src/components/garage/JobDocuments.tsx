@@ -426,6 +426,8 @@ export function JobDocuments({ jobId, onDocumentsChange }: JobDocumentsProps) {
                 >
                   <input
                     ref={fileInputRef}
+                    id="job-document-upload"
+                    name="job-document-upload"
                     type="file"
                     accept=".pdf,image/jpeg,image/png,image/webp"
                     className="hidden"

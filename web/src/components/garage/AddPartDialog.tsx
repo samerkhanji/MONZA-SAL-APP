@@ -8,13 +8,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Dialog,
   DialogContent,
   DialogFooter,
@@ -43,8 +36,6 @@ export function AddPartDialog({
   const [minQuantity, setMinQuantity] = useState("2");
   const [storageZone, setStorageZone] = useState("");
   const [supplier, setSupplier] = useState("");
-  const [unitCost, setUnitCost] = useState("");
-  const [currency, setCurrency] = useState("USD");
   const [orderDate, setOrderDate] = useState("");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -62,8 +53,6 @@ export function AddPartDialog({
       setMinQuantity("2");
       setStorageZone("");
       setSupplier("");
-      setUnitCost("");
-      setCurrency("USD");
       setOrderDate("");
       setNotes("");
     }
@@ -100,8 +89,8 @@ export function AddPartDialog({
         min_quantity: minQty,
         storage_zone: storageZone.trim() || null,
         supplier: supplier.trim() || null,
-        unit_cost: unitCost ? parseFloat(unitCost) : null,
-        currency: currency || "USD",
+        unit_cost: null,
+        currency: "USD",
         order_date: orderDate || null,
         notes: notes.trim() || null,
         created_by: authUser.user?.id ?? null,
@@ -132,7 +121,8 @@ export function AddPartDialog({
             <div className="sm:col-span-2">
               <Label htmlFor="part_name">Part Name *</Label>
               <Input
-                id="part_name"
+                id="part-name"
+                name="part-name"
                 value={partName}
                 onChange={(e) => setPartName(e.target.value)}
                 placeholder="e.g. Brake Pads Front Set"
@@ -143,7 +133,8 @@ export function AddPartDialog({
               <Label htmlFor="oe_number">OE Number</Label>
               <div className="flex gap-2">
                 <Input
-                  id="oe_number"
+                  id="part-oe-number"
+                  name="part-oe-number"
                   value={oeNumber}
                   onChange={(e) => setOeNumber(e.target.value)}
                   placeholder="e.g. ABC123"
@@ -164,7 +155,8 @@ export function AddPartDialog({
             <div>
               <Label htmlFor="car_model">Car Model</Label>
               <Input
-                id="car_model"
+                id="part-car-model"
+                name="part-car-model"
                 value={carModel}
                 onChange={(e) => setCarModel(e.target.value)}
                 placeholder="e.g. General, Voyah Passion, MHero"
@@ -173,7 +165,8 @@ export function AddPartDialog({
             <div className="sm:col-span-2">
               <Label htmlFor="description">Description</Label>
               <Input
-                id="description"
+                id="part-description"
+                name="part-description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
               />
@@ -181,7 +174,8 @@ export function AddPartDialog({
             <div>
               <Label htmlFor="initial_quantity">Initial Quantity *</Label>
               <Input
-                id="initial_quantity"
+                id="part-initial-quantity"
+                name="part-initial-quantity"
                 type="number"
                 min={0}
                 value={initialQuantity}
@@ -192,7 +186,8 @@ export function AddPartDialog({
             <div>
               <Label htmlFor="min_quantity">Min Quantity</Label>
               <Input
-                id="min_quantity"
+                id="part-min-quantity"
+                name="part-min-quantity"
                 type="number"
                 min={0}
                 value={minQuantity}
@@ -202,7 +197,8 @@ export function AddPartDialog({
             <div>
               <Label htmlFor="storage_zone">Storage Zone</Label>
               <Input
-                id="storage_zone"
+                id="part-storage-zone"
+                name="part-storage-zone"
                 value={storageZone}
                 onChange={(e) => setStorageZone(e.target.value)}
                 placeholder="e.g. A1-B2"
@@ -211,37 +207,17 @@ export function AddPartDialog({
             <div>
               <Label htmlFor="supplier">Supplier</Label>
               <Input
-                id="supplier"
+                id="part-supplier"
+                name="part-supplier"
                 value={supplier}
                 onChange={(e) => setSupplier(e.target.value)}
               />
             </div>
             <div>
-              <Label htmlFor="unit_cost">Unit Cost</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="unit_cost"
-                  type="number"
-                  step="0.01"
-                  min={0}
-                  value={unitCost}
-                  onChange={(e) => setUnitCost(e.target.value)}
-                />
-                <Select value={currency} onValueChange={setCurrency}>
-                  <SelectTrigger className="w-24">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="USD">USD</SelectItem>
-                    <SelectItem value="LBP">LBP</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div>
               <Label htmlFor="order_date">Order Date</Label>
               <Input
-                id="order_date"
+                id="part-order-date"
+                name="part-order-date"
                 type="date"
                 value={orderDate}
                 onChange={(e) => setOrderDate(e.target.value)}
@@ -250,7 +226,8 @@ export function AddPartDialog({
             <div className="sm:col-span-2">
               <Label htmlFor="notes">Notes</Label>
               <Textarea
-                id="notes"
+                id="part-notes"
+                name="part-notes"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 rows={2}

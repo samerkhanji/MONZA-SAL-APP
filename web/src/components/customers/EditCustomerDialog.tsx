@@ -51,7 +51,6 @@ export function EditCustomerDialog({
   const [preferredLanguage, setPreferredLanguage] = useState("en");
   const [leadStatus, setLeadStatus] = useState<LeadStatus>("new_lead");
   const [leadSource, setLeadSource] = useState<string>("");
-  const [company, setCompany] = useState("");
   const [address, setAddress] = useState("");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -69,7 +68,6 @@ export function EditCustomerDialog({
       setPreferredLanguage(customer.preferred_language ?? "en");
       setLeadStatus((customer.lead_status as LeadStatus) ?? "new_lead");
       setLeadSource(customer.lead_source ?? "");
-      setCompany(customer.company ?? "");
       setAddress(customer.address ?? "");
       setNotes(customer.notes ?? "");
     }
@@ -102,7 +100,7 @@ export function EditCustomerDialog({
         preferred_language: preferredLanguage || "en",
         lead_status: leadStatus,
         lead_source: (leadSource as LeadSource) || null,
-        company: company.trim() || null,
+        company: customer.company ?? null,
         address: address.trim() || null,
         notes: notes.trim() || null,
       })
@@ -134,7 +132,8 @@ export function EditCustomerDialog({
             <div className="space-y-2">
               <Label htmlFor="edit-firstName">First Name *</Label>
               <Input
-                id="edit-firstName"
+                id="edit-first-name"
+                name="edit-first-name"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
                 required
@@ -143,7 +142,8 @@ export function EditCustomerDialog({
             <div className="space-y-2">
               <Label htmlFor="edit-lastName">Last Name</Label>
               <Input
-                id="edit-lastName"
+                id="edit-last-name"
+                name="edit-last-name"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
               />
@@ -154,6 +154,7 @@ export function EditCustomerDialog({
               <Label htmlFor="edit-phone">Phone *</Label>
               <Input
                 id="edit-phone"
+                name="edit-phone"
                 type="tel"
                 value={phonePrimary}
                 onChange={(e) => setPhonePrimary(e.target.value)}
@@ -164,6 +165,7 @@ export function EditCustomerDialog({
               <Label htmlFor="edit-phone2">Phone 2</Label>
               <Input
                 id="edit-phone2"
+                name="edit-phone2"
                 type="tel"
                 value={phoneSecondary}
                 onChange={(e) => setPhoneSecondary(e.target.value)}
@@ -174,6 +176,7 @@ export function EditCustomerDialog({
             <Label htmlFor="edit-email">Email</Label>
             <Input
               id="edit-email"
+              name="edit-email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -184,6 +187,7 @@ export function EditCustomerDialog({
               <Label htmlFor="edit-dob">Date of Birth</Label>
               <Input
                 id="edit-dob"
+                name="edit-dob"
                 type="date"
                 value={dateOfBirth}
                 onChange={(e) => setDateOfBirth(e.target.value)}
@@ -248,17 +252,10 @@ export function EditCustomerDialog({
             </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="edit-company">Company</Label>
-            <Input
-              id="edit-company"
-              value={company}
-              onChange={(e) => setCompany(e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
             <Label htmlFor="edit-address">Address</Label>
             <Textarea
               id="edit-address"
+              name="edit-address"
               value={address}
               onChange={(e) => setAddress(e.target.value)}
               rows={2}
@@ -268,6 +265,7 @@ export function EditCustomerDialog({
             <Label htmlFor="edit-notes">Notes</Label>
             <Textarea
               id="edit-notes"
+              name="edit-notes"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={3}

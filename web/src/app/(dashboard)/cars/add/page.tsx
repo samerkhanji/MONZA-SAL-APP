@@ -80,8 +80,6 @@ export default function AddCarPage() {
   const [status, setStatus] = useState<CarStatus>(INITIAL_STATUS);
   const [plateNumber, setPlateNumber] = useState("");
   const [dateArrived, setDateArrived] = useState(todayISO());
-  const [price, setPrice] = useState("");
-  const [priceCurrency, setPriceCurrency] = useState<Currency>("USD");
   const [warrantyPerDms, setWarrantyPerDms] = useState("");
   const [warrantyMonzaStartDate, setWarrantyMonzaStartDate] = useState("");
   const [customsStatus, setCustomsStatus] = useState<CustomsStatus>("pending");
@@ -105,7 +103,6 @@ export default function AddCarPage() {
   const [clientEmail, setClientEmail] = useState("");
   const [preferredLanguage, setPreferredLanguage] = useState("en");
   const [sellingPrice, setSellingPrice] = useState("");
-  const [currency, setCurrency] = useState<Currency>("USD");
   const [saleDate, setSaleDate] = useState(todayISO());
   const [deliveryDate, setDeliveryDate] = useState("");
   const [depositAmount, setDepositAmount] = useState("");
@@ -201,8 +198,6 @@ export default function AddCarPage() {
       motor: string;
       ev_km: number;
       motor_km: number;
-      price: number;
-      price_currency: string;
       warranty_per_dms: string;
       warranty_monza_start_date: string;
       customs_status: string;
@@ -212,11 +207,6 @@ export default function AddCarPage() {
     if (dateArrived) extraFields.date_arrived = dateArrived;
     if (notes.trim()) extraFields.notes = notes.trim();
 
-    const priceNum = price ? parseFloat(price) : undefined;
-    if (priceNum !== undefined && !Number.isNaN(priceNum) && priceNum >= 0) {
-      extraFields.price = priceNum;
-      extraFields.price_currency = priceCurrency;
-    }
     if (warrantyPerDms) extraFields.warranty_per_dms = warrantyPerDms;
     if (warrantyMonzaStartDate) extraFields.warranty_monza_start_date = warrantyMonzaStartDate;
     extraFields.customs_status = customsStatus;
@@ -282,7 +272,7 @@ export default function AddCarPage() {
         const priceNum = sellingPrice ? parseFloat(sellingPrice) : undefined;
         if (priceNum !== undefined && !Number.isNaN(priceNum))
           saleFields.selling_price = priceNum;
-        if (currency) saleFields.currency = currency;
+        saleFields.currency = "USD";
         if (saleDate) saleFields.sale_date = saleDate;
         if (deliveryDate) saleFields.delivery_date = deliveryDate;
         if (saleNotes.trim()) saleFields.notes = saleNotes.trim();
@@ -336,10 +326,11 @@ export default function AddCarPage() {
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="vin">VIN *</Label>
+                <Label htmlFor="car-vin">VIN *</Label>
                 <div className="flex gap-2">
                   <Input
-                    id="vin"
+                    id="car-vin"
+                    name="car-vin"
                     value={vin}
                     onChange={(e) => setVin(e.target.value.toUpperCase())}
                     placeholder="17 characters"
@@ -362,13 +353,13 @@ export default function AddCarPage() {
                 </p>
               </div>
               <div className="space-y-2">
-                <Label>Brand *</Label>
+                <Label htmlFor="car-brand">Brand *</Label>
                 <Select
                   value={brand}
                   onValueChange={(v) => setBrand(v as Brand)}
                   required
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="car-brand">
                     <SelectValue placeholder="Select brand" />
                   </SelectTrigger>
                   <SelectContent>
@@ -384,9 +375,10 @@ export default function AddCarPage() {
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="model">Model *</Label>
+                <Label htmlFor="car-model">Model *</Label>
                 <Input
-                  id="model"
+                  id="car-model"
+                  name="car-model"
                   value={model}
                   onChange={(e) => setModel(e.target.value)}
                   placeholder="Model name"
@@ -394,9 +386,10 @@ export default function AddCarPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="modelYear">Model Year</Label>
+                <Label htmlFor="car-model-year">Model Year</Label>
                 <Input
-                  id="modelYear"
+                  id="car-model-year"
+                  name="car-model-year"
                   type="number"
                   min={1900}
                   max={2100}
@@ -409,18 +402,20 @@ export default function AddCarPage() {
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="exteriorColor">Exterior Color</Label>
+                <Label htmlFor="car-exterior-color">Exterior Color</Label>
                 <Input
-                  id="exteriorColor"
+                  id="car-exterior-color"
+                  name="car-exterior-color"
                   value={exteriorColor}
                   onChange={(e) => setExteriorColor(e.target.value)}
                   placeholder="e.g. Pearl White"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="interiorColor">Interior Color</Label>
+                <Label htmlFor="car-interior-color">Interior Color</Label>
                 <Input
-                  id="interiorColor"
+                  id="car-interior-color"
+                  name="car-interior-color"
                   value={interiorColor}
                   onChange={(e) => setInteriorColor(e.target.value)}
                   placeholder="e.g. Black"
@@ -429,12 +424,12 @@ export default function AddCarPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Location</Label>
+              <Label htmlFor="car-location">Location</Label>
               <Select
                 value={locationType}
                 onValueChange={(v) => setLocationType(v as LocationType)}
               >
-                <SelectTrigger>
+                <SelectTrigger id="car-location">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -449,12 +444,12 @@ export default function AddCarPage() {
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label>Status</Label>
+                <Label htmlFor="car-status">Status</Label>
                 <Select
                   value={status}
                   onValueChange={(v) => setStatus(v as CarStatus)}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="car-status">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -467,9 +462,10 @@ export default function AddCarPage() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="plateNumber">Plate Number</Label>
+                <Label htmlFor="car-plate-number">Plate Number</Label>
                 <Input
-                  id="plateNumber"
+                  id="car-plate-number"
+                  name="car-plate-number"
                   value={plateNumber}
                   onChange={(e) => setPlateNumber(e.target.value)}
                   placeholder="Optional"
@@ -479,27 +475,30 @@ export default function AddCarPage() {
 
             <div className="grid gap-4 sm:grid-cols-3">
               <div className="space-y-2">
-                <Label htmlFor="dateArrived">Date Arrived</Label>
+                <Label htmlFor="car-date-arrived">Date Arrived</Label>
                 <Input
-                  id="dateArrived"
+                  id="car-date-arrived"
+                  name="car-date-arrived"
                   type="date"
                   value={dateArrived}
                   onChange={(e) => setDateArrived(e.target.value)}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="warrantyPerDms">Warranty as per DMS</Label>
+                <Label htmlFor="car-warranty-dms">Warranty as per DMS</Label>
                 <Input
-                  id="warrantyPerDms"
+                  id="car-warranty-dms"
+                  name="car-warranty-dms"
                   type="date"
                   value={warrantyPerDms}
                   onChange={(e) => setWarrantyPerDms(e.target.value)}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="warrantyMonzaStart">Warranty as per Monza (Start)</Label>
+                <Label htmlFor="car-warranty-monza">Warranty as per Monza</Label>
                 <Input
-                  id="warrantyMonzaStart"
+                  id="car-warranty-monza"
+                  name="car-warranty-monza"
                   type="date"
                   value={warrantyMonzaStartDate}
                   onChange={(e) => setWarrantyMonzaStartDate(e.target.value)}
@@ -507,44 +506,14 @@ export default function AddCarPage() {
               </div>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="price">Price</Label>
-                <Input
-                  id="price"
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  value={price}
-                  onChange={(e) => setPrice(e.target.value)}
-                  placeholder="Optional"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Currency</Label>
-                <Select
-                  value={priceCurrency}
-                  onValueChange={(v) => setPriceCurrency(v as Currency)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {CURRENCIES.map((c) => (
-                      <SelectItem key={c} value={c}>
-                        {c}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Customs Status</Label>
+                <Label htmlFor="car-customs-status">Customs Status</Label>
                 <Select
                   value={customsStatus}
                   onValueChange={(v) => setCustomsStatus(v as CustomsStatus)}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="car-customs-status">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -559,9 +528,10 @@ export default function AddCarPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="notes">Notes</Label>
+              <Label htmlFor="car-notes">Notes</Label>
               <Textarea
-                id="notes"
+                id="car-notes"
+                name="car-notes"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Optional notes"
@@ -583,9 +553,10 @@ export default function AddCarPage() {
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="batteryPercent">Battery %</Label>
+                <Label htmlFor="car-battery-percent">Battery %</Label>
                 <Input
-                  id="batteryPercent"
+                  id="car-battery-percent"
+                  name="car-battery-percent"
                   type="number"
                   min={0}
                   max={100}
@@ -595,9 +566,10 @@ export default function AddCarPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="currentKm">KM Driven</Label>
+                <Label htmlFor="car-current-km">KM Driven</Label>
                 <Input
-                  id="currentKm"
+                  id="car-current-km"
+                  name="car-current-km"
                   type="number"
                   min={0}
                   value={currentKm}
@@ -608,9 +580,10 @@ export default function AddCarPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="softwareVersion">Software Version</Label>
+              <Label htmlFor="car-software-version">Software Version</Label>
               <Input
-                id="softwareVersion"
+                id="car-software-version"
+                name="car-software-version"
                 value={softwareVersion}
                 onChange={(e) => setSoftwareVersion(e.target.value)}
                 placeholder="Optional"
@@ -646,9 +619,10 @@ export default function AddCarPage() {
             {isErev && (
               <div className="space-y-4 rounded-lg border p-4">
                 <div className="space-y-2">
-                  <Label htmlFor="motor">Motor</Label>
+                    <Label htmlFor="car-motor">Motor</Label>
                   <Input
-                    id="motor"
+                    id="car-motor"
+                    name="car-motor"
                     value={motor}
                     onChange={(e) => setMotor(e.target.value)}
                     placeholder="e.g. 1.5T"
@@ -656,9 +630,10 @@ export default function AddCarPage() {
                 </div>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="evKm">EV KM</Label>
+                    <Label htmlFor="car-ev-km">EV KM</Label>
                     <Input
-                      id="evKm"
+                      id="car-ev-km"
+                      name="car-ev-km"
                       type="number"
                       min={0}
                       value={evKm}
@@ -667,9 +642,10 @@ export default function AddCarPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="motorKm">Motor KM</Label>
+                    <Label htmlFor="car-motor-km">Motor KM</Label>
                     <Input
-                      id="motorKm"
+                      id="car-motor-km"
+                      name="car-motor-km"
                       type="number"
                       min={0}
                       value={motorKm}
@@ -699,9 +675,10 @@ export default function AddCarPage() {
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="clientFirstName">Client First Name *</Label>
+                    <Label htmlFor="client-first-name">Client First Name *</Label>
                     <Input
-                      id="clientFirstName"
+                      id="client-first-name"
+                      name="client-first-name"
                       value={clientFirstName}
                       onChange={(e) => setClientFirstName(e.target.value)}
                       placeholder="Required"
@@ -709,9 +686,10 @@ export default function AddCarPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="clientLastName">Client Last Name</Label>
+                    <Label htmlFor="client-last-name">Client Last Name</Label>
                     <Input
-                      id="clientLastName"
+                      id="client-last-name"
+                      name="client-last-name"
                       value={clientLastName}
                       onChange={(e) => setClientLastName(e.target.value)}
                       placeholder="Optional"
@@ -721,9 +699,10 @@ export default function AddCarPage() {
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="clientPhone">Client Phone *</Label>
+                    <Label htmlFor="client-phone">Client Phone *</Label>
                     <Input
-                      id="clientPhone"
+                      id="client-phone"
+                      name="client-phone"
                       type="tel"
                       value={clientPhone}
                       onChange={(e) => setClientPhone(e.target.value)}
@@ -732,9 +711,10 @@ export default function AddCarPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="clientPhone2">Client Phone 2</Label>
+                    <Label htmlFor="client-phone-2">Client Phone 2</Label>
                     <Input
-                      id="clientPhone2"
+                      id="client-phone-2"
+                      name="client-phone-2"
                       type="tel"
                       value={clientPhone2}
                       onChange={(e) => setClientPhone2(e.target.value)}
@@ -745,22 +725,23 @@ export default function AddCarPage() {
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="clientEmail">Client Email</Label>
+                    <Label htmlFor="client-email">Client Email</Label>
                     <Input
-                      id="clientEmail"
+                      id="client-email"
+                      name="client-email"
                       type="email"
                       value={clientEmail}
                       onChange={(e) => setClientEmail(e.target.value)}
                       placeholder="Optional"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label>Preferred Language</Label>
-                    <Select
-                      value={preferredLanguage}
-                      onValueChange={setPreferredLanguage}
-                    >
-                      <SelectTrigger>
+              <div className="space-y-2">
+                <Label htmlFor="client-preferred-language">Preferred Language</Label>
+                <Select
+                  value={preferredLanguage}
+                  onValueChange={setPreferredLanguage}
+                >
+                  <SelectTrigger id="client-preferred-language">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -778,7 +759,7 @@ export default function AddCarPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Sale Details</CardTitle>
+                <CardTitle>Sale Details (Optional)</CardTitle>
                 <CardDescription>
                   Selling price, dates, deposit (for reservations)
                 </CardDescription>
@@ -786,51 +767,33 @@ export default function AddCarPage() {
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="sellingPrice">Selling Price</Label>
+                    <Label htmlFor="sale-selling-price">Selling Price (USD)</Label>
                     <Input
-                      id="sellingPrice"
+                      id="sale-selling-price"
+                      name="sale-selling-price"
                       type="number"
                       min={0}
                       step="0.01"
                       value={sellingPrice}
                       onChange={(e) => setSellingPrice(e.target.value)}
-                      placeholder="Optional"
+                      placeholder="USD 0.00"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Currency</Label>
-                    <Select
-                      value={currency}
-                      onValueChange={(v) => setCurrency(v as Currency)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {CURRENCIES.map((c) => (
-                          <SelectItem key={c} value={c}>
-                            {c}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="saleDate">Sale / Reserved Date</Label>
+                    <Label htmlFor="sale-date">Date of Sale</Label>
                     <Input
-                      id="saleDate"
+                      id="sale-date"
+                      name="sale-date"
                       type="date"
                       value={saleDate}
                       onChange={(e) => setSaleDate(e.target.value)}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="deliveryDate">Delivery Date</Label>
+                    <Label htmlFor="sale-delivery-date">Delivery Date</Label>
                     <Input
-                      id="deliveryDate"
+                      id="sale-delivery-date"
+                      name="sale-delivery-date"
                       type="date"
                       value={deliveryDate}
                       onChange={(e) => setDeliveryDate(e.target.value)}
@@ -842,21 +805,23 @@ export default function AddCarPage() {
                 {status === "reserved" && (
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
-                      <Label htmlFor="depositAmount">Deposit Amount</Label>
+                      <Label htmlFor="sale-deposit-amount">Deposit Amount (USD)</Label>
                       <Input
-                        id="depositAmount"
+                        id="sale-deposit-amount"
+                        name="sale-deposit-amount"
                         type="number"
                         min={0}
                         step="0.01"
                         value={depositAmount}
                         onChange={(e) => setDepositAmount(e.target.value)}
-                        placeholder="Optional"
+                        placeholder="USD 0.00"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="reservedUntil">Reserved Until</Label>
+                      <Label htmlFor="sale-reserved-until">Reserved Until</Label>
                       <Input
-                        id="reservedUntil"
+                        id="sale-reserved-until"
+                        name="sale-reserved-until"
                         type="date"
                         value={reservedUntil}
                         onChange={(e) => setReservedUntil(e.target.value)}
@@ -867,9 +832,10 @@ export default function AddCarPage() {
                 )}
 
                 <div className="space-y-2">
-                  <Label htmlFor="saleNotes">Sale Notes</Label>
+                  <Label htmlFor="sale-notes">Sale Notes</Label>
                   <Textarea
-                    id="saleNotes"
+                    id="sale-notes"
+                    name="sale-notes"
                     value={saleNotes}
                     onChange={(e) => setSaleNotes(e.target.value)}
                     placeholder="Optional"

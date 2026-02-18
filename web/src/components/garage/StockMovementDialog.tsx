@@ -149,7 +149,8 @@ export function StockMovementDialog({
           <div>
             <Label htmlFor="quantity">Quantity *</Label>
             <Input
-              id="quantity"
+              id="stock-movement-quantity"
+              name="stock-movement-quantity"
               type="number"
               min={1}
               value={quantity}
@@ -164,6 +165,8 @@ export function StockMovementDialog({
                 <Label>Link to Car (VIN)</Label>
                 <div className="flex gap-2">
                   <Input
+                    id="stock-movement-car-search"
+                    name="stock-movement-car-search"
                     placeholder="Search by VIN, brand, model..."
                     value={carSearch}
                     onChange={(e) => setCarSearch(e.target.value)}
@@ -202,7 +205,8 @@ export function StockMovementDialog({
               <div>
                 <Label htmlFor="job_description">Job Description</Label>
                 <Input
-                  id="job_description"
+                  id="stock-movement-job-description"
+                  name="stock-movement-job-description"
                   value={jobDescription}
                   onChange={(e) => setJobDescription(e.target.value)}
                   placeholder="e.g. Brake pad replacement"
@@ -214,7 +218,8 @@ export function StockMovementDialog({
           <div>
             <Label htmlFor="note">Note</Label>
             <Textarea
-              id="note"
+              id="stock-movement-note"
+              name="stock-movement-note"
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder={

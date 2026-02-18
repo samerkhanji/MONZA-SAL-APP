@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase";
+import { isConnectionError } from "@/lib/auth-utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,10 +38,16 @@ function HomePageContent() {
 
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user: u } }) => {
-      setUser(u ?? null);
-      setLoading(false);
-    });
+    supabase.auth
+      .getUser()
+      .then(({ data: { user: u } }) => {
+        setUser(u ?? null);
+        setLoading(false);
+      })
+      .catch(() => {
+        setUser(null);
+        setLoading(false);
+      });
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -57,7 +64,11 @@ function HomePageContent() {
     setSubmitting(false);
 
     if (signInError) {
-      setError(signInError.message);
+      setError(
+        isConnectionError(signInError)
+          ? "Connection failed. Please check your internet and try again."
+          : signInError.message
+      );
       return;
     }
 
@@ -140,7 +151,8 @@ function HomePageContent() {
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
-                id="email"
+                id="login-email"
+                name="login-email"
                 type="email"
                 placeholder="you@company.com"
                 value={email}
@@ -153,7 +165,8 @@ function HomePageContent() {
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <Input
-                id="password"
+                id="login-password"
+                name="login-password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -199,6 +212,7 @@ function HomePageContent() {
                 <Label htmlFor="forgot-email">Email</Label>
                 <Input
                   id="forgot-email"
+                  name="forgot-email"
                   type="email"
                   placeholder="you@company.com"
                   value={forgotEmail}

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
@@ -16,6 +16,8 @@ import {
   Pencil,
   Power,
   PowerOff,
+  Trash2,
+  Bell,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,7 +37,9 @@ const TABS = [
   { id: "team", label: "Team", icon: Users },
   { id: "company", label: "Company", icon: Building2 },
   { id: "prefs", label: "Preferences", icon: Settings },
+  { id: "notifications", label: "Notifications", icon: Bell },
   { id: "audit", label: "Audit Log", icon: FileText },
+  { id: "pending-deletions", label: "Pending Deletions", icon: Trash2 },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -78,8 +82,16 @@ function timeAgo(date: string): string {
 
 export default function SettingsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { canSeeSettings } = useUser();
-  const [activeTab, setActiveTab] = useState<TabId>("team");
+  const tabFromUrl = searchParams.get("tab") as TabId | null;
+  const [activeTab, setActiveTab] = useState<TabId>(tabFromUrl && TABS.some((t) => t.id === tabFromUrl) ? tabFromUrl : "team");
+
+  useEffect(() => {
+    if (tabFromUrl && TABS.some((t) => t.id === tabFromUrl)) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [tabFromUrl]);
   const [profiles, setProfiles] = useState<ProfileRow[]>([]);
   const [profilesLoading, setProfilesLoading] = useState(false);
   const [editProfile, setEditProfile] = useState<ProfileRow | null>(null);
@@ -113,14 +125,34 @@ export default function SettingsPage() {
   const [auditUserFilter, setAuditUserFilter] = useState<string>("all");
   const [auditDateFilter, setAuditDateFilter] = useState<string>("7");
 
+  const [pendingDeletes, setPendingDeletes] = useState<
+    Array<{
+      id: string;
+      item_type: string;
+      item_id: string;
+      item_details: Record<string, unknown>;
+      requested_by: string;
+      created_at: string;
+      requester_name?: string;
+    }>
+  >([]);
+  const [pendingDeletesLoading, setPendingDeletesLoading] = useState(false);
+  const [deleteActioning, setDeleteActioning] = useState<string | null>(null);
+
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [pushStatus, setPushStatus] = useState<string>("");
+  const [pushLoading, setPushLoading] = useState(false);
+
   const supabase = createClient();
 
+  const showNotificationsOnly = !canSeeSettings && searchParams.get("tab") === "notifications";
+
   useEffect(() => {
-    if (!canSeeSettings) {
+    if (!canSeeSettings && !showNotificationsOnly) {
       router.replace("/dashboard");
       return;
     }
-  }, [canSeeSettings, router]);
+  }, [canSeeSettings, showNotificationsOnly, router]);
 
   const fetchProfiles = useCallback(async () => {
     setProfilesLoading(true);
@@ -351,13 +383,136 @@ export default function SettingsPage() {
 
   const auditUsers = [...new Set(auditItems.map((i) => i.user))].sort();
 
-  if (!canSeeSettings) return null;
+  const fetchPendingDeletes = useCallback(async () => {
+    setPendingDeletesLoading(true);
+    const { data, error } = await supabase
+      .from("delete_requests")
+      .select("id, item_type, item_id, item_details, requested_by, created_at")
+      .eq("status", "pending")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      toast.error(error.message);
+      setPendingDeletes([]);
+    } else {
+      const list = (data ?? []) as Array<{
+        id: string;
+        item_type: string;
+        item_id: string;
+        item_details: Record<string, unknown>;
+        requested_by: string;
+        created_at: string;
+      }>;
+      const userIds = [...new Set(list.map((r) => r.requested_by))];
+      let namesMap: Record<string, string> = {};
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("id, full_name")
+          .in("id", userIds);
+        namesMap = Object.fromEntries(
+          (profiles ?? []).map((p: { id: string; full_name: string | null }) => [
+            p.id,
+            p.full_name ?? "Unknown",
+          ])
+        );
+      }
+      setPendingDeletes(
+        list.map((r) => ({
+          ...r,
+          requester_name: namesMap[r.requested_by] ?? "Unknown",
+        }))
+      );
+    }
+    setPendingDeletesLoading(false);
+  }, []);
+
+  useEffect(() => {
+    if (canSeeSettings && activeTab === "pending-deletions") {
+      fetchPendingDeletes();
+    }
+  }, [canSeeSettings, activeTab, fetchPendingDeletes]);
+
+  async function handleApproveDelete(reqId: string) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    setDeleteActioning(reqId);
+    const { approveDeleteRequest } = await import("@/lib/delete-requests");
+    await approveDeleteRequest(reqId, user.id);
+    setDeleteActioning(null);
+    fetchPendingDeletes();
+  }
+
+  async function handleDenyDelete(reqId: string) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    setDeleteActioning(reqId);
+    const { denyDeleteRequest } = await import("@/lib/delete-requests");
+    await denyDeleteRequest(reqId, user.id);
+    setDeleteActioning(null);
+    fetchPendingDeletes();
+  }
+
+  const refreshPushStatus = useCallback(async () => {
+    const { getPushStatus } = await import("@/lib/push-subscription");
+    const status = await getPushStatus();
+    setPushStatus(status);
+    if (status === "denied") {
+      setPushEnabled(false);
+    } else if (status === "enabled" || status === "unsubscribed") {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data } = await supabase
+          .from("push_subscriptions")
+          .select("id")
+          .eq("user_id", user.id)
+          .limit(1);
+        setPushEnabled((data?.length ?? 0) > 0);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (canSeeSettings && activeTab === "notifications") {
+      refreshPushStatus();
+    }
+  }, [canSeeSettings, activeTab, refreshPushStatus]);
+
+  async function handleTogglePush(enabled: boolean) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    setPushLoading(true);
+    const {
+      registerPushSubscription,
+      unregisterPushSubscription,
+    } = await import("@/lib/push-subscription");
+    if (enabled) {
+      const result = await registerPushSubscription(user.id);
+      if (result.ok) {
+        setPushEnabled(true);
+        toast.success("Push notifications enabled");
+      } else {
+        const msg = result.message ?? (result.reason === "permission_denied"
+          ? "Notifications blocked. Enable them in your browser settings."
+          : "Failed to enable push notifications");
+        toast.error(msg);
+      }
+    } else {
+      await unregisterPushSubscription(user.id);
+      setPushEnabled(false);
+      toast.success("Push notifications disabled");
+    }
+    setPushLoading(false);
+    refreshPushStatus();
+  }
+
+  if (!canSeeSettings && !showNotificationsOnly) return null;
 
   return (
     <div className="container mx-auto flex flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8 lg:flex-row">
       {/* Tabs sidebar */}
       <nav className="flex shrink-0 flex-row gap-2 border-b pb-4 lg:flex-col lg:border-b-0 lg:border-r lg:pb-0 lg:pr-6">
-        {TABS.map((tab) => (
+        {(showNotificationsOnly ? TABS.filter((t) => t.id === "notifications") : TABS).map((tab) => (
           <button
             key={tab.id}
             type="button"
@@ -499,7 +654,8 @@ export default function SettingsPage() {
                   <div>
                     <Label htmlFor="company_name">Company Name</Label>
                     <Input
-                      id="company_name"
+                      id="company-name"
+                      name="company-name"
                       value={companyName}
                       onChange={(e) => setCompanyName(e.target.value)}
                       placeholder="Monza S.A.L."
@@ -509,7 +665,8 @@ export default function SettingsPage() {
                   <div>
                     <Label htmlFor="company_phone">Phone</Label>
                     <Input
-                      id="company_phone"
+                      id="company-phone"
+                      name="company-phone"
                       value={companyPhone}
                       onChange={(e) => setCompanyPhone(e.target.value)}
                       placeholder="+961 ..."
@@ -519,7 +676,8 @@ export default function SettingsPage() {
                   <div>
                     <Label htmlFor="company_email">Email</Label>
                     <Input
-                      id="company_email"
+                      id="company-email"
+                      name="company-email"
                       type="email"
                       value={companyEmail}
                       onChange={(e) => setCompanyEmail(e.target.value)}
@@ -530,7 +688,8 @@ export default function SettingsPage() {
                   <div>
                     <Label htmlFor="company_address">Address</Label>
                     <Input
-                      id="company_address"
+                      id="company-address"
+                      name="company-address"
                       value={companyAddress}
                       onChange={(e) => setCompanyAddress(e.target.value)}
                       className="mt-2"
@@ -539,7 +698,8 @@ export default function SettingsPage() {
                   <div>
                     <Label htmlFor="company_website">Website</Label>
                     <Input
-                      id="company_website"
+                      id="company-website"
+                      name="company-website"
                       value={companyWebsite}
                       onChange={(e) => setCompanyWebsite(e.target.value)}
                       placeholder="https://..."
@@ -602,6 +762,53 @@ export default function SettingsPage() {
                     {prefsSaving ? "Saving..." : "Save Changes"}
                   </Button>
                 </form>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {activeTab === "notifications" && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Push Notifications</CardTitle>
+              <CardDescription>
+                Receive notifications even when the app is closed
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between rounded-lg border p-4">
+                <div>
+                  <p className="font-medium">Enable Push Notifications</p>
+                  <p className="text-sm text-muted-foreground">
+                    Get notified on your device when you receive new notifications
+                  </p>
+                </div>
+                <Button
+                  variant={pushEnabled ? "outline" : "default"}
+                  onClick={() => handleTogglePush(!pushEnabled)}
+                  disabled={pushLoading || pushStatus === "denied"}
+                >
+                  {pushEnabled ? "Disable" : "Enable"}
+                </Button>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {pushStatus === "denied"
+                  ? "Push notifications are blocked by your browser. Go to your browser settings to allow notifications for this site."
+                  : pushEnabled
+                    ? "Notifications: Enabled ✓"
+                    : "Notifications: Disabled"}
+              </p>
+              {typeof navigator !== "undefined" &&
+                /iPhone|iPad|iPod/.test(navigator.userAgent) && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm dark:border-amber-800 dark:bg-amber-950/30">
+                    For notifications on iPhone, add this app to your Home Screen
+                    first (tap Share → Add to Home Screen).
+                  </div>
+                )}
+              {typeof window !== "undefined" && !window.isSecureContext && (
+                <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm dark:border-red-800 dark:bg-red-950/30">
+                  Push requires HTTPS. You&apos;re on HTTP — use https:// in the address bar or deploy with SSL (e.g. Vercel provides HTTPS automatically).
+                </div>
               )}
             </CardContent>
           </Card>
@@ -686,6 +893,79 @@ export default function SettingsPage() {
                       )}
                     </Link>
                   ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {activeTab === "pending-deletions" && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Pending Deletion Requests</CardTitle>
+              <CardDescription>
+                Review and approve or deny deletion requests from employees
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {pendingDeletesLoading ? (
+                <p className="text-muted-foreground">Loading...</p>
+              ) : pendingDeletes.length === 0 ? (
+                <p className="py-8 text-center text-muted-foreground">
+                  No pending deletion requests
+                </p>
+              ) : (
+                <div className="overflow-x-auto rounded-lg border">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b bg-muted/50">
+                        <th className="px-4 py-3 text-left font-medium">Type</th>
+                        <th className="px-4 py-3 text-left font-medium">Item Details</th>
+                        <th className="px-4 py-3 text-left font-medium">Requested By</th>
+                        <th className="px-4 py-3 text-left font-medium">Date</th>
+                        <th className="px-4 py-3 text-right font-medium">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pendingDeletes.map((r) => {
+                        const details = r.item_details as Record<string, unknown>;
+                        const itemLabel =
+                          r.item_type === "car"
+                            ? `${details.brand ?? ""} ${details.model ?? ""} (${details.vin ?? ""})`
+                            : `${details.part_name ?? ""} (OE: ${details.oe_number ?? "—"})`;
+                        return (
+                          <tr key={r.id} className="border-b last:border-0">
+                            <td className="px-4 py-3 capitalize">{r.item_type}</td>
+                            <td className="px-4 py-3">{itemLabel}</td>
+                            <td className="px-4 py-3">{r.requester_name}</td>
+                            <td className="px-4 py-3 text-muted-foreground">
+                              {new Date(r.created_at).toLocaleString()}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="default"
+                                  onClick={() => handleApproveDelete(r.id)}
+                                  disabled={deleteActioning === r.id}
+                                >
+                                  Approve
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleDenyDelete(r.id)}
+                                  disabled={deleteActioning === r.id}
+                                >
+                                  Deny
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </CardContent>

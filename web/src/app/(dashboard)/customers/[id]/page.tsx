@@ -366,10 +366,6 @@ export default function CustomerDetailPage() {
                   </p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-muted-foreground text-sm">Company</p>
-                  <p>{customer.company ?? "—"}</p>
-                </div>
-                <div className="space-y-1">
                   <p className="text-muted-foreground text-sm">Address</p>
                   <p className="whitespace-pre-wrap">{customer.address ?? "—"}</p>
                 </div>

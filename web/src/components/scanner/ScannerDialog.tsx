@@ -211,6 +211,8 @@ export function ScannerDialog({
             <Label>Or enter manually</Label>
             <div className="flex gap-2">
               <Input
+                id="scanner-manual-input"
+                name="scanner-manual-input"
                 placeholder={placeholder}
                 value={manualValue}
                 onChange={(e) => setManualValue(e.target.value)}

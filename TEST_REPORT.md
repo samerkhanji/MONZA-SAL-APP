@@ -14,45 +14,9 @@
 
 ---
 
-## 2. Supabase Audit
+## 2. Supabase
 
-### Migrations (16 files)
-
-| Migration | Purpose |
-|-----------|---------|
-| 001 | cars, car_events, RLS, move_car, create_car |
-| 002 | customers, sales_orders, reservations, pdi_reports |
-| 003 | Simplify tables, drop reservations/pdi_reports |
-| 004 | Schema refinements, soft-delete, cars_display |
-| 005 | **Optional anon policies** – do not run if using Auth |
-| 006 | Price, warranty, customs on cars |
-| 007 | Car statuses: sent_to_sub_dealer, demo |
-| 008 | Customs amount paid |
-| 009 | Sub dealer name |
-| 010 | Location floor, inventory |
-| 011 | Warranty DMS/Monza dates |
-| 012 | Car documents, storage policies |
-| **012_add_parts_profiles_garage** | **NEW** – profiles, parts, garage_jobs, job_parts, job_documents, part_movements |
-| 013 | Event date on car_documents |
-| 014 | RLS on parts |
-| 015 | Role-restricted parts policies |
-| 016 | car_events FK to profiles |
-
-### Critical: Migration 005
-
-Migration `005_optional_anon_internal.sql` replaces authenticated policies with anon policies. **Do not run this if the app uses Supabase Auth.** The Monza CRM app uses Auth; this migration should be skipped.
-
-### New Migration: 012_add_parts_profiles_garage
-
-Adds tables that the app expects but were not in migrations:
-
-- **profiles** – User roles (owner, sales, garage_manager, assistant), required for 016
-- **parts** – Parts inventory, required for 014/015
-- **part_movements** – Stock movements
-- **garage_jobs** – Garage jobs linked to cars
-- **job_parts**, **job_documents** – Job-related data
-
-Runs after `012_add_car_documents` (alphabetically) and before 014.
+**Database is managed in the Supabase Dashboard.** No migrations are run from this project. The app connects as a client only and never modifies the schema.
 
 ---
 
@@ -114,16 +78,14 @@ Several `useEffect` hooks omit `fetchCars`, `fetchCustomer`, etc. from the depen
 
 ## 7. Improvements Done
 
-1. Added `012_add_parts_profiles_garage.sql` for profiles, parts, garage.
-2. Clarified migration 005 with a warning comment.
-3. Removed unused `garageVisitsCount` and `maintenanceCount` in `cars/[id]/page.tsx`.
+1. Removed unused `garageVisitsCount` and `maintenanceCount` in `cars/[id]/page.tsx`.
+2. Deleted migration files — database is managed in Supabase Dashboard.
 
 ---
 
 ## 8. Suggested Next Steps
 
-1. **Migration 005:** If it was already applied, add a migration to restore authenticated policies for cars and car_events.
-2. **Lint:** Gradually fix `setState` in effects and dependency arrays.
-3. **Storage:** Add a `job-documents` bucket if job document uploads are used.
-4. **Tests:** Add E2E tests for critical flows (login, add car, add customer).
-5. **Next.js:** Review middleware deprecation warning (middleware → proxy).
+1. **Lint:** Gradually fix `setState` in effects and dependency arrays.
+2. **Storage:** Add a `job-documents` bucket if job document uploads are used.
+3. **Tests:** Add E2E tests for critical flows (login, add car, add customer).
+4. **Next.js:** Review middleware deprecation warning (middleware → proxy).

@@ -5,6 +5,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
+import { useUser } from "@/lib/contexts/UserContext";
+import {
+  requestPageAccess,
+  getPageAccessStatus,
+  type PageAccessStatus,
+} from "@/lib/page-access";
 import type { GarageJob } from "@/types/database";
 import {
   JOB_STATUS_COLORS,
@@ -16,7 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, History } from "lucide-react";
+import { History, Lock } from "lucide-react";
 
 interface JobWithCar extends GarageJob {
   cars?: {
@@ -40,12 +46,55 @@ function vinShort(vin: string) {
 
 export default function GarageHistoryPage() {
   const router = useRouter();
+  const { profile, canSeeGarageHistory } = useUser();
   const [jobs, setJobs] = useState<JobWithParts[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [accessStatus, setAccessStatus] = useState<PageAccessStatus | null>(null);
+  const [accessCheckLoading, setAccessCheckLoading] = useState(true);
+  const [requestingAccess, setRequestingAccess] = useState(false);
 
   const supabase = createClient();
+
+  const hasAccess = canSeeGarageHistory || accessStatus === "approved";
+
+  useEffect(() => {
+    if (canSeeGarageHistory) {
+      setAccessStatus("approved");
+      setAccessCheckLoading(false);
+      return;
+    }
+    const run = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setAccessCheckLoading(false);
+        return;
+      }
+      const status = await getPageAccessStatus(user.id, "garage_history");
+      setAccessStatus(status);
+      setAccessCheckLoading(false);
+    };
+    run();
+  }, [canSeeGarageHistory]);
+
+  async function handleRequestAccess() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user || !profile) return;
+    setRequestingAccess(true);
+    const { success } = await requestPageAccess(
+      user.id,
+      "garage_history",
+      profile.full_name ?? "An employee"
+    );
+    setRequestingAccess(false);
+    if (success) {
+      setAccessStatus("pending");
+      toast.success("Access request sent. You will be notified when approved.");
+    } else {
+      toast.error("Failed to send access request.");
+    }
+  }
 
   async function fetchJobs() {
     setLoading(true);
@@ -137,17 +186,43 @@ export default function GarageHistoryPage() {
     };
   }, [jobs]);
 
+  if (accessCheckLoading) {
+    return (
+      <div className="container mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+        <p className="py-12 text-center text-muted-foreground">Loading...</p>
+      </div>
+    );
+  }
+
+  if (!hasAccess) {
+    return (
+      <div className="container mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+        <div className="mx-auto flex max-w-md flex-col items-center justify-center rounded-lg border border-dashed p-12 text-center">
+          <Lock className="mb-4 size-12 text-muted-foreground" />
+          <h2 className="text-xl font-semibold">You don&apos;t have access to Garage History</h2>
+          <p className="mt-2 text-muted-foreground">
+            Request access from management to view completed and cancelled garage jobs.
+          </p>
+          <Button
+            className="mt-6"
+            onClick={handleRequestAccess}
+            disabled={requestingAccess || accessStatus === "pending"}
+          >
+            {accessStatus === "pending"
+              ? "Access Requested — Waiting for Approval"
+              : requestingAccess
+                ? "Sending..."
+                : "Request Access"}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/garage">
-              <ArrowLeft className="mr-2 size-4" />
-              Jobs
-            </Link>
-          </Button>
-          <div>
+        <div>
             <h1 className="flex items-center gap-2 text-2xl font-semibold">
               <History className="size-6" />
               Garage History
@@ -157,7 +232,6 @@ export default function GarageHistoryPage() {
             </p>
           </div>
         </div>
-      </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         <div className="rounded-lg border bg-card p-4">
@@ -192,6 +266,8 @@ export default function GarageHistoryPage() {
           ))}
         </div>
         <Input
+          id="garage-history-search"
+          name="garage-history-search"
           placeholder="Search VIN, title, assigned to..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}

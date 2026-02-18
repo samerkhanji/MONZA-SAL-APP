@@ -12,6 +12,9 @@ web/.next/
 web/out/
 web/build
 
+# Supabase
+supabase/.temp/
+
 # Misc
 .DS_Store
 *.log

@@ -16,6 +16,10 @@ import {
   Menu,
   Lock,
   Download,
+  ClipboardList,
+  RefreshCw,
+  WifiOff,
+  Bell,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
@@ -29,7 +33,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { useTheme } from "@/lib/contexts/ThemeContext";
+import { NotificationBell } from "@/components/NotificationBell";
 import { useInstall } from "@/lib/contexts/InstallContext";
 import { cn } from "@/lib/utils";
 
@@ -41,6 +45,7 @@ const BASE_NAV_ITEMS: Array<{
   children?: Array<{ href: string; label: string; icon: typeof Package }>;
 }> = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/requests", label: "Request Center", icon: ClipboardList },
   { href: "/cars", label: "Inventory", icon: Car },
   { href: "/documents", label: "Documents", icon: FileText },
   { href: "/customers", label: "Customers", icon: Users },
@@ -64,6 +69,7 @@ function getPageTitle(pathname: string): string {
   if (pathname.startsWith("/cars")) return "Car Inventory";
   if (pathname.startsWith("/documents")) return "Documents";
   if (pathname.startsWith("/customers")) return "Customers";
+  if (pathname.startsWith("/requests")) return "Request Center";
   if (pathname.startsWith("/garage/jobs/")) return "Job Details";
   if (pathname.startsWith("/garage/inventory")) return "Parts Inventory";
   if (pathname.startsWith("/garage/history")) return "Garage History";
@@ -74,13 +80,42 @@ function getPageTitle(pathname: string): string {
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { profile, loading, canSeeSettings, noProfile } = useUser();
+  const {
+    profile,
+    loading,
+    canSeeSettings,
+    noProfile,
+    connectionError,
+    retryConnection,
+    canSeeDashboard,
+    canSeeCars,
+    canSeeDocuments,
+    canSeePartsInventory,
+    canSeeGarageJobs,
+    canSeeGarageHistory,
+  } = useUser();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
 
-  const navItems = BASE_NAV_ITEMS.filter(
-    (item) => !item.ownerOnly || canSeeSettings
-  );
+  const navItems = BASE_NAV_ITEMS.filter((item) => {
+    if (item.ownerOnly && !canSeeSettings) return false;
+    if (item.href === "/dashboard" && !canSeeDashboard) return false;
+    if (item.href === "/cars" && !canSeeCars) return false;
+    if (item.href === "/documents" && !canSeeDocuments) return false;
+    if (item.href === "/customers") return true;
+    if (item.href === "/requests") return true;
+    if (item.href === "/garage") return canSeeGarageJobs;
+    if (item.children) {
+      const visibleChildren = item.children.filter((child) => {
+        if (child.href === "/garage/inventory") return canSeePartsInventory;
+        if (child.href === "/garage/history") return canSeeGarageJobs;
+        if (child.href === "/garage") return canSeeGarageJobs;
+        return true;
+      });
+      if (visibleChildren.length === 0) return false;
+    }
+    return true;
+  });
 
   async function handleSignOut() {
     const supabase = createClient();
@@ -94,7 +129,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     : "Signed in";
   const avatarInitial = (profile?.full_name?.[0] ?? "U").toUpperCase();
 
-  const { theme } = useTheme();
   const { showInstallOption, triggerInstall } = useInstall();
 
   const SidebarContent = () => (
@@ -102,9 +136,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       <div className="flex h-14 items-center border-b shrink-0 px-4 md:justify-center md:px-0 md:group-hover:justify-start md:group-hover:px-4 lg:justify-start lg:px-4">
         <Link href="/dashboard" className="flex items-center justify-center md:justify-center lg:justify-start">
           <img
-            src={theme === "dark" ? "/images/sidebar-logo-dark.png" : "/images/sidebar-logo-light.png"}
+            src="/images/sidebar-logo-light.png"
             alt="Monza S.A.L."
-            className="h-10 max-h-10 w-auto object-contain"
+            className="h-10 max-h-10 w-auto object-contain brightness-0 invert"
           />
         </Link>
       </div>
@@ -124,8 +158,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                   className={cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors md:justify-center md:px-2 md:group-hover:justify-start md:group-hover:px-3 lg:justify-start lg:px-3",
                     pathname === item.href
-                      ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground dark:hover:bg-slate-700"
+                      ? "border-l-4 border-l-primary bg-sidebar-accent text-sidebar-accent-foreground"
+                      : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                   )}
                   title={undefined}
                 >
@@ -133,7 +167,12 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                   <span className="md:hidden md:group-hover:inline lg:inline">{item.label}</span>
                 </Link>
                 <div className="ml-4 space-y-0.5 border-l border-border pl-3 md:hidden md:group-hover:block lg:block">
-                  {item.children!.map((child) => {
+                  {item.children!.filter((child) => {
+                    if (child.href === "/garage/inventory") return canSeePartsInventory;
+                    if (child.href === "/garage/history") return canSeeGarageJobs;
+                    if (child.href === "/garage") return canSeeGarageJobs;
+                    return true;
+                  }).map((child) => {
                     const childActive =
                       pathname === child.href ||
                       (child.href !== "/garage" && pathname.startsWith(child.href + "/"));
@@ -145,8 +184,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                         className={cn(
                           "flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors",
                           childActive
-                            ? "font-medium text-primary"
-                            : "text-muted-foreground hover:bg-muted hover:text-foreground dark:hover:bg-slate-700"
+                            ? "font-medium border-l-2 border-l-primary bg-sidebar-accent/50 text-sidebar-accent-foreground"
+                            : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
                         )}
                       >
                         <child.icon className="size-3.5 shrink-0 opacity-70" />
@@ -167,9 +206,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                   className={cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors md:justify-center md:px-2 md:group-hover:justify-start md:group-hover:px-3 lg:justify-start lg:px-3",
                     isActive
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground dark:hover:bg-slate-700"
-              )}
+                      ? "border-l-4 border-l-primary bg-sidebar-accent text-sidebar-accent-foreground"
+                      : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  )}
               title={item.label}
             >
               <item.icon className="size-4 shrink-0" />
@@ -189,6 +228,29 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       </div>
     </div>
   );
+
+  if (connectionError && !loading) {
+    return (
+      <div className="relative flex min-h-screen flex-col items-center justify-center gap-4 p-8">
+        <div className="absolute right-4 top-4">
+          <ThemeToggle />
+        </div>
+        <WifiOff className="size-16 text-muted-foreground" />
+        <h1 className="text-xl font-semibold">Connection failed</h1>
+        <p className="max-w-md text-center text-muted-foreground">
+          Unable to connect to the server. Please check your internet connection
+          and try again.
+        </p>
+        <Button onClick={retryConnection}>
+          <RefreshCw className="mr-2 size-4" />
+          Retry
+        </Button>
+        <Button variant="outline" onClick={handleSignOut}>
+          Sign out
+        </Button>
+      </div>
+    );
+  }
 
   if (noProfile && !loading) {
     return (
@@ -239,6 +301,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             {getPageTitle(pathname)}
           </h1>
           <div className="flex items-center gap-1">
+            <NotificationBell />
             <ThemeToggle />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -255,6 +318,12 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                   Install App
                 </DropdownMenuItem>
               )}
+              <DropdownMenuItem asChild>
+                <Link href="/settings?tab=notifications">
+                  <Bell className="mr-2 size-4" />
+                  Notification preferences
+                </Link>
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setChangePasswordOpen(true)}>
                 <Lock className="mr-2 size-4" />
                 Change Password

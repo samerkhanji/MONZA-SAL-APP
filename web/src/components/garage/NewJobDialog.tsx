@@ -15,7 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Trash2, ScanLine } from "lucide-react";
+import { Trash2, ScanLine, Camera } from "lucide-react";
 import { ScannerDialog } from "@/components/scanner/ScannerDialog";
 
 interface CarOption {
@@ -68,6 +68,8 @@ export function NewJobDialog({
   const [partNote, setPartNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [scanVinOpen, setScanVinOpen] = useState(false);
+  const [partNumberSearch, setPartNumberSearch] = useState("");
+  const [scanPartOpen, setScanPartOpen] = useState(false);
 
   const supabase = createClient();
 
@@ -94,6 +96,7 @@ export function NewJobDialog({
       setAllParts([]);
       setPartQuantity("1");
       setPartNote("");
+      setPartNumberSearch("");
     }
   }, [open]);
 
@@ -108,7 +111,7 @@ export function NewJobDialog({
       .from("cars")
       .select("id, vin, brand, model, model_year, exterior_color, status")
       .is("deleted_at", null)
-      .or(`vin.ilike.%${q}%,brand.ilike.%${q}%,model.ilike.%${q}%`)
+      .ilike("vin", `%${q}%`)
       .limit(10)
       .then(({ data }) => setCars((data as CarOption[]) ?? []));
   }, [carSearch, open]);
@@ -128,6 +131,21 @@ export function NewJobDialog({
         setPartsLoading(false);
       });
   }, [open]);
+
+  function addPartByOeNumber(oeNumber: string) {
+    const q = oeNumber.trim().toUpperCase();
+    if (!q) return;
+    const match = allParts.find(
+      (p) => p.oe_number && p.oe_number.toUpperCase() === q
+    );
+    if (match) {
+      addPart(match.id, match.part_name, match.oe_number);
+      setPartNumberSearch("");
+      toast.success(`Added: ${match.part_name}`);
+    } else {
+      toast.error(`Part not found with OE number: ${q}`);
+    }
+  }
 
   function addPart(partId: string, partName: string, oeNumber: string | null) {
     const qty = parseInt(partQuantity, 10);
@@ -158,7 +176,7 @@ export function NewJobDialog({
       return;
     }
     if (!title.trim()) {
-      toast.error("Job title is required");
+      toast.error("Reason of visit is required");
       return;
     }
 
@@ -229,6 +247,18 @@ export function NewJobDialog({
       }
     }
 
+    const markId = (await import("@/lib/user-lookup").then((m) => m.getProfileIdByName("Mark"))) ?? null;
+    if (markId && user.id !== markId) {
+      await import("@/lib/notifications").then((m) =>
+        m.createNotification({
+          userId: markId,
+          title: "New garage job",
+          message: `New garage job created: ${title.trim()} for VIN ${selectedCar.vin ?? "—"}`,
+          link: `/garage/jobs/${jobId}`,
+        })
+      );
+    }
+
     toast.success(partsToAdd.length > 0 ? "Job created with parts" : "Job created");
     onOpenChange(false);
     onSuccess();
@@ -242,10 +272,12 @@ export function NewJobDialog({
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <Label className="text-base">🚗 Select Car *</Label>
+            <Label htmlFor="job-car-search" className="text-base">Select Car *</Label>
             <div className="mt-2 flex gap-2">
               <Input
-                placeholder="Search by VIN, brand, or model..."
+                id="job-car-search"
+                name="job-car-search"
+                placeholder="Search by VIN"
                 value={carSearch}
                 onChange={(e) => setCarSearch(e.target.value)}
                 className="h-11 flex-1"
@@ -266,10 +298,7 @@ export function NewJobDialog({
                 className="mt-2 flex cursor-pointer items-center justify-between rounded-lg border border-2 border-primary bg-primary/5 p-3"
                 onClick={() => setSelectedCar(null)}
               >
-                <span className="font-mono text-sm">
-                  {selectedCar.vin} · {selectedCar.brand} {selectedCar.model}
-                  {selectedCar.exterior_color ? ` · ${selectedCar.exterior_color}` : ""}
-                </span>
+                <span className="font-mono text-sm">{selectedCar.vin}</span>
                 <span className="text-muted-foreground text-xs">Clear</span>
               </div>
             ) : (
@@ -286,10 +315,7 @@ export function NewJobDialog({
                         setCars([]);
                       }}
                     >
-                      <span className="font-mono text-sm">
-                        {c.vin} · {c.brand} {c.model}
-                        {c.exterior_color ? ` · ${c.exterior_color}` : ""}
-                      </span>
+                      <span className="font-mono text-sm">{c.vin}</span>
                     </button>
                   ))}
                 </div>
@@ -298,8 +324,10 @@ export function NewJobDialog({
           </div>
 
           <div>
-            <Label className="text-base">📝 Job Title *</Label>
+            <Label htmlFor="job-reason-of-visit" className="text-base">Reason of Visit *</Label>
             <Input
+              id="job-reason-of-visit"
+              name="job-reason-of-visit"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g. Brake Pad Replacement"
@@ -309,8 +337,10 @@ export function NewJobDialog({
           </div>
 
           <div>
-            <Label className="text-base">📋 Description</Label>
+            <Label htmlFor="job-description" className="text-base">Description</Label>
             <Textarea
+              id="job-description"
+              name="job-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Customer complaint..."
@@ -320,7 +350,7 @@ export function NewJobDialog({
           </div>
 
           <div>
-            <Label className="text-base">⚡ Priority</Label>
+            <Label className="text-base">Priority</Label>
             <div className="mt-2 flex gap-2">
               {(["low", "normal", "urgent"] as const).map((p) => (
                 <button
@@ -333,28 +363,30 @@ export function NewJobDialog({
                       : "border-border hover:border-primary/50"
                   }`}
                 >
-                  {p === "low" ? "Low" : p === "normal" ? "Normal" : "Urgent"}
+                  {p === "low" ? "🟢 Low" : p === "normal" ? "🟡 Medium" : "🔴 Urgent"}
                 </button>
               ))}
             </div>
           </div>
 
           <div>
-            <Label className="text-base">👤 Assign To</Label>
+            <Label className="text-base">Assign To</Label>
             <div className="mt-2 flex flex-wrap gap-2">
               {ASSIGN_OPTIONS.map((opt) => (
                 <button
                   key={opt}
                   type="button"
-                  onClick={() => setAssignedTo(opt)}
-                  className={`rounded-lg border px-4 py-2 text-sm ${
-                    assignedTo === opt ? "border-primary bg-primary/10" : ""
+                  onClick={() => setAssignedTo(assignedTo === opt ? "" : opt)}
+                  className={`rounded-lg border px-4 py-2 text-sm transition-colors hover:border-primary/50 ${
+                    assignedTo === opt ? "border-primary bg-primary/10" : "border-border"
                   }`}
                 >
                   {opt}
                 </button>
               ))}
               <Input
+                id="job-assigned-to"
+                name="job-assigned-to"
                 placeholder="Or type name..."
                 value={ASSIGN_OPTIONS.includes(assignedTo) ? "" : assignedTo}
                 onChange={(e) => setAssignedTo(e.target.value)}
@@ -364,8 +396,10 @@ export function NewJobDialog({
           </div>
 
           <div>
-            <Label className="text-base">📅 Due Date</Label>
+            <Label htmlFor="job-day-to-be-serviced" className="text-base">Day to be Serviced</Label>
             <Input
+              id="job-day-to-be-serviced"
+              name="job-day-to-be-serviced"
               type="date"
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
@@ -374,8 +408,10 @@ export function NewJobDialog({
           </div>
 
           <div>
-            <Label className="text-base">⏱️ Estimated Hours</Label>
+            <Label htmlFor="job-estimated-hours" className="text-base">Estimated Hours</Label>
             <Input
+              id="job-estimated-hours"
+              name="job-estimated-hours"
               type="number"
               step="0.5"
               min={0}
@@ -387,12 +423,51 @@ export function NewJobDialog({
           </div>
 
           <div>
-            <Label className="text-base">🔧 Part Numbers Used</Label>
+            <Label className="text-base">Part Numbers Used</Label>
             <p className="mt-1 text-muted-foreground text-sm">
-              Click parts to add them — you can add multiple parts. Set quantity and note before each add.
+              Search by part number, scan barcode, or click parts below.
             </p>
             <div className="mt-2 flex gap-2">
               <Input
+                id="job-part-number"
+                name="job-part-number"
+                placeholder="Part number (OE)..."
+                value={partNumberSearch}
+                onChange={(e) => setPartNumberSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addPartByOeNumber(partNumberSearch);
+                  }
+                }}
+                className="h-9 min-w-[180px] max-w-[240px] font-mono"
+                maxLength={25}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={() => setScanPartOpen(true)}
+                title="Scan part number"
+                className="h-9 w-9 shrink-0"
+              >
+                <Camera className="size-4" />
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => addPartByOeNumber(partNumberSearch)}
+                disabled={!partNumberSearch.trim()}
+                className="h-9"
+              >
+                Add
+              </Button>
+            </div>
+            <div className="mt-2 flex gap-2">
+              <Input
+                id="job-part-quantity"
+                name="job-part-quantity"
                 type="number"
                 min={1}
                 value={partQuantity}
@@ -401,6 +476,8 @@ export function NewJobDialog({
                 className="h-9 w-20"
               />
               <Input
+                id="job-part-note"
+                name="job-part-note"
                 value={partNote}
                 onChange={(e) => setPartNote(e.target.value)}
                 placeholder="Note (optional)"
@@ -471,8 +548,10 @@ export function NewJobDialog({
           </div>
 
           <div>
-            <Label className="text-base">📝 Notes</Label>
+            <Label htmlFor="job-notes" className="text-base">Notes</Label>
             <Textarea
+              id="job-notes"
+              name="job-notes"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
@@ -506,6 +585,18 @@ export function NewJobDialog({
         title="Scan VIN"
         placeholder="17-character VIN..."
         scanType="vin"
+      />
+
+      <ScannerDialog
+        open={scanPartOpen}
+        onClose={() => setScanPartOpen(false)}
+        onScan={(value) => {
+          addPartByOeNumber(value);
+          setScanPartOpen(false);
+        }}
+        title="Scan Part Number"
+        placeholder="OE number..."
+        scanType="part"
       />
     </Dialog>
   );

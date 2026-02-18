@@ -126,7 +126,8 @@ export function EditPartDialog({
             <div className="sm:col-span-2">
               <Label htmlFor="part_name">Part Name *</Label>
               <Input
-                id="part_name"
+                id="edit-part-name"
+                name="edit-part-name"
                 value={partName}
                 onChange={(e) => setPartName(e.target.value)}
                 required
@@ -136,7 +137,8 @@ export function EditPartDialog({
               <Label htmlFor="oe_number">OE Number</Label>
               <div className="flex gap-2">
                 <Input
-                  id="oe_number"
+                  id="edit-part-oe-number"
+                  name="edit-part-oe-number"
                   value={oeNumber}
                   onChange={(e) => setOeNumber(e.target.value)}
                   className="font-mono flex-1"
@@ -156,7 +158,8 @@ export function EditPartDialog({
             <div>
               <Label htmlFor="car_model">Car Model</Label>
               <Input
-                id="car_model"
+                id="edit-part-car-model"
+                name="edit-part-car-model"
                 value={carModel}
                 onChange={(e) => setCarModel(e.target.value)}
                 placeholder="e.g. General, Voyah Passion, MHero"
@@ -165,7 +168,8 @@ export function EditPartDialog({
             <div className="sm:col-span-2">
               <Label htmlFor="description">Description</Label>
               <Input
-                id="description"
+                id="edit-part-description"
+                name="edit-part-description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
               />
@@ -173,7 +177,8 @@ export function EditPartDialog({
             <div>
               <Label htmlFor="min_quantity">Min Quantity</Label>
               <Input
-                id="min_quantity"
+                id="edit-part-min-quantity"
+                name="edit-part-min-quantity"
                 type="number"
                 min={0}
                 value={minQuantity}
@@ -183,7 +188,8 @@ export function EditPartDialog({
             <div>
               <Label htmlFor="storage_zone">Storage Zone</Label>
               <Input
-                id="storage_zone"
+                id="edit-part-storage-zone"
+                name="edit-part-storage-zone"
                 value={storageZone}
                 onChange={(e) => setStorageZone(e.target.value)}
               />
@@ -191,7 +197,8 @@ export function EditPartDialog({
             <div>
               <Label htmlFor="supplier">Supplier</Label>
               <Input
-                id="supplier"
+                id="edit-part-supplier"
+                name="edit-part-supplier"
                 value={supplier}
                 onChange={(e) => setSupplier(e.target.value)}
               />
@@ -200,7 +207,8 @@ export function EditPartDialog({
               <Label htmlFor="unit_cost">Unit Cost</Label>
               <div className="flex gap-2">
                 <Input
-                  id="unit_cost"
+                  id="edit-part-unit-cost"
+                  name="edit-part-unit-cost"
                   type="number"
                   step="0.01"
                   min={0}
@@ -221,7 +229,8 @@ export function EditPartDialog({
             <div>
               <Label htmlFor="order_date">Order Date</Label>
               <Input
-                id="order_date"
+                id="edit-part-order-date"
+                name="edit-part-order-date"
                 type="date"
                 value={orderDate}
                 onChange={(e) => setOrderDate(e.target.value)}
@@ -230,7 +239,8 @@ export function EditPartDialog({
             <div className="sm:col-span-2">
               <Label htmlFor="notes">Notes</Label>
               <Textarea
-                id="notes"
+                id="edit-part-notes"
+                name="edit-part-notes"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 rows={2}

@@ -1,11 +1,11 @@
 {
-  "name": "Monza S.A.L.",
+  "name": "Monza CRM",
   "short_name": "Monza",
   "description": "Monza S.A.L. - Vehicle & Business Management",
-  "start_url": "/dashboard",
+  "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#000000",
+  "background_color": "#111827",
+  "theme_color": "#F59E0B",
   "orientation": "any",
   "icons": [
     { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },

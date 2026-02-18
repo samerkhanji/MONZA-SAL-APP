@@ -3,6 +3,7 @@
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase";
+import { isConnectionError } from "@/lib/auth-utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -47,7 +48,11 @@ function LoginForm() {
     setLoading(false);
 
     if (signInError) {
-      setError(signInError.message);
+      setError(
+        isConnectionError(signInError)
+          ? "Connection failed. Please check your internet and try again."
+          : signInError.message
+      );
       return;
     }
 
@@ -109,7 +114,8 @@ function LoginForm() {
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
-                id="email"
+                id="login-email"
+                name="login-email"
                 type="email"
                 placeholder="you@company.com"
                 value={email}
@@ -122,7 +128,8 @@ function LoginForm() {
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <Input
-                id="password"
+                id="login-password"
+                name="login-password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -168,6 +175,7 @@ function LoginForm() {
                 <Label htmlFor="forgot-email">Email</Label>
                 <Input
                   id="forgot-email"
+                  name="forgot-email"
                   type="email"
                   placeholder="you@company.com"
                   value={forgotEmail}

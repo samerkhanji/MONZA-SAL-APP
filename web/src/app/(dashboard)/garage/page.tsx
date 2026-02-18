@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/select";
 import { Plus, ScanLine } from "lucide-react";
 import { NewJobDialog } from "@/components/garage/NewJobDialog";
+import { FinishJobDialog } from "@/components/garage/FinishJobDialog";
 import { ScannerDialog } from "@/components/scanner/ScannerDialog";
 
 interface JobWithCar extends GarageJob {
@@ -56,7 +57,7 @@ function formatTimeAgo(dateStr: string) {
   return d.toLocaleDateString();
 }
 
-const VALID_JOB_STATUSES = ["pending", "in_progress", "waiting_parts", "done", "cancelled"];
+const VALID_JOB_STATUSES = ["pending", "in_progress", "waiting_parts", "done", "delivered", "cancelled"];
 
 export default function GarageJobsPage() {
   const router = useRouter();
@@ -76,6 +77,8 @@ export default function GarageJobsPage() {
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [newJobOpen, setNewJobOpen] = useState(false);
   const [scanVinOpen, setScanVinOpen] = useState(false);
+  const [finishJobOpen, setFinishJobOpen] = useState<JobWithCar | null>(null);
+  const dueTodayNotifiedRef = useRef(false);
   const [preselectedCar, setPreselectedCar] = useState<{
     id: string;
     vin: string;
@@ -135,6 +138,80 @@ export default function GarageJobsPage() {
     fetchJobs();
   }, []);
 
+  useEffect(() => {
+    if (jobs.length === 0) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const dueTodayPending = jobs.filter(
+      (j) =>
+        j.due_date &&
+        j.due_date.slice(0, 10) === today &&
+        j.status === "pending"
+    );
+    if (dueTodayPending.length > 0) {
+      (async () => {
+        for (const j of dueTodayPending) {
+          const { data: existing } = await supabase
+            .from("service_day_notifications_sent")
+            .select("id")
+            .eq("job_id", j.id)
+            .eq("sent_date", today)
+            .limit(1);
+          if (existing && existing.length > 0) continue;
+          const markId = (await import("@/lib/user-lookup").then((m) => m.getProfileIdByName("Mark"))) ?? null;
+          if (markId) {
+            await import("@/lib/notifications").then((m) =>
+              m.createNotification({
+                userId: markId,
+                title: "Service reminder",
+                message: `Reminder: VIN ${j.cars?.vin ?? "—"} is scheduled for service today — ${j.title}`,
+                link: "/garage",
+              })
+            );
+            await supabase.from("service_day_notifications_sent").insert({
+              job_id: j.id,
+              sent_date: today,
+            });
+          }
+        }
+      })();
+    }
+  }, [jobs]);
+
+  useEffect(() => {
+    if (jobs.length === 0) return;
+    const overtimeJobs = jobs.filter(
+      (j) =>
+        j.status === "in_progress" &&
+        j.started_at &&
+        (j.estimated_hours ?? 0) > 0 &&
+        !j.overtime_notified
+    );
+    const now = Date.now();
+    for (const j of overtimeJobs) {
+      const startMs = new Date(j.started_at!).getTime();
+      const expectedEndMs = startMs + (j.estimated_hours ?? 0) * 60 * 60 * 1000;
+      if (now > expectedEndMs) {
+        (async () => {
+          const markId = (await import("@/lib/user-lookup").then((m) => m.getProfileIdByName("Mark"))) ?? null;
+          if (markId) {
+            await import("@/lib/notifications").then((m) =>
+              m.createNotification({
+                userId: markId,
+                title: "Overtime alert",
+                message: `Overtime alert: Job ${j.title} for VIN ${j.cars?.vin ?? "—"} has exceeded the estimated ${j.estimated_hours} hours`,
+                link: "/garage",
+              })
+            );
+            await supabase
+              .from("garage_jobs")
+              .update({ overtime_notified: true })
+              .eq("id", j.id);
+          }
+        })();
+      }
+    }
+  }, [jobs]);
+
   const filteredJobs = useMemo(() => {
     const q = search.trim().toLowerCase();
     return jobs.filter((j) => {
@@ -176,7 +253,7 @@ export default function GarageJobsPage() {
   const stats = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
     return {
-      urgent: jobs.filter((j) => j.priority === "urgent" && j.status !== "done" && j.status !== "cancelled").length,
+      urgent: jobs.filter((j) => j.priority === "urgent" && j.status !== "done" && j.status !== "delivered" && j.status !== "cancelled").length,
       inProgress: jobs.filter((j) => j.status === "in_progress").length,
       waitingParts: jobs.filter((j) => j.status === "waiting_parts").length,
       doneToday: jobs.filter(
@@ -196,6 +273,9 @@ export default function GarageJobsPage() {
     if (newStatus === "done") {
       updates.completed_at = new Date().toISOString();
     }
+    if (newStatus === "delivered") {
+      updates.delivered_at = new Date().toISOString();
+    }
 
     const { error } = await supabase
       .from("garage_jobs")
@@ -206,6 +286,24 @@ export default function GarageJobsPage() {
       toast.error(error.message);
       return;
     }
+
+    if (newStatus === "delivered") {
+      const carVin = job.cars?.vin ?? "—";
+      const { getProfileIdsByNames } = await import("@/lib/user-lookup");
+      const [laraId, samayaId] = await getProfileIdsByNames(["Lara", "Samaya"]);
+      const assistantIds = [laraId, samayaId].filter(Boolean);
+      if (assistantIds.length > 0) {
+        await import("@/lib/notifications").then((m) =>
+          m.createNotificationsForUsers(
+            assistantIds,
+            "Car delivered",
+            `Car delivered: VIN ${carVin} has been picked up by the customer. Job: ${job.title}`,
+            "/garage"
+          )
+        );
+      }
+    }
+
     toast.success("Status updated");
     fetchJobs();
   }
@@ -217,6 +315,21 @@ export default function GarageJobsPage() {
     const d = new Date(due);
     d.setHours(0, 0, 0, 0);
     return d < today;
+  };
+
+  const isDueToday = (due: string | null) => {
+    if (!due) return false;
+    const today = new Date().toISOString().slice(0, 10);
+    return due.slice(0, 10) === today;
+  };
+
+  const isOvertime = (job: JobWithCar) => {
+    if (job.status !== "in_progress" || !job.started_at) return false;
+    const estimatedHours = job.estimated_hours ?? 0;
+    if (estimatedHours <= 0) return false;
+    const startMs = new Date(job.started_at).getTime();
+    const expectedEndMs = startMs + estimatedHours * 60 * 60 * 1000;
+    return Date.now() > expectedEndMs;
   };
 
   return (
@@ -251,26 +364,26 @@ export default function GarageJobsPage() {
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <div className="rounded-lg border bg-card p-4">
-          <p className="text-muted-foreground text-sm">🔴 Urgent</p>
+          <p className="text-muted-foreground text-sm">Urgent</p>
           <p className="text-2xl font-bold">{stats.urgent}</p>
         </div>
         <div className="rounded-lg border bg-card p-4">
-          <p className="text-muted-foreground text-sm">🟡 In Progress</p>
+          <p className="text-muted-foreground text-sm">In Progress</p>
           <p className="text-2xl font-bold">{stats.inProgress}</p>
         </div>
         <div className="rounded-lg border bg-card p-4">
-          <p className="text-muted-foreground text-sm">⏳ Waiting Parts</p>
+          <p className="text-muted-foreground text-sm">Waiting Parts</p>
           <p className="text-2xl font-bold">{stats.waitingParts}</p>
         </div>
         <div className="rounded-lg border bg-card p-4">
-          <p className="text-muted-foreground text-sm">✅ Done Today</p>
+          <p className="text-muted-foreground text-sm">Done Today</p>
           <p className="text-2xl font-bold">{stats.doneToday}</p>
         </div>
       </div>
 
       <div className="flex flex-wrap gap-3">
         <div className="flex flex-wrap gap-2">
-          {["all", "pending", "in_progress", "waiting_parts", "done"].map(
+          {["all", "pending", "in_progress", "waiting_parts", "done", "delivered", "cancelled"].map(
             (s) => (
               <button
                 key={s}
@@ -304,7 +417,9 @@ export default function GarageJobsPage() {
           ))}
         </div>
         <Input
-          placeholder="Search VIN, title, assigned to..."
+          id="garage-job-search"
+          name="garage-job-search"
+          placeholder="Search VIN, reason of visit, assigned to..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="min-h-11 w-full sm:h-10 sm:w-64"
@@ -331,16 +446,25 @@ export default function GarageJobsPage() {
             const car = job.cars;
             const borderClass =
               PRIORITY_BORDERS[job.priority] ?? "border-l-4 border-l-gray-300";
+            const dueToday = isDueToday(job.due_date);
+            const overtime = isOvertime(job);
             return (
               <div
                 key={job.id}
-                className={`rounded-lg border bg-card ${borderClass} p-5 shadow-sm`}
+                className={`rounded-lg border bg-card ${borderClass} p-5 shadow-sm ${
+                  dueToday ? "ring-2 ring-amber-400/60 bg-amber-50/30 dark:bg-amber-950/20" : ""
+                } ${overtime ? "border-l-amber-500 bg-amber-50/50 dark:bg-amber-950/20" : ""}`}
               >
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       {job.priority === "urgent" && (
-                        <span className="text-red-600">🔴 URGENT</span>
+                        <span className="text-red-600 font-medium">Urgent</span>
+                      )}
+                      {dueToday && (
+                        <span className="rounded bg-amber-200 px-2 py-0.5 text-xs font-medium text-amber-900 dark:bg-amber-800 dark:text-amber-100">
+                          Due Today
+                        </span>
                       )}
                       <span className="text-muted-foreground text-sm">
                         {formatTimeAgo(job.created_at)}
@@ -357,10 +481,10 @@ export default function GarageJobsPage() {
                     )}
                     <div className="mt-3 flex flex-wrap gap-3 text-sm">
                       {job.assigned_to && (
-                        <span>👤 {job.assigned_to}</span>
+                        <span className="text-muted-foreground">{job.assigned_to}</span>
                       )}
-                      <span>
-                        ⏱️ Est: {job.estimated_hours ?? "—"}h / Act:{" "}
+                      <span className="text-muted-foreground">
+                        Est: {job.estimated_hours ?? "—"}h / Act:{" "}
                         {job.actual_hours ?? "—"}h
                       </span>
                       {job.due_date && (
@@ -371,11 +495,45 @@ export default function GarageJobsPage() {
                               : "text-muted-foreground"
                           }
                         >
-                          📅 Due: {new Date(job.due_date).toLocaleDateString()}
+                          Day to be Serviced: {new Date(job.due_date).toLocaleDateString()}
                         </span>
                       )}
                     </div>
                     <div className="mt-3 flex flex-wrap items-center gap-2">
+                      {canManageGarage && job.status === "pending" && (
+                        <Button
+                          size="sm"
+                          onClick={() => handleStatusChange(job, "in_progress")}
+                          className="h-9"
+                        >
+                          Start
+                        </Button>
+                      )}
+                      {canManageGarage && job.status === "in_progress" && (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => setFinishJobOpen(job)}
+                          className="h-9"
+                        >
+                          Finish
+                        </Button>
+                      )}
+                      {job.status === "done" && (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => handleStatusChange(job, "delivered")}
+                          className="h-9"
+                        >
+                          Delivered
+                        </Button>
+                      )}
+                      {job.status === "delivered" && (
+                        <Badge variant="secondary" className="h-9">
+                          Delivered
+                        </Badge>
+                      )}
                       <Select
                         value={job.status}
                         onValueChange={(v) => handleStatusChange(job, v)}
@@ -391,6 +549,7 @@ export default function GarageJobsPage() {
                               "in_progress",
                               "waiting_parts",
                               "done",
+                              "delivered",
                               "cancelled",
                             ] as const
                           ).map((s) => (
@@ -402,10 +561,11 @@ export default function GarageJobsPage() {
                       </Select>
                       <Button
                         size="sm"
+                        variant="outline"
                         onClick={() => router.push(`/garage/jobs/${job.id}`)}
                         className="h-9"
                       >
-                        Open Job →
+                        Open Job
                       </Button>
                     </div>
                   </div>
@@ -433,6 +593,13 @@ export default function GarageJobsPage() {
         }}
         onSuccess={fetchJobs}
         preselectedCar={preselectedCar}
+      />
+
+      <FinishJobDialog
+        job={finishJobOpen}
+        open={!!finishJobOpen}
+        onOpenChange={(o) => !o && setFinishJobOpen(null)}
+        onSuccess={fetchJobs}
       />
     </div>
   );

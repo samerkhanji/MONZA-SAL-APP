@@ -89,7 +89,8 @@ export default function ResetPasswordPage() {
               <div className="space-y-2">
                 <Label htmlFor="password">New password</Label>
                 <Input
-                  id="password"
+                  id="reset-password"
+                  name="reset-password"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -102,7 +103,8 @@ export default function ResetPasswordPage() {
               <div className="space-y-2">
                 <Label htmlFor="confirm">Confirm password</Label>
                 <Input
-                  id="confirm"
+                  id="reset-confirm-password"
+                  name="reset-confirm-password"
                   type="password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}

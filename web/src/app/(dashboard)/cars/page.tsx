@@ -56,6 +56,11 @@ import { CustomsDialog } from "@/components/customs-dialog";
 import { PdiStatusDialog } from "@/components/pdi-status-dialog";
 import { MoveCarDialog } from "@/components/move-car-dialog";
 import { EditCarDialog } from "@/components/edit-car-dialog";
+import {
+  createDeleteRequest,
+  getPendingDeleteRequestsForItems,
+  type CarDeleteDetails,
+} from "@/lib/delete-requests";
 
 function matchesSearch(
   car: CarDisplay,
@@ -79,8 +84,9 @@ export default function CarsListPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const statusFromUrl = searchParams.get("status");
-  const { canEditInventory, canDelete } = useUser();
+  const { canEditInventory, canDelete, profile } = useUser();
   const [cars, setCars] = useState<CarDisplay[]>([]);
+  const [pendingDeletes, setPendingDeletes] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -97,7 +103,6 @@ export default function CarsListPage() {
     }
   }, [statusFromUrl]);
   const [brandFilter, setBrandFilter] = useState<string>("all");
-  const [pdiFilter, setPdiFilter] = useState<string>("all");
   const [statusDialogCar, setStatusDialogCar] = useState<CarDisplay | null>(null);
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [customsDialogCar, setCustomsDialogCar] = useState<CarDisplay | null>(null);
@@ -129,25 +134,44 @@ export default function CarsListPage() {
   }
 
   async function handleDeleteCar() {
-    if (!deleteCar) return;
-    const { error } = await supabase
-      .from("cars")
-      .update({ deleted_at: new Date().toISOString() })
-      .eq("id", deleteCar.id);
+    if (!deleteCar || !profile) return;
 
-    if (error) {
-      const isRls =
-        error.code === "42501" ||
-        error.message.toLowerCase().includes("permission");
-      toast.error(
-        isRls ? "You don't have permission to do this." : error.message
-      );
-      return;
+    if (canDelete) {
+      const { error } = await supabase
+        .from("cars")
+        .update({ deleted_at: new Date().toISOString() })
+        .eq("id", deleteCar.id);
+
+      if (error) {
+        const isRls =
+          error.code === "42501" ||
+          error.message.toLowerCase().includes("permission");
+        toast.error(
+          isRls ? "You don't have permission to do this." : error.message
+        );
+        return;
+      }
+
+      toast.success("Car removed successfully");
+      setDeleteCar(null);
+      fetchCars();
+    } else {
+      const details: CarDeleteDetails = {
+        vin: deleteCar.vin ?? "",
+        brand: deleteCar.brand ?? "",
+        model: deleteCar.model ?? "",
+        model_year: deleteCar.model_year ?? null,
+      };
+      const id = await createDeleteRequest("car", deleteCar.id, details, profile.id);
+      if (id) {
+        toast.success("Deletion request sent for owner approval");
+        setPendingDeletes((prev) => ({ ...prev, [deleteCar.id]: true }));
+      } else {
+        toast.error("Failed to submit deletion request");
+      }
+      setDeleteCar(null);
+      fetchCars();
     }
-
-    toast.success("Car removed successfully");
-    setDeleteCar(null);
-    fetchCars();
   }
 
   async function fetchCars() {
@@ -175,6 +199,17 @@ export default function CarsListPage() {
     fetchCars();
   }, []);
 
+  useEffect(() => {
+    if (cars.length === 0) return;
+    getPendingDeleteRequestsForItems("car", cars.map((c) => c.id)).then((map) => {
+      const byId: Record<string, boolean> = {};
+      cars.forEach((c) => {
+        byId[c.id] = !!map[c.id];
+      });
+      setPendingDeletes(byId);
+    });
+  }, [cars]);
+
   const filteredCars = useMemo(() => {
     return cars.filter((car) => {
       if (!matchesSearch(car, search)) return false;
@@ -182,10 +217,9 @@ export default function CarsListPage() {
       if (locationFilter !== "all" && car.location_type !== locationFilter)
         return false;
       if (brandFilter !== "all" && car.brand !== brandFilter) return false;
-      if (pdiFilter !== "all" && car.pdi_status !== pdiFilter) return false;
       return true;
     });
-  }, [cars, search, statusFilter, locationFilter, brandFilter, pdiFilter]);
+  }, [cars, search, statusFilter, locationFilter, brandFilter]);
 
   return (
     <div className="container mx-auto max-w-[1800px] space-y-6 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
@@ -205,12 +239,14 @@ export default function CarsListPage() {
         <CardHeader>
           <CardTitle>Filters</CardTitle>
           <CardDescription>
-            Search by VIN, plate, brand, model · Status · Location · Brand · PDI
+            Search by VIN, plate, brand, model · Status · Location · Brand
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-3 sm:gap-4">
           <div className="flex w-full gap-2 sm:w-auto sm:max-w-xs">
             <Input
+              id="car-inventory-search"
+              name="car-inventory-search"
               placeholder="Search by VIN, plate, brand, model..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -227,52 +263,43 @@ export default function CarsListPage() {
             </Button>
           </div>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger id="car-status-filter" className="w-[180px]">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All statuses</SelectItem>
-              {Object.entries(CAR_STATUS_LABELS).map(([value, label]) => (
-                <SelectItem key={value} value={value}>
-                  {label}
-                </SelectItem>
-              ))}
+              {Object.entries(CAR_STATUS_LABELS)
+                .filter(([value]) => value)
+                .map(([value, label]) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
             </SelectContent>
           </Select>
           <Select value={locationFilter} onValueChange={setLocationFilter}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger id="car-location-filter" className="w-[180px]">
               <SelectValue placeholder="Location" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All locations</SelectItem>
-              {Object.entries(LOCATION_LABELS).map(([value, label]) => (
-                <SelectItem key={value} value={value}>
-                  {label}
-                </SelectItem>
-              ))}
+              {Object.entries(LOCATION_LABELS)
+                .filter(([value]) => value)
+                .map(([value, label]) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
             </SelectContent>
           </Select>
           <Select value={brandFilter} onValueChange={setBrandFilter}>
-            <SelectTrigger className="w-[140px]">
+            <SelectTrigger id="car-brand-filter" className="w-[140px]">
               <SelectValue placeholder="Brand" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All brands</SelectItem>
               <SelectItem value="Voyah">Voyah</SelectItem>
               <SelectItem value="MHero">MHero</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={pdiFilter} onValueChange={setPdiFilter}>
-            <SelectTrigger className="w-[160px]">
-              <SelectValue placeholder="PDI" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All PDI</SelectItem>
-              {Object.entries(PDI_LABELS).map(([value, label]) => (
-                <SelectItem key={value} value={value}>
-                  {label}
-                </SelectItem>
-              ))}
             </SelectContent>
           </Select>
         </CardContent>
@@ -338,7 +365,6 @@ export default function CarsListPage() {
                     <TableHead className="whitespace-nowrap">Plate</TableHead>
                     <TableHead className="whitespace-nowrap">Status</TableHead>
                     <TableHead className="hidden whitespace-nowrap lg:table-cell">Location</TableHead>
-                    <TableHead className="min-w-[80px] whitespace-nowrap">Price</TableHead>
                     <TableHead className="hidden min-w-[100px] whitespace-nowrap xl:table-cell">Warranty (DMS)</TableHead>
                     <TableHead className="hidden min-w-[110px] whitespace-nowrap xl:table-cell">Warranty (Monza)</TableHead>
                     <TableHead className="whitespace-nowrap">Battery %</TableHead>
@@ -399,19 +425,19 @@ export default function CarsListPage() {
                             setStatusDialogOpen(true);
                           }}
                         >
-                          <Badge className={`${statusClass} hover:opacity-80`}>
-                            {CAR_STATUS_LABELS[car.status]}
-                          </Badge>
+                          <div className="flex items-center gap-1">
+                            <Badge className={`${statusClass} hover:opacity-80`}>
+                              {CAR_STATUS_LABELS[car.status]}
+                            </Badge>
+                            {pendingDeletes[car.id] && (
+                              <Badge variant="outline" className="text-amber-600 border-amber-400 dark:text-amber-400 dark:border-amber-500">
+                                Pending Deletion
+                              </Badge>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell className="hidden max-w-[100px] truncate text-sm lg:table-cell" title={car.location_full ?? undefined}>
                           {car.location_full || "—"}
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {car.price_display && car.price_display !== "-"
-                            ? car.price_display
-                            : car.price != null
-                              ? `${Number(car.price).toLocaleString()} ${car.price_currency ?? "USD"}`
-                              : "—"}
                         </TableCell>
                         <TableCell className="hidden text-sm xl:table-cell">
                           {car.warranty_per_dms
@@ -540,7 +566,7 @@ export default function CarsListPage() {
                                   </DropdownMenuItem>
                                 </>
                               )}
-                              {canDelete && (
+                              {canEditInventory && (
                                 <DropdownMenuItem
                                   variant="destructive"
                                   onClick={() => setDeleteCar(car)}
@@ -623,10 +649,13 @@ export default function CarsListPage() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove vehicle?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {canDelete ? "Remove vehicle?" : "Request vehicle deletion?"}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to remove this vehicle? This action can be
-              undone by an admin.
+              {canDelete
+                ? "Are you sure you want to remove this vehicle? This action can be undone by an admin."
+                : "This deletion requires owner approval. A request will be sent for review."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -635,10 +664,9 @@ export default function CarsListPage() {
               variant="destructive"
               onClick={() => {
                 handleDeleteCar();
-                setDeleteCar(null);
               }}
             >
-              Delete
+              {canDelete ? "Delete" : "Send Request"}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

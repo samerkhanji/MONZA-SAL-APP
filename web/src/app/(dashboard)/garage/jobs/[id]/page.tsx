@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ArrowLeft, Plus, Play, Square, Check, Trash2, ScanLine } from "lucide-react";
 import { JobDocuments } from "@/components/garage/JobDocuments";
+import { FinishJobDialog } from "@/components/garage/FinishJobDialog";
 import { ScannerDialog } from "@/components/scanner/ScannerDialog";
 
 interface JobWithCar extends GarageJob {
@@ -69,6 +70,7 @@ export default function JobDetailPage() {
   const [partNote, setPartNote] = useState("");
   const [partSubmitting, setPartSubmitting] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [finishOpen, setFinishOpen] = useState(false);
   const [scanPartOpen, setScanPartOpen] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [elapsed, setElapsed] = useState(0);
@@ -196,41 +198,6 @@ export default function JobDetailPage() {
     toast.success(`Added ${(addHours).toFixed(1)}h`);
     fetchJob();
     setElapsed(0);
-  }
-
-  async function handleCompleteJob() {
-    if (!job) return;
-    const { error } = await supabase
-      .from("garage_jobs")
-      .update({
-        status: "done",
-        completed_at: new Date().toISOString(),
-      })
-      .eq("id", job.id);
-
-    if (error) {
-      toast.error(error.message);
-      return;
-    }
-
-    if (job.cars) {
-      await supabase
-        .from("cars")
-        .update({ status: "in_stock" })
-        .eq("id", job.cars.id);
-      const { data: { user } } = await supabase.auth.getUser();
-      await supabase.from("car_events").insert({
-        car_id: job.cars.id,
-        event_type: "status_changed",
-        from_value: "service",
-        to_value: "in_stock",
-        note: `Job completed: ${job.title}`,
-        created_by: user?.id ?? null,
-      });
-    }
-
-    toast.success("Job completed! Car moved back to stock.");
-    fetchJob();
   }
 
   async function handleAddPart() {
@@ -397,7 +364,7 @@ export default function JobDetailPage() {
               </Button>
             )}
             {job.status !== "done" && job.status !== "cancelled" && (
-              <Button size="lg" onClick={handleCompleteJob}>
+              <Button size="lg" onClick={() => setFinishOpen(true)}>
                 <Check className="mr-2 size-4" />
                 Complete Job
               </Button>
@@ -428,7 +395,7 @@ export default function JobDetailPage() {
               <p>{job.assigned_to ?? "—"}</p>
             </div>
             <div>
-              <Label>Due Date</Label>
+              <Label>Day to be Serviced</Label>
               <p className={isOverdue ? "text-red-600" : ""}>
                 {job.due_date
                   ? new Date(job.due_date).toLocaleDateString()
@@ -462,8 +429,10 @@ export default function JobDetailPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
-            <Label>Diagnosis</Label>
+            <Label htmlFor="job-diagnosis">Diagnosis</Label>
             <Textarea
+              id="job-diagnosis"
+              name="job-diagnosis"
               value={job.diagnosis ?? ""}
               onChange={(e) => setJob({ ...job, diagnosis: e.target.value })}
               onBlur={(e) =>
@@ -475,8 +444,10 @@ export default function JobDetailPage() {
             />
           </div>
           <div>
-            <Label>Work Done</Label>
+            <Label htmlFor="job-work-done">Work Done</Label>
             <Textarea
+              id="job-work-done"
+              name="job-work-done"
               value={job.work_done ?? ""}
               onChange={(e) => setJob({ ...job, work_done: e.target.value })}
               onBlur={(e) =>
@@ -564,8 +535,10 @@ export default function JobDetailPage() {
             <h3 className="mb-4 text-lg font-semibold">Add Part to Job</h3>
             <div className="space-y-4">
               <div>
-                <Label>Search Part</Label>
+                <Label htmlFor="add-part-search">Search Part</Label>
                 <Input
+                  id="add-part-search"
+                  name="add-part-search"
                   placeholder="Part name or OE number..."
                   value={partSearch}
                   onChange={(e) => setPartSearch(e.target.value)}
@@ -594,8 +567,10 @@ export default function JobDetailPage() {
               {selectedPartId && (
                 <>
                   <div>
-                    <Label>Quantity</Label>
+                    <Label htmlFor="add-part-quantity">Quantity</Label>
                     <Input
+                      id="add-part-quantity"
+                      name="add-part-quantity"
                       type="number"
                       min={1}
                       value={partQuantity}
@@ -604,8 +579,10 @@ export default function JobDetailPage() {
                     />
                   </div>
                   <div>
-                    <Label>Note</Label>
+                    <Label htmlFor="add-part-note">Note</Label>
                     <Input
+                      id="add-part-note"
+                      name="add-part-note"
                       value={partNote}
                       onChange={(e) => setPartNote(e.target.value)}
                       placeholder="Optional"
@@ -635,6 +612,16 @@ export default function JobDetailPage() {
           </div>
         </div>
       )}
+
+      <FinishJobDialog
+        job={job}
+        open={finishOpen}
+        onOpenChange={setFinishOpen}
+        onSuccess={() => {
+          setFinishOpen(false);
+          fetchJob();
+        }}
+      />
 
       <ScannerDialog
         open={scanPartOpen}

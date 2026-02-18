@@ -42,7 +42,6 @@ export default function AddCustomerPage() {
   const [preferredLanguage, setPreferredLanguage] = useState("en");
   const [leadStatus, setLeadStatus] = useState<LeadStatus>("new_lead");
   const [leadSource, setLeadSource] = useState<string>("");
-  const [company, setCompany] = useState("");
   const [address, setAddress] = useState("");
   const [notes, setNotes] = useState("");
 
@@ -83,7 +82,6 @@ export default function AddCustomerPage() {
         preferred_language: preferredLanguage || "en",
         lead_status: leadStatus,
         lead_source: (leadSource as LeadSource) || null,
-        company: company.trim() || null,
         address: address.trim() || null,
         notes: notes.trim() || null,
         created_by: user?.id ?? null,
@@ -120,18 +118,20 @@ export default function AddCustomerPage() {
           <CardContent className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="firstName">First Name *</Label>
+                <Label htmlFor="customer-first-name">First Name *</Label>
                 <Input
-                  id="firstName"
+                  id="customer-first-name"
+                  name="customer-first-name"
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
                   required
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="lastName">Last Name</Label>
+                <Label htmlFor="customer-last-name">Last Name</Label>
                 <Input
-                  id="lastName"
+                  id="customer-last-name"
+                  name="customer-last-name"
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
                 />
@@ -139,9 +139,10 @@ export default function AddCustomerPage() {
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="phonePrimary">Phone *</Label>
+                <Label htmlFor="customer-phone-primary">Phone *</Label>
                 <Input
-                  id="phonePrimary"
+                  id="customer-phone-primary"
+                  name="customer-phone-primary"
                   type="tel"
                   value={phonePrimary}
                   onChange={(e) => setPhonePrimary(e.target.value)}
@@ -149,9 +150,10 @@ export default function AddCustomerPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="phoneSecondary">Phone 2</Label>
+                <Label htmlFor="customer-phone-secondary">Phone 2</Label>
                 <Input
-                  id="phoneSecondary"
+                  id="customer-phone-secondary"
+                  name="customer-phone-secondary"
                   type="tel"
                   value={phoneSecondary}
                   onChange={(e) => setPhoneSecondary(e.target.value)}
@@ -159,9 +161,10 @@ export default function AddCustomerPage() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="customer-email">Email</Label>
               <Input
-                id="email"
+                id="customer-email"
+                name="customer-email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -170,9 +173,10 @@ export default function AddCustomerPage() {
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="dateOfBirth">Date of Birth</Label>
+                <Label htmlFor="customer-date-of-birth">Date of Birth</Label>
                 <Input
-                  id="dateOfBirth"
+                  id="customer-date-of-birth"
+                  name="customer-date-of-birth"
                   type="date"
                   value={dateOfBirth}
                   onChange={(e) => setDateOfBirth(e.target.value)}
@@ -246,17 +250,10 @@ export default function AddCustomerPage() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="company">Company</Label>
-              <Input
-                id="company"
-                value={company}
-                onChange={(e) => setCompany(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="address">Address</Label>
+              <Label htmlFor="customer-address">Address</Label>
               <Textarea
-                id="address"
+                id="customer-address"
+                name="customer-address"
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
                 rows={2}
@@ -272,7 +269,8 @@ export default function AddCustomerPage() {
           </CardHeader>
           <CardContent>
             <Textarea
-              id="notes"
+              id="customer-notes"
+              name="customer-notes"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={3}

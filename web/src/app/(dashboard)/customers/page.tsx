@@ -11,7 +11,6 @@ import type { CustomerDisplay } from "@/types/database";
 import {
   LEAD_STATUS_LABELS,
   LEAD_SOURCE_LABELS,
-  LANGUAGE_LABELS,
   LEAD_STATUS_COLORS,
 } from "@/lib/constants/customers";
 import { Button } from "@/components/ui/button";
@@ -56,12 +55,10 @@ function matchesSearch(customer: CustomerDisplay, search: string): boolean {
   const fullName = (customer.full_name ?? `${customer.first_name} ${customer.last_name ?? ""}`.trim()).toLowerCase();
   const phone = (customer.phone_primary ?? "").toLowerCase();
   const email = (customer.email ?? "").toLowerCase();
-  const company = (customer.company ?? "").toLowerCase();
   return (
     fullName.includes(q) ||
     phone.includes(q) ||
-    email.includes(q) ||
-    company.includes(q)
+    email.includes(q)
   );
 }
 
@@ -73,7 +70,6 @@ export default function CustomersPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
-  const [languageFilter, setLanguageFilter] = useState<string>("all");
   const [editCustomer, setEditCustomer] = useState<CustomerDisplay | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [deleteCustomer, setDeleteCustomer] = useState<CustomerDisplay | null>(null);
@@ -106,10 +102,9 @@ export default function CustomersPage() {
       if (!matchesSearch(c, search)) return false;
       if (statusFilter !== "all" && c.lead_status !== statusFilter) return false;
       if (sourceFilter !== "all" && c.lead_source !== sourceFilter) return false;
-      if (languageFilter !== "all" && (c.preferred_language ?? "en") !== languageFilter) return false;
       return true;
     });
-  }, [customers, search, statusFilter, sourceFilter, languageFilter]);
+  }, [customers, search, statusFilter, sourceFilter]);
 
   async function handleDelete() {
     if (!deleteCustomer) return;
@@ -158,53 +153,46 @@ export default function CustomersPage() {
         <CardHeader>
           <CardTitle>Filters</CardTitle>
           <CardDescription>
-            Search by name, phone, email, company · Status · Source · Language
+            Search by name, phone, email · Status · Source
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-4">
           <Input
-            placeholder="Search name, phone, email, company..."
+            id="customer-search"
+            name="customer-search"
+            placeholder="Search name, phone, email..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="min-h-11 w-full text-base sm:max-w-xs sm:text-sm"
           />
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[160px]">
+            <SelectTrigger id="customer-status-filter" className="w-[160px]">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All statuses</SelectItem>
-              {Object.entries(LEAD_STATUS_LABELS).map(([value, label]) => (
-                <SelectItem key={value} value={value}>
-                  {label}
-                </SelectItem>
-              ))}
+              {Object.entries(LEAD_STATUS_LABELS)
+                .filter(([value]) => value)
+                .map(([value, label]) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
             </SelectContent>
           </Select>
           <Select value={sourceFilter} onValueChange={setSourceFilter}>
-            <SelectTrigger className="w-[160px]">
+            <SelectTrigger id="customer-source-filter" className="w-[160px]">
               <SelectValue placeholder="Source" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All sources</SelectItem>
-              {Object.entries(LEAD_SOURCE_LABELS).map(([value, label]) => (
-                <SelectItem key={value} value={value}>
-                  {label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={languageFilter} onValueChange={setLanguageFilter}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Language" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All languages</SelectItem>
-              {Object.entries(LANGUAGE_LABELS).map(([value, label]) => (
-                <SelectItem key={value} value={value}>
-                  {label}
-                </SelectItem>
-              ))}
+              {Object.entries(LEAD_SOURCE_LABELS)
+                .filter(([value]) => value)
+                .map(([value, label]) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
             </SelectContent>
           </Select>
         </CardContent>
@@ -281,7 +269,6 @@ export default function CustomersPage() {
                     <TableHead>Email</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Source</TableHead>
-                    <TableHead>Company</TableHead>
                     <TableHead>Orders</TableHead>
                     <TableHead>Last Visit</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -334,9 +321,6 @@ export default function CustomersPage() {
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {getSourceLabel(customer) || "—"}
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {customer.company ?? "—"}
                         </TableCell>
                         <TableCell>
                           {customer.total_orders != null ? (

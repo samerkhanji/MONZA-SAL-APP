@@ -89,7 +89,7 @@ export default function CarProfilePage() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { canEditInventory, canDelete } = useUser();
+  const { canEditInventory, canDelete, profile } = useUser();
   const param = params.id as string;
   // Support lookup by VIN (17 alphanumeric) or by UUID
   const isVin = /^[A-HJ-NPR-Z0-9]{17}$/i.test(param);
@@ -237,25 +237,43 @@ export default function CarProfilePage() {
   }
 
   async function handleDelete() {
-    if (!car) return;
-    const { error } = await supabase
-      .from("cars")
-      .update({ deleted_at: new Date().toISOString() })
-      .eq("id", car.id);
+    if (!car || !profile) return;
 
-    if (error) {
-      const isRls =
-        error.code === "42501" ||
-        error.message.toLowerCase().includes("permission");
-      toast.error(
-        isRls ? "You don't have permission to do this." : error.message
-      );
-      return;
+    if (canDelete) {
+      const { error } = await supabase
+        .from("cars")
+        .update({ deleted_at: new Date().toISOString() })
+        .eq("id", car.id);
+
+      if (error) {
+        const isRls =
+          error.code === "42501" ||
+          error.message.toLowerCase().includes("permission");
+        toast.error(
+          isRls ? "You don't have permission to do this." : error.message
+        );
+        return;
+      }
+
+      toast.success("Car removed successfully");
+      setDeleteOpen(false);
+      router.push("/cars");
+    } else {
+      const { createDeleteRequest } = await import("@/lib/delete-requests");
+      const details = {
+        vin: car.vin ?? "",
+        brand: car.brand ?? "",
+        model: car.model ?? "",
+        model_year: car.model_year ?? null,
+      };
+      const id = await createDeleteRequest("car", car.id, details, profile.id);
+      if (id) {
+        toast.success("Deletion request sent for owner approval");
+      } else {
+        toast.error("Failed to submit deletion request");
+      }
+      setDeleteOpen(false);
     }
-
-    toast.success("Car removed successfully");
-    setDeleteOpen(false);
-    router.push("/cars");
   }
 
   async function handleAddNote(e: React.FormEvent) {
@@ -366,7 +384,7 @@ export default function CarProfilePage() {
           <Button variant="outline" onClick={() => setMoveOpen(true)}>
             Move location
           </Button>
-          {canDelete && (
+          {canEditInventory && (
             <Button
               variant="destructive"
               onClick={() => setDeleteOpen(true)}
@@ -407,10 +425,13 @@ export default function CarProfilePage() {
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove vehicle?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {canDelete ? "Remove vehicle?" : "Request vehicle deletion?"}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to remove this vehicle? This action can be
-              undone by an admin.
+              {canDelete
+                ? "Are you sure you want to remove this vehicle? This action can be undone by an admin."
+                : "This deletion requires owner approval. A request will be sent for review."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -419,7 +440,7 @@ export default function CarProfilePage() {
               variant="destructive"
               onClick={() => void handleDelete()}
             >
-              Delete
+              {canDelete ? "Delete" : "Send Request"}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -771,6 +792,8 @@ export default function CarProfilePage() {
                   className="flex flex-col gap-2 rounded-lg border p-4"
                 >
                   <Textarea
+                    id="car-note-text"
+                    name="car-note-text"
                     value={noteText}
                     onChange={(e) => setNoteText(e.target.value)}
                     placeholder="Add a note..."

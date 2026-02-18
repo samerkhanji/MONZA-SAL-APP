@@ -83,6 +83,7 @@ export function ChangePasswordDialog({
             <Label htmlFor="new-password">New Password</Label>
             <Input
               id="new-password"
+              name="new-password"
               type="password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
@@ -95,6 +96,7 @@ export function ChangePasswordDialog({
             <Label htmlFor="confirm-password">Confirm Password</Label>
             <Input
               id="confirm-password"
+              name="confirm-password"
               type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}

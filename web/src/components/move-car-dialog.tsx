@@ -53,6 +53,7 @@ export function MoveCarDialog({
     setError(null);
     setSubmitting(true);
 
+    const { data: { user } } = await supabase.auth.getUser();
     const { error: rpcError } = await supabase.rpc("move_car", {
       p_car_id: carId,
       p_new_location_type: locationType,
@@ -60,7 +61,7 @@ export function MoveCarDialog({
       p_new_location_floor: null,
       p_new_status: status || null,
       p_note: note.trim() || null,
-      p_user_id: null,
+      p_user_id: user?.id ?? null,
     });
 
     setSubmitting(false);
@@ -141,7 +142,8 @@ export function MoveCarDialog({
           <div className="space-y-2">
             <Label htmlFor="note">Note</Label>
             <Input
-              id="note"
+              id="move-car-note"
+              name="move-car-note"
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="Optional note for event"

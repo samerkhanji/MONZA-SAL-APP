@@ -4,6 +4,7 @@ export const JOB_STATUS_COLORS: Record<string, string> = {
   waiting_parts:
     "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300",
   done: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
+  delivered: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300",
   cancelled: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
 };
 
@@ -12,6 +13,7 @@ export const JOB_STATUS_LABELS: Record<string, string> = {
   in_progress: "In Progress",
   waiting_parts: "Waiting Parts",
   done: "Done",
+  delivered: "Delivered",
   cancelled: "Cancelled",
 };
 
@@ -22,9 +24,9 @@ export const JOB_PRIORITY_COLORS: Record<string, string> = {
 };
 
 export const JOB_PRIORITY_LABELS: Record<string, string> = {
-  low: "Low",
-  normal: "Normal",
-  urgent: "Urgent",
+  low: "🟢 Low",
+  normal: "🟡 Medium",
+  urgent: "🔴 Urgent",
 };
 
 export const PRIORITY_BORDERS: Record<string, string> = {
