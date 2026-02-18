@@ -212,7 +212,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const isKhalil = nameLower.includes("khalil");
   const isOwner = role === "owner";
 
-  const canSeeDashboard = isOwner;
+  const canSeeDashboard = isOwner || role === "assistant" || isRequestAssistant;
   const canSeeCars =
     isRequestAssistant || isKhalil || isOwner;
   const canSeeDocuments = true;

@@ -17,6 +17,7 @@ import {
   AlertCircle,
   RefreshCw,
   ChevronRight,
+  ClipboardList,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -68,6 +69,15 @@ interface GarageJobRow {
   due_date: string | null;
   created_at: string;
   cars?: GarageJobCar | GarageJobCar[] | null;
+}
+
+interface RequestSummaryRow {
+  id: string;
+  status: string;
+  submitted_by: string;
+  assigned_to: string | null;
+  send_to: string | null;
+  send_to_user_id: string | null;
 }
 
 const CAR_STATUS_ORDER: CarStatus[] = [
@@ -157,22 +167,31 @@ function getActivityIcon(eventType: string): string {
 }
 
 export default function DashboardPage() {
-  const { profile, loading: profileLoading } = useUser();
+  const {
+    profile,
+    loading: profileLoading,
+    isRequestAssistant,
+    isRequestManagement,
+    isSamer,
+    isKareem,
+    isHoussam,
+    isOwner,
+  } = useUser();
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [totalCars, setTotalCars] = useState<number>(0);
   const [inGarageCount, setInGarageCount] = useState<number>(0);
   const [customersCount, setCustomersCount] = useState<number>(0);
   const [activeJobsCount, setActiveJobsCount] = useState<number>(0);
+  const [pendingRequestsCount, setPendingRequestsCount] = useState<number>(0);
   const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
   const [jobStatusCounts, setJobStatusCounts] = useState<Record<string, number>>({});
   const [recentJobs, setRecentJobs] = useState<GarageJobRow[]>([]);
   const [lowStockParts, setLowStockParts] = useState<LowStockPart[]>([]);
   const [activities, setActivities] = useState<CarEventRow[]>([]);
 
-  const supabase = createClient();
-
   const fetchData = useCallback(async () => {
+    const supabase = createClient();
     setLoading(true);
 
     const [
@@ -184,6 +203,7 @@ export default function DashboardPage() {
       jobsStatusRes,
       carsStatusRes,
       partsRes,
+      requestsRes,
       eventsRes,
     ] = await Promise.all([
       supabase
@@ -221,6 +241,9 @@ export default function DashboardPage() {
         .in("status", ["low_stock", "out_of_stock"])
         .order("quantity", { ascending: true })
         .limit(5),
+      supabase
+        .from("requests")
+        .select("id, status, submitted_by, assigned_to, send_to, send_to_user_id"),
       supabase
         .from("car_events")
         .select("*, profiles:created_by(full_name), cars:car_id(vin, brand, model)")
@@ -291,6 +314,76 @@ export default function DashboardPage() {
       setLowStockParts((partsRes.data as LowStockPart[]) ?? []);
     }
 
+    if (requestsRes.error) {
+      setPendingRequestsCount(0);
+    } else {
+      const myId = profile?.id ?? null;
+      const canTrackRequests =
+        isRequestAssistant ||
+        isRequestManagement ||
+        isSamer ||
+        isKareem ||
+        isHoussam ||
+        isOwner;
+
+      if (!myId || !canTrackRequests) {
+        setPendingRequestsCount(0);
+      } else {
+        const rows = (requestsRes.data as RequestSummaryRow[]) ?? [];
+        const myPersonal = rows.filter(
+          (r) =>
+            r.submitted_by === myId ||
+            r.send_to_user_id === myId ||
+            r.assigned_to === myId
+        );
+
+        const mergeUnique = (
+          base: RequestSummaryRow[],
+          extra: RequestSummaryRow[]
+        ): RequestSummaryRow[] => {
+          const seen = new Set(base.map((r) => r.id));
+          const merged = [...base];
+          for (const row of extra) {
+            if (!seen.has(row.id)) {
+              merged.push(row);
+              seen.add(row.id);
+            }
+          }
+          return merged;
+        };
+
+        let visible = myPersonal;
+        if (isRequestAssistant) {
+          const forReview = rows.filter(
+            (r) => r.send_to === "houssam" || r.send_to === "kareem"
+          );
+          visible = mergeUnique(forReview, myPersonal);
+        } else if (
+          isRequestManagement ||
+          isSamer ||
+          isKareem ||
+          isHoussam
+        ) {
+          const forOwners = rows.filter(
+            (r) =>
+              r.send_to === "samer" ||
+              r.send_to === "kareem" ||
+              (r.send_to === "houssam" && r.status === "awaiting_approval")
+          );
+          visible = mergeUnique(forOwners, myPersonal);
+        }
+
+        const pendingCount = visible.filter(
+          (r) =>
+            r.status === "submitted" ||
+            r.status === "awaiting_approval" ||
+            r.status === "needs_more_info"
+        ).length;
+
+        setPendingRequestsCount(pendingCount);
+      }
+    }
+
     if (eventsRes.error) {
       toast.error(eventsRes.error.message ?? "Failed to load activity");
     } else {
@@ -299,11 +392,27 @@ export default function DashboardPage() {
 
     setLastUpdated(new Date());
     setLoading(false);
-  }, []);
+  }, [
+    profile?.id,
+    isRequestAssistant,
+    isRequestManagement,
+    isSamer,
+    isKareem,
+    isHoussam,
+    isOwner,
+  ]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  const showPendingRequestsCard =
+    isRequestAssistant ||
+    isRequestManagement ||
+    isSamer ||
+    isKareem ||
+    isHoussam ||
+    isOwner;
 
   const kpiCards = [
     {
@@ -344,6 +453,24 @@ export default function DashboardPage() {
           ? "bg-red-100 dark:bg-red-900/30"
           : "bg-muted/50",
     },
+    ...(showPendingRequestsCard
+      ? [
+          {
+            label: "Pending Requests",
+            value: pendingRequestsCount,
+            icon: ClipboardList,
+            href: "/requests",
+            color:
+              pendingRequestsCount > 0
+                ? "text-violet-600 dark:text-violet-400"
+                : "text-muted-foreground",
+            bgColor:
+              pendingRequestsCount > 0
+                ? "bg-violet-100 dark:bg-violet-900/30"
+                : "bg-muted/50",
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -379,7 +506,9 @@ export default function DashboardPage() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div
+        className={`grid grid-cols-1 gap-4 sm:grid-cols-2 ${showPendingRequestsCard ? "lg:grid-cols-5" : "lg:grid-cols-4"}`}
+      >
         {kpiCards.map((card) => (
           <Link key={card.label} href={card.href}>
             <Card className="transition-colors hover:bg-muted/50">

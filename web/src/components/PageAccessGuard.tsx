@@ -29,7 +29,7 @@ export function PageAccessGuard({ children }: { children: React.ReactNode }) {
     if (pathname === "/garage" || pathname.startsWith("/garage/jobs"))
       return canSeeGarageJobs;
     if (pathname.startsWith("/garage/inventory")) return canSeePartsInventory;
-    if (pathname.startsWith("/garage/history")) return true;
+    if (pathname.startsWith("/garage/history")) return canSeeGarageHistory;
     if (pathname.startsWith("/settings")) return true;
     return true;
   };
