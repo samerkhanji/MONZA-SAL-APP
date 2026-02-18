@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
@@ -40,6 +41,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Plus, Check, X, MessageSquare, ChevronRight } from "lucide-react";
+import { ExportButton } from "@/components/ExportButton";
+import type { ExportColumn } from "@/lib/exportToExcel";
 
 interface RequestWithProfiles extends Request {
   submitter?: { full_name: string | null } | null;
@@ -81,6 +84,7 @@ function getSendToLabel(r: RequestWithProfiles): string {
 }
 
 export default function RequestCenterPage() {
+  const searchParams = useSearchParams();
   const { profile, isRequestAssistant, isRequestManagement, isSamer, isKareem, isHoussam } = useUser();
   const [requests, setRequests] = useState<RequestWithProfiles[]>([]);
   const [allProfiles, setAllProfiles] = useState<{ id: string; full_name: string | null }[]>([]);
@@ -170,6 +174,14 @@ export default function RequestCenterPage() {
       setNewSendToUserId("");
     }
   }, [newOpen]);
+
+  const detailIdFromUrl = searchParams.get("detail");
+  useEffect(() => {
+    if (detailIdFromUrl && requests.length > 0) {
+      const req = requests.find((r) => r.id === detailIdFromUrl);
+      if (req) setDetailOpen(req);
+    }
+  }, [detailIdFromUrl, requests]);
 
   const visibleRequests = useMemo(() => {
     const myId = profile?.id;
@@ -321,6 +333,28 @@ export default function RequestCenterPage() {
     if (name.includes("samer")) return "samer";
     return null;
   }
+
+  const requestExportColumns: ExportColumn[] = [
+    { key: "subject", header: "Subject" },
+    { key: "description", header: "Description" },
+    { key: "category", header: "Category" },
+    { key: "status_display", header: "Status" },
+    { key: "priority_display", header: "Priority", type: "priority" },
+    { key: "submitter_name", header: "Submitted By" },
+    { key: "send_to_label", header: "Sent To" },
+    { key: "created_at", header: "Date Submitted", type: "date" },
+    { key: "assistant_notes", header: "Assistant Notes" },
+    { key: "management_comments", header: "Management Comments" },
+  ];
+
+  const requestExportData = (list: RequestWithProfiles[]) =>
+    list.map((r) => ({
+      ...r,
+      status_display: REQUEST_STATUS_LABELS[r.status] ?? r.status,
+      priority_display: r.priority === "low" ? "🟢 Low" : r.priority === "urgent" ? "🔴 Urgent" : "🟡 Medium",
+      submitter_name: r.submitter?.full_name ?? "Unknown",
+      send_to_label: getSendToLabel(r),
+    }));
 
   async function handleSubmitRequest() {
     if (!newSubject.trim()) {
@@ -587,10 +621,23 @@ export default function RequestCenterPage() {
     <div className="container mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-xl font-semibold sm:text-2xl">Request Center</h1>
-        <Button onClick={() => setNewOpen(true)}>
-          <Plus className="mr-2 size-5" />
-          New Request
-        </Button>
+        <div className="flex gap-2">
+          <ExportButton
+            data={requestExportData(filteredRequests)}
+            allData={requestExportData(visibleRequests)}
+            columns={requestExportColumns}
+            filename="Request_Center"
+            options={{
+              pageName: "Request Center",
+              summary: `Total Requests: ${filteredRequests.length}`,
+            }}
+            disabled={loading}
+          />
+          <Button onClick={() => setNewOpen(true)}>
+            <Plus className="mr-2 size-5" />
+            New Request
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-3">
@@ -786,7 +833,7 @@ export default function RequestCenterPage() {
                 <SelectTrigger id="request-category" className="mt-2">
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="z-[100]">
                   <SelectItem value="none">None</SelectItem>
                   {REQUEST_CATEGORIES.filter((c) => c).map((c) => (
                     <SelectItem key={c} value={c}>
@@ -806,7 +853,7 @@ export default function RequestCenterPage() {
                 <SelectTrigger id="request-send-to" className="mt-2">
                   <SelectValue placeholder="Select recipient" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="z-[100]">
                   {allProfiles
                     .filter((p) => p.id !== profile?.id)
                     .map((p) => (
@@ -921,7 +968,7 @@ export default function RequestCenterPage() {
                         <SelectTrigger id="request-assistant-priority" className="mt-1">
                           <SelectValue />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="z-[100]">
                           <SelectItem value="low">Low</SelectItem>
                           <SelectItem value="normal">Medium</SelectItem>
                           <SelectItem value="urgent">Urgent</SelectItem>

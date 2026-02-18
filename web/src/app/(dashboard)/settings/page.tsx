@@ -18,6 +18,8 @@ import {
   PowerOff,
   Trash2,
   Bell,
+  User,
+  FileCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,18 +33,22 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { EditTeamMemberDialog } from "@/components/settings/EditTeamMemberDialog";
+import { ChangePasswordDialog } from "@/components/settings/ChangePasswordDialog";
 import { cn } from "@/lib/utils";
+import { REQUEST_STATUS_LABELS } from "@/lib/constants/requests";
 
-const TABS = [
-  { id: "team", label: "Team", icon: Users },
-  { id: "company", label: "Company", icon: Building2 },
-  { id: "prefs", label: "Preferences", icon: Settings },
-  { id: "notifications", label: "Notifications", icon: Bell },
-  { id: "audit", label: "Audit Log", icon: FileText },
-  { id: "pending-deletions", label: "Pending Deletions", icon: Trash2 },
+const ALL_TABS = [
+  { id: "profile", label: "Profile", icon: User, everyone: true },
+  { id: "my-requests", label: "My Requests", icon: FileCheck, everyone: true },
+  { id: "notifications", label: "Notifications", icon: Bell, everyone: true },
+  { id: "team", label: "Team", icon: Users, everyone: false },
+  { id: "company", label: "Company", icon: Building2, everyone: false },
+  { id: "prefs", label: "Preferences", icon: Settings, everyone: false },
+  { id: "audit", label: "Audit Log", icon: FileText, everyone: false },
+  { id: "pending-requests", label: "Pending Requests", icon: Trash2, everyone: false },
 ] as const;
 
-type TabId = (typeof TABS)[number]["id"];
+type TabId = (typeof ALL_TABS)[number]["id"];
 
 const ROLE_COLORS: Record<string, string> = {
   owner: "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300",
@@ -83,15 +89,28 @@ function timeAgo(date: string): string {
 export default function SettingsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { canSeeSettings } = useUser();
+  const { canSeeSettings, canSeeProfileSettings, canSeeMyRequests, canSeeAllRequests, profile } = useUser();
   const tabFromUrl = searchParams.get("tab") as TabId | null;
-  const [activeTab, setActiveTab] = useState<TabId>(tabFromUrl && TABS.some((t) => t.id === tabFromUrl) ? tabFromUrl : "team");
+  const defaultTab: TabId = canSeeSettings ? "team" : "profile";
+  const [activeTab, setActiveTab] = useState<TabId>(tabFromUrl && ALL_TABS.some((t) => t.id === tabFromUrl) ? tabFromUrl : defaultTab);
+
+  const TABS = ALL_TABS.filter((t) => t.everyone || canSeeSettings);
 
   useEffect(() => {
-    if (tabFromUrl && TABS.some((t) => t.id === tabFromUrl)) {
-      setActiveTab(tabFromUrl);
+    if (tabFromUrl && ALL_TABS.some((t) => t.id === tabFromUrl)) {
+      const tab = ALL_TABS.find((t) => t.id === tabFromUrl);
+      if (tab && (tab.everyone || canSeeSettings)) {
+        setActiveTab(tabFromUrl);
+      }
     }
-  }, [tabFromUrl]);
+  }, [tabFromUrl, canSeeSettings]);
+
+  useEffect(() => {
+    const allowedIds = TABS.map((t) => t.id);
+    if (!allowedIds.includes(activeTab)) {
+      setActiveTab((TABS[0]?.id ?? "profile") as TabId);
+    }
+  }, [activeTab, canSeeSettings]);
   const [profiles, setProfiles] = useState<ProfileRow[]>([]);
   const [profilesLoading, setProfilesLoading] = useState(false);
   const [editProfile, setEditProfile] = useState<ProfileRow | null>(null);
@@ -125,34 +144,52 @@ export default function SettingsPage() {
   const [auditUserFilter, setAuditUserFilter] = useState<string>("all");
   const [auditDateFilter, setAuditDateFilter] = useState<string>("7");
 
-  const [pendingDeletes, setPendingDeletes] = useState<
+  const [pendingItems, setPendingItems] = useState<
     Array<{
       id: string;
-      item_type: string;
-      item_id: string;
-      item_details: Record<string, unknown>;
+      type: "delete" | "request" | "document_access" | "page_access";
+      typeLabel: string;
+      subject?: string;
+      item_type?: string;
+      item_id?: string;
+      item_details?: Record<string, unknown>;
       requested_by: string;
-      created_at: string;
       requester_name?: string;
+      created_at: string;
+      link?: string;
     }>
   >([]);
-  const [pendingDeletesLoading, setPendingDeletesLoading] = useState(false);
+  const [pendingItemsLoading, setPendingItemsLoading] = useState(false);
   const [deleteActioning, setDeleteActioning] = useState<string | null>(null);
 
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushStatus, setPushStatus] = useState<string>("");
   const [pushLoading, setPushLoading] = useState(false);
 
+  const [myRequests, setMyRequests] = useState<
+    Array<{
+      id: string;
+      subject: string;
+      status: string;
+      submitted_by: string;
+      submitter_name?: string;
+      created_at: string;
+      resolved_at: string | null;
+    }>
+  >([]);
+  const [myRequestsLoading, setMyRequestsLoading] = useState(false);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
+
   const supabase = createClient();
 
-  const showNotificationsOnly = !canSeeSettings && searchParams.get("tab") === "notifications";
+  const canAccessSettings = canSeeSettings || canSeeProfileSettings || canSeeMyRequests;
 
   useEffect(() => {
-    if (!canSeeSettings && !showNotificationsOnly) {
+    if (!canAccessSettings) {
       router.replace("/dashboard");
       return;
     }
-  }, [canSeeSettings, showNotificationsOnly, router]);
+  }, [canAccessSettings, router]);
 
   const fetchProfiles = useCallback(async () => {
     setProfilesLoading(true);
@@ -383,27 +420,165 @@ export default function SettingsPage() {
 
   const auditUsers = [...new Set(auditItems.map((i) => i.user))].sort();
 
-  const fetchPendingDeletes = useCallback(async () => {
-    setPendingDeletesLoading(true);
-    const { data, error } = await supabase
-      .from("delete_requests")
-      .select("id, item_type, item_id, item_details, requested_by, created_at")
-      .eq("status", "pending")
+  const fetchPendingItems = useCallback(async () => {
+    setPendingItemsLoading(true);
+    type PendingItem = {
+      id: string;
+      type: "delete" | "request" | "document_access" | "page_access";
+      typeLabel: string;
+      subject?: string;
+      item_type?: string;
+      item_id?: string;
+      item_details?: Record<string, unknown>;
+      requested_by: string;
+      requester_name?: string;
+      created_at: string;
+      link?: string;
+    };
+    const items: PendingItem[] = [];
+
+    const [delRes, reqRes, docRes, pageRes] = await Promise.all([
+      supabase
+        .from("delete_requests")
+        .select("id, item_type, item_id, item_details, requested_by, created_at")
+        .eq("status", "pending")
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("requests")
+        .select("id, subject, submitted_by, created_at")
+        .eq("status", "submitted")
+        .in("send_to", ["houssam", "kareem"])
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("document_access_requests")
+        .select("id, search_query, requested_by, created_at")
+        .eq("status", "pending")
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("page_access_requests")
+        .select("id, page_name, requested_by, created_at")
+        .eq("status", "pending")
+        .order("created_at", { ascending: false }),
+    ]);
+
+    const userIds = new Set<string>();
+    (delRes.data ?? []).forEach((r: { requested_by: string }) => userIds.add(r.requested_by));
+    (reqRes.data ?? []).forEach((r: { submitted_by: string }) => userIds.add(r.submitted_by));
+    (docRes.data ?? []).forEach((r: { requested_by: string }) => userIds.add(r.requested_by));
+    (pageRes.data ?? []).forEach((r: { requested_by: string }) => userIds.add(r.requested_by));
+
+    let namesMap: Record<string, string> = {};
+    if (userIds.size > 0) {
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, full_name")
+        .in("id", Array.from(userIds));
+      namesMap = Object.fromEntries(
+        (profiles ?? []).map((p: { id: string; full_name: string | null }) => [
+          p.id,
+          p.full_name ?? "Unknown",
+        ])
+      );
+    }
+
+    (delRes.data ?? []).forEach((r: { id: string; item_type: string; item_id: string; item_details: Record<string, unknown>; requested_by: string; created_at: string }) => {
+      const details = r.item_details ?? {};
+      const label = r.item_type === "car"
+        ? `${details.brand ?? ""} ${details.model ?? ""} (${details.vin ?? ""})`
+        : `${details.part_name ?? ""} (OE: ${details.oe_number ?? "—"})`;
+      items.push({
+        id: `del-${r.id}`,
+        type: "delete",
+        typeLabel: "Delete",
+        subject: label,
+        item_type: r.item_type,
+        item_id: r.item_id,
+        item_details: r.item_details,
+        requested_by: r.requested_by,
+        requester_name: namesMap[r.requested_by] ?? "Unknown",
+        created_at: r.created_at,
+        link: "/settings?tab=pending-requests",
+      });
+    });
+
+    (reqRes.data ?? []).forEach((r: { id: string; subject: string; submitted_by: string; created_at: string }) => {
+      items.push({
+        id: `req-${r.id}`,
+        type: "request",
+        typeLabel: "Request",
+        subject: r.subject,
+        requested_by: r.submitted_by,
+        requester_name: namesMap[r.submitted_by] ?? "Unknown",
+        created_at: r.created_at,
+        link: `/requests?detail=${r.id}`,
+      });
+    });
+
+    (docRes.data ?? []).forEach((r: { id: string; search_query: string; requested_by: string; created_at: string }) => {
+      items.push({
+        id: `doc-${r.id}`,
+        type: "document_access",
+        typeLabel: "Document Access",
+        subject: r.search_query,
+        requested_by: r.requested_by,
+        requester_name: namesMap[r.requested_by] ?? "Unknown",
+        created_at: r.created_at,
+        link: "/settings?tab=pending-requests",
+      });
+    });
+
+    (pageRes.data ?? []).forEach((r: { id: string; page_name: string; requested_by: string; created_at: string }) => {
+      items.push({
+        id: `page-${r.id}`,
+        type: "page_access",
+        typeLabel: "Page Access",
+        subject: r.page_name,
+        requested_by: r.requested_by,
+        requester_name: namesMap[r.requested_by] ?? "Unknown",
+        created_at: r.created_at,
+        link: "/settings?tab=pending-requests",
+      });
+    });
+
+    items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    setPendingItems(items);
+    setPendingItemsLoading(false);
+  }, []);
+
+  useEffect(() => {
+    if (canSeeSettings && activeTab === "pending-requests") {
+      fetchPendingItems();
+    }
+  }, [canSeeSettings, activeTab, fetchPendingItems]);
+
+  const fetchMyRequests = useCallback(async () => {
+    if (!profile?.id) return;
+    setMyRequestsLoading(true);
+    let query = supabase
+      .from("requests")
+      .select("id, subject, status, submitted_by, created_at, resolved_at")
+      .in("status", ["approved", "rejected"])
       .order("created_at", { ascending: false });
+
+    if (!canSeeAllRequests) {
+      query = query.eq("send_to_user_id", profile.id);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       toast.error(error.message);
-      setPendingDeletes([]);
+      setMyRequests([]);
     } else {
       const list = (data ?? []) as Array<{
         id: string;
-        item_type: string;
-        item_id: string;
-        item_details: Record<string, unknown>;
-        requested_by: string;
+        subject: string;
+        status: string;
+        submitted_by: string;
         created_at: string;
+        resolved_at: string | null;
       }>;
-      const userIds = [...new Set(list.map((r) => r.requested_by))];
+      const userIds = [...new Set(list.map((r) => r.submitted_by))];
       let namesMap: Record<string, string> = {};
       if (userIds.length > 0) {
         const { data: profiles } = await supabase
@@ -417,21 +592,21 @@ export default function SettingsPage() {
           ])
         );
       }
-      setPendingDeletes(
+      setMyRequests(
         list.map((r) => ({
           ...r,
-          requester_name: namesMap[r.requested_by] ?? "Unknown",
+          submitter_name: namesMap[r.submitted_by] ?? "Unknown",
         }))
       );
     }
-    setPendingDeletesLoading(false);
-  }, []);
+    setMyRequestsLoading(false);
+  }, [profile?.id, canSeeAllRequests]);
 
   useEffect(() => {
-    if (canSeeSettings && activeTab === "pending-deletions") {
-      fetchPendingDeletes();
+    if (activeTab === "my-requests") {
+      fetchMyRequests();
     }
-  }, [canSeeSettings, activeTab, fetchPendingDeletes]);
+  }, [activeTab, fetchMyRequests]);
 
   async function handleApproveDelete(reqId: string) {
     const { data: { user } } = await supabase.auth.getUser();
@@ -440,7 +615,7 @@ export default function SettingsPage() {
     const { approveDeleteRequest } = await import("@/lib/delete-requests");
     await approveDeleteRequest(reqId, user.id);
     setDeleteActioning(null);
-    fetchPendingDeletes();
+    fetchPendingItems();
   }
 
   async function handleDenyDelete(reqId: string) {
@@ -450,7 +625,7 @@ export default function SettingsPage() {
     const { denyDeleteRequest } = await import("@/lib/delete-requests");
     await denyDeleteRequest(reqId, user.id);
     setDeleteActioning(null);
-    fetchPendingDeletes();
+    fetchPendingItems();
   }
 
   const refreshPushStatus = useCallback(async () => {
@@ -473,10 +648,10 @@ export default function SettingsPage() {
   }, []);
 
   useEffect(() => {
-    if (canSeeSettings && activeTab === "notifications") {
+    if (activeTab === "notifications") {
       refreshPushStatus();
     }
-  }, [canSeeSettings, activeTab, refreshPushStatus]);
+  }, [activeTab, refreshPushStatus]);
 
   async function handleTogglePush(enabled: boolean) {
     const { data: { user } } = await supabase.auth.getUser();
@@ -506,13 +681,13 @@ export default function SettingsPage() {
     refreshPushStatus();
   }
 
-  if (!canSeeSettings && !showNotificationsOnly) return null;
+  if (!canAccessSettings) return null;
 
   return (
     <div className="container mx-auto flex flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8 lg:flex-row">
       {/* Tabs sidebar */}
       <nav className="flex shrink-0 flex-row gap-2 border-b pb-4 lg:flex-col lg:border-b-0 lg:border-r lg:pb-0 lg:pr-6">
-        {(showNotificationsOnly ? TABS.filter((t) => t.id === "notifications") : TABS).map((tab) => (
+        {TABS.map((tab) => (
           <button
             key={tab.id}
             type="button"
@@ -532,6 +707,89 @@ export default function SettingsPage() {
 
       {/* Content */}
       <div className="min-w-0 flex-1">
+        {activeTab === "profile" && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Profile Settings</CardTitle>
+              <CardDescription>
+                Manage your account and preferences
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="rounded-lg border p-4">
+                <p className="font-medium">{profile?.full_name ?? "User"}</p>
+                <p className="text-sm text-muted-foreground">
+                  {profile?.phone ?? "No phone"}{" "}
+                  · {USER_ROLE_LABELS[profile?.role ?? "assistant"]}
+                </p>
+              </div>
+              <div className="flex items-center justify-between rounded-lg border p-4">
+                <div>
+                  <p className="font-medium">Password</p>
+                  <p className="text-sm text-muted-foreground">
+                    Change your password to keep your account secure
+                  </p>
+                </div>
+                <Button variant="outline" onClick={() => setChangePasswordOpen(true)}>
+                  Change Password
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {activeTab === "my-requests" && (
+          <Card>
+            <CardHeader>
+              <CardTitle>
+                {canSeeAllRequests ? "All Requests" : "My Requests"}
+              </CardTitle>
+              <CardDescription>
+                {canSeeAllRequests
+                  ? "All requests (approved or rejected)"
+                  : "Requests sent to you that have been approved or rejected"}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {myRequestsLoading ? (
+                <p className="text-muted-foreground">Loading...</p>
+              ) : myRequests.length === 0 ? (
+                <p className="py-8 text-center text-muted-foreground">
+                  No resolved requests found
+                </p>
+              ) : (
+                <div className="space-y-1 rounded-lg border">
+                  {myRequests.map((r) => (
+                    <Link
+                      key={r.id}
+                      href={`/requests?detail=${r.id}`}
+                      className="flex items-center gap-4 border-b p-3 text-left transition-colors last:border-0 hover:bg-muted/50"
+                    >
+                      <span className="shrink-0 text-sm text-muted-foreground w-16">
+                        {timeAgo(r.resolved_at ?? r.created_at)}
+                      </span>
+                      <span className="shrink-0 font-medium min-w-[80px]">
+                        {REQUEST_STATUS_LABELS[r.status] ?? r.status}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate">{r.subject}</span>
+                      <span className="shrink-0 text-muted-foreground text-sm">
+                        from {r.submitter_name}
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              )}
+              {canSeeAllRequests && (
+                <div className="mt-4">
+                  <Link href="/requests">
+                    <Button variant="outline">Open Request Center</Button>
+                  </Link>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         {activeTab === "team" && (
           <Card>
             <CardHeader>
@@ -899,20 +1157,20 @@ export default function SettingsPage() {
           </Card>
         )}
 
-        {activeTab === "pending-deletions" && (
+        {activeTab === "pending-requests" && (
           <Card>
             <CardHeader>
-              <CardTitle>Pending Deletion Requests</CardTitle>
+              <CardTitle>Pending Requests</CardTitle>
               <CardDescription>
-                Review and approve or deny deletion requests from employees
+                All pending items requiring action: deletions, employee requests, document access, page access
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {pendingDeletesLoading ? (
+              {pendingItemsLoading ? (
                 <p className="text-muted-foreground">Loading...</p>
-              ) : pendingDeletes.length === 0 ? (
+              ) : pendingItems.length === 0 ? (
                 <p className="py-8 text-center text-muted-foreground">
-                  No pending deletion requests
+                  No pending requests
                 </p>
               ) : (
                 <div className="overflow-x-auto rounded-lg border">
@@ -920,46 +1178,68 @@ export default function SettingsPage() {
                     <thead>
                       <tr className="border-b bg-muted/50">
                         <th className="px-4 py-3 text-left font-medium">Type</th>
-                        <th className="px-4 py-3 text-left font-medium">Item Details</th>
+                        <th className="px-4 py-3 text-left font-medium">Details</th>
                         <th className="px-4 py-3 text-left font-medium">Requested By</th>
                         <th className="px-4 py-3 text-left font-medium">Date</th>
                         <th className="px-4 py-3 text-right font-medium">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {pendingDeletes.map((r) => {
-                        const details = r.item_details as Record<string, unknown>;
-                        const itemLabel =
-                          r.item_type === "car"
-                            ? `${details.brand ?? ""} ${details.model ?? ""} (${details.vin ?? ""})`
-                            : `${details.part_name ?? ""} (OE: ${details.oe_number ?? "—"})`;
+                      {pendingItems.map((r) => {
+                        const deleteId = r.type === "delete" ? r.id.replace("del-", "") : null;
                         return (
                           <tr key={r.id} className="border-b last:border-0">
-                            <td className="px-4 py-3 capitalize">{r.item_type}</td>
-                            <td className="px-4 py-3">{itemLabel}</td>
+                            <td className="px-4 py-3">
+                              <span
+                                className={cn(
+                                  "rounded px-2 py-0.5 text-xs font-medium",
+                                  r.type === "delete" && "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+                                  r.type === "request" && "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+                                  r.type === "document_access" && "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+                                  r.type === "page_access" && "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
+                                )}
+                              >
+                                {r.typeLabel}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              {r.link ? (
+                                <Link href={r.link} className="text-primary hover:underline truncate block max-w-[200px]">
+                                  {r.subject ?? "—"}
+                                </Link>
+                              ) : (
+                                r.subject ?? "—"
+                              )}
+                            </td>
                             <td className="px-4 py-3">{r.requester_name}</td>
                             <td className="px-4 py-3 text-muted-foreground">
                               {new Date(r.created_at).toLocaleString()}
                             </td>
                             <td className="px-4 py-3 text-right">
-                              <div className="flex justify-end gap-2">
-                                <Button
-                                  size="sm"
-                                  variant="default"
-                                  onClick={() => handleApproveDelete(r.id)}
-                                  disabled={deleteActioning === r.id}
-                                >
-                                  Approve
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleDenyDelete(r.id)}
-                                  disabled={deleteActioning === r.id}
-                                >
-                                  Deny
-                                </Button>
-                              </div>
+                              {r.type === "delete" && deleteId ? (
+                                <div className="flex justify-end gap-2">
+                                  <Button
+                                    size="sm"
+                                    variant="default"
+                                    onClick={() => handleApproveDelete(deleteId)}
+                                    disabled={deleteActioning === deleteId}
+                                  >
+                                    Approve
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleDenyDelete(deleteId)}
+                                    disabled={deleteActioning === deleteId}
+                                  >
+                                    Deny
+                                  </Button>
+                                </div>
+                              ) : (
+                                <Link href={r.link ?? "#"}>
+                                  <Button size="sm" variant="outline">View</Button>
+                                </Link>
+                              )}
                             </td>
                           </tr>
                         );
@@ -981,6 +1261,10 @@ export default function SettingsPage() {
           if (!open) setEditProfile(null);
         }}
         onSuccess={fetchProfiles}
+      />
+      <ChangePasswordDialog
+        open={changePasswordOpen}
+        onOpenChange={setChangePasswordOpen}
       />
     </div>
   );

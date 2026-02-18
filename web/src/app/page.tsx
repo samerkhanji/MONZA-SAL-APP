@@ -22,7 +22,7 @@ import {
 
 function HomePageContent() {
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get("redirectTo") ?? "/cars";
+  const redirectTo = searchParams.get("redirectTo") ?? "/dashboard";
   const [user, setUser] = useState<{ id: string } | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -123,7 +123,7 @@ function HomePageContent() {
           Internal system — car inventory & operations
         </p>
         <Button asChild size="lg">
-          <Link href="/cars">Go to Cars</Link>
+          <Link href="/dashboard">Go to App</Link>
         </Button>
       </div>
     );

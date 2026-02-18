@@ -21,7 +21,7 @@ import { useTheme } from "@/lib/contexts/ThemeContext";
 
 function LoginForm() {
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get("redirectTo") ?? "/cars";
+  const redirectTo = searchParams.get("redirectTo") ?? "/dashboard";
   const { theme } = useTheme();
 
   const [email, setEmail] = useState("");

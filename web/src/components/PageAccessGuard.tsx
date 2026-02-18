@@ -14,12 +14,16 @@ export function PageAccessGuard({ children }: { children: React.ReactNode }) {
     canSeePartsInventory,
     canSeeGarageJobs,
     canSeeGarageHistory,
+    isRequestAssistant,
+    isOwner,
     loading,
   } = useUser();
 
   if (loading) return null;
 
   const hasAccess = (): boolean => {
+    if (pathname.startsWith("/assistant-dashboard"))
+      return isRequestAssistant || isOwner;
     if (pathname === "/dashboard") return canSeeDashboard;
     if (pathname.startsWith("/cars") && pathname !== "/cars") return canSeeCars;
     if (pathname === "/cars") return canSeeCars;

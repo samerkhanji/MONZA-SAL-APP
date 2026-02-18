@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useEffect, useState, useMemo, useRef, useCallback } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
@@ -23,10 +24,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, ScanLine } from "lucide-react";
+import { ExportButton } from "@/components/ExportButton";
+import type { ExportColumn } from "@/lib/exportToExcel";
 import { NewJobDialog } from "@/components/garage/NewJobDialog";
 import { FinishJobDialog } from "@/components/garage/FinishJobDialog";
-import { ScannerDialog } from "@/components/scanner/ScannerDialog";
+
+const ScannerDialog = dynamic(
+  () => import("@/components/scanner/ScannerDialog").then((m) => ({ default: m.ScannerDialog })),
+  { ssr: false }
+);
 
 interface JobWithCar extends GarageJob {
   cars?: {
@@ -117,7 +125,7 @@ export default function GarageJobsPage() {
     toast.success(`Found: ${(car as { brand: string }).brand} ${(car as { model: string }).model}`);
   }
 
-  async function fetchJobs() {
+  const fetchJobs = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
       .from("garage_jobs")
@@ -132,11 +140,11 @@ export default function GarageJobsPage() {
       setJobs((data as JobWithCar[]) ?? []);
     }
     setLoading(false);
-  }
+  }, []);
 
   useEffect(() => {
     fetchJobs();
-  }, []);
+  }, [fetchJobs]);
 
   useEffect(() => {
     if (jobs.length === 0) return;
@@ -332,34 +340,79 @@ export default function GarageJobsPage() {
     return Date.now() > expectedEndMs;
   };
 
+  const jobExportColumns: ExportColumn[] = [
+    { key: "car_vin", header: "VIN" },
+    { key: "car_model", header: "Model" },
+    { key: "title", header: "Reason of Visit" },
+    { key: "status_display", header: "Status" },
+    { key: "priority_display", header: "Priority", type: "priority" },
+    { key: "due_date", header: "Service Date", type: "date" },
+    { key: "assigned_to", header: "Assigned To" },
+    { key: "estimated_hours", header: "Est. Hours", type: "number" },
+    { key: "started_at", header: "Started", type: "date" },
+    { key: "completed_at", header: "Completed", type: "date" },
+    { key: "delivered_at", header: "Delivered", type: "date" },
+    { key: "work_done", header: "Work Description" },
+    { key: "notes", header: "Notes" },
+  ];
+
+  const jobExportData = (list: JobWithCar[]) =>
+    list.map((j) => {
+      const car = Array.isArray(j.cars) ? j.cars[0] : j.cars;
+      const priorityLabel = j.priority === "low" ? "🟢 Low" : j.priority === "urgent" ? "🔴 Urgent" : "🟡 Medium";
+      return {
+        ...j,
+        car_vin: car?.vin ?? "",
+        car_model: car ? `${car.brand} ${car.model}` : "",
+        status_display: JOB_STATUS_LABELS[j.status] ?? j.status,
+        priority_display: priorityLabel,
+      };
+    });
+
+  const doneCount = sortedJobs.filter((j) => j.status === "done").length;
+  const inProgressCount = sortedJobs.filter((j) => j.status === "in_progress").length;
+
   return (
     <div className="container mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-xl font-semibold sm:text-2xl">Garage Jobs</h1>
-        {canManageGarage && (
-          <div className="flex gap-2">
-            <Button
-              size="lg"
-              variant="outline"
-              className="h-12 px-6 text-base"
-              onClick={() => setScanVinOpen(true)}
-            >
-              <ScanLine className="mr-2 size-5" />
-              Scan VIN
-            </Button>
-            <Button
-              size="lg"
-              className="h-12 px-6 text-base"
-              onClick={() => {
-                setPreselectedCar(null);
-                setNewJobOpen(true);
-              }}
-            >
-              <Plus className="mr-2 size-5" />
-              New Job
-            </Button>
-          </div>
-        )}
+        <div className="flex gap-2">
+          <ExportButton
+            data={jobExportData(sortedJobs)}
+            allData={jobExportData(jobs)}
+            columns={jobExportColumns}
+            filename="Garage_Jobs"
+            options={{
+              pageName: "Garage Jobs",
+              summary: `Total Jobs: ${sortedJobs.length} | Completed: ${doneCount} | In Progress: ${inProgressCount}`,
+            }}
+            disabled={loading}
+          />
+          {canManageGarage && (
+            <>
+              <Button
+                size="lg"
+                variant="outline"
+                className="h-12 px-6 text-base"
+                onClick={() => setScanVinOpen(true)}
+              >
+                <ScanLine className="mr-2 size-5" />
+                Scan VIN
+              </Button>
+              <Button
+                size="lg"
+                className="h-12 px-6 text-base"
+                onClick={() => {
+                  setPreselectedCar(null);
+                  setNewJobOpen(true);
+                }}
+              >
+                <Plus className="mr-2 size-5" />
+                New Job
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -427,7 +480,11 @@ export default function GarageJobsPage() {
       </div>
 
       {loading ? (
-        <p className="py-12 text-center text-muted-foreground">Loading...</p>
+        <div className="space-y-3">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <Skeleton key={i} className="h-24 w-full" />
+          ))}
+        </div>
       ) : sortedJobs.length === 0 ? (
         <div className="rounded-lg border border-dashed py-16 text-center">
           <p className="text-muted-foreground">No jobs found.</p>

@@ -23,6 +23,8 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { History, Lock } from "lucide-react";
+import { ExportButton } from "@/components/ExportButton";
+import type { ExportColumn } from "@/lib/exportToExcel";
 
 interface JobWithCar extends GarageJob {
   cars?: {
@@ -186,6 +188,34 @@ export default function GarageHistoryPage() {
     };
   }, [jobs]);
 
+  const jobExportColumns: ExportColumn[] = [
+    { key: "car_vin", header: "VIN" },
+    { key: "car_model", header: "Model" },
+    { key: "title", header: "Reason of Visit" },
+    { key: "status_display", header: "Status" },
+    { key: "priority_display", header: "Priority", type: "priority" },
+    { key: "due_date", header: "Service Date", type: "date" },
+    { key: "assigned_to", header: "Assigned To" },
+    { key: "estimated_hours", header: "Est. Hours", type: "number" },
+    { key: "actual_hours", header: "Act. Hours", type: "number" },
+    { key: "completed_at", header: "Completed", type: "date" },
+    { key: "work_done", header: "Work Description" },
+    { key: "notes", header: "Notes" },
+  ];
+
+  const jobExportData = (list: JobWithParts[]) =>
+    list.map((j) => {
+      const car = Array.isArray(j.cars) ? j.cars[0] : j.cars;
+      const priorityLabel = j.priority === "low" ? "🟢 Low" : j.priority === "urgent" ? "🔴 Urgent" : "🟡 Medium";
+      return {
+        ...j,
+        car_vin: car?.vin ?? "",
+        car_model: car ? `${car.brand} ${car.model}` : "",
+        status_display: JOB_STATUS_LABELS[j.status] ?? j.status,
+        priority_display: priorityLabel,
+      };
+    });
+
   if (accessCheckLoading) {
     return (
       <div className="container mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
@@ -223,15 +253,26 @@ export default function GarageHistoryPage() {
     <div className="container mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-            <h1 className="flex items-center gap-2 text-2xl font-semibold">
-              <History className="size-6" />
-              Garage History
-            </h1>
-            <p className="text-muted-foreground text-sm">
-              All completed and cancelled jobs
-            </p>
-          </div>
+          <h1 className="flex items-center gap-2 text-2xl font-semibold">
+            <History className="size-6" />
+            Garage History
+          </h1>
+          <p className="text-muted-foreground text-sm">
+            All completed and cancelled jobs
+          </p>
         </div>
+        <ExportButton
+          data={jobExportData(sortedJobs)}
+          allData={jobExportData(jobs)}
+          columns={jobExportColumns}
+          filename="Garage_History"
+          options={{
+            pageName: "Garage History",
+            summary: `Total Jobs: ${sortedJobs.length} | Completed: ${stats.done} | Cancelled: ${stats.cancelled}`,
+          }}
+          disabled={loading}
+        />
+      </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         <div className="rounded-lg border bg-card p-4">

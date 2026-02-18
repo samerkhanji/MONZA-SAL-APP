@@ -3,7 +3,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import * as XLSX from "xlsx";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
 import type { Part } from "@/types/database";
@@ -54,28 +53,8 @@ import {
   getPendingDeleteRequestsForItems,
   type PartDeleteDetails,
 } from "@/lib/delete-requests";
-
-function exportToExcel(parts: Part[]) {
-  const ws = XLSX.utils.json_to_sheet(
-    parts.map((p) => ({
-      "Part Name": p.part_name,
-      "OE Number": p.oe_number,
-      "Car Model": p.car_model,
-      Quantity: p.quantity,
-      "Min Quantity": p.min_quantity,
-      "Storage Zone": p.storage_zone,
-      Supplier: p.supplier,
-      "Unit Cost": p.unit_cost,
-      Currency: p.currency ?? "USD",
-      "Order Date": p.order_date,
-      Status: p.status,
-      Notes: p.notes,
-    }))
-  );
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Parts");
-  XLSX.writeFile(wb, "monza_parts_inventory.xlsx");
-}
+import { ExportButton } from "@/components/ExportButton";
+import type { ExportColumn } from "@/lib/exportToExcel";
 
 function matchesSearch(p: Part, q: string): boolean {
   const s = q.trim().toLowerCase();
@@ -225,6 +204,23 @@ export default function GarageInventoryPage() {
     return "text-green-600 dark:text-green-400";
   }
 
+  const partExportColumns: ExportColumn[] = [
+    { key: "part_name", header: "Part Name" },
+    { key: "oe_number", header: "Part Number" },
+    { key: "car_model", header: "Category" },
+    { key: "quantity", header: "Qty in Stock", type: "number" },
+    { key: "storage_zone", header: "Location" },
+    { key: "notes", header: "Notes" },
+  ];
+
+  const partExportData = (list: Part[]) =>
+    list.map((p) => ({
+      ...p,
+      status_display: PART_STATUS_LABELS[p.status] ?? p.status,
+    }));
+
+  const totalQty = filteredParts.reduce((s, p) => s + p.quantity, 0);
+
   return (
     <div className="container mx-auto max-w-[1800px] space-y-6 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       <h1 className="text-xl font-semibold sm:text-2xl">Garage Inventory</h1>
@@ -268,14 +264,17 @@ export default function GarageInventoryPage() {
                   </Button>
                 </>
               )}
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => exportToExcel(filteredParts)}
-              >
-                <Download className="mr-2 size-4" />
-                Export to Excel
-              </Button>
+              <ExportButton
+                data={partExportData(filteredParts)}
+                allData={partExportData(parts)}
+                columns={partExportColumns}
+                filename="Parts_Inventory"
+                options={{
+                  pageName: "Parts Inventory",
+                  summary: `Total Parts: ${filteredParts.length} | Total Quantity: ${totalQty}`,
+                }}
+                disabled={loading}
+              />
               <Button
                 size="sm"
                 variant="outline"
@@ -369,7 +368,7 @@ export default function GarageInventoryPage() {
                         </Badge>
                         {pendingDeletes[p.id] && (
                           <Badge variant="outline" className="text-amber-600 border-amber-400 dark:text-amber-400 dark:border-amber-500">
-                            Pending Deletion
+                            Pending Request
                           </Badge>
                         )}
                       </div>
@@ -443,7 +442,7 @@ export default function GarageInventoryPage() {
                           </Badge>
                           {pendingDeletes[p.id] && (
                             <Badge variant="outline" className="text-amber-600 border-amber-400 dark:text-amber-400 dark:border-amber-500">
-                              Pending Deletion
+                              Pending Request
                             </Badge>
                           )}
                         </div>

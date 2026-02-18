@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { ChangePasswordDialog } from "@/components/settings/ChangePasswordDialog";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -20,6 +20,7 @@ import {
   RefreshCw,
   WifiOff,
   Bell,
+  LayoutGrid,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
@@ -42,8 +43,10 @@ const BASE_NAV_ITEMS: Array<{
   label: string;
   icon: typeof LayoutDashboard;
   ownerOnly?: boolean;
+  assistantDashboard?: boolean;
   children?: Array<{ href: string; label: string; icon: typeof Package }>;
 }> = [
+  { href: "/assistant-dashboard", label: "Assistant Dashboard", icon: LayoutGrid, assistantDashboard: true },
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/requests", label: "Request Center", icon: ClipboardList },
   { href: "/cars", label: "Inventory", icon: Car },
@@ -59,10 +62,11 @@ const BASE_NAV_ITEMS: Array<{
       { href: "/garage/history", label: "Garage History", icon: History },
     ],
   },
-  { href: "/settings", label: "Settings", icon: Settings, ownerOnly: true },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 function getPageTitle(pathname: string): string {
+  if (pathname.startsWith("/assistant-dashboard")) return "Assistant Dashboard";
   if (pathname === "/dashboard") return "Dashboard";
   if (pathname.startsWith("/cars/add")) return "Add Car";
   if (pathname.startsWith("/cars/") && pathname !== "/cars") return "Car Details";
@@ -93,13 +97,21 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     canSeePartsInventory,
     canSeeGarageJobs,
     canSeeGarageHistory,
+    isRequestAssistant,
+    isOwner,
   } = useUser();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
 
-  const navItems = BASE_NAV_ITEMS.filter((item) => {
-    if (item.ownerOnly && !canSeeSettings) return false;
-    if (item.href === "/dashboard" && !canSeeDashboard) return false;
+  const navItems = useMemo(() => BASE_NAV_ITEMS.filter((item) => {
+    if (item.assistantDashboard) {
+      return isRequestAssistant || isOwner;
+    }
+    if (item.href === "/dashboard") {
+      if (!canSeeDashboard) return false;
+      if (isRequestAssistant && !isOwner) return false;
+      return true;
+    }
     if (item.href === "/cars" && !canSeeCars) return false;
     if (item.href === "/documents" && !canSeeDocuments) return false;
     if (item.href === "/customers") return true;
@@ -115,7 +127,16 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       if (visibleChildren.length === 0) return false;
     }
     return true;
-  });
+  }), [
+    isRequestAssistant,
+    isOwner,
+    canSeeDashboard,
+    canSeeCars,
+    canSeeDocuments,
+    canSeePartsInventory,
+    canSeeGarageJobs,
+    canSeeGarageHistory,
+  ]);
 
   async function handleSignOut() {
     const supabase = createClient();

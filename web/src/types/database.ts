@@ -8,7 +8,11 @@ export type CarStatus =
   | "delivered"
   | "service"
   | "sent_to_sub_dealer"
-  | "demo";
+  | "demo"
+  | "registered"
+  | "under_registration"
+  | "sent_to_customs"
+  | "company_car";
 
 export type LocationType = "showroom1" | "showroom2" | "garage" | "storage" | "inventory";
 
@@ -36,6 +40,17 @@ export interface Car {
   exterior_color: string | null;
   interior_color: string | null;
   status: CarStatus;
+  issue: string | null;
+  software_update: string | null;
+  dongle: string | null;
+  sold_marker: string | null;
+  suffix: string | null;
+  engine_number: string | null;
+  client_name: string | null;
+  delivery_date: string | null;
+  client_phone: string | null;
+  reserved_by: string | null;
+  reservation_date: string | null;
   location_type: LocationType;
   location_slot: string | null;
   location_floor: string | null;
@@ -106,14 +121,18 @@ export interface CarEvent {
 
 export const CAR_STATUS_LABELS: Record<CarStatus, string> = {
   inbound: "Inbound",
-  in_stock: "In Stock",
+  in_stock: "Available",
   showroom: "Showroom",
   reserved: "Reserved",
   sold: "Sold",
   delivered: "Delivered",
   service: "Service",
-  sent_to_sub_dealer: "Sent to Sub Dealer",
-  demo: "Demo",
+  sent_to_sub_dealer: "Sent to Dealership",
+  demo: "Display",
+  registered: "Registered",
+  under_registration: "Under Registration",
+  sent_to_customs: "Sent to Customs",
+  company_car: "Company Car",
 };
 
 export const LOCATION_LABELS: Record<LocationType, string> = {

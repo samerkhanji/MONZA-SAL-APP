@@ -1,0 +1,22 @@
+# When main is pushed, automatically sync to phone branch.
+# Keeps the phone build (PWA/mobile) up to date with desktop.
+name: Sync main to phone
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Sync main to phone
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -B phone origin/main
+          git push origin phone

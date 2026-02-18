@@ -84,6 +84,14 @@ export default function AddCarPage() {
   const [warrantyMonzaStartDate, setWarrantyMonzaStartDate] = useState("");
   const [customsStatus, setCustomsStatus] = useState<CustomsStatus>("pending");
   const [notes, setNotes] = useState("");
+  const [issue, setIssue] = useState("");
+  const [suffix, setSuffix] = useState("");
+  const [engineNumber, setEngineNumber] = useState("");
+  const [softwareUpdate, setSoftwareUpdate] = useState("");
+  const [dongle, setDongle] = useState("");
+  const [soldMarker, setSoldMarker] = useState(false);
+  const [reservedBy, setReservedBy] = useState("");
+  const [reservationDate, setReservationDate] = useState("");
 
   // Section 2: Technical Details
   const [batteryPercent, setBatteryPercent] = useState("");
@@ -102,14 +110,15 @@ export default function AddCarPage() {
   const [clientPhone2, setClientPhone2] = useState("");
   const [clientEmail, setClientEmail] = useState("");
   const [preferredLanguage, setPreferredLanguage] = useState("en");
-  const [sellingPrice, setSellingPrice] = useState("");
   const [saleDate, setSaleDate] = useState(todayISO());
   const [deliveryDate, setDeliveryDate] = useState("");
   const [depositAmount, setDepositAmount] = useState("");
   const [reservedUntil, setReservedUntil] = useState("");
   const [saleNotes, setSaleNotes] = useState("");
 
-  const showCustomerSection = status === "sold" || status === "reserved";
+  const CUSTOMER_REQUIRED_STATUSES: CarStatus[] = ["sold", "reserved", "registered", "under_registration", "sent_to_sub_dealer", "delivered"];
+  const showCustomerSection = CUSTOMER_REQUIRED_STATUSES.includes(status) || soldMarker;
+  const requireDeliveryDate = status === "sold" || status === "delivered" || soldMarker;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -127,13 +136,17 @@ export default function AddCarPage() {
       return;
     }
 
-    if (showCustomerSection) {
+    if (showCustomerSection || soldMarker) {
       if (!clientFirstName.trim()) {
-        toast.error("Client first name is required when status is Sold or Reserved");
+        toast.error("Client name is required");
         return;
       }
       if (!clientPhone.trim()) {
-        toast.error("Client phone is required when status is Sold or Reserved");
+        toast.error("Client phone is required");
+        return;
+      }
+      if ((requireDeliveryDate || soldMarker) && !deliveryDate.trim()) {
+        toast.error("Delivery date is required when sold");
         return;
       }
     }
@@ -201,11 +214,37 @@ export default function AddCarPage() {
       warranty_per_dms: string;
       warranty_monza_start_date: string;
       customs_status: string;
+      issue: string;
+      software_update: string;
+      dongle: string;
+      sold_marker: string;
+      suffix: string;
+      engine_number: string;
+      client_name: string;
+      delivery_date: string;
+      client_phone: string;
+      reserved_by: string;
+      reservation_date: string;
     }> = {};
 
     if (plateNumber.trim()) extraFields.plate_number = plateNumber.trim();
     if (dateArrived) extraFields.date_arrived = dateArrived;
     if (notes.trim()) extraFields.notes = notes.trim();
+    if (issue.trim()) extraFields.issue = issue.trim();
+    if (suffix.trim()) extraFields.suffix = suffix.trim();
+    if (engineNumber.trim()) extraFields.engine_number = engineNumber.trim();
+    if (softwareUpdate.trim()) extraFields.software_update = softwareUpdate.trim();
+    if (dongle.trim()) extraFields.dongle = dongle.trim();
+    extraFields.sold_marker = soldMarker ? "X" : "";
+    if (reservedBy.trim()) extraFields.reserved_by = reservedBy.trim();
+    if (reservationDate) extraFields.reservation_date = reservationDate;
+    if (showCustomerSection || soldMarker) {
+      extraFields.client_name = `${clientFirstName.trim()} ${clientLastName.trim()}`.trim();
+      extraFields.client_phone = clientPhone.trim();
+      if (deliveryDate.trim()) extraFields.delivery_date = deliveryDate.trim();
+      if (reservedBy.trim()) extraFields.reserved_by = reservedBy.trim();
+      if (reservationDate) extraFields.reservation_date = reservationDate;
+    }
 
     if (warrantyPerDms) extraFields.warranty_per_dms = warrantyPerDms;
     if (warrantyMonzaStartDate) extraFields.warranty_monza_start_date = warrantyMonzaStartDate;
@@ -269,9 +308,6 @@ export default function AddCarPage() {
           created_by: user.id,
         };
 
-        const priceNum = sellingPrice ? parseFloat(sellingPrice) : undefined;
-        if (priceNum !== undefined && !Number.isNaN(priceNum))
-          saleFields.selling_price = priceNum;
         saleFields.currency = "USD";
         if (saleDate) saleFields.sale_date = saleDate;
         if (deliveryDate) saleFields.delivery_date = deliveryDate;
@@ -423,6 +459,29 @@ export default function AddCarPage() {
               </div>
             </div>
 
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="car-suffix">Suffix</Label>
+                <Input
+                  id="car-suffix"
+                  name="car-suffix"
+                  value={suffix}
+                  onChange={(e) => setSuffix(e.target.value)}
+                  placeholder="e.g. H97c REV CN, 318 GCC REV"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="car-engine-number">Engine Number</Label>
+                <Input
+                  id="car-engine-number"
+                  name="car-engine-number"
+                  value={engineNumber}
+                  onChange={(e) => setEngineNumber(e.target.value)}
+                  placeholder="e.g. 254001204DUB"
+                />
+              </div>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="car-location">Location</Label>
               <Select
@@ -447,7 +506,11 @@ export default function AddCarPage() {
                 <Label htmlFor="car-status">Status</Label>
                 <Select
                   value={status}
-                  onValueChange={(v) => setStatus(v as CarStatus)}
+                  onValueChange={(v) => {
+                    const s = v as CarStatus;
+                    setStatus(s);
+                    if (s === "sold") setSoldMarker(true);
+                  }}
                 >
                   <SelectTrigger id="car-status">
                     <SelectValue />
@@ -528,6 +591,28 @@ export default function AddCarPage() {
             </div>
 
             <div className="space-y-2">
+              <Label htmlFor="car-issue">Issue</Label>
+              <Input
+                id="car-issue"
+                name="car-issue"
+                value={issue}
+                onChange={(e) => setIssue(e.target.value)}
+                placeholder="e.g. Missing Parts, DVR Updated"
+              />
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="car-sold-marker"
+                checked={soldMarker}
+                onCheckedChange={(c) => setSoldMarker(!!c)}
+              />
+              <Label htmlFor="car-sold-marker" className="font-normal">
+                Sold (X)
+              </Label>
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="car-notes">Notes</Label>
               <Textarea
                 id="car-notes"
@@ -551,6 +636,28 @@ export default function AddCarPage() {
             <CardDescription>Battery, range, KM, software, PDI</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="car-software-update"
+                  checked={!!softwareUpdate}
+                  onCheckedChange={(c) => setSoftwareUpdate(c ? "Yes" : "")}
+                />
+                <Label htmlFor="car-software-update" className="font-normal">
+                  Software update done
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="car-dongle"
+                  checked={!!dongle}
+                  onCheckedChange={(c) => setDongle(c ? "Yes" : "")}
+                />
+                <Label htmlFor="car-dongle" className="font-normal">
+                  Dongle
+                </Label>
+              </div>
+            </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="car-battery-percent">Battery %</Label>
@@ -767,19 +874,6 @@ export default function AddCarPage() {
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="sale-selling-price">Selling Price (USD)</Label>
-                    <Input
-                      id="sale-selling-price"
-                      name="sale-selling-price"
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      value={sellingPrice}
-                      onChange={(e) => setSellingPrice(e.target.value)}
-                      placeholder="USD 0.00"
-                    />
-                  </div>
-                  <div className="space-y-2">
                     <Label htmlFor="sale-date">Date of Sale</Label>
                     <Input
                       id="sale-date"
@@ -798,6 +892,29 @@ export default function AddCarPage() {
                       value={deliveryDate}
                       onChange={(e) => setDeliveryDate(e.target.value)}
                       placeholder="Optional"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="reserved-by">Reserved By</Label>
+                    <Input
+                      id="reserved-by"
+                      name="reserved-by"
+                      value={reservedBy}
+                      onChange={(e) => setReservedBy(e.target.value)}
+                      placeholder="Employee name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="reservation-date">Reservation Date</Label>
+                    <Input
+                      id="reservation-date"
+                      name="reservation-date"
+                      type="date"
+                      value={reservationDate}
+                      onChange={(e) => setReservationDate(e.target.value)}
                     />
                   </div>
                 </div>

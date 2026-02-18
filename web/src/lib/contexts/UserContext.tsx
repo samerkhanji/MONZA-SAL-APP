@@ -39,6 +39,9 @@ export interface UserContextType {
   canEditInventory: boolean;
   canDelete: boolean;
   canSeeSettings: boolean;
+  canSeeProfileSettings: boolean;
+  canSeeMyRequests: boolean;
+  canSeeAllRequests: boolean;
   canUploadDocuments: boolean;
   canManageParts: boolean;
   canManageGarage: boolean;
@@ -67,6 +70,9 @@ const UserContext = createContext<UserContextType>({
   canEditInventory: false,
   canDelete: false,
   canSeeSettings: false,
+  canSeeProfileSettings: false,
+  canSeeMyRequests: false,
+  canSeeAllRequests: false,
   canUploadDocuments: false,
   canManageParts: false,
   canManageGarage: false,
@@ -184,9 +190,15 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   const role = profile?.role;
   const capabilities = profile?.capabilities ?? [];
+  const nameLower = (profile?.full_name ?? "").toLowerCase();
+  const isRequestAssistant =
+    nameLower.includes("lara") || nameLower.includes("samaya");
   const canEditInventory = role === "owner" || role === "sales";
   const canDelete = role === "owner";
   const canSeeSettings = role === "owner";
+  const canSeeProfileSettings = !!profile;
+  const canSeeMyRequests = !!profile;
+  const canSeeAllRequests = role === "owner" || isRequestAssistant;
   const canUploadDocuments =
     role === "owner" ||
     role === "sales" ||
@@ -201,9 +213,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     role === "garage_manager" ||
     capabilities.includes("garage");
 
-  const nameLower = (profile?.full_name ?? "").toLowerCase();
-  const isRequestAssistant =
-    nameLower.includes("lara") || nameLower.includes("samaya");
   const isRequestManagement = role === "owner";
   const isSamer = nameLower.includes("samer");
   const isKareem = nameLower.includes("kareem");
@@ -231,6 +240,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         canEditInventory,
         canDelete,
         canSeeSettings,
+        canSeeProfileSettings,
+        canSeeMyRequests,
+        canSeeAllRequests,
         canUploadDocuments,
         canManageParts,
         canManageGarage,

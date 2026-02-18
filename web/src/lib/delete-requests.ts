@@ -62,7 +62,7 @@ export async function createDeleteRequest(
       userId: houssamId,
       title: "Delete request pending",
       message: `${itemType === "car" ? "Car" : "Part"} deletion requested: ${itemLabel}`,
-      link: "/settings?tab=pending-deletions",
+      link: "/settings?tab=pending-requests",
       metadata: { type: "delete_request", delete_request_id: id },
     });
   }

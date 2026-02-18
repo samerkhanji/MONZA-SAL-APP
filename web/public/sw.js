@@ -1,3 +1,7 @@
+self.addEventListener("message", function (event) {
+  if (event.data?.type === "SKIP_WAITING") self.skipWaiting();
+});
+
 self.addEventListener("push", function (event) {
   const data = event.data ? event.data.json() : {};
   const title = data.title || "Monza CRM";

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { InstallBanner } from "@/components/pwa/InstallBanner";
 import { createClient } from "@/lib/supabase";
@@ -157,7 +158,17 @@ function getActivityIcon(eventType: string): string {
 }
 
 export default function DashboardPage() {
-  const { profile, loading: profileLoading } = useUser();
+  const router = useRouter();
+  const { profile, loading: profileLoading, isRequestAssistant, isOwner } = useUser();
+
+  useEffect(() => {
+    if (profileLoading) return;
+    if (isRequestAssistant && !isOwner) {
+      router.replace("/assistant-dashboard");
+    }
+  }, [profileLoading, isRequestAssistant, isOwner, router]);
+
+  const shouldRedirect = !profileLoading && isRequestAssistant && !isOwner;
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [totalCars, setTotalCars] = useState<number>(0);
@@ -173,6 +184,7 @@ export default function DashboardPage() {
   const supabase = createClient();
 
   const fetchData = useCallback(async () => {
+    if (shouldRedirect) return;
     setLoading(true);
 
     const [
@@ -299,7 +311,7 @@ export default function DashboardPage() {
 
     setLastUpdated(new Date());
     setLoading(false);
-  }, []);
+  }, [shouldRedirect]);
 
   useEffect(() => {
     fetchData();
@@ -345,6 +357,8 @@ export default function DashboardPage() {
           : "bg-muted/50",
     },
   ];
+
+  if (shouldRedirect) return null;
 
   return (
     <div className="container mx-auto space-y-6 px-4 py-6 sm:px-6 lg:px-8">

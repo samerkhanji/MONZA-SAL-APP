@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { MoreHorizontal, FileText, ScanLine } from "lucide-react";
-import { ScannerDialog } from "@/components/scanner/ScannerDialog";
+import { MoreHorizontal, FileText, ScanLine, FileSpreadsheet, Download } from "lucide-react";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
 import type { CarDisplay } from "@/types/database";
@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -51,16 +52,42 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { StatusCustomerDialog } from "@/components/status-customer-dialog";
-import { CustomsDialog } from "@/components/customs-dialog";
-import { PdiStatusDialog } from "@/components/pdi-status-dialog";
-import { MoveCarDialog } from "@/components/move-car-dialog";
-import { EditCarDialog } from "@/components/edit-car-dialog";
 import {
   createDeleteRequest,
   getPendingDeleteRequestsForItems,
   type CarDeleteDetails,
 } from "@/lib/delete-requests";
+import { ExportButton } from "@/components/ExportButton";
+import type { ExportColumn } from "@/lib/exportToExcel";
+
+const ScannerDialog = dynamic(
+  () => import("@/components/scanner/ScannerDialog").then((m) => ({ default: m.ScannerDialog })),
+  { ssr: false }
+);
+const StatusCustomerDialog = dynamic(
+  () => import("@/components/status-customer-dialog").then((m) => ({ default: m.StatusCustomerDialog })),
+  { ssr: false }
+);
+const CustomsDialog = dynamic(
+  () => import("@/components/customs-dialog").then((m) => ({ default: m.CustomsDialog })),
+  { ssr: false }
+);
+const PdiStatusDialog = dynamic(
+  () => import("@/components/pdi-status-dialog").then((m) => ({ default: m.PdiStatusDialog })),
+  { ssr: false }
+);
+const MoveCarDialog = dynamic(
+  () => import("@/components/move-car-dialog").then((m) => ({ default: m.MoveCarDialog })),
+  { ssr: false }
+);
+const EditCarDialog = dynamic(
+  () => import("@/components/edit-car-dialog").then((m) => ({ default: m.EditCarDialog })),
+  { ssr: false }
+);
+const ImportExcelDialog = dynamic(
+  () => import("@/components/ImportExcelDialog").then((m) => ({ default: m.ImportExcelDialog })),
+  { ssr: false }
+);
 
 function matchesSearch(
   car: CarDisplay,
@@ -84,7 +111,7 @@ export default function CarsListPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const statusFromUrl = searchParams.get("status");
-  const { canEditInventory, canDelete, profile } = useUser();
+  const { canEditInventory, canDelete, profile, isOwner } = useUser();
   const [cars, setCars] = useState<CarDisplay[]>([]);
   const [pendingDeletes, setPendingDeletes] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
@@ -95,9 +122,9 @@ export default function CarsListPage() {
   useEffect(() => {
     if (
       statusFromUrl &&
-      /^(inbound|in_stock|showroom|reserved|sold|delivered|service|sent_to_sub_dealer|demo)$/.test(
-        statusFromUrl
-      )
+        /^(inbound|in_stock|showroom|reserved|sold|delivered|service|sent_to_sub_dealer|demo|registered|under_registration|sent_to_customs|company_car)$/.test(
+          statusFromUrl
+        )
     ) {
       setStatusFilter(statusFromUrl);
     }
@@ -109,6 +136,7 @@ export default function CarsListPage() {
   const [customsDialogOpen, setCustomsDialogOpen] = useState(false);
   const [pdiDialogCar, setPdiDialogCar] = useState<CarDisplay | null>(null);
   const [pdiDialogOpen, setPdiDialogOpen] = useState(false);
+  const [importExcelOpen, setImportExcelOpen] = useState(false);
   const [moveCar, setMoveCar] = useState<CarDisplay | null>(null);
   const [editCar, setEditCar] = useState<CarDisplay | null>(null);
   const [deleteCar, setDeleteCar] = useState<CarDisplay | null>(null);
@@ -174,7 +202,7 @@ export default function CarsListPage() {
     }
   }
 
-  async function fetchCars() {
+  const fetchCars = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
       .from("cars_display")
@@ -193,11 +221,11 @@ export default function CarsListPage() {
       setCars((data as CarDisplay[]) ?? []);
     }
     setLoading(false);
-  }
+  }, []);
 
   useEffect(() => {
     fetchCars();
-  }, []);
+  }, [fetchCars]);
 
   useEffect(() => {
     if (cars.length === 0) return;
@@ -221,6 +249,32 @@ export default function CarsListPage() {
     });
   }, [cars, search, statusFilter, locationFilter, brandFilter]);
 
+  const carExportColumns: ExportColumn[] = [
+    { key: "vin", header: "VIN Number", width: 22 },
+    { key: "model", header: "Model" },
+    { key: "suffix", header: "Suffix / Trim" },
+    { key: "model_year", header: "Year" },
+    { key: "exterior_color", header: "Exterior Color" },
+    { key: "interior_color", header: "Interior Color" },
+    { key: "status_display", header: "Status" },
+    { key: "engine_number", header: "Engine Number" },
+    { key: "issue", header: "Issue" },
+    { key: "client_name", header: "Client" },
+    { key: "client_phone", header: "Client Phone", width: 18 },
+    { key: "delivery_date", header: "Delivery Date", type: "date" },
+    { key: "reservation_date", header: "Reservation Date", type: "date" },
+    { key: "reserved_by", header: "Reserved By" },
+    { key: "location_display", header: "Location" },
+  ];
+
+  const carExportData = (list: CarDisplay[]) =>
+    list.map((c) => ({
+      ...c,
+      status_display: CAR_STATUS_LABELS[c.status as keyof typeof CAR_STATUS_LABELS] ?? c.status,
+      location_display: c.location_full ?? (c.location_type ? `${LOCATION_LABELS[c.location_type as keyof typeof LOCATION_LABELS] ?? c.location_type}${c.location_slot ? ` ${c.location_slot}` : ""}` : ""),
+      model: `${c.brand ?? ""} ${c.model ?? ""}`.trim(),
+    }));
+
   return (
     <div className="container mx-auto max-w-[1800px] space-y-6 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
@@ -228,11 +282,30 @@ export default function CarsListPage() {
           <h1 className="text-xl font-semibold sm:text-2xl">Car Inventory</h1>
           <p className="text-muted-foreground">View and manage all cars</p>
         </div>
-        {canEditInventory && (
-          <Button asChild className="shrink-0">
-            <Link href="/cars/add">Add Car</Link>
-          </Button>
-        )}
+        <div className="flex shrink-0 flex-wrap gap-2">
+          <ExportButton
+            data={carExportData(filteredCars)}
+            allData={carExportData(cars)}
+            columns={carExportColumns}
+            filename="Car_Inventory"
+            options={{
+              pageName: "Car Inventory",
+              summary: `Total Cars: ${filteredCars.length}`,
+            }}
+            disabled={loading}
+          />
+          {isOwner && (
+            <Button variant="outline" onClick={() => setImportExcelOpen(true)}>
+              <FileSpreadsheet className="mr-2 size-4" />
+              Import from Excel
+            </Button>
+          )}
+          {canEditInventory && (
+            <Button asChild>
+              <Link href="/cars/add">Add Car</Link>
+            </Button>
+          )}
+        </div>
       </div>
 
       <Card>
@@ -314,7 +387,11 @@ export default function CarsListPage() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <p className="text-muted-foreground">Loading...</p>
+            <div className="space-y-2">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <Skeleton key={i} className="h-12 w-full" />
+              ))}
+            </div>
           ) : filteredCars.length === 0 ? (
             <p className="text-muted-foreground">No cars found.</p>
           ) : (
@@ -364,6 +441,7 @@ export default function CarsListPage() {
                     <TableHead className="hidden whitespace-nowrap xl:table-cell">Interior</TableHead>
                     <TableHead className="whitespace-nowrap">Plate</TableHead>
                     <TableHead className="whitespace-nowrap">Status</TableHead>
+                    <TableHead className="whitespace-nowrap w-12">Sold</TableHead>
                     <TableHead className="hidden whitespace-nowrap lg:table-cell">Location</TableHead>
                     <TableHead className="hidden min-w-[100px] whitespace-nowrap xl:table-cell">Warranty (DMS)</TableHead>
                     <TableHead className="hidden min-w-[110px] whitespace-nowrap xl:table-cell">Warranty (Monza)</TableHead>
@@ -431,10 +509,13 @@ export default function CarsListPage() {
                             </Badge>
                             {pendingDeletes[car.id] && (
                               <Badge variant="outline" className="text-amber-600 border-amber-400 dark:text-amber-400 dark:border-amber-500">
-                                Pending Deletion
+                                Pending Request
                               </Badge>
                             )}
                           </div>
+                        </TableCell>
+                        <TableCell className="text-center font-bold text-amber-600 dark:text-amber-400 w-12">
+                          {(car as { sold_marker?: string }).sold_marker === "X" ? "X" : "—"}
                         </TableCell>
                         <TableCell className="hidden max-w-[100px] truncate text-sm lg:table-cell" title={car.location_full ?? undefined}>
                           {car.location_full || "—"}
@@ -632,6 +713,12 @@ export default function CarsListPage() {
           setEditCar(null);
           fetchCars();
         }}
+      />
+
+      <ImportExcelDialog
+        open={importExcelOpen}
+        onOpenChange={setImportExcelOpen}
+        onSuccess={fetchCars}
       />
 
       <ScannerDialog

@@ -48,6 +48,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { EditCustomerDialog } from "@/components/customers/EditCustomerDialog";
+import { ExportButton } from "@/components/ExportButton";
+import type { ExportColumn } from "@/lib/exportToExcel";
 
 function matchesSearch(customer: CustomerDisplay, search: string): boolean {
   const q = search.trim().toLowerCase();
@@ -133,6 +135,28 @@ export default function CustomersPage() {
     return c.source_display ?? (c.lead_source ? LEAD_SOURCE_LABELS[c.lead_source] : "") ?? "—";
   }
 
+  const customerExportColumns: ExportColumn[] = [
+    { key: "first_name", header: "First Name" },
+    { key: "last_name", header: "Last Name" },
+    { key: "phone_primary", header: "Phone", width: 18 },
+    { key: "phone_secondary", header: "Secondary Phone", width: 18 },
+    { key: "email", header: "Email" },
+    { key: "status_display", header: "Status" },
+    { key: "source_display", header: "Source" },
+    { key: "language_display", header: "Language" },
+    { key: "notes", header: "Notes" },
+    { key: "created_at", header: "Date Added", type: "date" },
+    { key: "last_visit_date", header: "Last Visit", type: "date" },
+  ];
+
+  const customerExportData = (list: CustomerDisplay[]) =>
+    list.map((c) => ({
+      ...c,
+      status_display: getStatusLabel(c),
+      source_display: getSourceLabel(c),
+      language_display: c.language_display ?? c.preferred_language ?? "",
+    }));
+
   return (
     <div className="container mx-auto max-w-[1600px] space-y-6 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -142,11 +166,24 @@ export default function CustomersPage() {
             {loading ? "Loading..." : `${filteredCustomers.length} contact(s)`}
           </p>
         </div>
-        {canEditInventory && (
-          <Button asChild>
-            <Link href="/customers/add">Add Customer</Link>
-          </Button>
-        )}
+        <div className="flex gap-2">
+          <ExportButton
+            data={customerExportData(filteredCustomers)}
+            allData={customerExportData(customers)}
+            columns={customerExportColumns}
+            filename="Customers"
+            options={{
+              pageName: "Customers",
+              summary: `Total Customers: ${filteredCustomers.length}`,
+            }}
+            disabled={loading}
+          />
+          {canEditInventory && (
+            <Button asChild>
+              <Link href="/customers/add">Add Customer</Link>
+            </Button>
+          )}
+        </div>
       </div>
 
       <Card>

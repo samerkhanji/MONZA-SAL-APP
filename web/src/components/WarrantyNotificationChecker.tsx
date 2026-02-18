@@ -6,12 +6,22 @@ import { getProfileIdsByNames } from "@/lib/user-lookup";
 import { createNotificationsForUsers } from "@/lib/notifications";
 
 const THRESHOLDS = [30, 14, 7];
+const SESSION_KEY = "monza-warranty-check";
+
+function shouldRunWarrantyCheck(): boolean {
+  if (typeof window === "undefined") return true;
+  const today = new Date().toDateString();
+  const stored = sessionStorage.getItem(SESSION_KEY);
+  if (stored === today) return false;
+  sessionStorage.setItem(SESSION_KEY, today);
+  return true;
+}
 
 export function WarrantyNotificationChecker() {
   const ranRef = useRef(false);
 
   useEffect(() => {
-    if (ranRef.current) return;
+    if (ranRef.current || !shouldRunWarrantyCheck()) return;
     ranRef.current = true;
 
     const run = async () => {

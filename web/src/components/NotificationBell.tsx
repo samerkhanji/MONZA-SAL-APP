@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, memo } from "react";
 import { createClient } from "@/lib/supabase";
 import { Bell, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -31,7 +31,7 @@ interface Notification {
   } | null;
 }
 
-export function NotificationBell() {
+function NotificationBellInner() {
   const { profile, isOwner, isHoussam } = useUser();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -40,20 +40,20 @@ export function NotificationBell() {
 
   const supabase = createClient();
 
-  async function fetchNotifications() {
+  const fetchNotifications = useCallback(async () => {
     const { data } = await supabase
       .from("notifications")
       .select("id, title, message, link, is_read, created_at, metadata")
       .order("created_at", { ascending: false })
-      .limit(20);
-    setNotifications((data as Notification[]) ?? []);
-    const unread = (data ?? []).filter((n: Notification) => !n.is_read).length;
-    setUnreadCount(unread);
-  }
+      .limit(50);
+    const list = (data as Notification[]) ?? [];
+    setNotifications(list);
+    setUnreadCount(list.filter((n) => !n.is_read).length);
+  }, []);
 
   useEffect(() => {
     fetchNotifications();
-  }, []);
+  }, [fetchNotifications]);
 
   useEffect(() => {
     const channel = supabase
@@ -65,13 +65,13 @@ export function NotificationBell() {
           schema: "public",
           table: "notifications",
         },
-        () => fetchNotifications()
+        fetchNotifications
       )
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [fetchNotifications]);
 
   async function markAsRead(id: string) {
     await supabase
@@ -298,3 +298,5 @@ export function NotificationBell() {
     </DropdownMenu>
   );
 }
+
+export const NotificationBell = memo(NotificationBellInner);
