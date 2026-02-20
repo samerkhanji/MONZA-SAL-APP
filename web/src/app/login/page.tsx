@@ -1,9 +1,13 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { isConnectionError } from "@/lib/auth-utils";
+import {
+  clearAuthSessionMarkers,
+  markAuthSessionUnlocked,
+} from "@/lib/auth-session";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,6 +26,7 @@ import { useTheme } from "@/lib/contexts/ThemeContext";
 function LoginForm() {
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirectTo") ?? "/dashboard";
+  const reason = searchParams.get("reason");
   const { theme } = useTheme();
 
   const [email, setEmail] = useState("");
@@ -33,6 +38,12 @@ function LoginForm() {
   const [forgotLoading, setForgotLoading] = useState(false);
   const [forgotError, setForgotError] = useState<string | null>(null);
   const [forgotSuccess, setForgotSuccess] = useState(false);
+
+  useEffect(() => {
+    const supabase = createClient();
+    clearAuthSessionMarkers();
+    void supabase.auth.signOut();
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -56,6 +67,7 @@ function LoginForm() {
       return;
     }
 
+    markAuthSessionUnlocked();
     window.location.href = redirectTo.startsWith("/") ? redirectTo : `/${redirectTo}`;
   }
 
@@ -87,6 +99,13 @@ function LoginForm() {
     setForgotSuccess(false);
   }
 
+  const reasonMessage =
+    reason === "inactive"
+      ? "You were logged out after 15 minutes of inactivity."
+      : reason === "reauth"
+        ? "Please sign in again to continue."
+        : null;
+
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-background via-muted/30 to-background p-4">
       <div className="absolute right-4 top-4">
@@ -106,6 +125,11 @@ function LoginForm() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            {reasonMessage && !error && (
+              <p className="rounded-md bg-primary/10 p-3 text-sm text-foreground">
+                {reasonMessage}
+              </p>
+            )}
             {error && (
               <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
                 {error}

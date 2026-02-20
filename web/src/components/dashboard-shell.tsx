@@ -37,6 +37,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { NotificationBell } from "@/components/NotificationBell";
 import { useInstall } from "@/lib/contexts/InstallContext";
+import { clearAuthSessionMarkers } from "@/lib/auth-session";
 import { cn } from "@/lib/utils";
 
 const BASE_NAV_ITEMS: Array<{
@@ -87,7 +88,7 @@ function getPageTitle(pathname: string): string {
   if (pathname.startsWith("/garage/jobs/")) return "Job Details";
   if (pathname.startsWith("/garage/inventory")) return "Parts Inventory";
   if (pathname.startsWith("/garage/history")) return "Garage History";
-  if (pathname.startsWith("/garage")) return "Garage Jobs";
+  if (pathname.startsWith("/garage")) return "Garage";
   if (pathname.startsWith("/settings")) return "Settings";
   return "Monza S.A.L.";
 }
@@ -98,7 +99,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const {
     profile,
     loading,
-    canSeeSettings,
     noProfile,
     connectionError,
     retryConnection,
@@ -107,7 +107,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     canSeeDocuments,
     canSeePartsInventory,
     canSeeGarageJobs,
-    canSeeGarageHistory,
+    canSeeSettings,
     isRequestAssistant,
     isOwner,
   } = useUser();
@@ -147,13 +147,13 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     canSeeDocuments,
     canSeePartsInventory,
     canSeeGarageJobs,
-    canSeeGarageHistory,
     canSeeSettings,
   ]);
 
   async function handleSignOut() {
     const supabase = createClient();
     await supabase.auth.signOut();
+    clearAuthSessionMarkers();
     window.location.href = "/";
   }
 
@@ -165,7 +165,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
   const { showInstallOption, triggerInstall } = useInstall();
 
-  const SidebarContent = () => (
+  const renderSidebarContent = () => (
     <div className="flex h-full w-full min-w-0 flex-col">
       <div className="flex h-14 items-center border-b shrink-0 px-4 pt-safe md:justify-center md:px-0 md:group-hover:justify-start md:group-hover:px-4 lg:justify-start lg:px-4">
         <Link href="/dashboard" className="flex items-center justify-center md:justify-center lg:justify-start">
@@ -250,7 +250,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               title={item.label}
             >
               <item.icon className="size-4 shrink-0" />
-              <span className="hidden lg:inline">{item.label}</span>
+              <span className="md:hidden md:group-hover:inline lg:inline">
+                {item.label}
+              </span>
             </Link>
           );
         })}
@@ -312,7 +314,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen">
       {/* Tablet: collapsed icon-only, expand on hover (md) | Desktop: full sidebar (lg) */}
       <aside className="group hidden shrink-0 border-r border-sidebar-border bg-sidebar transition-[width] duration-200 md:block md:w-16 md:hover:w-56 lg:w-56">
-        <SidebarContent />
+        {renderSidebarContent()}
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
@@ -331,7 +333,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="w-72 max-w-[85vw] max-h-[100dvh] border-sidebar-border bg-sidebar p-0 sm:max-w-sm">
-              <SidebarContent />
+              {renderSidebarContent()}
             </SheetContent>
           </Sheet>
           <h1 className="min-w-0 flex-1 truncate text-lg font-semibold">

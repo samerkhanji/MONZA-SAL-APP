@@ -5,6 +5,7 @@ import { ClientOnly } from "@/components/client-only";
 import { PageAccessGuard } from "@/components/PageAccessGuard";
 import { FloatingScanButton } from "@/components/scanner/FloatingScanButton";
 import { WarrantyNotificationChecker } from "@/components/WarrantyNotificationChecker";
+import { SessionEnforcer } from "@/components/auth/SessionEnforcer";
 
 export default function DashboardLayout({
   children,
@@ -14,15 +15,17 @@ export default function DashboardLayout({
   return (
     <UserProvider>
       <ClientOnly>
-        <InstallProvider>
-          <DashboardShell>
-            <WarrantyNotificationChecker />
-            <PageAccessGuard>
-              {children}
-              <FloatingScanButton />
-            </PageAccessGuard>
-          </DashboardShell>
-        </InstallProvider>
+        <SessionEnforcer>
+          <InstallProvider>
+            <DashboardShell>
+              <WarrantyNotificationChecker />
+              <PageAccessGuard>
+                {children}
+                <FloatingScanButton />
+              </PageAccessGuard>
+            </DashboardShell>
+          </InstallProvider>
+        </SessionEnforcer>
       </ClientOnly>
     </UserProvider>
   );
