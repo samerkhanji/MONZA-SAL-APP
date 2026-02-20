@@ -11,7 +11,6 @@ import {
   Car,
   Wrench,
   AlertTriangle,
-  Trash2,
   Calendar,
   Phone,
   ChevronRight,
@@ -25,6 +24,8 @@ import { Badge } from "@/components/ui/badge";
 import { JOB_STATUS_LABELS } from "@/lib/constants/jobs";
 import { REQUEST_CATEGORIES } from "@/lib/constants/requests";
 import { ExportButton } from "@/components/ExportButton";
+import { KpiCard } from "@/components/ui/kpi-card";
+import { cn } from "@/lib/utils";
 
 const REFRESH_INTERVAL_MS = 60000;
 
@@ -92,6 +93,7 @@ export default function AssistantDashboardPage() {
   const pendingRequestsRef = useRef<HTMLDivElement>(null);
   const carsReadyRef = useRef<HTMLDivElement>(null);
   const workshopRef = useRef<HTMLDivElement>(null);
+  const [activeTab, setActiveTab] = useState<string>("Review Requests");
   const [markingDelivered, setMarkingDelivered] = useState<string | null>(null);
 
   const supabase = createClient();
@@ -276,48 +278,12 @@ export default function AssistantDashboardPage() {
   if (!profileLoading && !canAccess) return null;
 
   const cards = [
-    {
-      label: "Pending Requests",
-      value: pendingRequestsCount,
-      color: "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200",
-      icon: ClipboardList,
-      ref: pendingRequestsRef,
-    },
-    {
-      label: "Cars Ready for Pickup",
-      value: carsReadyCount,
-      color: "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-200",
-      icon: Car,
-      ref: carsReadyRef,
-    },
-    {
-      label: "Cars in Workshop",
-      value: carsInWorkshopCount,
-      color: "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200",
-      icon: Wrench,
-      ref: workshopRef,
-    },
-    {
-      label: "Overdue Pickups",
-      value: overduePickupsCount,
-      color: "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 border-red-200",
-      icon: AlertTriangle,
-      ref: carsReadyRef,
-    },
-    {
-      label: "Pending Deletions",
-      value: pendingDeletionsCount,
-      color: "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200",
-      icon: Trash2,
-      href: "/settings?tab=pending-requests",
-    },
-    {
-      label: "Today's Service",
-      value: todaysServiceCount,
-      color: "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200",
-      icon: Calendar,
-      ref: workshopRef,
-    },
+    { label: "Team Requests", value: pendingRequestsCount, color: "amber" as const, icon: ClipboardList, ref: pendingRequestsRef },
+    { label: "Cars Ready for Pickup", value: carsReadyCount, color: "green" as const, icon: Car, ref: carsReadyRef },
+    { label: "Cars in Workshop", value: carsInWorkshopCount, color: "amber" as const, icon: Wrench, ref: workshopRef },
+    { label: "Overdue Pickups", value: overduePickupsCount, color: "red" as const, icon: AlertTriangle, ref: carsReadyRef },
+    { label: "Pending Approvals", value: pendingDeletionsCount, color: "amber" as const, icon: FileCheck, href: "/requests/pending" },
+    { label: "Today's Service", value: todaysServiceCount, color: "amber" as const, icon: Calendar, ref: workshopRef },
   ];
 
   return (
@@ -339,45 +305,58 @@ export default function AssistantDashboardPage() {
         </div>
       </div>
 
-      {/* Quick Actions */}
-      <div className="flex flex-wrap gap-2">
-        <Button variant="outline" size="sm" onClick={() => scrollTo(pendingRequestsRef)}>
-          <FileCheck className="mr-2 size-4" />
-          Review Requests
-        </Button>
-        <Button variant="outline" size="sm" onClick={() => scrollTo(carsReadyRef)}>
-          <Car className="mr-2 size-4" />
-          Cars Ready
-        </Button>
-        <Button variant="outline" size="sm" onClick={() => scrollTo(workshopRef)}>
-          <BarChart3 className="mr-2 size-4" />
-          Workshop Overview
-        </Button>
-        <Button variant="outline" size="sm" asChild>
-          <Link href="/requests">
-            <ClipboardList className="mr-2 size-4" />
-            Request Center
-          </Link>
-        </Button>
+      {/* Tab bar */}
+      <div className="mb-6 flex flex-wrap items-center gap-2 border-b border-border pb-4">
+        {[
+          { label: "Review Requests", icon: FileCheck, action: () => { setActiveTab("Review Requests"); scrollTo(pendingRequestsRef); } },
+          { label: "Cars Ready", icon: Car, action: () => { setActiveTab("Cars Ready"); scrollTo(carsReadyRef); } },
+          { label: "Workshop Overview", icon: BarChart3, action: () => { setActiveTab("Workshop Overview"); scrollTo(workshopRef); } },
+          { label: "Request Center", icon: ClipboardList, href: "/requests" },
+        ].map((tab) =>
+          tab.href ? (
+            <Link
+              key={tab.label}
+              href={tab.href}
+              className={cn(
+                "flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors",
+                "border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground"
+              )}
+            >
+              <tab.icon className="size-4" />
+              {tab.label}
+            </Link>
+          ) : (
+            <button
+              key={tab.label}
+              type="button"
+              onClick={tab.action}
+              className={cn(
+                "flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors",
+                activeTab === tab.label
+                  ? "border-amber-500 bg-amber-500/10 text-amber-500"
+                  : "border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground"
+              )}
+            >
+              <tab.icon className="size-4" />
+              {tab.label}
+            </button>
+          )
+        )}
       </div>
 
       {/* Overview Cards */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-        {cards.map((card) => (
-          <button
-            key={card.label}
-            type="button"
+        {cards.map((card, i) => (
+          <KpiCard
+            key={card.href ?? `card-${i}`}
+            label={card.label}
+            value={loading ? "—" : card.value}
+            icon={card.icon}
+            color={card.color}
             onClick={() =>
               card.href ? (window.location.href = card.href) : card.ref && scrollTo(card.ref)
             }
-            className="rounded-lg border p-4 text-left transition-colors hover:bg-muted/50"
-          >
-            <div className={`mb-2 inline-flex rounded-lg p-2 ${card.color}`}>
-              <card.icon className="size-5" />
-            </div>
-            <p className="text-2xl font-bold">{loading ? "—" : card.value}</p>
-            <p className="text-sm text-muted-foreground">{card.label}</p>
-          </button>
+          />
         ))}
       </div>
 

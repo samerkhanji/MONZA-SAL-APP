@@ -124,6 +124,14 @@
   --table-header-text: #9CA3AF;
 }
 
+/* Phone-only: safe area insets (0 on desktop) */
+@utility pt-safe {
+  padding-top: env(safe-area-inset-top, 0);
+}
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -134,6 +142,12 @@
   body {
     @apply bg-background text-foreground;
     font-size: clamp(14px, 2.5vw, 16px);
+  }
+  /* Phone: prevent iOS zoom on focus; 16px minimum on inputs */
+  @media (max-width: 768px) {
+    input, textarea, select {
+      font-size: 16px !important;
+    }
   }
 }
 

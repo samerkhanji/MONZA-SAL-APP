@@ -68,6 +68,8 @@ const COLUMN_MAP: Record<string, string> = {
   "currency": "currency",
   "Order Date": "order_date",
   "OrderDate": "order_date",
+  "Arrived Date": "order_date",
+  "ArrivedDate": "order_date",
   "order_date": "order_date",
   "Notes": "notes",
   "notes": "notes",
@@ -188,7 +190,7 @@ export function ImportPartsDialog({
           {rows.length > 0 && (
             <>
               <p className="text-muted-foreground text-sm">
-                Preview ({rows.length} rows). Columns: Part Name (required), OE Number, Car Model, Quantity, Min Quantity, Storage Zone, Supplier, Unit Cost, Currency, Order Date, Notes.
+                Preview ({rows.length} rows). Columns: Part Name (required), OE Number, Car Model, Quantity, Min Quantity, Storage Zone, Supplier, Unit Cost, Currency, Arrived Date, Notes.
               </p>
               <div className="max-h-64 overflow-auto rounded border">
                 <Table>

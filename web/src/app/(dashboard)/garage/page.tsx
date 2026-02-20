@@ -376,7 +376,7 @@ export default function GarageJobsPage() {
     <div className="container mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-xl font-semibold sm:text-2xl">Garage Jobs</h1>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <ExportButton
             data={jobExportData(sortedJobs)}
             allData={jobExportData(jobs)}
@@ -434,8 +434,8 @@ export default function GarageJobsPage() {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-3">
-        <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-3 max-md:overflow-x-auto max-md:pb-2 max-md:-mx-4 max-md:px-4 max-md:scrollbar-none">
+        <div className="flex flex-wrap gap-2 min-w-max">
           {["all", "pending", "in_progress", "waiting_parts", "done", "delivered", "cancelled"].map(
             (s) => (
               <button

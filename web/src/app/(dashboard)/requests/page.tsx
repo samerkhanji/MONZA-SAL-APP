@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
@@ -113,10 +113,27 @@ export default function RequestCenterPage() {
 
   const supabase = createClient();
 
-  async function fetchRequests() {
+  const fetchRequests = useCallback(async () => {
     setLoading(true);
+    const myId = profile?.id;
+    let query = supabase.from("requests").select("*").order("created_at", { ascending: false });
+
+    if (myId) {
+      if (isRequestAssistant) {
+        query = query.or(
+          `send_to.eq.houssam,send_to.eq.kareem,submitted_by.eq.${myId},send_to_user_id.eq.${myId},assigned_to.eq.${myId}`
+        );
+      } else if (!isRequestManagement && !isSamer && !isKareem && !isHoussam) {
+        query = query.or(
+          `submitted_by.eq.${myId},send_to_user_id.eq.${myId},assigned_to.eq.${myId}`
+        );
+      }
+    } else if (!profile) {
+      query = query.eq("id", "00000000-0000-0000-0000-000000000000");
+    }
+
     const [reqResult, profilesResult] = await Promise.all([
-      supabase.from("requests").select("*").order("created_at", { ascending: false }),
+      query,
       getAllProfiles(),
     ]);
 
@@ -163,11 +180,11 @@ export default function RequestCenterPage() {
 
     setRequests(withProfiles);
     setLoading(false);
-  }
+  }, [profile?.id, isRequestAssistant, isRequestManagement, isSamer, isKareem, isHoussam]);
 
   useEffect(() => {
     fetchRequests();
-  }, []);
+  }, [fetchRequests]);
 
   useEffect(() => {
     if (!newOpen) {
@@ -413,9 +430,12 @@ export default function RequestCenterPage() {
       const { getProfileIdsByNames } = await import("@/lib/user-lookup");
       const [laraId, samayaId] = await getProfileIdsByNames(["Lara", "Samaya"]);
       const assistantIds = [laraId, samayaId].filter(Boolean);
-      if (assistantIds.length > 0) {
+      const ownerId = newSendToUserId;
+      const notifyIds = [...assistantIds];
+      if (ownerId && !assistantIds.includes(ownerId)) notifyIds.push(ownerId);
+      if (notifyIds.length > 0) {
         await createNotificationsForUsers(
-          assistantIds,
+          notifyIds,
           "New request for review",
           `${submitterName} submitted a request to Houssam: "${newSubject.trim()}"`,
           `/requests`
@@ -500,17 +520,24 @@ export default function RequestCenterPage() {
     const req = detailOpen ?? requests.find((r) => r.id === rid);
     const subject = req?.subject ?? "Your request";
     const submitterId = req?.submitted_by;
-    const ownerName = profile?.full_name ?? "Management";
+    const reviewerName = profile?.full_name ?? "Management";
+    const { data: { user } } = await supabase.auth.getUser();
 
     setActionSubmitting(true);
+    const updatePayload: Record<string, unknown> = {
+      status: "approved",
+      management_comments: (isRequestAssistant ? assistantNotes : managementComments).trim() || null,
+      resolved_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    if (user && isRequestAssistant) {
+      updatePayload.reviewed_by = user.id;
+      updatePayload.assistant_notes = assistantNotes.trim() || null;
+      updatePayload.priority = assistantPriority || null;
+    }
     const { error } = await supabase
       .from("requests")
-      .update({
-        status: "approved",
-        management_comments: managementComments.trim() || null,
-        resolved_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq("id", rid);
 
     setActionSubmitting(false);
@@ -522,13 +549,14 @@ export default function RequestCenterPage() {
       await createNotification({
         userId: submitterId,
         title: "Request approved",
-        message: `Your request "${subject}" has been approved by ${ownerName}`,
+        message: `Your request "${subject}" has been approved by ${reviewerName}`,
         link: "/requests",
       });
     }
     toast.success("Request approved");
     setDetailOpen(null);
     setManagementComments("");
+    setAssistantNotes("");
     fetchRequests();
   }
 
@@ -536,17 +564,24 @@ export default function RequestCenterPage() {
     const req = detailOpen ?? requests.find((r) => r.id === rid);
     const subject = req?.subject ?? "Your request";
     const submitterId = req?.submitted_by;
-    const ownerName = profile?.full_name ?? "Management";
+    const reviewerName = profile?.full_name ?? "Management";
+    const { data: { user } } = await supabase.auth.getUser();
 
     setActionSubmitting(true);
+    const updatePayload: Record<string, unknown> = {
+      status: "rejected",
+      management_comments: (isRequestAssistant ? assistantNotes : managementComments).trim() || null,
+      resolved_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    if (user && isRequestAssistant) {
+      updatePayload.reviewed_by = user.id;
+      updatePayload.assistant_notes = assistantNotes.trim() || null;
+      updatePayload.priority = assistantPriority || null;
+    }
     const { error } = await supabase
       .from("requests")
-      .update({
-        status: "rejected",
-        management_comments: managementComments.trim() || null,
-        resolved_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq("id", rid);
 
     setActionSubmitting(false);
@@ -558,13 +593,14 @@ export default function RequestCenterPage() {
       await createNotification({
         userId: submitterId,
         title: "Request rejected",
-        message: `Your request "${subject}" has been rejected by ${ownerName}`,
+        message: `Your request "${subject}" has been rejected by ${reviewerName}`,
         link: "/requests",
       });
     }
     toast.success("Request rejected");
     setDetailOpen(null);
     setManagementComments("");
+    setAssistantNotes("");
     fetchRequests();
   }
 
@@ -830,10 +866,15 @@ export default function RequestCenterPage() {
             <div>
               <Label>Category (optional)</Label>
               <Select value={newCategory} onValueChange={setNewCategory}>
-                <SelectTrigger id="request-category" className="mt-2">
+                <SelectTrigger id="request-category" className="mt-2 w-full min-w-0">
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
-                <SelectContent className="z-[100]">
+                <SelectContent
+                  position="popper"
+                  sideOffset={4}
+                  collisionPadding={16}
+                  className="z-[100]"
+                >
                   <SelectItem value="none">None</SelectItem>
                   {REQUEST_CATEGORIES.filter((c) => c).map((c) => (
                     <SelectItem key={c} value={c}>
@@ -850,10 +891,15 @@ export default function RequestCenterPage() {
                 onValueChange={setNewSendToUserId}
                 required
               >
-                <SelectTrigger id="request-send-to" className="mt-2">
+                <SelectTrigger id="request-send-to" className="mt-2 w-full min-w-0">
                   <SelectValue placeholder="Select recipient" />
                 </SelectTrigger>
-                <SelectContent className="z-[100]">
+                <SelectContent
+                  position="popper"
+                  sideOffset={4}
+                  collisionPadding={16}
+                  className="z-[100] max-h-[min(70vh,300px)]"
+                >
                   {allProfiles
                     .filter((p) => p.id !== profile?.id)
                     .map((p) => (
@@ -956,7 +1002,7 @@ export default function RequestCenterPage() {
               )}
 
               {isRequestAssistant &&
-                detailOpen.status === "submitted" && (
+                (detailOpen.status === "submitted" || detailOpen.status === "awaiting_approval") && (
                   <div className="space-y-4 border-t pt-4">
                     <h4 className="font-medium">Assistant Actions</h4>
                     <div>
@@ -976,7 +1022,7 @@ export default function RequestCenterPage() {
                       </Select>
                     </div>
                     <div>
-                      <Label>Notes</Label>
+                      <Label>Notes / Comments</Label>
                       <Textarea
                         id="request-assistant-notes"
                         name="request-assistant-notes"
@@ -987,12 +1033,33 @@ export default function RequestCenterPage() {
                         className="mt-1"
                       />
                     </div>
-                    <Button
-                      onClick={() => handleForward(detailOpen.id)}
-                      disabled={actionSubmitting}
-                    >
-                      Forward to Management
-                    </Button>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        onClick={() => handleApprove(detailOpen.id)}
+                        disabled={actionSubmitting}
+                        className="text-green-600 hover:text-green-700"
+                      >
+                        <Check className="mr-2 size-4" />
+                        Approve
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        onClick={() => handleReject(detailOpen.id)}
+                        disabled={actionSubmitting}
+                      >
+                        <X className="mr-2 size-4" />
+                        Reject
+                      </Button>
+                      {detailOpen.status === "submitted" && (
+                        <Button
+                          variant="outline"
+                          onClick={() => handleForward(detailOpen.id)}
+                          disabled={actionSubmitting}
+                        >
+                          Forward to Owners
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 )}
 

@@ -20,7 +20,8 @@ import {
   RefreshCw,
   WifiOff,
   Bell,
-  LayoutGrid,
+  BarChart3,
+  FileCheck,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
@@ -46,9 +47,17 @@ const BASE_NAV_ITEMS: Array<{
   assistantDashboard?: boolean;
   children?: Array<{ href: string; label: string; icon: typeof Package }>;
 }> = [
-  { href: "/assistant-dashboard", label: "Assistant Dashboard", icon: LayoutGrid, assistantDashboard: true },
+  { href: "/assistant-dashboard", label: "Assistant Dashboard", icon: BarChart3, assistantDashboard: true },
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/requests", label: "Request Center", icon: ClipboardList },
+  {
+    href: "/requests",
+    label: "Request Center",
+    icon: ClipboardList,
+    children: [
+      { href: "/requests", label: "All Requests", icon: ClipboardList },
+      { href: "/requests/pending", label: "Pending Requests", icon: FileCheck },
+    ],
+  },
   { href: "/cars", label: "Inventory", icon: Car },
   { href: "/documents", label: "Documents", icon: FileText },
   { href: "/customers", label: "Customers", icon: Users },
@@ -73,6 +82,7 @@ function getPageTitle(pathname: string): string {
   if (pathname.startsWith("/cars")) return "Car Inventory";
   if (pathname.startsWith("/documents")) return "Documents";
   if (pathname.startsWith("/customers")) return "Customers";
+  if (pathname.startsWith("/requests/pending")) return "Pending Requests";
   if (pathname.startsWith("/requests")) return "Request Center";
   if (pathname.startsWith("/garage/jobs/")) return "Job Details";
   if (pathname.startsWith("/garage/inventory")) return "Parts Inventory";
@@ -81,6 +91,7 @@ function getPageTitle(pathname: string): string {
   if (pathname.startsWith("/settings")) return "Settings";
   return "Monza S.A.L.";
 }
+
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -122,6 +133,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         if (child.href === "/garage/inventory") return canSeePartsInventory;
         if (child.href === "/garage/history") return canSeeGarageJobs;
         if (child.href === "/garage") return canSeeGarageJobs;
+        if (child.href === "/requests/pending") return canSeeSettings;
         return true;
       });
       if (visibleChildren.length === 0) return false;
@@ -136,6 +148,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     canSeePartsInventory,
     canSeeGarageJobs,
     canSeeGarageHistory,
+    canSeeSettings,
   ]);
 
   async function handleSignOut() {
@@ -154,7 +167,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
   const SidebarContent = () => (
     <div className="flex h-full w-full min-w-0 flex-col">
-      <div className="flex h-14 items-center border-b shrink-0 px-4 md:justify-center md:px-0 md:group-hover:justify-start md:group-hover:px-4 lg:justify-start lg:px-4">
+      <div className="flex h-14 items-center border-b shrink-0 px-4 pt-safe md:justify-center md:px-0 md:group-hover:justify-start md:group-hover:px-4 lg:justify-start lg:px-4">
         <Link href="/dashboard" className="flex items-center justify-center md:justify-center lg:justify-start">
           <img
             src="/images/sidebar-logo-light.png"
@@ -163,7 +176,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           />
         </Link>
       </div>
-      <nav className="flex-1 space-y-1 overflow-x-hidden p-2 lg:p-4">
+      <nav className="flex-1 min-h-0 space-y-1 overflow-y-auto overflow-x-hidden p-2 lg:p-4">
         {navItems.map((item) => {
           const hasChildren = item.children && item.children.length > 0;
           const isActive =
@@ -192,11 +205,15 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                     if (child.href === "/garage/inventory") return canSeePartsInventory;
                     if (child.href === "/garage/history") return canSeeGarageJobs;
                     if (child.href === "/garage") return canSeeGarageJobs;
+                    if (child.href === "/requests/pending") return canSeeSettings;
                     return true;
                   }).map((child) => {
+                    const isPendingRequestsTab =
+                      child.href === "/requests/pending" && pathname.startsWith("/requests/pending");
                     const childActive =
+                      isPendingRequestsTab ||
                       pathname === child.href ||
-                      (child.href !== "/garage" && pathname.startsWith(child.href + "/"));
+                      (child.href !== "/garage" && child.href !== "/requests" && pathname.startsWith(child.href.split("?")[0] + "/"));
                     return (
                       <Link
                         key={child.href}
@@ -238,7 +255,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           );
         })}
       </nav>
-      <div className="flex flex-col border-t shrink-0 p-4 md:items-center md:p-2 md:group-hover:items-stretch md:group-hover:p-4 lg:items-stretch lg:p-4">
+      <div className="flex flex-col border-t shrink-0 p-4 max-md:pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:items-center md:p-2 md:group-hover:items-stretch md:group-hover:p-4 lg:items-stretch lg:p-4">
         <div className="flex size-8 items-center justify-center rounded-full bg-primary/10 text-sm font-medium md:flex md:group-hover:hidden lg:hidden">
           {avatarInitial}
         </div>
@@ -298,27 +315,26 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         <SidebarContent />
       </aside>
 
-      {/* Mobile sidebar */}
-      <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-        <SheetTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute left-4 top-4 size-11 min-h-11 min-w-11 md:hidden"
-            aria-label="Open menu"
-          >
-            <Menu className="size-5" />
-          </Button>
-        </SheetTrigger>
-        <SheetContent side="left" className="w-72 max-w-[85vw] border-sidebar-border bg-sidebar p-0 sm:max-w-sm">
-          <SidebarContent />
-        </SheetContent>
-      </Sheet>
-
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Topbar */}
-        <header className="sticky top-0 z-10 flex h-14 min-h-14 items-center justify-between border-b border-border bg-background pl-14 pr-4 md:pl-4 md:pr-4 lg:pl-6 lg:pr-6">
-          <h1 className="text-lg font-semibold">
+        <header className="sticky top-0 z-10 flex h-14 min-h-14 items-center gap-2 border-b border-border bg-background px-4 md:px-6">
+          {/* Mobile: menu button top-left */}
+          <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+            <SheetTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="-ml-1 size-11 shrink-0 md:hidden"
+                aria-label="Open menu"
+              >
+                <Menu className="size-5" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="w-72 max-w-[85vw] max-h-[100dvh] border-sidebar-border bg-sidebar p-0 sm:max-w-sm">
+              <SidebarContent />
+            </SheetContent>
+          </Sheet>
+          <h1 className="min-w-0 flex-1 truncate text-lg font-semibold">
             {getPageTitle(pathname)}
           </h1>
           <div className="flex items-center gap-1">

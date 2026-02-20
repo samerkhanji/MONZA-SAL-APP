@@ -258,9 +258,11 @@ export default function GarageInventoryPage() {
                     size="sm"
                     variant="outline"
                     onClick={() => setImportOpen(true)}
+                    title="Import from Excel"
                   >
-                    <Upload className="mr-2 size-4" />
-                    Import from Excel
+                    <Upload className="mr-2 size-4 shrink-0" />
+                    <span className="hidden sm:inline">Import from Excel</span>
+                    <span className="sm:hidden">Import</span>
                   </Button>
                 </>
               )}
@@ -397,7 +399,7 @@ export default function GarageInventoryPage() {
                     <TableHead>Storage Zone</TableHead>
                     <TableHead>Supplier</TableHead>
                     <TableHead>Unit Cost</TableHead>
-                    <TableHead>Order Date</TableHead>
+                    <TableHead>Arrived Date</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="w-12"></TableHead>
                   </TableRow>

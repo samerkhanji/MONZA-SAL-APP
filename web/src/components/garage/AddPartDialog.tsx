@@ -112,7 +112,7 @@ export function AddPartDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto max-w-lg">
+      <DialogContent className="max-h-[min(90vh,92dvh)] overflow-y-auto max-w-lg">
         <DialogHeader>
           <DialogTitle>Add New Part</DialogTitle>
         </DialogHeader>
@@ -139,6 +139,7 @@ export function AddPartDialog({
                   onChange={(e) => setOeNumber(e.target.value)}
                   placeholder="e.g. ABC123"
                   className="font-mono flex-1"
+                  autoComplete="off"
                 />
                 <Button
                   type="button"
@@ -160,6 +161,7 @@ export function AddPartDialog({
                 value={carModel}
                 onChange={(e) => setCarModel(e.target.value)}
                 placeholder="e.g. General, Voyah Passion, MHero"
+                autoComplete="off"
               />
             </div>
             <div className="sm:col-span-2">
@@ -181,6 +183,9 @@ export function AddPartDialog({
                 value={initialQuantity}
                 onChange={(e) => setInitialQuantity(e.target.value)}
                 required
+                inputMode="numeric"
+                pattern="[0-9]*"
+                autoComplete="off"
               />
             </div>
             <div>
@@ -192,6 +197,9 @@ export function AddPartDialog({
                 min={0}
                 value={minQuantity}
                 onChange={(e) => setMinQuantity(e.target.value)}
+                inputMode="numeric"
+                pattern="[0-9]*"
+                autoComplete="off"
               />
             </div>
             <div>
@@ -202,6 +210,7 @@ export function AddPartDialog({
                 value={storageZone}
                 onChange={(e) => setStorageZone(e.target.value)}
                 placeholder="e.g. A1-B2"
+                autoComplete="off"
               />
             </div>
             <div>
@@ -211,10 +220,11 @@ export function AddPartDialog({
                 name="part-supplier"
                 value={supplier}
                 onChange={(e) => setSupplier(e.target.value)}
+                autoComplete="off"
               />
             </div>
             <div>
-              <Label htmlFor="order_date">Order Date</Label>
+              <Label htmlFor="order_date">Arrived Date</Label>
               <Input
                 id="part-order-date"
                 name="part-order-date"
@@ -231,6 +241,7 @@ export function AddPartDialog({
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 rows={2}
+                autoComplete="off"
               />
             </div>
           </div>

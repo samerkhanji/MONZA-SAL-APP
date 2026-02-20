@@ -227,7 +227,7 @@ export function EditPartDialog({
               </div>
             </div>
             <div>
-              <Label htmlFor="order_date">Order Date</Label>
+              <Label htmlFor="order_date">Arrived Date</Label>
               <Input
                 id="edit-part-order-date"
                 name="edit-part-order-date"

@@ -346,6 +346,7 @@ export function NewJobDialog({
               placeholder="Customer complaint..."
               rows={3}
               className="mt-2"
+              autoComplete="off"
             />
           </div>
 
@@ -434,6 +435,7 @@ export function NewJobDialog({
                 placeholder="Part number (OE)..."
                 value={partNumberSearch}
                 onChange={(e) => setPartNumberSearch(e.target.value)}
+                autoComplete="off"
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault();
@@ -474,6 +476,9 @@ export function NewJobDialog({
                 onChange={(e) => setPartQuantity(e.target.value)}
                 placeholder="Qty"
                 className="h-9 w-20"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                autoComplete="off"
               />
               <Input
                 id="job-part-note"
@@ -482,6 +487,7 @@ export function NewJobDialog({
                 onChange={(e) => setPartNote(e.target.value)}
                 placeholder="Note (optional)"
                 className="h-9 flex-1"
+                autoComplete="off"
               />
             </div>
             {partsLoading ? (
@@ -556,6 +562,7 @@ export function NewJobDialog({
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
               className="mt-2"
+              autoComplete="off"
             />
           </div>
 
