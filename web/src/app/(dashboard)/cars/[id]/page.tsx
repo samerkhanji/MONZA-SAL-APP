@@ -29,6 +29,13 @@ import { CarDocuments } from "@/components/car-documents";
 import { DayDetailDialog } from "@/components/car-day-detail-dialog";
 import { VisitsMaintenanceDialog } from "@/components/visits-maintenance-dialog";
 import { STATUS_BADGE_COLORS, PDI_BADGE_COLORS } from "@/lib/constants/badges";
+import { User } from "lucide-react";
+import dynamic from "next/dynamic";
+
+const StatusCustomerDialog = dynamic(
+  () => import("@/components/status-customer-dialog").then((m) => ({ default: m.StatusCustomerDialog })),
+  { ssr: false }
+);
 
 const EVENT_LABELS: Record<CarEventType, string> = {
   created: "Created",
@@ -89,7 +96,7 @@ export default function CarProfilePage() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { canEditInventory, canDelete, profile } = useUser();
+  const { canEditInventory, canDelete, profile, isOwner } = useUser();
   const param = params.id as string;
   // Support lookup by VIN (17 alphanumeric) or by UUID
   const isVin = /^[A-HJ-NPR-Z0-9]{17}$/i.test(param);
@@ -113,6 +120,10 @@ export default function CarProfilePage() {
   const [visitsMaintenanceMode, setVisitsMaintenanceMode] = useState<
     "garage" | "maintenance"
   >("garage");
+  const [salesOrder, setSalesOrder] = useState<{
+    customer: { id: string; first_name: string; last_name: string | null };
+  } | null>(null);
+  const [linkCustomerOpen, setLinkCustomerOpen] = useState(false);
 
   const supabase = createClient();
 
@@ -224,6 +235,26 @@ export default function CarProfilePage() {
     })();
   }, [car?.created_by]);
 
+  useEffect(() => {
+    if (!car?.id) return;
+    (async () => {
+      const { data } = await supabase
+        .from("sales_orders")
+        .select("customer_id, customers(id, first_name, last_name)")
+        .eq("car_id", car.id)
+        .not("status", "eq", "cancelled")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const row = data as { customer_id: string; customers: { id: string; first_name: string; last_name: string | null } | null } | null;
+      if (row?.customers) {
+        setSalesOrder({ customer: row.customers });
+      } else {
+        setSalesOrder(null);
+      }
+    })();
+  }, [car?.id]);
+
   function onMoved() {
     setMoveOpen(false);
     fetchCar();
@@ -234,6 +265,27 @@ export default function CarProfilePage() {
     setEditOpen(false);
     fetchCar();
     fetchEvents();
+  }
+
+  function onLinkCustomerSuccess() {
+    setLinkCustomerOpen(false);
+    fetchCar();
+    // Refetch sales order
+    if (car?.id) {
+      supabase
+        .from("sales_orders")
+        .select("customer_id, customers(id, first_name, last_name)")
+        .eq("car_id", car.id)
+        .not("status", "eq", "cancelled")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+        .then(({ data }) => {
+          const row = data as { customer_id: string; customers: { id: string; first_name: string; last_name: string | null } | null } | null;
+          if (row?.customers) setSalesOrder({ customer: row.customers });
+          else setSalesOrder(null);
+        });
+    }
   }
 
   async function handleDelete() {
@@ -363,8 +415,8 @@ export default function CarProfilePage() {
     <div className="container mx-auto space-y-6 px-4 py-6 sm:px-6 sm:py-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/cars">← Back</Link>
+          <Button variant="ghost" size="sm" onClick={() => router.back()}>
+            ← Back
           </Button>
           <div>
             <h1 className="break-all font-mono text-lg font-semibold sm:text-xl">
@@ -420,6 +472,13 @@ export default function CarProfilePage() {
           fetchCar();
           fetchEvents();
         }}
+      />
+
+      <StatusCustomerDialog
+        car={car}
+        open={linkCustomerOpen}
+        onOpenChange={setLinkCustomerOpen}
+        onSuccess={onLinkCustomerSuccess}
       />
 
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
@@ -532,10 +591,30 @@ export default function CarProfilePage() {
                 <p>{car.plate_number ?? "—"}</p>
               </div>
               <div className="space-y-1">
+                <p className="text-muted-foreground text-sm">Suffix</p>
+                <p className="font-mono text-sm">{car.suffix ?? "—"}</p>
+              </div>
+              <div className="space-y-1">
                 <p className="text-muted-foreground text-sm">Status</p>
                 <Badge className={statusBadgeClass}>
                   {car.status_display ?? car.status}
                 </Badge>
+              </div>
+              <div className="space-y-1">
+                <p className="text-muted-foreground text-sm">Engine Number</p>
+                <p className="font-mono text-sm">{(car as { engine_number?: string }).engine_number ?? "—"}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-muted-foreground text-sm">Software Update</p>
+                <p className="text-sm">{(car as { software_update?: string }).software_update ?? "—"}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-muted-foreground text-sm">Dongle</p>
+                <p className="text-sm">{(car as { dongle?: string }).dongle ?? "—"}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-muted-foreground text-sm">Issue / Notes</p>
+                <p className="text-sm">{(car as { issue?: string }).issue ?? "—"}</p>
               </div>
               <div className="space-y-1">
                 <p className="text-muted-foreground text-sm">Vehicle Type</p>
@@ -549,6 +628,53 @@ export default function CarProfilePage() {
                   {(car as { is_erev?: boolean }).is_erev ? "EREV" : "Pure EV"}
                 </Badge>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Section: Customer */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Customer</CardTitle>
+              <CardDescription>Linked buyer for this vehicle</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {salesOrder?.customer ? (
+                <Link href={`/customers/${salesOrder.customer.id}`}>
+                  <div className="flex items-center gap-3 rounded-lg bg-muted p-3 transition-colors hover:bg-accent cursor-pointer">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-500/10">
+                      <User className="h-4 w-4 text-amber-500" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">
+                        {salesOrder.customer.first_name} {salesOrder.customer.last_name ?? ""}
+                      </p>
+                      <p className="text-muted-foreground text-xs">View customer profile →</p>
+                    </div>
+                  </div>
+                </Link>
+              ) : car.client_name ? (
+                <div className="flex items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-500/10">
+                    <User className="h-4 w-4 text-amber-500" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium">{car.client_name}</p>
+                    <p className="text-amber-600 text-xs dark:text-amber-500">Not linked to a customer profile yet</p>
+                  </div>
+                  {isOwner && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="shrink-0 text-xs"
+                      onClick={() => setLinkCustomerOpen(true)}
+                    >
+                      Link
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-sm">No customer linked.</p>
+              )}
             </CardContent>
           </Card>
 

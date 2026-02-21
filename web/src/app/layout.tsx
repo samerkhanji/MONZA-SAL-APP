@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/lib/contexts/ThemeContext";
 import { ThemeToaster } from "@/components/theme-toaster";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
+import { AbortErrorHandler } from "@/components/AbortErrorHandler";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -44,6 +45,15 @@ export default function RootLayout({
                 var theme = saved === 'light' ? 'light' : 'dark';
                 document.documentElement.classList.toggle('dark', theme === 'dark');
               })();
+              (function() {
+                window.addEventListener('unhandledrejection', function(e) {
+                  var err = e.reason;
+                  if (err && (err.name === 'AbortError' || (err.message && String(err.message).toLowerCase().indexOf('aborted') !== -1))) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }
+                }, true);
+              })();
             `,
           }}
         />
@@ -52,6 +62,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <ThemeProvider>
+          <AbortErrorHandler />
           {children}
           <ThemeToaster />
           <ServiceWorkerRegistration />

@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { MoreHorizontal, FileText, ScanLine, FileSpreadsheet, Download } from "lucide-react";
+import { MoreHorizontal, FileText, ScanLine, FileSpreadsheet, Download, ExternalLink } from "lucide-react";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
 import type { CarDisplay } from "@/types/database";
@@ -143,6 +143,44 @@ export default function CarsListPage() {
   const [scanVinOpen, setScanVinOpen] = useState(false);
 
   const supabase = createClient();
+
+  const LINKED_STATUSES = ["sold", "delivered", "registered"] as const;
+
+  async function handleStatusClick(car: CarDisplay) {
+    if (!LINKED_STATUSES.includes(car.status as typeof LINKED_STATUSES[number])) {
+      setStatusDialogCar(car);
+      setStatusDialogOpen(true);
+      return;
+    }
+    const { data: order } = await supabase
+      .from("sales_orders")
+      .select("customer_id")
+      .eq("car_id", car.id)
+      .in("status", ["reserved", "confirmed"])
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (order?.customer_id) {
+      router.push(`/customers/${order.customer_id}`);
+      return;
+    }
+    if (car.client_name) {
+      const firstName = car.client_name.trim().split(/\s+/)[0];
+      const { data: customer } = await supabase
+        .from("customers")
+        .select("id")
+        .ilike("first_name", `%${firstName}%`)
+        .limit(1)
+        .maybeSingle();
+      if (customer) {
+        router.push(`/customers/${customer.id}`);
+        return;
+      }
+    }
+    setStatusDialogCar(car);
+    setStatusDialogOpen(true);
+  }
 
   async function handleVinScan(vin: string) {
     const { data: car } = await supabase
@@ -413,8 +451,19 @@ export default function CarsListPage() {
                         <span className="font-mono text-sm font-medium text-muted-foreground">
                           {car.vin ?? "—"}
                         </span>
-                        <Badge className={`shrink-0 ${statusClass}`}>
+                        <Badge
+                          className={`shrink-0 ${statusClass} ${LINKED_STATUSES.includes(car.status as (typeof LINKED_STATUSES)[number]) && car.client_name ? "hover:ring-2 hover:ring-offset-1" : ""}`}
+                          onClick={(e) => {
+                            if (LINKED_STATUSES.includes(car.status as (typeof LINKED_STATUSES)[number]) && car.client_name) {
+                              e.stopPropagation();
+                              void handleStatusClick(car);
+                            }
+                          }}
+                        >
                           {CAR_STATUS_LABELS[car.status]}
+                          {LINKED_STATUSES.includes(car.status as (typeof LINKED_STATUSES)[number]) && car.client_name && (
+                            <ExternalLink className="ml-1 inline h-3 w-3 opacity-60" />
+                          )}
                         </Badge>
                       </div>
                       <p className="text-base font-medium">
@@ -422,6 +471,9 @@ export default function CarsListPage() {
                       </p>
                       {car.model_year && (
                         <p className="text-sm text-muted-foreground">{car.model_year}</p>
+                      )}
+                      {car.client_name && (
+                        <p className="text-sm text-muted-foreground">Client: {car.client_name}</p>
                       )}
                     </button>
                   );
@@ -442,6 +494,7 @@ export default function CarsListPage() {
                     <TableHead className="whitespace-nowrap">Plate</TableHead>
                     <TableHead className="whitespace-nowrap">Status</TableHead>
                     <TableHead className="whitespace-nowrap w-12">Sold</TableHead>
+                    <TableHead className="whitespace-nowrap min-w-[100px]">Client</TableHead>
                     <TableHead className="hidden whitespace-nowrap lg:table-cell">Location</TableHead>
                     <TableHead className="hidden min-w-[100px] whitespace-nowrap xl:table-cell">Warranty (DMS)</TableHead>
                     <TableHead className="hidden min-w-[110px] whitespace-nowrap xl:table-cell">Warranty (Monza)</TableHead>
@@ -499,13 +552,21 @@ export default function CarsListPage() {
                           className="cursor-pointer"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setStatusDialogCar(car);
-                            setStatusDialogOpen(true);
+                            void handleStatusClick(car);
                           }}
                         >
                           <div className="flex items-center gap-1">
-                            <Badge className={`${statusClass} hover:opacity-80`}>
+                            <Badge
+                              className={
+                                LINKED_STATUSES.includes(car.status as (typeof LINKED_STATUSES)[number]) && car.client_name
+                                  ? `${statusClass} hover:opacity-80 hover:ring-2 hover:ring-offset-1 hover:ring-current`
+                                  : `${statusClass} hover:opacity-80`
+                              }
+                            >
                               {CAR_STATUS_LABELS[car.status]}
+                              {LINKED_STATUSES.includes(car.status as (typeof LINKED_STATUSES)[number]) && car.client_name && (
+                                <ExternalLink className="ml-1 inline h-3 w-3 opacity-60" />
+                              )}
                             </Badge>
                             {pendingDeletes[car.id] && (
                               <Badge variant="outline" className="text-amber-600 border-amber-400 dark:text-amber-400 dark:border-amber-500">
@@ -516,6 +577,9 @@ export default function CarsListPage() {
                         </TableCell>
                         <TableCell className="text-center font-bold text-amber-600 dark:text-amber-400 w-12">
                           {(car as { sold_marker?: string }).sold_marker === "X" ? "X" : "—"}
+                        </TableCell>
+                        <TableCell className="max-w-[120px] truncate text-sm" title={car.client_name ?? undefined}>
+                          {car.client_name ?? "—"}
                         </TableCell>
                         <TableCell className="hidden max-w-[100px] truncate text-sm lg:table-cell" title={car.location_full ?? undefined}>
                           {car.location_full || "—"}

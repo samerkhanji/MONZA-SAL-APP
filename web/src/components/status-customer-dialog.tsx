@@ -118,6 +118,15 @@ export function StatusCustomerDialog({
           } else {
             setSale(null);
             setCustomer(null);
+            setNewStatus(car.status === "reserved" ? "reserved" : "sold");
+            if ((car as { client_name?: string }).client_name) {
+              const parts = (car as { client_name: string }).client_name.trim().split(/\s+/);
+              setFirstName(parts[0] ?? "");
+              setLastName(parts.slice(1).join(" ") ?? "");
+            }
+            if ((car as { client_phone?: string }).client_phone) {
+              setPhone((car as { client_phone: string }).client_phone);
+            }
           }
         } finally {
           setLoading(false);
@@ -345,7 +354,81 @@ export function StatusCustomerDialog({
                 )}
               </>
             ) : isSoldOrReserved && !customer ? (
-              <p className="text-muted-foreground">No customer linked. Contact admin.</p>
+              canEditInventory ? (
+                <div className="space-y-4">
+                  <p className="text-muted-foreground text-sm">Link an existing customer or add a new one.</p>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>First name *</Label>
+                      <Input
+                        value={firstName}
+                        onChange={(e) => setFirstName(e.target.value)}
+                        placeholder="Required"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Last name</Label>
+                      <Input
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Phone *</Label>
+                      <Input
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        type="tel"
+                        placeholder="Required"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Phone 2</Label>
+                      <Input
+                        value={phone2}
+                        onChange={(e) => setPhone2(e.target.value)}
+                        type="tel"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Email</Label>
+                    <Input
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      type="email"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Number plate</Label>
+                    <Input
+                      value={plateNumber}
+                      onChange={(e) => setPlateNumber(e.target.value)}
+                      placeholder="Car plate number"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Selling price</Label>
+                    <Input
+                      value={sellingPrice}
+                      onChange={(e) => setSellingPrice(e.target.value)}
+                      type="number"
+                      min={0}
+                      placeholder="Optional"
+                    />
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+                    <Button onClick={() => void handleSaveCustomer()} disabled={submitting || !firstName.trim() || !phone.trim()}>
+                      {submitting ? "Saving..." : "Link customer"}
+                    </Button>
+                  </DialogFooter>
+                </div>
+              ) : (
+                <p className="text-muted-foreground">No customer linked. Contact admin.</p>
+              )
             ) : (
               canEditInventory && (
                 <div className="space-y-4">

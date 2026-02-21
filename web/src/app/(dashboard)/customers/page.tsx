@@ -161,7 +161,7 @@ export default function CustomersPage() {
     <div className="container mx-auto max-w-[1600px] space-y-6 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-semibold sm:text-2xl">Customers & Leads</h1>
+          <h1 className="text-xl font-semibold sm:text-2xl">Customers</h1>
           <p className="text-muted-foreground">
             {loading ? "Loading..." : `${filteredCustomers.length} contact(s)`}
           </p>

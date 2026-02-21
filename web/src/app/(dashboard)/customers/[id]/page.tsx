@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
@@ -212,8 +211,8 @@ export default function CustomerDetailPage() {
   if (!customer) {
     return (
       <div className="container mx-auto space-y-4 px-4 py-8">
-        <Button variant="ghost" asChild>
-          <Link href="/customers">← Customers</Link>
+        <Button variant="ghost" onClick={() => router.back()}>
+          ← Back
         </Button>
         <p className="text-muted-foreground">Customer not found.</p>
       </div>
@@ -241,8 +240,8 @@ export default function CustomerDetailPage() {
     <div className="container mx-auto space-y-6 px-4 py-6 sm:px-6 sm:py-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/customers">← Customers</Link>
+          <Button variant="ghost" size="sm" onClick={() => router.back()}>
+            ← Back
           </Button>
           <div>
             <h1 className="text-2xl font-semibold">{fullName || "—"}</h1>
