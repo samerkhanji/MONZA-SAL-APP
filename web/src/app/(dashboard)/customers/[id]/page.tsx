@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
 import type { CustomerDisplay } from "@/types/database";
+import { CAR_STATUS_LABELS } from "@/types/database";
 import {
   LEAD_STATUS_LABELS,
   LEAD_SOURCE_LABELS,
@@ -152,10 +153,7 @@ export default function CustomerDetailPage() {
         const visitEvents: VisitEvent[] = movedEvents.map((ev) => {
           const toVal = (ev.to_value ?? "").toLowerCase();
           const isGarage = toVal.includes("garage");
-          return {
-            ...ev,
-            visitType: isGarage ? "garage" : "company_entry",
-          };
+          return { ...ev, visitType: isGarage ? "garage" : "company_entry" };
         });
 
         const garageCount = visitEvents.filter((v) => v.visitType === "garage").length;
@@ -220,13 +218,13 @@ export default function CustomerDetailPage() {
   }
 
   const fullName =
-    customer.full_name ??
-    `${customer.first_name} ${customer.last_name ?? ""}`.trim();
+    customer.full_name ?? `${customer.first_name} ${customer.last_name ?? ""}`.trim();
   const statusClass =
-    LEAD_STATUS_COLORS[customer.lead_status] ??
-    "bg-muted text-muted-foreground";
+    LEAD_STATUS_COLORS[customer.lead_status] ?? "bg-muted text-muted-foreground";
   const statusLabel =
-    customer.status_display ?? LEAD_STATUS_LABELS[customer.lead_status] ?? customer.lead_status;
+    customer.status_display ??
+    LEAD_STATUS_LABELS[customer.lead_status] ??
+    customer.lead_status;
   const sourceLabel =
     customer.source_display ??
     (customer.lead_source ? LEAD_SOURCE_LABELS[customer.lead_source] : null) ??
@@ -245,7 +243,7 @@ export default function CustomerDetailPage() {
           </Button>
           <div>
             <h1 className="text-2xl font-semibold">{fullName || "—"}</h1>
-            <Badge className={statusClass}>{statusLabel}</Badge>
+            <Badge className={`mt-1 ${statusClass}`}>{statusLabel}</Badge>
           </div>
         </div>
         <div className="flex gap-2">
@@ -255,10 +253,7 @@ export default function CustomerDetailPage() {
             </Button>
           )}
           {canDelete && (
-            <Button
-              variant="destructive"
-              onClick={() => setDeleteOpen(true)}
-            >
+            <Button variant="destructive" onClick={() => setDeleteOpen(true)}>
               Delete
             </Button>
           )}
@@ -280,8 +275,8 @@ export default function CustomerDetailPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Remove customer?</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to remove this customer? This action can be
-              undone by an admin.
+              Are you sure you want to remove this customer? This action can be undone by an
+              admin.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -296,7 +291,14 @@ export default function CustomerDetailPage() {
       <Tabs defaultValue="profile" className="space-y-4">
         <TabsList>
           <TabsTrigger value="profile">Profile</TabsTrigger>
-          <TabsTrigger value="vehicles">Vehicles</TabsTrigger>
+          <TabsTrigger value="vehicles">
+            Vehicles
+            {vehicles.length > 0 && (
+              <Badge variant="secondary" className="ml-2">
+                {vehicles.length}
+              </Badge>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="history">Interaction History</TabsTrigger>
           <TabsTrigger value="documents">Documents</TabsTrigger>
         </TabsList>
@@ -315,21 +317,19 @@ export default function CustomerDetailPage() {
                 </div>
                 <div className="space-y-1">
                   <p className="text-muted-foreground text-sm">Phone</p>
-                  <a
-                    href={`tel:${customer.phone_primary}`}
-                    className="text-primary hover:underline"
-                  >
-                    {customer.phone_primary}
-                  </a>
+                  {customer.phone_primary ? (
+                    <a href={`tel:${customer.phone_primary}`} className="text-primary hover:underline">
+                      {customer.phone_primary}
+                    </a>
+                  ) : (
+                    <p>—</p>
+                  )}
                 </div>
                 <div className="space-y-1">
                   <p className="text-muted-foreground text-sm">Phone 2</p>
                   <p>
                     {customer.phone_secondary ? (
-                      <a
-                        href={`tel:${customer.phone_secondary}`}
-                        className="text-primary hover:underline"
-                      >
+                      <a href={`tel:${customer.phone_secondary}`} className="text-primary hover:underline">
                         {customer.phone_secondary}
                       </a>
                     ) : (
@@ -341,10 +341,7 @@ export default function CustomerDetailPage() {
                   <p className="text-muted-foreground text-sm">Email</p>
                   <p>
                     {customer.email ? (
-                      <a
-                        href={`mailto:${customer.email}`}
-                        className="text-primary hover:underline"
-                      >
+                      <a href={`mailto:${customer.email}`} className="text-primary hover:underline">
                         {customer.email}
                       </a>
                     ) : (
@@ -386,6 +383,16 @@ export default function CustomerDetailPage() {
                   <p>{sourceLabel}</p>
                 </div>
                 <div className="space-y-1">
+                  <p className="text-muted-foreground text-sm">Total Orders</p>
+                  <p>
+                    {customer.total_orders != null ? (
+                      <Badge variant="secondary">{customer.total_orders}</Badge>
+                    ) : (
+                      "—"
+                    )}
+                  </p>
+                </div>
+                <div className="space-y-1">
                   <p className="text-muted-foreground text-sm">Last Visit</p>
                   <p>
                     {customer.last_visit_date
@@ -395,9 +402,7 @@ export default function CustomerDetailPage() {
                 </div>
                 <div className="space-y-1">
                   <p className="text-muted-foreground text-sm">Created</p>
-                  <p>
-                    {new Date(customer.created_at).toLocaleString()}
-                  </p>
+                  <p>{new Date(customer.created_at).toLocaleString()}</p>
                 </div>
                 <div className="space-y-1">
                   <p className="text-muted-foreground text-sm">Notes</p>
@@ -412,9 +417,7 @@ export default function CustomerDetailPage() {
           <Card>
             <CardHeader>
               <CardTitle>Linked Vehicles</CardTitle>
-              <CardDescription>
-                Cars linked via sales orders
-              </CardDescription>
+              <CardDescription>Cars linked via sales orders</CardDescription>
             </CardHeader>
             <CardContent>
               {vehicles.length === 0 ? (
@@ -426,9 +429,11 @@ export default function CustomerDetailPage() {
                   {vehicles.map((so) => {
                     const car = so.cars;
                     if (!car) return null;
-                    const statusClass =
-                      STATUS_BADGE_COLORS[car.status] ??
-                      "bg-muted text-muted-foreground";
+                    const carStatusClass =
+                      STATUS_BADGE_COLORS[car.status] ?? "bg-muted text-muted-foreground";
+                    const carStatusLabel =
+                      CAR_STATUS_LABELS[car.status as keyof typeof CAR_STATUS_LABELS] ??
+                      car.status;
                     return (
                       <div
                         key={so.id}
@@ -452,13 +457,11 @@ export default function CustomerDetailPage() {
                               >
                                 VIN: {car.vin}
                               </p>
-                              <p>
+                              <p className="flex items-center gap-1">
                                 Status:{" "}
-                                <Badge className={statusClass}>{car.status}</Badge>
+                                <Badge className={carStatusClass}>{carStatusLabel}</Badge>
                               </p>
-                              <p>
-                                Color: {car.exterior_color ?? "—"}
-                              </p>
+                              <p>Color: {car.exterior_color ?? "—"}</p>
                               <p>
                                 Price:{" "}
                                 {so.selling_price != null
@@ -472,7 +475,14 @@ export default function CustomerDetailPage() {
                                   : "—"}
                               </p>
                               <p>
-                                Sale: <Badge variant="secondary">{so.status}</Badge>
+                                Delivery:{" "}
+                                {so.delivery_date
+                                  ? new Date(so.delivery_date).toLocaleDateString()
+                                  : "—"}
+                              </p>
+                              <p>
+                                Sale:{" "}
+                                <Badge variant="secondary">{so.status}</Badge>
                               </p>
                             </div>
                             <div className="mt-3 flex flex-wrap gap-2">
@@ -516,10 +526,7 @@ export default function CustomerDetailPage() {
                                 </p>
                                 <ul className="space-y-1.5 text-sm">
                                   {so.visitEvents.map((ev) => (
-                                    <li
-                                      key={ev.id}
-                                      className="flex items-center gap-2"
-                                    >
+                                    <li key={ev.id} className="flex items-center gap-2">
                                       <span
                                         className={
                                           ev.visitType === "garage"
@@ -552,7 +559,7 @@ export default function CustomerDetailPage() {
                               router.push(`/cars/${encodeURIComponent(car.vin ?? car.id)}`)
                             }
                           >
-                            View Car Details →
+                            View Car →
                           </Button>
                         </div>
                       </div>

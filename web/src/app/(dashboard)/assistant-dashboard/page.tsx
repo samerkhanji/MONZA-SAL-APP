@@ -58,7 +58,6 @@ interface JobWithCar {
   assigned_to: string | null;
   created_at: string;
   cars?: { vin: string; brand: string; model: string } | null;
-  customers?: { first_name: string; last_name: string | null; phone_primary: string } | null;
 }
 
 interface RequestRow {
@@ -130,20 +129,14 @@ export default function AssistantDashboardPage() {
     const threeDaysAgo = new Date(Date.now() - 3 * 86400000).toISOString();
 
     const [
-      pendingReqRes,
       jobsRes,
       deleteRes,
       carsRes,
       requestsWithProfiles,
     ] = await Promise.all([
       supabase
-        .from("requests")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "submitted")
-        .in("send_to", ["houssam", "kareem"]),
-      supabase
         .from("garage_jobs")
-        .select("*, cars:car_id(id, vin, brand, model), customers:customer_id(first_name, last_name, phone_primary)")
+        .select("*, cars:car_id(id, vin, brand, model)")
         .is("deleted_at", null)
         .in("status", ["pending", "in_progress", "waiting_parts", "done", "delivered"])
         .order("created_at", { ascending: false }),
@@ -153,20 +146,18 @@ export default function AssistantDashboardPage() {
         .eq("status", "pending"),
       supabase
         .from("cars")
-        .select("id, vin, brand, model, warranty_expiry, warranty_per_dms, warranty_monza_start_date")
+        .select("id, vin, brand, model, warranty_per_dms, warranty_monza_start_date")
         .is("deleted_at", null),
       supabase
         .from("requests")
-        .select("id, subject, category, submitted_by, created_at")
+        .select("id, subject, category, submitted_by, created_at, profiles:submitted_by(full_name)")
         .eq("status", "submitted")
-        .in("send_to", ["houssam", "kareem"])
         .order("created_at", { ascending: false }),
     ]);
 
     const jobs = (jobsRes.data ?? []) as JobWithCar[];
     const cars = carsRes.data ?? [];
 
-    setPendingRequestsCount(pendingReqRes.count ?? 0);
     setPendingDeletionsCount(deleteRes.count ?? 0);
 
     const doneJobs = jobs.filter((j) => j.status === "done");
@@ -200,12 +191,10 @@ export default function AssistantDashboardPage() {
         vin: string;
         brand: string;
         model: string;
-        warranty_expiry: string | null;
         warranty_per_dms: string | null;
         warranty_monza_start_date: string | null;
       };
       const dates: Array<{ type: string; date: string }> = [];
-      if (c.warranty_expiry) dates.push({ type: "DMS", date: c.warranty_expiry });
       if (c.warranty_per_dms) dates.push({ type: "DMS (per)", date: c.warranty_per_dms });
       if (c.warranty_monza_start_date) {
         const start = new Date(c.warranty_monza_start_date);
@@ -236,25 +225,15 @@ export default function AssistantDashboardPage() {
       category: string | null;
       submitted_by: string;
       created_at: string;
+      profiles?: { full_name: string | null } | null;
     }>;
-    const userIds = [...new Set(reqList.map((r) => r.submitted_by))];
-    let namesMap: Record<string, string> = {};
-    if (userIds.length > 0) {
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("id, full_name")
-        .in("id", userIds);
-      namesMap = Object.fromEntries(
-        (profiles ?? []).map((p: { id: string; full_name: string | null }) => [
-          p.id,
-          p.full_name ?? "Unknown",
-        ])
-      );
-    }
+
+    // Use the same result set for both the list and the counter
+    setPendingRequestsCount(reqList.length);
     setPendingRequests(
       reqList.map((r) => ({
         ...r,
-        submitter_name: namesMap[r.submitted_by] ?? "Unknown",
+        submitter_name: r.profiles?.full_name ?? "Unknown",
       }))
     );
 

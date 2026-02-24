@@ -44,7 +44,7 @@ interface JobWithCar extends GarageJob {
     model: string;
     model_year: number | null;
     exterior_color: string | null;
-    status: string;
+    car_status: string;
   } | null;
 }
 
@@ -129,7 +129,7 @@ export default function GarageJobsPage() {
     setLoading(true);
     const { data, error } = await supabase
       .from("garage_jobs")
-      .select("*, cars:car_id(id, vin, brand, model, model_year, exterior_color, status)")
+      .select("*, cars:car_id(id, vin, brand, model, model_year, exterior_color, car_status:status)")
       .is("deleted_at", null)
       .order("created_at", { ascending: false });
 

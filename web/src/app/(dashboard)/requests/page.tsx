@@ -103,6 +103,7 @@ export default function RequestCenterPage() {
   const [newSubject, setNewSubject] = useState("");
   const [newDescription, setNewDescription] = useState("");
   const [newCategory, setNewCategory] = useState<string>("none");
+  const [newPriority, setNewPriority] = useState<string>("normal");
   const [newSendToUserId, setNewSendToUserId] = useState<string>("");
   const [newSubmitting, setNewSubmitting] = useState(false);
 
@@ -412,7 +413,7 @@ export default function RequestCenterPage() {
         description: newDescription.trim() || null,
         category: newCategory === "none" || !newCategory ? null : newCategory,
         status,
-        priority: "normal",
+        priority: newPriority,
         submitted_by: user.id,
         assigned_to: assignedTo,
         send_to: effectiveSendTo,
@@ -464,6 +465,7 @@ export default function RequestCenterPage() {
     setNewSubject("");
     setNewDescription("");
     setNewCategory("none");
+    setNewPriority("normal");
     setNewSendToUserId("");
     setNewOpen(false);
     fetchRequests();
@@ -881,6 +883,24 @@ export default function RequestCenterPage() {
                       {c}
                     </SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Priority</Label>
+              <Select value={newPriority} onValueChange={setNewPriority}>
+                <SelectTrigger id="request-priority" className="mt-2 w-full min-w-0">
+                  <SelectValue placeholder="Select priority" />
+                </SelectTrigger>
+                <SelectContent
+                  position="popper"
+                  sideOffset={4}
+                  collisionPadding={16}
+                  className="z-[100]"
+                >
+                  <SelectItem value="low">🟢 Low</SelectItem>
+                  <SelectItem value="normal">🟡 Medium</SelectItem>
+                  <SelectItem value="urgent">🔴 Urgent</SelectItem>
                 </SelectContent>
               </Select>
             </div>

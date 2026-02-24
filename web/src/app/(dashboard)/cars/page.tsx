@@ -19,6 +19,7 @@ import {
 import { STATUS_BADGE_COLORS, PDI_BADGE_COLORS, CUSTOMS_BADGE_COLORS } from "@/lib/constants/badges";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -152,11 +153,12 @@ export default function CarsListPage() {
       setStatusDialogOpen(true);
       return;
     }
+    // 1. Find linked customer via sales_orders (any non-cancelled order)
     const { data: order } = await supabase
       .from("sales_orders")
       .select("customer_id")
       .eq("car_id", car.id)
-      .in("status", ["reserved", "confirmed"])
+      .not("status", "eq", "cancelled")
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -165,17 +167,34 @@ export default function CarsListPage() {
       router.push(`/customers/${order.customer_id}`);
       return;
     }
-    if (car.client_name) {
-      const firstName = car.client_name.trim().split(/\s+/)[0];
-      const { data: customer } = await supabase
+    // 2. Fallback: match by phone if we have client_phone
+    const clientPhone = (car as { client_phone?: string }).client_phone;
+    if (clientPhone?.trim()) {
+      const { data: byPhone } = await supabase
         .from("customers")
         .select("id")
-        .ilike("first_name", `%${firstName}%`)
+        .eq("phone_primary", clientPhone.trim())
         .limit(1)
         .maybeSingle();
-      if (customer) {
-        router.push(`/customers/${customer.id}`);
+      if (byPhone) {
+        router.push(`/customers/${byPhone.id}`);
         return;
+      }
+    }
+    // 3. Fallback: fuzzy match by first name from client_name
+    if (car.client_name) {
+      const firstName = car.client_name.trim().split(/\s+/)[0];
+      if (firstName) {
+        const { data: customer } = await supabase
+          .from("customers")
+          .select("id")
+          .ilike("first_name", `%${firstName}%`)
+          .limit(1)
+          .maybeSingle();
+        if (customer) {
+          router.push(`/customers/${customer.id}`);
+          return;
+        }
       }
     }
     setStatusDialogCar(car);
@@ -199,45 +218,59 @@ export default function CarsListPage() {
     setScanVinOpen(false);
   }
 
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
   async function handleDeleteCar() {
     if (!deleteCar || !profile) return;
-
-    if (canDelete) {
-      const { error } = await supabase
-        .from("cars")
-        .update({ deleted_at: new Date().toISOString() })
-        .eq("id", deleteCar.id);
-
-      if (error) {
-        const isRls =
-          error.code === "42501" ||
-          error.message.toLowerCase().includes("permission");
-        toast.error(
-          isRls ? "You don't have permission to do this." : error.message
-        );
-        return;
-      }
-
-      toast.success("Car removed successfully");
-      setDeleteCar(null);
-      fetchCars();
-    } else {
-      const details: CarDeleteDetails = {
-        vin: deleteCar.vin ?? "",
-        brand: deleteCar.brand ?? "",
-        model: deleteCar.model ?? "",
-        model_year: deleteCar.model_year ?? null,
-      };
-      const id = await createDeleteRequest("car", deleteCar.id, details, profile.id);
-      if (id) {
-        toast.success("Deletion request sent for owner approval");
-        setPendingDeletes((prev) => ({ ...prev, [deleteCar.id]: true }));
-      } else {
-        toast.error("Failed to submit deletion request");
-      }
-      setDeleteCar(null);
-      fetchCars();
+    if (!(isOwner || profile.role === "owner")) {
+      toast.error("Only owners can delete vehicles.");
+      return;
     }
+
+    setDeleteError(null);
+    setDeleteLoading(true);
+
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user?.email) {
+      setDeleteLoading(false);
+      toast.error("Unable to verify current user. Please sign in again.");
+      return;
+    }
+
+    const { error: authError } = await supabase.auth.signInWithPassword({
+      email: user.email,
+      password: deletePassword,
+    });
+
+    if (authError) {
+      setDeleteLoading(false);
+      setDeleteError("Incorrect password");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("cars")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", deleteCar.id);
+
+    setDeleteLoading(false);
+
+    if (error) {
+      const isRls =
+        error.code === "42501" ||
+        error.message.toLowerCase().includes("permission");
+      toast.error(
+        isRls ? "You don't have permission to do this." : error.message
+      );
+      return;
+    }
+
+    toast.success("Car removed successfully");
+    setDeletePassword("");
+    setDeleteCar(null);
+    fetchCars();
   }
 
   const fetchCars = useCallback(async () => {
@@ -452,16 +485,16 @@ export default function CarsListPage() {
                           {car.vin ?? "—"}
                         </span>
                         <Badge
-                          className={`shrink-0 ${statusClass} ${LINKED_STATUSES.includes(car.status as (typeof LINKED_STATUSES)[number]) && car.client_name ? "hover:ring-2 hover:ring-offset-1" : ""}`}
+                          className={`shrink-0 ${statusClass} ${LINKED_STATUSES.includes(car.status as (typeof LINKED_STATUSES)[number]) ? "hover:ring-2 hover:ring-offset-1 cursor-pointer" : ""}`}
                           onClick={(e) => {
-                            if (LINKED_STATUSES.includes(car.status as (typeof LINKED_STATUSES)[number]) && car.client_name) {
+                            if (LINKED_STATUSES.includes(car.status as (typeof LINKED_STATUSES)[number])) {
                               e.stopPropagation();
                               void handleStatusClick(car);
                             }
                           }}
                         >
                           {CAR_STATUS_LABELS[car.status]}
-                          {LINKED_STATUSES.includes(car.status as (typeof LINKED_STATUSES)[number]) && car.client_name && (
+                          {LINKED_STATUSES.includes(car.status as (typeof LINKED_STATUSES)[number]) && (car.client_name || (car as { client_phone?: string }).client_phone) && (
                             <ExternalLink className="ml-1 inline h-3 w-3 opacity-60" />
                           )}
                         </Badge>
@@ -481,8 +514,8 @@ export default function CarsListPage() {
               </div>
 
               {/* Tablet/Desktop: table */}
-              <div className="scrollbar-thick hidden overflow-x-auto rounded-lg border border-border/50 md:block">
-              <Table className="w-full min-w-[900px] xl:min-w-[1200px]">
+              <div className="scrollbar-thick hidden overflow-x-auto overflow-visible rounded-lg border border-border/50 md:block">
+              <Table className="w-full min-w-[600px] overflow-visible xl:min-w-[1200px]">
                 <TableHeader>
                   <TableRow>
                     <TableHead className="min-w-[140px] whitespace-nowrap">VIN</TableHead>
@@ -491,21 +524,15 @@ export default function CarsListPage() {
                     <TableHead className="whitespace-nowrap">Year</TableHead>
                     <TableHead className="hidden whitespace-nowrap xl:table-cell">Exterior</TableHead>
                     <TableHead className="hidden whitespace-nowrap xl:table-cell">Interior</TableHead>
-                    <TableHead className="whitespace-nowrap">Plate</TableHead>
                     <TableHead className="whitespace-nowrap">Status</TableHead>
-                    <TableHead className="whitespace-nowrap w-12">Sold</TableHead>
-                    <TableHead className="whitespace-nowrap min-w-[100px]">Client</TableHead>
                     <TableHead className="hidden whitespace-nowrap lg:table-cell">Location</TableHead>
                     <TableHead className="hidden min-w-[100px] whitespace-nowrap xl:table-cell">Warranty (DMS)</TableHead>
                     <TableHead className="hidden min-w-[110px] whitespace-nowrap xl:table-cell">Warranty (Monza)</TableHead>
                     <TableHead className="whitespace-nowrap">Battery %</TableHead>
-                    <TableHead className="whitespace-nowrap">KM</TableHead>
-                    <TableHead className="hidden whitespace-nowrap xl:table-cell">EV Range</TableHead>
-                    <TableHead className="hidden whitespace-nowrap xl:table-cell">Motor</TableHead>
                     <TableHead className="whitespace-nowrap">PDI</TableHead>
                     <TableHead className="hidden whitespace-nowrap xl:table-cell">Customs</TableHead>
                     <TableHead className="whitespace-nowrap">Date Arrived</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead className="text-right w-[80px]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -545,9 +572,6 @@ export default function CarsListPage() {
                         <TableCell className="hidden text-sm text-muted-foreground xl:table-cell">
                           {car.interior_color ?? "—"}
                         </TableCell>
-                        <TableCell className="text-sm">
-                          {car.plate_number ?? car.sub_dealer_name ?? "—"}
-                        </TableCell>
                         <TableCell
                           className="cursor-pointer"
                           onClick={(e) => {
@@ -558,13 +582,13 @@ export default function CarsListPage() {
                           <div className="flex items-center gap-1">
                             <Badge
                               className={
-                                LINKED_STATUSES.includes(car.status as (typeof LINKED_STATUSES)[number]) && car.client_name
+                                LINKED_STATUSES.includes(car.status as (typeof LINKED_STATUSES)[number]) && (car.client_name || (car as { client_phone?: string }).client_phone)
                                   ? `${statusClass} hover:opacity-80 hover:ring-2 hover:ring-offset-1 hover:ring-current`
                                   : `${statusClass} hover:opacity-80`
                               }
                             >
                               {CAR_STATUS_LABELS[car.status]}
-                              {LINKED_STATUSES.includes(car.status as (typeof LINKED_STATUSES)[number]) && car.client_name && (
+                              {LINKED_STATUSES.includes(car.status as (typeof LINKED_STATUSES)[number]) && (car.client_name || (car as { client_phone?: string }).client_phone) && (
                                 <ExternalLink className="ml-1 inline h-3 w-3 opacity-60" />
                               )}
                             </Badge>
@@ -574,12 +598,6 @@ export default function CarsListPage() {
                               </Badge>
                             )}
                           </div>
-                        </TableCell>
-                        <TableCell className="text-center font-bold text-amber-600 dark:text-amber-400 w-12">
-                          {(car as { sold_marker?: string }).sold_marker === "X" ? "X" : "—"}
-                        </TableCell>
-                        <TableCell className="max-w-[120px] truncate text-sm" title={car.client_name ?? undefined}>
-                          {car.client_name ?? "—"}
                         </TableCell>
                         <TableCell className="hidden max-w-[100px] truncate text-sm lg:table-cell" title={car.location_full ?? undefined}>
                           {car.location_full || "—"}
@@ -611,15 +629,6 @@ export default function CarsListPage() {
                             )}
                           </div>
                         </TableCell>
-                        <TableCell className="text-sm">
-                          {car.km_display ?? (car.current_km != null ? `${car.current_km} km` : "—")}
-                        </TableCell>
-                        <TableCell className="hidden text-sm xl:table-cell">
-                          {car.ev_range_km != null ? `${car.ev_range_km} km` : "—"}
-                        </TableCell>
-                        <TableCell className="hidden text-sm xl:table-cell">
-                          {car.motor ?? "—"}
-                        </TableCell>
                         <TableCell
                           className="cursor-pointer"
                           onClick={(e) => {
@@ -648,27 +657,29 @@ export default function CarsListPage() {
                                 : CUSTOMS_STATUS_LABELS[car.customs_status] ?? "Pending"}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-sm">
+                        <TableCell className="whitespace-nowrap text-sm">
                           {car.date_arrived
                             ? new Date(car.date_arrived).toLocaleDateString()
                             : "—"}
                         </TableCell>
                         <TableCell
-                          className="text-right"
+                          className="min-w-[80px] w-[80px] text-right"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <div className="flex items-center justify-end gap-1">
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="size-8"
+                              className="size-8 shrink-0"
                               title="Open documents & files"
-                              onClick={() =>
-                                router.push(`/cars/${encodeURIComponent(car.vin ?? car.id)}`)
-                              }
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                router.push(`/cars/${encodeURIComponent(car.vin ?? car.id)}`);
+                              }}
                             >
                               <FileText className="size-4" />
                             </Button>
+                            <div className="relative w-8 shrink-0">
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button
@@ -679,7 +690,7 @@ export default function CarsListPage() {
                                   <MoreHorizontal className="size-4" />
                                 </Button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
+                              <DropdownMenuContent align="end" side="left" sideOffset={4}>
                                 <DropdownMenuItem
                                   onClick={() => router.push(`/cars/${encodeURIComponent(car.vin ?? car.id)}`)}
                                 >
@@ -711,7 +722,7 @@ export default function CarsListPage() {
                                   </DropdownMenuItem>
                                 </>
                               )}
-                              {canEditInventory && (
+                              {(isOwner || profile?.role === "owner") && (
                                 <DropdownMenuItem
                                   variant="destructive"
                                   onClick={() => setDeleteCar(car)}
@@ -721,6 +732,7 @@ export default function CarsListPage() {
                               )}
                             </DropdownMenuContent>
                           </DropdownMenu>
+                            </div>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -801,23 +813,41 @@ export default function CarsListPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {canDelete ? "Remove vehicle?" : "Request vehicle deletion?"}
+              Confirm deletion — enter your password to permanently delete this vehicle
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {canDelete
-                ? "Are you sure you want to remove this vehicle? This action can be undone by an admin."
-                : "This deletion requires owner approval. A request will be sent for review."}
+              This action is irreversible. Please confirm your password to continue.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {(isOwner || profile?.role === "owner") ? (
+            <div className="space-y-2">
+              <Label htmlFor="delete-password">Password</Label>
+              <Input
+                id="delete-password"
+                type="password"
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+                autoComplete="current-password"
+              />
+              {deleteError && (
+                <p className="text-sm text-destructive">{deleteError}</p>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Only owners can delete vehicles.
+            </p>
+          )}
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <Button
               variant="destructive"
+              disabled={deleteLoading || !deletePassword || !(isOwner || profile?.role === "owner")}
               onClick={() => {
-                handleDeleteCar();
+                void handleDeleteCar();
               }}
             >
-              {canDelete ? "Delete" : "Send Request"}
+              {deleteLoading ? "Deleting..." : "Confirm Delete"}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

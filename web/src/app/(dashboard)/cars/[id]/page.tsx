@@ -10,6 +10,8 @@ import type { CarDisplay, CarEvent } from "@/types/database";
 import { PDI_LABELS, type CarEventType } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
@@ -288,44 +290,59 @@ export default function CarProfilePage() {
     }
   }
 
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
   async function handleDelete() {
     if (!car || !profile) return;
-
-    if (canDelete) {
-      const { error } = await supabase
-        .from("cars")
-        .update({ deleted_at: new Date().toISOString() })
-        .eq("id", car.id);
-
-      if (error) {
-        const isRls =
-          error.code === "42501" ||
-          error.message.toLowerCase().includes("permission");
-        toast.error(
-          isRls ? "You don't have permission to do this." : error.message
-        );
-        return;
-      }
-
-      toast.success("Car removed successfully");
-      setDeleteOpen(false);
-      router.push("/cars");
-    } else {
-      const { createDeleteRequest } = await import("@/lib/delete-requests");
-      const details = {
-        vin: car.vin ?? "",
-        brand: car.brand ?? "",
-        model: car.model ?? "",
-        model_year: car.model_year ?? null,
-      };
-      const id = await createDeleteRequest("car", car.id, details, profile.id);
-      if (id) {
-        toast.success("Deletion request sent for owner approval");
-      } else {
-        toast.error("Failed to submit deletion request");
-      }
-      setDeleteOpen(false);
+    if (!(isOwner || profile.role === "owner")) {
+      toast.error("Only owners can delete vehicles.");
+      return;
     }
+
+    setDeleteError(null);
+    setDeleteLoading(true);
+
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user?.email) {
+      setDeleteLoading(false);
+      toast.error("Unable to verify current user. Please sign in again.");
+      return;
+    }
+
+    const { error: authError } = await supabase.auth.signInWithPassword({
+      email: user.email,
+      password: deletePassword,
+    });
+
+    if (authError) {
+      setDeleteLoading(false);
+      setDeleteError("Incorrect password");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("cars")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", car.id);
+
+    setDeleteLoading(false);
+
+    if (error) {
+      const isRls =
+        error.code === "42501" ||
+        error.message.toLowerCase().includes("permission");
+      toast.error(
+        isRls ? "You don't have permission to do this." : error.message
+      );
+      return;
+    }
+
+    toast.success("Car removed successfully");
+    setDeletePassword("");
+    setDeleteOpen(false);
+    router.push("/cars");
   }
 
   async function handleAddNote(e: React.FormEvent) {
@@ -436,7 +453,7 @@ export default function CarProfilePage() {
           <Button variant="outline" onClick={() => setMoveOpen(true)}>
             Move location
           </Button>
-          {canEditInventory && (
+          {(isOwner || profile?.role === "owner") && (
             <Button
               variant="destructive"
               onClick={() => setDeleteOpen(true)}
@@ -485,21 +502,39 @@ export default function CarProfilePage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {canDelete ? "Remove vehicle?" : "Request vehicle deletion?"}
+              Confirm deletion — enter your password to permanently delete this vehicle
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {canDelete
-                ? "Are you sure you want to remove this vehicle? This action can be undone by an admin."
-                : "This deletion requires owner approval. A request will be sent for review."}
+              This action is irreversible. Please confirm your password to continue.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {(isOwner || profile?.role === "owner") ? (
+            <div className="space-y-2">
+              <Label htmlFor="delete-password-detail">Password</Label>
+              <Input
+                id="delete-password-detail"
+                type="password"
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+                autoComplete="current-password"
+              />
+              {deleteError && (
+                <p className="text-sm text-destructive">{deleteError}</p>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Only owners can delete vehicles.
+            </p>
+          )}
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <Button
               variant="destructive"
+              disabled={deleteLoading || !deletePassword || !(isOwner || profile?.role === "owner")}
               onClick={() => void handleDelete()}
             >
-              {canDelete ? "Delete" : "Send Request"}
+              {deleteLoading ? "Deleting..." : "Confirm Delete"}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -538,7 +573,7 @@ export default function CarProfilePage() {
         }}
       />
 
-      <Tabs defaultValue="documents">
+      <Tabs defaultValue="overview">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="documents">Documents</TabsTrigger>
@@ -596,7 +631,10 @@ export default function CarProfilePage() {
               </div>
               <div className="space-y-1">
                 <p className="text-muted-foreground text-sm">Status</p>
-                <Badge className={statusBadgeClass}>
+                <Badge
+                  className={`${statusBadgeClass} cursor-pointer hover:ring-2 hover:ring-offset-1`}
+                  onClick={() => setLinkCustomerOpen(true)}
+                >
                   {car.status_display ?? car.status}
                 </Badge>
               </div>

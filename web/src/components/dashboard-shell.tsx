@@ -9,6 +9,7 @@ import {
   Car,
   FileText,
   Users,
+  UserPlus,
   Wrench,
   Package,
   History,

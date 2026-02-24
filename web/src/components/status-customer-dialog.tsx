@@ -221,24 +221,24 @@ export function StatusCustomerDialog({
           return;
         }
       }
-    } else {
-      // Status-only update (in_stock, sent_to_sub_dealer, demo)
-      const updatePayload: Record<string, unknown> = { status: newStatus };
-      if (newStatus === "sent_to_sub_dealer") {
-        updatePayload.sub_dealer_name = subDealerName.trim() || null;
-      } else {
-        updatePayload.sub_dealer_name = null;
-      }
-      const { error: carError } = await supabase
-        .from("cars")
-        .update(updatePayload)
-        .eq("id", car.id);
+    }
 
-      if (carError) {
-        setSubmitting(false);
-        toast.error("Failed to update status: " + carError.message);
-        return;
-      }
+    // Always update the car's status on the cars table
+    const carStatusPayload: Record<string, unknown> = { status: newStatus };
+    if (newStatus === "sent_to_sub_dealer") {
+      carStatusPayload.sub_dealer_name = subDealerName.trim() || null;
+    } else {
+      carStatusPayload.sub_dealer_name = null;
+    }
+    const { error: carError } = await supabase
+      .from("cars")
+      .update(carStatusPayload)
+      .eq("id", car.id);
+
+    if (carError) {
+      setSubmitting(false);
+      toast.error("Failed to update status: " + carError.message);
+      return;
     }
 
     if (newStatus !== "sent_to_sub_dealer" && plateNumber.trim() !== (car.plate_number ?? "")) {
@@ -439,11 +439,19 @@ export function StatusCustomerDialog({
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="in_stock">In Stock</SelectItem>
+                        <SelectItem value="inbound">Inbound</SelectItem>
+                        <SelectItem value="in_stock">Available</SelectItem>
+                        <SelectItem value="showroom">Showroom</SelectItem>
                         <SelectItem value="reserved">Reserved</SelectItem>
                         <SelectItem value="sold">Sold</SelectItem>
-                        <SelectItem value="sent_to_sub_dealer">Sent to Sub Dealer</SelectItem>
-                        <SelectItem value="demo">Demo</SelectItem>
+                        <SelectItem value="delivered">Delivered</SelectItem>
+                        <SelectItem value="service">Service</SelectItem>
+                        <SelectItem value="sent_to_sub_dealer">Sent to Dealership</SelectItem>
+                        <SelectItem value="demo">Display</SelectItem>
+                        <SelectItem value="registered">Registered</SelectItem>
+                        <SelectItem value="under_registration">Under Registration</SelectItem>
+                        <SelectItem value="sent_to_customs">Sent to Customs</SelectItem>
+                        <SelectItem value="company_car">Company Car</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

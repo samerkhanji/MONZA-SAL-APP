@@ -3,8 +3,8 @@
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
-import type { CarDisplay, PdiStatus, CustomsStatus } from "@/types/database";
-import { PDI_LABELS, CUSTOMS_STATUS_LABELS } from "@/types/database";
+import type { CarDisplay, PdiStatus, CustomsStatus, CarStatus, LocationType } from "@/types/database";
+import { PDI_LABELS, CUSTOMS_STATUS_LABELS, CAR_STATUS_LABELS, LOCATION_LABELS } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -39,9 +39,15 @@ export function EditCarDialog({
   onOpenChange,
   onSuccess,
 }: EditCarDialogProps) {
+  const [status, setStatus] = useState<CarStatus>("inbound");
   const [plateNumber, setPlateNumber] = useState("");
   const [exteriorColor, setExteriorColor] = useState("");
   const [interiorColor, setInteriorColor] = useState("");
+  const [dateArrived, setDateArrived] = useState("");
+  const [suffix, setSuffix] = useState("");
+  const [engineNumber, setEngineNumber] = useState("");
+  const [dongle, setDongle] = useState("");
+  const [issue, setIssue] = useState("");
   const [batteryPercent, setBatteryPercent] = useState("");
   const [evRangeKm, setEvRangeKm] = useState("");
   const [currentKm, setCurrentKm] = useState("");
@@ -57,15 +63,23 @@ export function EditCarDialog({
   const [warrantyPerDms, setWarrantyPerDms] = useState("");
   const [warrantyMonzaStartDate, setWarrantyMonzaStartDate] = useState("");
   const [customsStatus, setCustomsStatus] = useState<CustomsStatus>("pending");
+  const [locationType, setLocationType] = useState<LocationType>("storage");
+  const [locationSlot, setLocationSlot] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const supabase = createClient();
 
   useEffect(() => {
     if (car && open) {
+      setStatus(car.status);
       setPlateNumber(car.plate_number ?? "");
       setExteriorColor(car.exterior_color ?? "");
       setInteriorColor(car.interior_color ?? "");
+      setDateArrived(car.date_arrived ?? "");
+      setSuffix((car as { suffix?: string }).suffix ?? "");
+      setEngineNumber((car as { engine_number?: string }).engine_number ?? "");
+      setDongle((car as { dongle?: string }).dongle ?? "");
+      setIssue((car as { issue?: string }).issue ?? "");
       setBatteryPercent(
         car.battery_percent != null ? String(car.battery_percent) : ""
       );
@@ -86,6 +100,8 @@ export function EditCarDialog({
       setWarrantyPerDms(car.warranty_per_dms ?? "");
       setWarrantyMonzaStartDate(car.warranty_monza_start_date ?? "");
       setCustomsStatus(car.customs_status ?? "pending");
+      setLocationType(car.location_type ?? "storage");
+      setLocationSlot(car.location_slot ?? "");
     }
   }, [car, open]);
 
@@ -96,15 +112,23 @@ export function EditCarDialog({
     setSubmitting(true);
 
     const updates: Record<string, unknown> = {
+      status,
       plate_number: plateNumber.trim() || null,
       exterior_color: exteriorColor.trim() || null,
       interior_color: interiorColor.trim() || null,
+      date_arrived: dateArrived || null,
+      suffix: suffix.trim() || null,
+      engine_number: engineNumber.trim() || null,
+      dongle: dongle.trim() || null,
+      issue: issue.trim() || null,
       notes: notes.trim() || null,
       software_version: softwareVersion.trim() || null,
       pdi_status: pdiStatus,
       customs_status: customsStatus,
       warranty_per_dms: warrantyPerDms || null,
       warranty_monza_start_date: warrantyMonzaStartDate || null,
+      location_type: locationType,
+      location_slot: locationSlot.trim() || null,
     };
 
     const priceNum = price ? parseFloat(price) : null;
@@ -186,6 +210,21 @@ export function EditCarDialog({
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
+              <Label htmlFor="status">Status</Label>
+              <Select value={status} onValueChange={(v) => setStatus(v as CarStatus)}>
+                <SelectTrigger id="status">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(CAR_STATUS_LABELS).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="plate">Plate number</Label>
               <Input
                 id="plate"
@@ -194,10 +233,85 @@ export function EditCarDialog({
                 placeholder="Optional"
               />
             </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="dateArrived">Date Arrived</Label>
+              <Input
+                id="dateArrived"
+                type="date"
+                value={dateArrived}
+                onChange={(e) => setDateArrived(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="suffix">Suffix</Label>
+              <Input
+                id="suffix"
+                value={suffix}
+                onChange={(e) => setSuffix(e.target.value)}
+                placeholder="Optional"
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="engineNumber">Engine number</Label>
+              <Input
+                id="engineNumber"
+                value={engineNumber}
+                onChange={(e) => setEngineNumber(e.target.value)}
+                placeholder="Optional"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="dongle">Dongle</Label>
+              <Input
+                id="dongle"
+                value={dongle}
+                onChange={(e) => setDongle(e.target.value)}
+                placeholder="Optional"
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="locationType">Location type</Label>
+              <Select
+                value={locationType}
+                onValueChange={(v) => setLocationType(v as LocationType)}
+              >
+                <SelectTrigger id="locationType">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(LOCATION_LABELS).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="locationSlot">Location slot</Label>
+              <Input
+                id="locationSlot"
+                value={locationSlot}
+                onChange={(e) => setLocationSlot(e.target.value)}
+                placeholder="Optional"
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="pdi">PDI status</Label>
               <Select value={pdiStatus} onValueChange={(v) => setPdiStatus(v as PdiStatus)}>
-                <SelectTrigger>
+                <SelectTrigger id="pdi">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -209,9 +323,6 @@ export function EditCarDialog({
                 </SelectContent>
               </Select>
             </div>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="exterior">Exterior color</Label>
               <Input
@@ -221,12 +332,24 @@ export function EditCarDialog({
                 placeholder="Optional"
               />
             </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="interior">Interior color</Label>
               <Input
                 id="interior"
                 value={interiorColor}
                 onChange={(e) => setInteriorColor(e.target.value)}
+                placeholder="Optional"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="software">Software version</Label>
+              <Input
+                id="software"
+                value={softwareVersion}
+                onChange={(e) => setSoftwareVersion(e.target.value)}
                 placeholder="Optional"
               />
             </div>
@@ -267,15 +390,6 @@ export function EditCarDialog({
                 min={0}
                 value={currentKm}
                 onChange={(e) => setCurrentKm(e.target.value)}
-                placeholder="Optional"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="software">Software version</Label>
-              <Input
-                id="software"
-                value={softwareVersion}
-                onChange={(e) => setSoftwareVersion(e.target.value)}
                 placeholder="Optional"
               />
             </div>
@@ -393,7 +507,18 @@ export function EditCarDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="notes">Notes</Label>
+            <Label htmlFor="issue">Issue / Notes</Label>
+            <Textarea
+              id="issue"
+              value={issue}
+              onChange={(e) => setIssue(e.target.value)}
+              placeholder="Optional"
+              rows={3}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="notes">Internal notes</Label>
             <Textarea
               id="notes"
               value={notes}
