@@ -74,21 +74,8 @@ interface SoldCar {
     first_name: string;
     last_name: string | null;
     phone_primary: string | null;
+    lead_status: string | null;
   } | null;
-}
-
-interface ReservedCar {
-  id: string;
-  vin: string;
-  brand: string;
-  model: string;
-  model_year: number | null;
-  exterior_color: string | null;
-  status: string;
-  client_name: string | null;
-  client_phone: string | null;
-  reservation_date: string | null;
-  reserved_by: string | null;
 }
 
 function matchesSearch(customer: CustomerDisplay, search: string): boolean {
@@ -107,10 +94,8 @@ export default function CustomersPage() {
   const { canEditInventory, canDelete } = useUser();
   const [customers, setCustomers] = useState<CustomerDisplay[]>([]);
   const [soldCars, setSoldCars] = useState<SoldCar[]>([]);
-  const [reservedCars, setReservedCars] = useState<ReservedCar[]>([]);
   const [loading, setLoading] = useState(true);
   const [soldLoading, setSoldLoading] = useState(true);
-  const [reservedLoading, setReservedLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
@@ -154,7 +139,7 @@ export default function CustomersPage() {
           vin, brand, model, model_year, exterior_color, status
         ),
         customers:customer_id (
-          id, first_name, last_name, phone_primary
+          id, first_name, last_name, phone_primary, lead_status
         )
       `)
       .not("status", "eq", "cancelled")
@@ -166,24 +151,9 @@ export default function CustomersPage() {
     setSoldLoading(false);
   }
 
-  async function fetchReservedCars() {
-    setReservedLoading(true);
-    const { data, error } = await supabase
-      .from("cars_display")
-      .select("id, vin, brand, model, model_year, exterior_color, status, client_name, client_phone, reservation_date, reserved_by")
-      .eq("status", "reserved")
-      .order("reservation_date", { ascending: false });
-
-    if (!error && data) {
-      setReservedCars(data as ReservedCar[]);
-    }
-    setReservedLoading(false);
-  }
-
   useEffect(() => {
     fetchCustomers();
     fetchSoldCars();
-    fetchReservedCars();
   }, []);
 
   const filteredCustomers = useMemo(() => {
@@ -194,6 +164,46 @@ export default function CustomersPage() {
       return true;
     });
   }, [customers, search, statusFilter, sourceFilter]);
+
+  const leadCustomers = useMemo(
+    () => customers.filter((c) => c.lead_status === "new_lead"),
+    [customers]
+  );
+
+  const convertedSoldCars = useMemo(
+    () => soldCars.filter((so) => so.customers?.lead_status === "converted"),
+    [soldCars]
+  );
+
+  const soldCustomerIds = useMemo(() => {
+    const ids = new Set<string>();
+    convertedSoldCars.forEach((so) => {
+      if (so.customer_id) {
+        ids.add(so.customer_id);
+      }
+    });
+    return ids;
+  }, [convertedSoldCars]);
+
+  const soldCustomers = useMemo(
+    () => customers.filter((c) => soldCustomerIds.has(c.id)),
+    [customers, soldCustomerIds]
+  );
+
+  const exclusiveLeadCustomers = useMemo(
+    () => leadCustomers.filter((c) => !soldCustomerIds.has(c.id)),
+    [leadCustomers, soldCustomerIds]
+  );
+
+  useEffect(() => {
+    if (!loading && !soldLoading) {
+      console.log("[CustomersPage] counts", {
+        totalCustomers: customers.length,
+        soldCustomers: soldCustomers.length,
+        leadCustomers: exclusiveLeadCustomers.length,
+      });
+    }
+  }, [loading, soldLoading, customers.length, soldCustomers.length, exclusiveLeadCustomers.length]);
 
   async function handleDelete() {
     if (!deleteCustomer) return;
@@ -214,7 +224,8 @@ export default function CustomersPage() {
   }
 
   function getStatusLabel(c: CustomerDisplay): string {
-    return c.status_display ?? LEAD_STATUS_LABELS[c.lead_status] ?? c.lead_status;
+    const orders = c.total_orders ?? 0;
+    return orders > 0 ? "Sold" : "Lead";
   }
 
   function getSourceLabel(c: CustomerDisplay): string {
@@ -254,8 +265,10 @@ export default function CustomersPage() {
             const fullName =
               customer.full_name ??
               `${customer.first_name} ${customer.last_name ?? ""}`.trim();
-            const statusClass =
-              LEAD_STATUS_COLORS[customer.lead_status] ?? "bg-muted text-muted-foreground";
+            const isSold = (customer.total_orders ?? 0) > 0;
+            const statusClass = isSold
+              ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
+              : "bg-muted text-muted-foreground";
             return (
               <button
                 key={customer.id}
@@ -300,8 +313,11 @@ export default function CustomersPage() {
             </TableHeader>
             <TableBody>
               {list.map((customer) => {
-                const statusClass =
-                  LEAD_STATUS_COLORS[customer.lead_status] ?? "bg-muted text-muted-foreground";
+                const orders = customer.total_orders ?? 0;
+                const isSold = orders > 0;
+                const statusClass = isSold
+                  ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
+                  : "bg-muted text-muted-foreground";
                 const fullName =
                   customer.full_name ??
                   `${customer.first_name} ${customer.last_name ?? ""}`.trim();
@@ -445,15 +461,15 @@ export default function CustomersPage() {
             Sold Cars
             {!soldLoading && (
               <Badge variant="secondary" className="ml-2">
-                {soldCars.length}
+                {soldCustomers.length}
               </Badge>
             )}
           </TabsTrigger>
           <TabsTrigger value="leads">
             Leads
-            {!reservedLoading && (
+            {!loading && (
               <Badge variant="secondary" className="ml-2">
-                {reservedCars.length}
+                {exclusiveLeadCustomers.length}
               </Badge>
             )}
           </TabsTrigger>
@@ -535,13 +551,15 @@ export default function CustomersPage() {
             <CardHeader>
               <CardTitle>Sold Cars</CardTitle>
               <CardDescription>
-                {soldLoading ? "Loading..." : `${soldCars.length} sale(s) — all active sales orders`}
+                {soldLoading
+                  ? "Loading..."
+                  : `${soldCustomers.length} customer(s) with sold cars (converted)`}
               </CardDescription>
             </CardHeader>
             <CardContent>
               {soldLoading ? (
                 <p className="text-muted-foreground">Loading...</p>
-              ) : soldCars.length === 0 ? (
+              ) : soldCustomers.length === 0 ? (
                 <p className="text-muted-foreground">No sold cars found.</p>
               ) : (
                 <div className="overflow-x-auto">
@@ -561,12 +579,13 @@ export default function CustomersPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {soldCars.map((so) => {
+                      {convertedSoldCars.map((so) => {
                         const car = so.cars;
                         const customer = so.customers;
                         const fullName = customer
                           ? `${customer.first_name} ${customer.last_name ?? ""}`.trim()
                           : "—";
+                        const isSubDealer = car?.status === "sent_to_sub_dealer";
                         return (
                           <TableRow key={so.id}>
                             <TableCell className="font-medium">
@@ -619,7 +638,17 @@ export default function CustomersPage() {
                                 : "—"}
                             </TableCell>
                             <TableCell>
-                              <Badge variant="secondary">{so.status}</Badge>
+                              <div className="flex flex-wrap items-center gap-1">
+                                <Badge variant="secondary">{so.status}</Badge>
+                                {isSubDealer && (
+                                  <Badge
+                                    variant="outline"
+                                    className="bg-muted text-muted-foreground"
+                                  >
+                                    Sub-dealer
+                                  </Badge>
+                                )}
+                              </div>
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex items-center justify-end gap-1">
@@ -661,97 +690,20 @@ export default function CustomersPage() {
         <TabsContent value="leads" className="mt-4">
           <Card>
             <CardHeader>
-              <CardTitle>Leads — Reserved Cars</CardTitle>
+              <CardTitle>Leads</CardTitle>
               <CardDescription>
-                {reservedLoading
-                  ? "Loading..."
-                  : `${reservedCars.length} reserved car(s)`}
+                {loading ? "Loading..." : `${exclusiveLeadCustomers.length} lead contact(s)`}
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {reservedLoading ? (
+              {loading ? (
                 <p className="text-muted-foreground">Loading...</p>
-              ) : reservedCars.length === 0 ? (
-                <p className="text-muted-foreground">No reserved cars at the moment.</p>
+              ) : exclusiveLeadCustomers.length === 0 ? (
+                <p className="text-muted-foreground">
+                  No leads found. Add your first lead contact.
+                </p>
               ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Vehicle</TableHead>
-                        <TableHead>VIN</TableHead>
-                        <TableHead>Color</TableHead>
-                        <TableHead>Client Name</TableHead>
-                        <TableHead>Client Phone</TableHead>
-                        <TableHead>Reserved By</TableHead>
-                        <TableHead>Reservation Date</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {reservedCars.map((car) => (
-                        <TableRow
-                          key={car.id}
-                          className="cursor-pointer"
-                          onClick={() =>
-                            router.push(`/cars/${encodeURIComponent(car.vin ?? car.id)}`)
-                          }
-                        >
-                          <TableCell className="font-medium">
-                            {car.brand} {car.model}
-                            {car.model_year ? ` (${car.model_year})` : ""}
-                          </TableCell>
-                          <TableCell className="font-mono text-xs text-muted-foreground">
-                            {car.vin}
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {car.exterior_color ?? "—"}
-                          </TableCell>
-                          <TableCell className="text-sm font-medium">
-                            {car.client_name ?? "—"}
-                          </TableCell>
-                          <TableCell className="text-sm">
-                            {car.client_phone ? (
-                              <a
-                                href={`tel:${car.client_phone}`}
-                                onClick={(e) => e.stopPropagation()}
-                                className="text-primary hover:underline"
-                              >
-                                {car.client_phone}
-                              </a>
-                            ) : (
-                              "—"
-                            )}
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {car.reserved_by ?? "—"}
-                          </TableCell>
-                          <TableCell className="text-sm">
-                            {car.reservation_date
-                              ? new Date(car.reservation_date).toLocaleDateString()
-                              : "—"}
-                          </TableCell>
-                          <TableCell
-                            className="text-right"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() =>
-                                router.push(
-                                  `/cars/${encodeURIComponent(car.vin ?? car.id)}`
-                                )
-                              }
-                            >
-                              View Car →
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                <CustomerTable list={exclusiveLeadCustomers} />
               )}
             </CardContent>
           </Card>

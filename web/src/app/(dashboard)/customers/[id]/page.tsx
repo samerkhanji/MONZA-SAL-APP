@@ -60,6 +60,7 @@ interface EnrichedSaleOrder {
     model_year: number | null;
     exterior_color: string | null;
     status: string;
+    sub_dealer_name?: string | null;
   } | null;
 }
 
@@ -109,7 +110,8 @@ export default function CustomerDetailPage() {
           model,
           model_year,
           exterior_color,
-          status
+          status,
+          sub_dealer_name
         )
       `)
       .eq("customer_id", id)
@@ -427,13 +429,14 @@ export default function CustomerDetailPage() {
               ) : (
                 <div className="space-y-4">
                   {vehicles.map((so) => {
-                    const car = so.cars;
-                    if (!car) return null;
-                    const carStatusClass =
-                      STATUS_BADGE_COLORS[car.status] ?? "bg-muted text-muted-foreground";
-                    const carStatusLabel =
-                      CAR_STATUS_LABELS[car.status as keyof typeof CAR_STATUS_LABELS] ??
-                      car.status;
+                  const car = so.cars;
+                  if (!car) return null;
+                  const isSubDealer = car.status === "sent_to_sub_dealer";
+                  const carStatusClass =
+                    STATUS_BADGE_COLORS[car.status] ?? "bg-muted text-muted-foreground";
+                  const carStatusLabel =
+                    CAR_STATUS_LABELS[car.status as keyof typeof CAR_STATUS_LABELS] ??
+                    car.status;
                     return (
                       <div
                         key={so.id}
@@ -460,6 +463,11 @@ export default function CustomerDetailPage() {
                               <p className="flex items-center gap-1">
                                 Status:{" "}
                                 <Badge className={carStatusClass}>{carStatusLabel}</Badge>
+                                {isSubDealer && (
+                                  <Badge variant="outline" className="bg-muted text-muted-foreground">
+                                    {car.sub_dealer_name || "Sub-dealer"}
+                                  </Badge>
+                                )}
                               </p>
                               <p>Color: {car.exterior_color ?? "—"}</p>
                               <p>
