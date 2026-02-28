@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { MOVEMENT_TYPE_LABELS } from "@/lib/constants/parts";
+import { getProfileFullName } from "@/lib/supabase-profile";
 
 interface PartMovementRow {
   id: string;
@@ -71,8 +72,7 @@ export function PartHistoryDialog({
     mov.movement_type === "stock_in" || mov.movement_type === "return"
       ? "+"
       : "-";
-  const by = (mov: PartMovementRow) =>
-    (mov.profiles as { full_name?: string } | undefined)?.full_name ?? "Unknown";
+  const by = (mov: PartMovementRow) => getProfileFullName(mov.profiles);
   const carInfo = (mov: PartMovementRow) => {
     const c = mov.cars as { vin?: string; brand?: string; model?: string } | undefined;
     if (!c) return null;

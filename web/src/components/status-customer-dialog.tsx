@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
-import type { CarDisplay } from "@/types/database";
+import type { CarDisplay, CarStatus } from "@/types/database";
 import { CAR_STATUS_LABELS } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -74,7 +74,7 @@ export function StatusCustomerDialog({
   const [email, setEmail] = useState("");
   const [plateNumber, setPlateNumber] = useState("");
   const [subDealerName, setSubDealerName] = useState("");
-  const [newStatus, setNewStatus] = useState<"in_stock" | "reserved" | "sold" | "sent_to_sub_dealer" | "demo">("in_stock");
+  const [newStatus, setNewStatus] = useState<CarStatus>("in_stock");
   const [sellingPrice, setSellingPrice] = useState("");
   const [currency, setCurrency] = useState("USD");
 
@@ -83,6 +83,7 @@ export function StatusCustomerDialog({
   useEffect(() => {
     if (!open || !car) return;
 
+    setNewStatus(car.status);
     setPlateNumber(car.plate_number ?? "");
     setSubDealerName(car.sub_dealer_name ?? "");
 
@@ -108,6 +109,8 @@ export function StatusCustomerDialog({
 
             setSale(saleData as SaleData);
             setCustomer(custData as CustomerData | null);
+            setSellingPrice(saleData.selling_price != null ? String(saleData.selling_price) : "");
+            setCurrency(saleData.currency ?? "USD");
             if (custData) {
               setFirstName(custData.first_name);
               setLastName(custData.last_name ?? "");
@@ -143,9 +146,10 @@ export function StatusCustomerDialog({
       setSellingPrice("");
       setCurrency("USD");
     }
-  }, [open, car?.id, isSoldOrReserved]);
+  }, [open, car, isSoldOrReserved]);
 
   const needsCustomer = newStatus === "reserved" || newStatus === "sold";
+  const showPlateField = ["sold", "delivered", "registered"].includes(newStatus);
 
   async function handleSaveCustomer() {
     if (!car || !canEditInventory) return;
@@ -181,6 +185,23 @@ export function StatusCustomerDialog({
           return;
         }
       } else {
+        // Safeguard: Check if this car is already linked to another customer
+        const { data: existingSale } = await supabase
+          .from("sales_orders")
+          .select("id, customer_id, customers(first_name, last_name)")
+          .eq("car_id", car.id)
+          .not("status", "eq", "cancelled")
+          .limit(1)
+          .maybeSingle();
+
+        if (existingSale?.customer_id) {
+          const other = existingSale.customers as { first_name?: string; last_name?: string } | null;
+          const otherName = other ? `${other.first_name ?? ""} ${other.last_name ?? ""}`.trim() : "another customer";
+          setSubmitting(false);
+          toast.error(`This car is already linked to ${otherName}. Remove that link first if you need to reassign.`);
+          return;
+        }
+
         const { data: newCustomer, error: custError } = await supabase
           .from("customers")
           .insert({
@@ -241,7 +262,7 @@ export function StatusCustomerDialog({
       return;
     }
 
-    if (newStatus !== "sent_to_sub_dealer" && plateNumber.trim() !== (car.plate_number ?? "")) {
+    if (showPlateField && plateNumber.trim() !== (car.plate_number ?? "")) {
       await supabase
         .from("cars")
         .update({ plate_number: plateNumber.trim() || null })
@@ -261,7 +282,11 @@ export function StatusCustomerDialog({
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>
-            {isSoldOrReserved ? "Customer details" : "Add customer & set status"}
+            {isSoldOrReserved
+              ? "Customer details"
+              : needsCustomer
+                ? "Add customer & set status"
+                : "Set status"}
           </DialogTitle>
           <DialogDescription>
             {car.brand} {car.model} — VIN: <span className="font-mono">{car.vin_short ?? car.vin?.slice(-8)}</span>
@@ -323,20 +348,27 @@ export function StatusCustomerDialog({
                         type="email"
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label>Number plate</Label>
-                      <Input
-                        value={plateNumber}
-                        onChange={(e) => setPlateNumber(e.target.value)}
-                        placeholder="Car plate number"
-                      />
-                    </div>
+                    {showPlateField && (
+                      <div className="space-y-2">
+                        <Label>Number plate</Label>
+                        <Input
+                          value={plateNumber}
+                          onChange={(e) => setPlateNumber(e.target.value)}
+                          placeholder="Car plate number"
+                        />
+                      </div>
+                    )}
                     {sale && (
                       <div className="rounded-md border p-3 text-sm">
                         <p className="font-medium">Sale info</p>
                         <p className="text-muted-foreground">
                           Price: {sale.selling_price != null ? `${sale.selling_price} ${sale.currency ?? "USD"}` : "—"}
                         </p>
+                        {sale.delivery_date && (
+                          <p className="text-muted-foreground">
+                            Delivery: {new Date(sale.delivery_date).toLocaleDateString()}
+                          </p>
+                        )}
                       </div>
                     )}
                   </div>
@@ -346,7 +378,7 @@ export function StatusCustomerDialog({
                     <p><span className="font-medium">Phone:</span> {phone}</p>
                     {phone2 && <p><span className="font-medium">Phone 2:</span> {phone2}</p>}
                     {email && <p><span className="font-medium">Email:</span> {email}</p>}
-                    <p><span className="font-medium">Plate:</span> {car.plate_number ?? "—"}</p>
+                    {showPlateField && <p><span className="font-medium">Plate:</span> {car.plate_number ?? "—"}</p>}
                     {sale?.selling_price != null && (
                       <p><span className="font-medium">Price:</span> {sale.selling_price} {sale.currency ?? "USD"}</p>
                     )}
@@ -401,14 +433,16 @@ export function StatusCustomerDialog({
                       type="email"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label>Number plate</Label>
-                    <Input
-                      value={plateNumber}
-                      onChange={(e) => setPlateNumber(e.target.value)}
-                      placeholder="Car plate number"
-                    />
-                  </div>
+                  {showPlateField && (
+                    <div className="space-y-2">
+                      <Label>Number plate</Label>
+                      <Input
+                        value={plateNumber}
+                        onChange={(e) => setPlateNumber(e.target.value)}
+                        placeholder="Car plate number"
+                      />
+                    </div>
+                  )}
                   <div className="space-y-2">
                     <Label>Selling price</Label>
                     <Input
@@ -464,7 +498,7 @@ export function StatusCustomerDialog({
                         placeholder="Which sub dealer?"
                       />
                     </div>
-                  ) : (
+                  ) : showPlateField ? (
                     <div className="space-y-2">
                       <Label>Number plate</Label>
                       <Input
@@ -473,7 +507,7 @@ export function StatusCustomerDialog({
                         placeholder="Car plate number"
                       />
                     </div>
-                  )}
+                  ) : null}
                   {needsCustomer && (
                     <>
                       <div className="grid gap-4 sm:grid-cols-2">

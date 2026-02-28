@@ -31,6 +31,7 @@ import { CarDocuments } from "@/components/car-documents";
 import { DayDetailDialog } from "@/components/car-day-detail-dialog";
 import { VisitsMaintenanceDialog } from "@/components/visits-maintenance-dialog";
 import { STATUS_BADGE_COLORS, PDI_BADGE_COLORS } from "@/lib/constants/badges";
+import { getProfileFullName } from "@/lib/supabase-profile";
 import { User } from "lucide-react";
 import dynamic from "next/dynamic";
 
@@ -50,8 +51,8 @@ const EVENT_LABELS: Record<CarEventType, string> = {
 };
 
 function getEventActor(ev: CarEvent): string {
-  const name = (ev.profiles as { full_name?: string } | undefined)?.full_name;
-  return (name?.trim() && ev.created_by) ? name : "System";
+  const name = getProfileFullName(ev.profiles);
+  return (name !== "Unknown" && name.trim() && ev.created_by) ? name : "System";
 }
 
 function formatEventDisplay(ev: CarEvent): string {
@@ -124,6 +125,7 @@ export default function CarProfilePage() {
   >("garage");
   const [salesOrder, setSalesOrder] = useState<{
     customer: { id: string; first_name: string; last_name: string | null };
+    status?: string;
   } | null>(null);
   const [linkCustomerOpen, setLinkCustomerOpen] = useState(false);
 
@@ -242,20 +244,41 @@ export default function CarProfilePage() {
     (async () => {
       const { data } = await supabase
         .from("sales_orders")
-        .select("customer_id, customers(id, first_name, last_name)")
+        .select("customer_id, status, customers(id, first_name, last_name)")
         .eq("car_id", car.id)
         .not("status", "eq", "cancelled")
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
-      const row = data as { customer_id: string; customers: { id: string; first_name: string; last_name: string | null } | null } | null;
+      const row = data as { customer_id: string; status?: string; customers: { id: string; first_name: string; last_name: string | null } | null } | null;
       if (row?.customers) {
-        setSalesOrder({ customer: row.customers });
+        setSalesOrder({ customer: row.customers, status: row.status });
       } else {
         setSalesOrder(null);
       }
     })();
   }, [car?.id]);
+
+  const hasConfirmedSaleButWrongStatus =
+    car &&
+    salesOrder?.customer &&
+    salesOrder?.status === "confirmed" &&
+    (car.status === "registered" || car.status === "under_registration");
+
+  async function handleUpdateToSold() {
+    if (!car || !canEditInventory) return;
+    const { error } = await supabase
+      .from("cars")
+      .update({ status: "sold" })
+      .eq("id", car.id);
+    if (error) {
+      toast.error(error.message ?? "Failed to update status");
+      return;
+    }
+    toast.success("Status updated to Sold");
+    fetchCar();
+    fetchEvents();
+  }
 
   function onMoved() {
     setMoveOpen(false);
@@ -464,6 +487,18 @@ export default function CarProfilePage() {
         </div>
       </div>
 
+      {hasConfirmedSaleButWrongStatus && canEditInventory && (
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-amber-500/50 bg-amber-500/10 p-4">
+          <p className="text-sm text-amber-800 dark:text-amber-200">
+            This car has a linked customer with a confirmed sale but status is still{" "}
+            <strong>{car.status_display ?? car.status}</strong>. Should it be updated to Sold?
+          </p>
+          <Button size="sm" variant="outline" onClick={() => void handleUpdateToSold()}>
+            Update to Sold
+          </Button>
+        </div>
+      )}
+
       <MoveCarDialog
         carId={car.id}
         currentLocationType={car.location_type}
@@ -669,52 +704,72 @@ export default function CarProfilePage() {
             </CardContent>
           </Card>
 
-          {/* Section: Customer */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Customer</CardTitle>
-              <CardDescription>Linked buyer for this vehicle</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {salesOrder?.customer ? (
-                <Link href={`/customers/${salesOrder.customer.id}`}>
-                  <div className="flex items-center gap-3 rounded-lg bg-muted p-3 transition-colors hover:bg-accent cursor-pointer">
+          {/* Section: Customer — only show add/link prompt for statuses that need a customer */}
+          {["sold", "reserved", "sent_to_sub_dealer"].includes(car.status) && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Customer</CardTitle>
+                <CardDescription>Linked buyer for this vehicle</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {salesOrder?.customer ? (
+                  <Link href={`/customers/${salesOrder.customer.id}`}>
+                    <div className="flex items-center gap-3 rounded-lg bg-muted p-3 transition-colors hover:bg-accent cursor-pointer">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-500/10">
+                        <User className="h-4 w-4 text-amber-500" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">
+                          {salesOrder.customer.first_name} {salesOrder.customer.last_name ?? ""}
+                        </p>
+                        <p className="text-muted-foreground text-xs">View customer profile →</p>
+                      </div>
+                    </div>
+                  </Link>
+                ) : car.client_name ? (
+                  <div className="flex items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-500/10">
                       <User className="h-4 w-4 text-amber-500" />
                     </div>
-                    <div>
-                      <p className="text-sm font-medium">
-                        {salesOrder.customer.first_name} {salesOrder.customer.last_name ?? ""}
-                      </p>
-                      <p className="text-muted-foreground text-xs">View customer profile →</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium">{car.client_name}</p>
+                      <p className="text-amber-600 text-xs dark:text-amber-500">Not linked to a customer profile yet</p>
                     </div>
+                    {canEditInventory && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="shrink-0 text-xs"
+                        onClick={() => setLinkCustomerOpen(true)}
+                      >
+                        Link
+                      </Button>
+                    )}
                   </div>
-                </Link>
-              ) : car.client_name ? (
-                <div className="flex items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-500/10">
-                    <User className="h-4 w-4 text-amber-500" />
+                ) : (
+                  <div className="flex items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-500/10">
+                      <User className="h-4 w-4 text-amber-500" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-amber-700 dark:text-amber-400">Add customer</p>
+                      <p className="text-amber-600 text-xs dark:text-amber-500">This status requires customer data</p>
+                    </div>
+                    {canEditInventory && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="shrink-0 text-xs"
+                        onClick={() => setLinkCustomerOpen(true)}
+                      >
+                        Add customer
+                      </Button>
+                    )}
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium">{car.client_name}</p>
-                    <p className="text-amber-600 text-xs dark:text-amber-500">Not linked to a customer profile yet</p>
-                  </div>
-                  {isOwner && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="shrink-0 text-xs"
-                      onClick={() => setLinkCustomerOpen(true)}
-                    >
-                      Link
-                    </Button>
-                  )}
-                </div>
-              ) : (
-                <p className="text-muted-foreground text-sm">No customer linked.</p>
-              )}
-            </CardContent>
-          </Card>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {/* Section 2: Location & Status */}
           <Card>

@@ -26,6 +26,7 @@ import { REQUEST_CATEGORIES } from "@/lib/constants/requests";
 import { ExportButton } from "@/components/ExportButton";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { cn } from "@/lib/utils";
+import { getProfileFullName } from "@/lib/supabase-profile";
 
 const REFRESH_INTERVAL_MS = 60000;
 
@@ -219,21 +220,25 @@ export default function AssistantDashboardPage() {
     warrantyItems.sort((a, b) => a.days_left - b.days_left);
     setWarrantyAlerts(warrantyItems.slice(0, 10));
 
-    const reqList = (requestsWithProfiles.data ?? []) as Array<{
-      id: string;
-      subject: string;
-      category: string | null;
-      submitted_by: string;
-      created_at: string;
-      profiles?: { full_name: string | null } | null;
-    }>;
+    const reqList = (requestsWithProfiles.data ?? []).map((r: { id: string; subject: string; category: string | null; submitted_by: string; created_at: string; profiles?: unknown }) => ({
+      id: r.id,
+      subject: r.subject,
+      category: r.category,
+      submitted_by: r.submitted_by,
+      created_at: r.created_at,
+      profiles: Array.isArray(r.profiles) ? r.profiles[0] : r.profiles,
+    }));
 
     // Use the same result set for both the list and the counter
     setPendingRequestsCount(reqList.length);
     setPendingRequests(
-      reqList.map((r) => ({
-        ...r,
-        submitter_name: r.profiles?.full_name ?? "Unknown",
+      reqList.map((r): RequestRow => ({
+        id: r.id,
+        subject: r.subject,
+        category: r.category,
+        submitted_by: r.submitted_by,
+        created_at: r.created_at,
+        submitter_name: getProfileFullName(r.profiles),
       }))
     );
 
@@ -557,24 +562,22 @@ export default function AssistantDashboardPage() {
             <ExportButton
               data={completedAwaitingPickup.map((j) => {
                 const car = Array.isArray(j.cars) ? j.cars[0] : j.cars;
-                const cust = Array.isArray(j.customers) ? j.customers[0] : j.customers;
                 return {
                   vin: car?.vin ?? "",
                   model: car ? `${car.brand} ${car.model}` : "",
-                  customer: cust ? `${cust.first_name} ${cust.last_name ?? ""}`.trim() : "",
-                  phone: cust?.phone_primary ?? "",
+                  customer: "",
+                  phone: "",
                   completed_at: j.completed_at ?? j.created_at,
                   days_waiting: daysSince(j.completed_at ?? j.created_at),
                 };
               })}
               allData={completedAwaitingPickup.map((j) => {
                 const car = Array.isArray(j.cars) ? j.cars[0] : j.cars;
-                const cust = Array.isArray(j.customers) ? j.customers[0] : j.customers;
                 return {
                   vin: car?.vin ?? "",
                   model: car ? `${car.brand} ${car.model}` : "",
-                  customer: cust ? `${cust.first_name} ${cust.last_name ?? ""}`.trim() : "",
-                  phone: cust?.phone_primary ?? "",
+                  customer: "",
+                  phone: "",
                   completed_at: j.completed_at ?? j.created_at,
                   days_waiting: daysSince(j.completed_at ?? j.created_at),
                 };
@@ -603,7 +606,6 @@ export default function AssistantDashboardPage() {
               <div className="space-y-2">
                 {completedAwaitingPickup.map((job) => {
                   const car = Array.isArray(job.cars) ? job.cars[0] : job.cars;
-                  const cust = Array.isArray(job.customers) ? job.customers[0] : job.customers;
                   const completed = job.completed_at ?? "";
                   const daysWaiting = daysSince(completed);
                   const isOverdue = daysWaiting > 3;
@@ -617,9 +619,7 @@ export default function AssistantDashboardPage() {
                           {car ? `${car.brand} ${car.model}` : "—"} · VIN ...{car?.vin?.slice(-6) ?? "—"}
                         </p>
                         <p className="text-sm text-muted-foreground">
-                          {cust
-                            ? `${cust.first_name} ${cust.last_name ?? ""} · ${cust.phone_primary}`
-                            : "No customer"}
+                          —
                         </p>
                         <p className="text-xs text-muted-foreground">
                           Completed {timeAgo(completed)} · {daysWaiting} days waiting
@@ -628,14 +628,6 @@ export default function AssistantDashboardPage() {
                       <div className="flex items-center gap-2">
                         {isOverdue && (
                           <Badge variant="destructive">Overdue Pickup</Badge>
-                        )}
-                        {cust?.phone_primary && (
-                          <Button size="sm" variant="outline" asChild>
-                            <a href={`tel:${cust.phone_primary}`}>
-                              <Phone className="mr-1 size-4" />
-                              Call Customer
-                            </a>
-                          </Button>
                         )}
                         <Button
                           size="sm"

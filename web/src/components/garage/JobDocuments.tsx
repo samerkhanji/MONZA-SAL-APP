@@ -23,6 +23,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Upload, Trash2, Download, Eye } from "lucide-react";
+import { getProfileFullName } from "@/lib/supabase-profile";
 
 const DOCUMENT_TYPE_ICONS: Record<string, string> = {
   job_card: "🔧",
@@ -274,8 +275,7 @@ export function JobDocuments({ jobId, onDocumentsChange }: JobDocumentsProps) {
   }
 
   function getUploaderName(doc: JobDocumentRow): string {
-    const profiles = doc.profiles as { full_name?: string } | undefined;
-    return profiles?.full_name ?? "Unknown";
+    return getProfileFullName(doc.profiles);
   }
 
   const isImageType = (mime: string | null | undefined) =>

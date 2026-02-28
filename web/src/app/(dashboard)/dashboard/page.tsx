@@ -23,6 +23,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getProfileFullName } from "@/lib/supabase-profile";
 
 function timeAgo(date: string): string {
   const now = new Date();
@@ -116,8 +117,8 @@ const STATUS_DOT_COLORS: Record<string, string> = {
 };
 
 function formatActivityMessage(ev: CarEventRow): string {
-  const user =
-    (ev.profiles as { full_name?: string } | undefined)?.full_name ?? "System";
+  const name = getProfileFullName(ev.profiles);
+  const user = name !== "Unknown" ? name : "System";
   const car = ev.cars as
     | { vin?: string; brand?: string; model?: string }
     | undefined;

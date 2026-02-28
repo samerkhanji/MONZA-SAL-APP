@@ -318,7 +318,14 @@ export default function CustomerDetailPage() {
                   <p>{fullName || "—"}</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-muted-foreground text-sm">Phone</p>
+                  <p className="text-muted-foreground text-sm flex items-center gap-2">
+                    Phone
+                    {!customer.phone_primary?.trim() && (
+                      <Badge variant="outline" className="border-red-500/50 bg-red-500/10 text-red-700 dark:text-red-400 text-xs">
+                        Missing
+                      </Badge>
+                    )}
+                  </p>
                   {customer.phone_primary ? (
                     <a href={`tel:${customer.phone_primary}`} className="text-primary hover:underline">
                       {customer.phone_primary}
@@ -340,7 +347,14 @@ export default function CustomerDetailPage() {
                   </p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-muted-foreground text-sm">Email</p>
+                  <p className="text-muted-foreground text-sm flex items-center gap-2">
+                    Email
+                    {!customer.email?.trim() && (
+                      <Badge variant="outline" className="border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-400 text-xs">
+                        Missing
+                      </Badge>
+                    )}
+                  </p>
                   <p>
                     {customer.email ? (
                       <a href={`mailto:${customer.email}`} className="text-primary hover:underline">

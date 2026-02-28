@@ -31,6 +31,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Upload, Trash2, Download, Eye } from "lucide-react";
+import { getProfileFullName } from "@/lib/supabase-profile";
 
 const CUSTOMER_DOCUMENT_TYPES = [
   { value: "id_passport", label: "ID / Passport" },
@@ -248,8 +249,7 @@ export function CustomerDocuments({ customerId }: CustomerDocumentsProps) {
   }
 
   function getUploaderName(doc: CustomerDocumentRow): string {
-    const profiles = doc.profiles as { full_name?: string } | undefined;
-    return profiles?.full_name ?? "Unknown";
+    return getProfileFullName(doc.profiles);
   }
 
   return (

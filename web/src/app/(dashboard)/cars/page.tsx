@@ -108,6 +108,24 @@ function matchesSearch(
   );
 }
 
+function isCarComplete(car: CarDisplay): boolean {
+  const c = car as CarDisplay & { suffix?: string; engine_number?: string; issue?: string; client_name?: string; client_phone?: string; delivery_date?: string };
+  const hasVin = !!c.vin?.trim();
+  const hasModel = !!c.model?.trim();
+  const hasYear = c.model_year != null;
+  const hasSuffix = !!c.suffix?.trim();
+  const hasExterior = !!c.exterior_color?.trim();
+  const hasInterior = !!c.interior_color?.trim();
+  const hasEngine = !!c.engine_number?.trim();
+  const hasIssue = !!c.issue?.trim();
+  const baseComplete = hasVin && hasModel && hasYear && hasSuffix && hasExterior && hasInterior && hasEngine && hasIssue;
+  if (car.status !== "sold") return baseComplete;
+  const hasClientName = !!c.client_name?.trim();
+  const hasPhone = !!c.client_phone?.trim();
+  const hasDelivery = !!c.delivery_date?.trim();
+  return baseComplete && hasClientName && hasPhone && hasDelivery;
+}
+
 export default function CarsListPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -167,7 +185,7 @@ export default function CarsListPage() {
       router.push(`/customers/${order.customer_id}`);
       return;
     }
-    // 2. Fallback: match by phone if we have client_phone
+    // 2. Fallback: exact match by phone if we have client_phone (no fuzzy matching)
     const clientPhone = (car as { client_phone?: string }).client_phone;
     if (clientPhone?.trim()) {
       const { data: byPhone } = await supabase
@@ -181,22 +199,7 @@ export default function CarsListPage() {
         return;
       }
     }
-    // 3. Fallback: fuzzy match by first name from client_name
-    if (car.client_name) {
-      const firstName = car.client_name.trim().split(/\s+/)[0];
-      if (firstName) {
-        const { data: customer } = await supabase
-          .from("customers")
-          .select("id")
-          .ilike("first_name", `%${firstName}%`)
-          .limit(1)
-          .maybeSingle();
-        if (customer) {
-          router.push(`/customers/${customer.id}`);
-          return;
-        }
-      }
-    }
+    // No fuzzy first-name match — it can incorrectly link to wrong customers (e.g. OMAR HAOUCHI vs OMAR AKAR)
     setStatusDialogCar(car);
     setStatusDialogOpen(true);
   }
@@ -484,20 +487,32 @@ export default function CarsListPage() {
                         <span className="font-mono text-sm font-medium text-muted-foreground">
                           {car.vin ?? "—"}
                         </span>
-                        <Badge
-                          className={`shrink-0 ${statusClass} ${LINKED_STATUSES.includes(car.status as (typeof LINKED_STATUSES)[number]) ? "hover:ring-2 hover:ring-offset-1 cursor-pointer" : ""}`}
-                          onClick={(e) => {
-                            if (LINKED_STATUSES.includes(car.status as (typeof LINKED_STATUSES)[number])) {
-                              e.stopPropagation();
-                              void handleStatusClick(car);
+                        <div className="flex shrink-0 flex-wrap items-center gap-1">
+                          <Badge
+                            className={`${statusClass} ${LINKED_STATUSES.includes(car.status as (typeof LINKED_STATUSES)[number]) ? "hover:ring-2 hover:ring-offset-1 cursor-pointer" : ""}`}
+                            onClick={(e) => {
+                              if (LINKED_STATUSES.includes(car.status as (typeof LINKED_STATUSES)[number])) {
+                                e.stopPropagation();
+                                void handleStatusClick(car);
+                              }
+                            }}
+                          >
+                            {CAR_STATUS_LABELS[car.status]}
+                            {LINKED_STATUSES.includes(car.status as (typeof LINKED_STATUSES)[number]) && (car.client_name || (car as { client_phone?: string }).client_phone) && (
+                              <ExternalLink className="ml-1 inline h-3 w-3 opacity-60" />
+                            )}
+                          </Badge>
+                          <Badge
+                            variant="outline"
+                            className={
+                              isCarComplete(car)
+                                ? "border-green-500/50 bg-green-500/10 text-green-700 dark:text-green-400 text-xs"
+                                : "border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-400 text-xs"
                             }
-                          }}
-                        >
-                          {CAR_STATUS_LABELS[car.status]}
-                          {LINKED_STATUSES.includes(car.status as (typeof LINKED_STATUSES)[number]) && (car.client_name || (car as { client_phone?: string }).client_phone) && (
-                            <ExternalLink className="ml-1 inline h-3 w-3 opacity-60" />
-                          )}
-                        </Badge>
+                          >
+                            {isCarComplete(car) ? "Complete" : "Incomplete"}
+                          </Badge>
+                        </div>
                       </div>
                       <p className="text-base font-medium">
                         {car.brand ?? "—"} {car.model ?? "—"}
@@ -580,18 +595,30 @@ export default function CarsListPage() {
                           }}
                         >
                           <div className="flex items-center gap-1">
-                            <Badge
-                              className={
-                                LINKED_STATUSES.includes(car.status as (typeof LINKED_STATUSES)[number]) && (car.client_name || (car as { client_phone?: string }).client_phone)
-                                  ? `${statusClass} hover:opacity-80 hover:ring-2 hover:ring-offset-1 hover:ring-current`
-                                  : `${statusClass} hover:opacity-80`
-                              }
-                            >
-                              {CAR_STATUS_LABELS[car.status]}
-                              {LINKED_STATUSES.includes(car.status as (typeof LINKED_STATUSES)[number]) && (car.client_name || (car as { client_phone?: string }).client_phone) && (
-                                <ExternalLink className="ml-1 inline h-3 w-3 opacity-60" />
-                              )}
-                            </Badge>
+                            <div className="flex flex-wrap items-center gap-1">
+                              <Badge
+                                className={
+                                  LINKED_STATUSES.includes(car.status as (typeof LINKED_STATUSES)[number]) && (car.client_name || (car as { client_phone?: string }).client_phone)
+                                    ? `${statusClass} hover:opacity-80 hover:ring-2 hover:ring-offset-1 hover:ring-current`
+                                    : `${statusClass} hover:opacity-80`
+                                }
+                              >
+                                {CAR_STATUS_LABELS[car.status]}
+                                {LINKED_STATUSES.includes(car.status as (typeof LINKED_STATUSES)[number]) && (car.client_name || (car as { client_phone?: string }).client_phone) && (
+                                  <ExternalLink className="ml-1 inline h-3 w-3 opacity-60" />
+                                )}
+                              </Badge>
+                              <Badge
+                                variant="outline"
+                                className={
+                                  isCarComplete(car)
+                                    ? "border-green-500/50 bg-green-500/10 text-green-700 dark:text-green-400"
+                                    : "border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-400"
+                                }
+                              >
+                                {isCarComplete(car) ? "Complete" : "Incomplete"}
+                              </Badge>
+                            </div>
                             {pendingDeletes[car.id] && (
                               <Badge variant="outline" className="text-amber-600 border-amber-400 dark:text-amber-400 dark:border-amber-500">
                                 Pending Request

@@ -33,6 +33,7 @@ import {
 import { EditTeamMemberDialog } from "@/components/settings/EditTeamMemberDialog";
 import { ChangePasswordDialog } from "@/components/settings/ChangePasswordDialog";
 import { cn } from "@/lib/utils";
+import { getProfileFullName } from "@/lib/supabase-profile";
 
 const ALL_TABS = [
   { id: "profile", label: "Profile", icon: User, everyone: true },
@@ -314,9 +315,10 @@ export default function SettingsPage() {
       note_added: (e) => `Added note on ${e.cars?.brand ?? ""} ${e.cars?.model ?? ""}`,
     };
 
-    (carRes.data ?? []).forEach((ev: { id: string; car_id: string; event_type: string; created_at: string; profiles?: { full_name?: string } | null; cars?: { vin?: string; brand?: string; model?: string }; from_value?: string; to_value?: string }) => {
+    (carRes.data ?? []).forEach((ev: { id: string; car_id: string; event_type: string; created_at: string; profiles?: unknown; cars?: { vin?: string; brand?: string; model?: string }; from_value?: string; to_value?: string }) => {
       if (cutoff && ev.created_at < cutoff) return;
-      const user = (ev.profiles as { full_name?: string })?.full_name ?? "System";
+      const name = getProfileFullName(ev.profiles);
+      const user = name !== "Unknown" ? name : "System";
       const msg = carMessages[ev.event_type]?.(ev) ?? ev.event_type;
       items.push({
         id: `car-${ev.id}`,
@@ -336,9 +338,10 @@ export default function SettingsPage() {
       return: (m) => `Returned ${m.quantity ?? 0}× ${(m.parts as { part_name?: string })?.part_name ?? ""}`,
     };
 
-    (partRes.data ?? []).forEach((mov: { id: string; part_id: string; created_at: string; movement_type: string; quantity?: number; profiles?: { full_name?: string } | null; parts?: { part_name?: string }; cars?: { brand?: string; model?: string } }) => {
+    (partRes.data ?? []).forEach((mov: { id: string; part_id: string; created_at: string; movement_type: string; quantity?: number; profiles?: unknown; parts?: { part_name?: string }; cars?: { brand?: string; model?: string } }) => {
       if (cutoff && mov.created_at < cutoff) return;
-      const user = (mov.profiles as { full_name?: string })?.full_name ?? "System";
+      const name = getProfileFullName(mov.profiles);
+      const user = name !== "Unknown" ? name : "System";
       const msg = movementMessages[mov.movement_type]?.(mov) ?? mov.movement_type;
       items.push({
         id: `part-${mov.id}`,
@@ -351,9 +354,10 @@ export default function SettingsPage() {
       });
     });
 
-    (noteRes.data ?? []).forEach((n: { id: string; customer_id: string; note_type: string; created_at: string; profiles?: { full_name?: string } | null; customers?: { first_name?: string; last_name?: string } }) => {
+    (noteRes.data ?? []).forEach((n: { id: string; customer_id: string; note_type: string; created_at: string; profiles?: unknown; customers?: { first_name?: string; last_name?: string } }) => {
       if (cutoff && n.created_at < cutoff) return;
-      const user = (n.profiles as { full_name?: string })?.full_name ?? "System";
+      const name = getProfileFullName(n.profiles);
+      const user = name !== "Unknown" ? name : "System";
       const cust = n.customers as { first_name?: string; last_name?: string };
       items.push({
         id: `note-${n.id}`,

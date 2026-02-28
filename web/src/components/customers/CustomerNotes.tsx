@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { getProfileFullName } from "@/lib/supabase-profile";
 
 const NOTE_TYPES = [
   "general",
@@ -108,8 +109,7 @@ export function CustomerNotes({ customerId }: CustomerNotesProps) {
   }
 
   function getCreatorName(note: CustomerNoteRow): string {
-    const profiles = note.profiles as { full_name?: string } | undefined;
-    return profiles?.full_name ?? "Unknown";
+    return getProfileFullName(note.profiles);
   }
 
   return (
