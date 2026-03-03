@@ -60,6 +60,7 @@ import {
 } from "@/lib/delete-requests";
 import { ExportButton } from "@/components/ExportButton";
 import type { ExportColumn } from "@/lib/exportToExcel";
+import { canPerform } from "@/lib/permissions";
 
 const ScannerDialog = dynamic(
   () => import("@/components/scanner/ScannerDialog").then((m) => ({ default: m.ScannerDialog })),
@@ -108,29 +109,11 @@ function matchesSearch(
   );
 }
 
-function isCarComplete(car: CarDisplay): boolean {
-  const c = car as CarDisplay & { suffix?: string; engine_number?: string; issue?: string; client_name?: string; client_phone?: string; delivery_date?: string };
-  const hasVin = !!c.vin?.trim();
-  const hasModel = !!c.model?.trim();
-  const hasYear = c.model_year != null;
-  const hasSuffix = !!c.suffix?.trim();
-  const hasExterior = !!c.exterior_color?.trim();
-  const hasInterior = !!c.interior_color?.trim();
-  const hasEngine = !!c.engine_number?.trim();
-  const hasIssue = !!c.issue?.trim();
-  const baseComplete = hasVin && hasModel && hasYear && hasSuffix && hasExterior && hasInterior && hasEngine && hasIssue;
-  if (car.status !== "sold") return baseComplete;
-  const hasClientName = !!c.client_name?.trim();
-  const hasPhone = !!c.client_phone?.trim();
-  const hasDelivery = !!c.delivery_date?.trim();
-  return baseComplete && hasClientName && hasPhone && hasDelivery;
-}
-
 export default function CarsListPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const statusFromUrl = searchParams.get("status");
-  const { canEditInventory, canDelete, profile, isOwner } = useUser();
+  const { canEditInventory, canDelete, profile, isOwner, appRole } = useUser();
   const [cars, setCars] = useState<CarDisplay[]>([]);
   const [pendingDeletes, setPendingDeletes] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
@@ -227,8 +210,8 @@ export default function CarsListPage() {
 
   async function handleDeleteCar() {
     if (!deleteCar || !profile) return;
-    if (!(isOwner || profile.role === "owner")) {
-      toast.error("Only owners can delete vehicles.");
+    if (!canDeleteCar) {
+      toast.error("You don't have permission to delete vehicles.");
       return;
     }
 
@@ -349,6 +332,10 @@ export default function CarsListPage() {
       model: `${c.brand ?? ""} ${c.model ?? ""}`.trim(),
     }));
 
+  const canCreateCar = canPerform("cars", "create", appRole ?? null);
+  const canEditCar = canPerform("cars", "edit", appRole ?? null);
+  const canDeleteCar = canPerform("cars", "delete", appRole ?? null);
+
   return (
     <div className="container mx-auto max-w-[1800px] space-y-6 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
@@ -374,7 +361,7 @@ export default function CarsListPage() {
               Import from Excel
             </Button>
           )}
-          {canEditInventory && (
+          {canCreateCar && (
             <Button asChild>
               <Link href="/cars/add">Add Car</Link>
             </Button>
@@ -502,16 +489,6 @@ export default function CarsListPage() {
                               <ExternalLink className="ml-1 inline h-3 w-3 opacity-60" />
                             )}
                           </Badge>
-                          <Badge
-                            variant="outline"
-                            className={
-                              isCarComplete(car)
-                                ? "border-green-500/50 bg-green-500/10 text-green-700 dark:text-green-400 text-xs"
-                                : "border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-400 text-xs"
-                            }
-                          >
-                            {isCarComplete(car) ? "Complete" : "Incomplete"}
-                          </Badge>
                         </div>
                       </div>
                       <p className="text-base font-medium">
@@ -607,16 +584,6 @@ export default function CarsListPage() {
                                 {LINKED_STATUSES.includes(car.status as (typeof LINKED_STATUSES)[number]) && (car.client_name || (car as { client_phone?: string }).client_phone) && (
                                   <ExternalLink className="ml-1 inline h-3 w-3 opacity-60" />
                                 )}
-                              </Badge>
-                              <Badge
-                                variant="outline"
-                                className={
-                                  isCarComplete(car)
-                                    ? "border-green-500/50 bg-green-500/10 text-green-700 dark:text-green-400"
-                                    : "border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-400"
-                                }
-                              >
-                                {isCarComplete(car) ? "Complete" : "Incomplete"}
                               </Badge>
                             </div>
                             {pendingDeletes[car.id] && (
@@ -731,34 +698,34 @@ export default function CarsListPage() {
                                   <FileText className="mr-2 size-4" />
                                   Documents & PDFs
                                 </DropdownMenuItem>
-                                {canEditInventory && (
-                                <>
+                                {canEditCar && (
+                                  <>
+                                    <DropdownMenuItem
+                                      onClick={() => {
+                                        setEditCar(car);
+                                      }}
+                                    >
+                                      Edit
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onClick={() => {
+                                        setMoveCar(car);
+                                      }}
+                                    >
+                                      Move
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
+                                {canDeleteCar && (
                                   <DropdownMenuItem
-                                    onClick={() => {
-                                      setEditCar(car);
-                                    }}
+                                    variant="destructive"
+                                    onClick={() => setDeleteCar(car)}
                                   >
-                                    Edit
+                                    Delete
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    onClick={() => {
-                                      setMoveCar(car);
-                                    }}
-                                  >
-                                    Move
-                                  </DropdownMenuItem>
-                                </>
-                              )}
-                              {(isOwner || profile?.role === "owner") && (
-                                <DropdownMenuItem
-                                  variant="destructive"
-                                  onClick={() => setDeleteCar(car)}
-                                >
-                                  Delete
-                                </DropdownMenuItem>
-                              )}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                             </div>
                           </div>
                         </TableCell>

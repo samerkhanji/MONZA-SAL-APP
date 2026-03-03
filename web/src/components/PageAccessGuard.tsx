@@ -2,43 +2,45 @@
 
 import { usePathname } from "next/navigation";
 import { useUser } from "@/lib/contexts/UserContext";
+import { canAccessPage } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 
+function getPageKeyFromPathname(pathname: string):
+  | "dashboard"
+  | "assistant_dashboard"
+  | "requests"
+  | "cars"
+  | "parts"
+  | "customers"
+  | "garage"
+  | "garage_history"
+  | "documents"
+  | "settings"
+  | null {
+  if (pathname.startsWith("/assistant-dashboard")) return "assistant_dashboard";
+  if (pathname === "/dashboard") return "dashboard";
+  if (pathname.startsWith("/cars")) return "cars";
+  if (pathname.startsWith("/documents")) return "documents";
+  if (pathname.startsWith("/customers")) return "customers";
+  if (pathname.startsWith("/requests")) return "requests";
+  if (pathname.startsWith("/garage/inventory")) return "parts";
+  if (pathname.startsWith("/garage/history")) return "garage_history";
+  if (pathname === "/garage" || pathname.startsWith("/garage/jobs")) return "garage";
+  if (pathname.startsWith("/settings")) return "settings";
+  return null;
+}
+
 export function PageAccessGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const {
-    canSeeDashboard,
-    canSeeCars,
-    canSeeDocuments,
-    canSeePartsInventory,
-    canSeeGarageJobs,
-    canSeeGarageHistory,
-    isRequestAssistant,
-    isOwner,
-    loading,
-  } = useUser();
+  const { appRole, loading } = useUser();
 
   if (loading) return null;
 
-  const hasAccess = (): boolean => {
-    if (pathname.startsWith("/assistant-dashboard"))
-      return isRequestAssistant || isOwner;
-    if (pathname === "/dashboard") return canSeeDashboard;
-    if (pathname.startsWith("/cars") && pathname !== "/cars") return canSeeCars;
-    if (pathname === "/cars") return canSeeCars;
-    if (pathname.startsWith("/documents")) return canSeeDocuments;
-    if (pathname.startsWith("/customers")) return true;
-    if (pathname.startsWith("/requests")) return true;
-    if (pathname === "/garage" || pathname.startsWith("/garage/jobs"))
-      return canSeeGarageJobs;
-    if (pathname.startsWith("/garage/inventory")) return canSeePartsInventory;
-    if (pathname.startsWith("/garage/history")) return canSeeGarageHistory;
-    if (pathname.startsWith("/settings")) return true;
-    return true;
-  };
+  const pageKey = getPageKeyFromPathname(pathname);
+  const hasAccess = pageKey ? canAccessPage(pageKey, appRole) : true;
 
-  if (!hasAccess()) {
+  if (!hasAccess) {
     return (
       <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 p-8">
         <h1 className="text-xl font-semibold">Access Denied</h1>
@@ -54,3 +56,4 @@ export function PageAccessGuard({ children }: { children: React.ReactNode }) {
 
   return <>{children}</>;
 }
+

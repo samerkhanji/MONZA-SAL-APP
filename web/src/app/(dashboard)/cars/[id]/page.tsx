@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -32,8 +32,16 @@ import { DayDetailDialog } from "@/components/car-day-detail-dialog";
 import { VisitsMaintenanceDialog } from "@/components/visits-maintenance-dialog";
 import { STATUS_BADGE_COLORS, PDI_BADGE_COLORS } from "@/lib/constants/badges";
 import { getProfileFullName } from "@/lib/supabase-profile";
-import { User } from "lucide-react";
+import { AlertCircle, Check, User, X } from "lucide-react";
 import dynamic from "next/dynamic";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const StatusCustomerDialog = dynamic(
   () => import("@/components/status-customer-dialog").then((m) => ({ default: m.StatusCustomerDialog })),
@@ -49,6 +57,195 @@ const EVENT_LABELS: Record<CarEventType, string> = {
   details_updated: "Details updated",
   note_added: "Note added",
 };
+
+type ChecklistSection = "base" | "inspections" | "customer" | "subdealer";
+
+interface ChecklistItem {
+  key: string;
+  label: string;
+  section: ChecklistSection;
+  isFilled: boolean;
+  editTarget?:
+    | { type: "edit"; fieldId?: string }
+    | { type: "statusDialog" }
+    | { type: "uneditable" };
+}
+
+interface ChecklistResult {
+  items: ChecklistItem[];
+  completedCount: number;
+  totalCount: number;
+  percent: number;
+}
+
+function computeChecklist(car: CarDisplay): ChecklistResult {
+  const baseItems: ChecklistItem[] = [
+    {
+      key: "vin",
+      label: "VIN Number",
+      section: "base",
+      isFilled: !!car.vin?.trim(),
+      editTarget: { type: "uneditable" },
+    },
+    {
+      key: "model",
+      label: "Model",
+      section: "base",
+      isFilled: !!car.model?.trim(),
+      editTarget: { type: "uneditable" },
+    },
+    {
+      key: "suffix",
+      label: "Suffix",
+      section: "base",
+      isFilled: !!car.suffix?.trim(),
+      editTarget: { type: "edit", fieldId: "suffix" },
+    },
+    {
+      key: "model_year",
+      label: "Year",
+      section: "base",
+      isFilled: car.model_year != null,
+      editTarget: { type: "uneditable" },
+    },
+    {
+      key: "exterior_color",
+      label: "Exterior Color",
+      section: "base",
+      isFilled: !!car.exterior_color?.trim(),
+      editTarget: { type: "edit", fieldId: "exterior" },
+    },
+    {
+      key: "interior_color",
+      label: "Interior Color",
+      section: "base",
+      isFilled: !!car.interior_color?.trim(),
+      editTarget: { type: "edit", fieldId: "interior" },
+    },
+    {
+      key: "engine_number",
+      label: "Engine Number",
+      section: "base",
+      isFilled: !!car.engine_number?.trim(),
+      editTarget: { type: "edit", fieldId: "engineNumber" },
+    },
+    {
+      key: "issue",
+      label: "Issue",
+      section: "base",
+      isFilled: !!car.issue?.trim(),
+      editTarget: { type: "edit", fieldId: "issue" },
+    },
+  ];
+
+  const inspectionItems: ChecklistItem[] = [
+    {
+      key: "pdi_status",
+      label: "PDI Status",
+      section: "inspections",
+      // Consider PDI "done" as complete; pending / in_progress need attention
+      isFilled: car.pdi_status === "done",
+      editTarget: { type: "edit", fieldId: "pdi" },
+    },
+    {
+      key: "customs_status",
+      label: "Customs Status",
+      section: "inspections",
+      // Consider cleared/exempt as complete; others need attention
+      isFilled: car.customs_status === "cleared" || car.customs_status === "exempt",
+      editTarget: { type: "edit", fieldId: "editCustomsStatus" },
+    },
+    {
+      key: "warranty_per_dms",
+      label: "Warranty per DMS",
+      section: "inspections",
+      isFilled: !!car.warranty_per_dms,
+      editTarget: { type: "edit", fieldId: "editWarrantyDms" },
+    },
+    {
+      key: "warranty_monza_start_date",
+      label: "Warranty Monza Start Date",
+      section: "inspections",
+      isFilled: !!car.warranty_monza_start_date,
+      editTarget: { type: "edit", fieldId: "editWarrantyMonza" },
+    },
+  ];
+
+  const customerItems: ChecklistItem[] = [];
+  const subDealerItems: ChecklistItem[] = [];
+
+  if (car.status === "sold") {
+    customerItems.push(
+      {
+        key: "client_name",
+        label: "Client Name",
+        section: "customer",
+        isFilled: !!car.client_name?.trim(),
+        editTarget: { type: "statusDialog" },
+      },
+      {
+        key: "client_phone",
+        label: "Client Phone",
+        section: "customer",
+        isFilled: !!car.client_phone?.trim(),
+        editTarget: { type: "statusDialog" },
+      },
+      {
+        key: "delivery_date",
+        label: "Delivery Date",
+        section: "customer",
+        isFilled: !!car.delivery_date,
+        editTarget: { type: "statusDialog" },
+      },
+      {
+        key: "sold_marker",
+        label: "Sold Marker",
+        section: "customer",
+        isFilled: !!car.sold_marker?.trim(),
+        editTarget: { type: "uneditable" },
+      },
+    );
+  } else if (car.status === "reserved") {
+    customerItems.push(
+      {
+        key: "client_name",
+        label: "Client Name",
+        section: "customer",
+        isFilled: !!car.client_name?.trim(),
+        editTarget: { type: "statusDialog" },
+      },
+      {
+        key: "client_phone",
+        label: "Client Phone",
+        section: "customer",
+        isFilled: !!car.client_phone?.trim(),
+        editTarget: { type: "statusDialog" },
+      },
+      {
+        key: "reserved_by",
+        label: "Reserved By",
+        section: "customer",
+        isFilled: !!car.reserved_by?.trim(),
+        editTarget: { type: "uneditable" },
+      },
+    );
+  } else if (car.status === "sent_to_sub_dealer") {
+    subDealerItems.push({
+      key: "sub_dealer_name",
+      label: "Sub-dealer Name",
+      section: "subdealer",
+      isFilled: !!car.sub_dealer_name?.trim(),
+      editTarget: { type: "statusDialog" },
+    });
+  }
+
+  const items = [...baseItems, ...inspectionItems, ...customerItems, ...subDealerItems];
+  const totalCount = items.length;
+  const completedCount = items.filter((i) => i.isFilled).length;
+  const percent = totalCount === 0 ? 100 : Math.round((completedCount / totalCount) * 100);
+
+  return { items, completedCount, totalCount, percent };
+}
 
 function getEventActor(ev: CarEvent): string {
   const name = getProfileFullName(ev.profiles);
@@ -128,6 +325,8 @@ export default function CarProfilePage() {
     status?: string;
   } | null>(null);
   const [linkCustomerOpen, setLinkCustomerOpen] = useState(false);
+  const [checklistOpen, setChecklistOpen] = useState(false);
+  const [pendingFieldFocusId, setPendingFieldFocusId] = useState<string | null>(null);
 
   const supabase = createClient();
 
@@ -317,6 +516,20 @@ export default function CarProfilePage() {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
+  useEffect(() => {
+    if (!editOpen || !pendingFieldFocusId) return;
+    if (typeof document === "undefined") return;
+    const timeout = window.setTimeout(() => {
+      const el = document.getElementById(pendingFieldFocusId);
+      if (el && "focus" in el) {
+        (el as HTMLElement).focus();
+        el.scrollIntoView({ block: "center", behavior: "smooth" });
+      }
+      setPendingFieldFocusId(null);
+    }, 120);
+    return () => window.clearTimeout(timeout);
+  }, [editOpen, pendingFieldFocusId]);
+
   async function handleDelete() {
     if (!car || !profile) return;
     if (!(isOwner || profile.role === "owner")) {
@@ -395,6 +608,46 @@ export default function CarProfilePage() {
     fetchEvents();
   }
 
+  const checklist = useMemo(
+    () =>
+      car
+        ? computeChecklist(car)
+        : { items: [], completedCount: 0, totalCount: 0, percent: 0 },
+    [car]
+  );
+  const hasIncomplete =
+    checklist.totalCount > 0 && checklist.completedCount < checklist.totalCount;
+
+  const missingItems = checklist.items.filter((item) => !item.isFilled);
+
+  function getProgressBarColor(percent: number): string {
+    if (percent < 50) return "bg-red-500 dark:bg-red-600";
+    if (percent < 80) return "bg-amber-500 dark:bg-amber-500";
+    return "bg-emerald-500 dark:bg-emerald-500";
+  }
+
+  function handleChecklistItemClick(item: ChecklistItem) {
+    if (item.isFilled) return;
+    if (item.editTarget?.type === "edit") {
+      if (item.editTarget.fieldId) {
+        setChecklistOpen(false);
+        setPendingFieldFocusId(item.editTarget.fieldId);
+        setEditOpen(true);
+        return;
+      }
+      toast.info("This field is not directly editable here.");
+      return;
+    }
+    if (item.editTarget?.type === "statusDialog") {
+      setChecklistOpen(false);
+      setLinkCustomerOpen(true);
+      return;
+    }
+    if (item.editTarget?.type === "uneditable") {
+      toast.info("This field can only be updated from the import or creation flows.");
+    }
+  }
+
   if (loading) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -453,7 +706,7 @@ export default function CarProfilePage() {
 
   return (
     <div className="container mx-auto space-y-6 px-4 py-6 sm:px-6 sm:py-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
           <Button variant="ghost" size="sm" onClick={() => router.back()}>
             ← Back
@@ -467,23 +720,50 @@ export default function CarProfilePage() {
             </p>
           </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {canEditInventory && (
-            <Button variant="outline" onClick={() => setEditOpen(true)}>
-              Edit
+        <div className="flex flex-col items-stretch gap-3 sm:items-end">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {hasIncomplete ? (
+              <div className="inline-flex items-center gap-2 rounded-full border border-amber-500/50 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-800 dark:text-amber-200">
+                <AlertCircle className="h-3.5 w-3.5" />
+                <span>
+                  Incomplete — {missingItems.length}{" "}
+                  {missingItems.length === 1 ? "item" : "items"} need attention
+                </span>
+              </div>
+            ) : (
+              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/60 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+                <Check className="h-3.5 w-3.5" />
+                <span>Complete</span>
+              </div>
+            )}
+            {hasIncomplete && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setChecklistOpen(true)}
+              >
+                Checklist
+              </Button>
+            )}
+          </div>
+          <div className="flex flex-wrap justify-end gap-2">
+            {canEditInventory && (
+              <Button variant="outline" onClick={() => setEditOpen(true)}>
+                Edit
+              </Button>
+            )}
+            <Button variant="outline" onClick={() => setMoveOpen(true)}>
+              Move location
             </Button>
-          )}
-          <Button variant="outline" onClick={() => setMoveOpen(true)}>
-            Move location
-          </Button>
-          {(isOwner || profile?.role === "owner") && (
-            <Button
-              variant="destructive"
-              onClick={() => setDeleteOpen(true)}
-            >
-              Delete
-            </Button>
-          )}
+            {(isOwner || profile?.role === "owner") && (
+              <Button
+                variant="destructive"
+                onClick={() => setDeleteOpen(true)}
+              >
+                Delete
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -607,6 +887,218 @@ export default function CarProfilePage() {
           setDayDetailOpen(true);
         }}
       />
+
+      <Dialog open={checklistOpen} onOpenChange={setChecklistOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Car Completion Checklist</DialogTitle>
+            <DialogDescription>
+              Make sure all core vehicle, compliance, and customer fields are complete.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <p className="text-sm font-medium">
+                Progress: {checklist.completedCount} of {checklist.totalCount} fields
+                complete ({checklist.percent}%)
+              </p>
+              <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                <div
+                  className={`h-full ${getProgressBarColor(checklist.percent)}`}
+                  style={{ width: `${checklist.percent}%` }}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <p className="text-xs font-semibold uppercase text-muted-foreground">
+                  Base Information
+                </p>
+                <div className="mt-2 space-y-1.5">
+                  {checklist.items
+                    .filter((i) => i.section === "base")
+                    .map((item) => {
+                      const isMissing = !item.isFilled;
+                      return (
+                        <button
+                          key={item.key}
+                          type="button"
+                          className={`flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm ${
+                            isMissing
+                              ? "hover:bg-amber-500/10"
+                              : "hover:bg-emerald-500/5"
+                          }`}
+                          onClick={() => handleChecklistItemClick(item)}
+                        >
+                          <span className="flex items-center gap-2">
+                            {item.isFilled ? (
+                              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-300">
+                                <Check className="h-3 w-3" />
+                              </span>
+                            ) : (
+                              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-red-500/15 text-red-600 dark:text-red-400">
+                                <X className="h-3 w-3" />
+                              </span>
+                            )}
+                            <span>{item.label}</span>
+                          </span>
+                          {!item.isFilled && (
+                            <span className="text-xs font-medium text-red-600 dark:text-red-400">
+                              Missing
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold uppercase text-muted-foreground">
+                  Inspections &amp; Compliance
+                </p>
+                <div className="mt-2 space-y-1.5">
+                  {checklist.items
+                    .filter((i) => i.section === "inspections")
+                    .map((item) => {
+                      const isMissing = !item.isFilled;
+                      return (
+                        <button
+                          key={item.key}
+                          type="button"
+                          className={`flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm ${
+                            isMissing
+                              ? "hover:bg-amber-500/10"
+                              : "hover:bg-emerald-500/5"
+                          }`}
+                          onClick={() => handleChecklistItemClick(item)}
+                        >
+                          <span className="flex items-center gap-2">
+                            {item.isFilled ? (
+                              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-300">
+                                <Check className="h-3 w-3" />
+                              </span>
+                            ) : (
+                              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-red-500/15 text-red-600 dark:text-red-400">
+                                <X className="h-3 w-3" />
+                              </span>
+                            )}
+                            <span>{item.label}</span>
+                          </span>
+                          {!item.isFilled && (
+                            <span className="text-xs font-medium text-red-600 dark:text-red-400">
+                              Missing
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                </div>
+              </div>
+
+              {checklist.items.some((i) => i.section === "customer") && (
+                <div>
+                  <p className="text-xs font-semibold uppercase text-muted-foreground">
+                    Customer Information
+                  </p>
+                  <div className="mt-2 space-y-1.5">
+                    {checklist.items
+                      .filter((i) => i.section === "customer")
+                      .map((item) => {
+                        const isMissing = !item.isFilled;
+                        return (
+                          <button
+                            key={item.key}
+                            type="button"
+                            className={`flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm ${
+                              isMissing
+                                ? "hover:bg-amber-500/10"
+                                : "hover:bg-emerald-500/5"
+                            }`}
+                            onClick={() => handleChecklistItemClick(item)}
+                          >
+                            <span className="flex items-center gap-2">
+                              {item.isFilled ? (
+                                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-300">
+                                  <Check className="h-3 w-3" />
+                                </span>
+                              ) : (
+                                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-red-500/15 text-red-600 dark:text-red-400">
+                                  <X className="h-3 w-3" />
+                                </span>
+                              )}
+                              <span>{item.label}</span>
+                            </span>
+                            {!item.isFilled && (
+                              <span className="text-xs font-medium text-red-600 dark:text-red-400">
+                                Missing
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                  </div>
+                </div>
+              )}
+
+              {checklist.items.some((i) => i.section === "subdealer") && (
+                <div>
+                  <p className="text-xs font-semibold uppercase text-muted-foreground">
+                    Sub-dealer Information
+                  </p>
+                  <div className="mt-2 space-y-1.5">
+                    {checklist.items
+                      .filter((i) => i.section === "subdealer")
+                      .map((item) => {
+                        const isMissing = !item.isFilled;
+                        return (
+                          <button
+                            key={item.key}
+                            type="button"
+                            className={`flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm ${
+                              isMissing
+                                ? "hover:bg-amber-500/10"
+                                : "hover:bg-emerald-500/5"
+                            }`}
+                            onClick={() => handleChecklistItemClick(item)}
+                          >
+                            <span className="flex items-center gap-2">
+                              {item.isFilled ? (
+                                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-300">
+                                  <Check className="h-3 w-3" />
+                                </span>
+                              ) : (
+                                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-red-500/15 text-red-600 dark:text-red-400">
+                                  <X className="h-3 w-3" />
+                                </span>
+                              )}
+                              <span>{item.label}</span>
+                            </span>
+                            {!item.isFilled && (
+                              <span className="text-xs font-medium text-red-600 dark:text-red-400">
+                                Missing
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+          <DialogFooter className="mt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setChecklistOpen(false)}
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Tabs defaultValue="overview">
         <TabsList>

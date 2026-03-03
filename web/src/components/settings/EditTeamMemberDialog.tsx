@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
-import type { UserRole, UserCapability } from "@/lib/contexts/UserContext";
+import type { UserCapability } from "@/lib/contexts/UserContext";
+import type { AppRole } from "@/lib/permissions";
 import {
   Dialog,
   DialogContent,
@@ -25,10 +26,15 @@ import { USER_ROLE_LABELS } from "@/lib/constants/user";
 
 const ROLE_COLORS: Record<string, string> = {
   owner: "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300",
-  sales: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
+  assistant: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
+  khalil_hybrid:
+    "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
+  it: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900 dark:text-cyan-300",
   garage_manager:
     "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300",
-  assistant: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
+  garage_staff:
+    "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300",
+  sales_ops: "bg-pink-100 text-pink-700 dark:bg-pink-900 dark:text-pink-300",
 };
 
 const CAPABILITY_LABELS: Record<string, string> = {
@@ -49,7 +55,7 @@ interface ProfileRow {
   id: string;
   full_name: string;
   phone: string | null;
-  role: UserRole;
+  user_role: AppRole | null;
   capabilities: UserCapability[];
   is_active: boolean;
   created_at?: string;
@@ -70,7 +76,7 @@ export function EditTeamMemberDialog({
 }: EditTeamMemberDialogProps) {
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
-  const [role, setRole] = useState<UserRole>("assistant");
+  const [role, setRole] = useState<AppRole>("assistant");
   const [capabilities, setCapabilities] = useState<UserCapability[]>([]);
   const [isActive, setIsActive] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -79,7 +85,7 @@ export function EditTeamMemberDialog({
     if (profile && open) {
       setFullName(profile.full_name ?? "");
       setPhone(profile.phone ?? "");
-      setRole(profile.role ?? "assistant");
+      setRole(profile.user_role ?? "assistant");
       setCapabilities(profile.capabilities ?? []);
       setIsActive(profile.is_active ?? true);
     }
@@ -100,7 +106,7 @@ export function EditTeamMemberDialog({
       .update({
         full_name: fullName.trim(),
         phone: phone.trim() || null,
-        role,
+        user_role: role,
         capabilities,
         is_active: isActive,
       })
@@ -154,12 +160,12 @@ export function EditTeamMemberDialog({
           </div>
           <div>
             <Label>Role *</Label>
-            <Select value={role} onValueChange={(v) => setRole(v as UserRole)}>
+            <Select value={role} onValueChange={(v) => setRole(v as AppRole)}>
               <SelectTrigger className="mt-2">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {(Object.keys(USER_ROLE_LABELS) as UserRole[]).map((r) => (
+                {(Object.keys(USER_ROLE_LABELS) as AppRole[]).map((r) => (
                   <SelectItem key={r} value={r}>
                     {USER_ROLE_LABELS[r]}
                   </SelectItem>

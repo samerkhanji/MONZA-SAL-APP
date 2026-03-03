@@ -471,7 +471,7 @@ export function EditCarDialog({
             <div className="space-y-2">
               <Label>Customs</Label>
               <Select value={customsStatus} onValueChange={(v) => setCustomsStatus(v as CustomsStatus)}>
-                <SelectTrigger>
+                <SelectTrigger id="editCustomsStatus">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

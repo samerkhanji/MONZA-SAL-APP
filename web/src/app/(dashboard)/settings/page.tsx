@@ -6,7 +6,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
-import type { UserRole, UserCapability } from "@/lib/contexts/UserContext";
+import type { UserCapability } from "@/lib/contexts/UserContext";
+import type { AppRole } from "@/lib/permissions";
 import { USER_ROLE_LABELS } from "@/lib/constants/user";
 import {
   Users,
@@ -65,7 +66,7 @@ interface ProfileRow {
   id: string;
   full_name: string;
   phone: string | null;
-  role: UserRole;
+  user_role: AppRole | null;
   capabilities: UserCapability[];
   is_active: boolean;
   created_at?: string;
@@ -481,7 +482,7 @@ export default function SettingsPage() {
                 <p className="font-medium">{profile?.full_name ?? "User"}</p>
                 <p className="text-sm text-muted-foreground">
                   {profile?.phone ?? "No phone"}{" "}
-                  · {USER_ROLE_LABELS[profile?.role ?? "assistant"]}
+                  · {profile?.user_role ? USER_ROLE_LABELS[profile.user_role] : "Signed in"}
                 </p>
               </div>
               <div className="flex items-center justify-between rounded-lg border p-4">
@@ -494,6 +495,47 @@ export default function SettingsPage() {
                 <Button variant="outline" onClick={() => setChangePasswordOpen(true)}>
                   Change Password
                 </Button>
+              </div>
+              <div className="flex flex-col gap-2 rounded-lg border p-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="font-medium">Onboarding Tour</p>
+                    <p className="text-sm text-muted-foreground">
+                      Walk through the main features of Monza CRM for your role.
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Tour completed on:{" "}
+                      {profile?.onboarding_completed_at
+                        ? new Date(profile.onboarding_completed_at).toLocaleString()
+                        : "Not completed yet"}
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={async () => {
+                      const { data: { user } } = await supabase.auth.getUser();
+                      if (!user) {
+                        toast.error("You must be signed in to start the tour.");
+                        return;
+                      }
+                      const { error } = await supabase
+                        .from("profiles")
+                        .update({
+                          onboarding_completed: false,
+                          onboarding_completed_at: null,
+                        })
+                        .eq("id", user.id);
+                      if (error) {
+                        toast.error(error.message);
+                        return;
+                      }
+                      toast.success("Onboarding tour will start on your next page.");
+                      router.replace("/requests");
+                    }}
+                  >
+                    Take Onboarding Tour Again
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -536,10 +578,10 @@ export default function SettingsPage() {
                             <span
                               className={cn(
                                 "rounded px-2 py-0.5 text-xs font-medium",
-                                ROLE_COLORS[p.role] ?? "bg-muted"
+                                p.user_role ? ROLE_COLORS[p.user_role] ?? "bg-muted" : "bg-muted"
                               )}
                             >
-                              {USER_ROLE_LABELS[p.role]}
+                              {p.user_role ? USER_ROLE_LABELS[p.user_role] : "Unassigned"}
                             </span>
                           </td>
                           <td className="px-4 py-3">

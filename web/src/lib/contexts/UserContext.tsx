@@ -9,6 +9,7 @@ import {
 } from "react";
 import { createClient } from "@/lib/supabase";
 import { handleSessionExpiredError, isConnectionError } from "@/lib/auth-utils";
+import type { AppRole } from "@/lib/permissions";
 
 export type UserRole =
   | "owner"
@@ -27,8 +28,12 @@ export interface UserProfile {
   full_name: string;
   phone: string | null;
   role: UserRole;
+  user_role?: AppRole | null;
   capabilities: UserCapability[];
   is_active: boolean;
+  must_change_password?: boolean;
+  onboarding_completed?: boolean;
+  onboarding_completed_at?: string | null;
 }
 
 export interface UserContextType {
@@ -54,6 +59,7 @@ export interface UserContextType {
   isMark: boolean;
   isKhalil: boolean;
   isOwner: boolean;
+  appRole: AppRole | null;
   canSeeDashboard: boolean;
   canSeeCars: boolean;
   canSeeDocuments: boolean;
@@ -85,6 +91,7 @@ const UserContext = createContext<UserContextType>({
   isMark: false,
   isKhalil: false,
   isOwner: false,
+  appRole: null,
   canSeeDashboard: false,
   canSeeCars: false,
   canSeeDocuments: false,
@@ -190,45 +197,78 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   const role = profile?.role;
   const capabilities = profile?.capabilities ?? [];
-  const nameLower = (profile?.full_name ?? "").toLowerCase();
-  const isRequestAssistant =
-    nameLower.includes("lara") || nameLower.includes("samaya");
-  const canEditInventory = role === "owner" || role === "sales";
-  const canDelete = role === "owner";
-  const canSeeSettings = role === "owner";
+  const appRole: AppRole | null =
+    profile?.user_role ??
+    (role === "sales"
+      ? "sales_ops"
+      : role === "garage_manager"
+        ? "garage_manager"
+        : role === "assistant"
+          ? "assistant"
+          : role === "owner"
+            ? "owner"
+            : null);
+
+  const isRequestAssistant = appRole === "assistant";
+  const canEditInventory = appRole === "owner" || appRole === "sales_ops";
+  const canDelete = appRole === "owner";
+  const canSeeSettings = appRole === "owner";
   const canSeeProfileSettings = !!profile;
   const canSeeMyRequests = !!profile;
-  const canSeeAllRequests = role === "owner" || isRequestAssistant;
+  const canSeeAllRequests = appRole === "owner" || isRequestAssistant;
   const canUploadDocuments =
-    role === "owner" ||
-    role === "sales" ||
-    role === "garage_manager" ||
+    appRole === "owner" ||
+    appRole === "sales_ops" ||
+    appRole === "garage_manager" ||
     capabilities.includes("garage");
   const canManageParts =
-    role === "owner" ||
-    role === "garage_manager" ||
+    appRole === "owner" ||
+    appRole === "garage_manager" ||
     capabilities.includes("garage");
   const canManageGarage =
-    role === "owner" ||
-    role === "garage_manager" ||
+    appRole === "owner" ||
+    appRole === "garage_manager" ||
     capabilities.includes("garage");
 
-  const isRequestManagement = role === "owner";
-  const isSamer = nameLower.includes("samer");
-  const isKareem = nameLower.includes("kareem");
-  const isHoussam = nameLower.includes("houssam");
-  const isMark = nameLower.includes("mark");
-  const isKhalil = nameLower.includes("khalil");
-  const isOwner = role === "owner";
+  const isRequestManagement = appRole === "owner";
+  const isSamer = false;
+  const isKareem = false;
+  const isHoussam = false;
+  const isMark = appRole === "garage_manager";
+  const isKhalil = appRole === "khalil_hybrid";
+  const isOwner = appRole === "owner";
 
-  const canSeeDashboard = isOwner || role === "assistant" || isRequestAssistant;
+  const canSeeDashboard = appRole === "owner";
   const canSeeCars =
-    isRequestAssistant || isKhalil || isOwner;
-  const canSeeDocuments = true;
+    appRole === "owner" ||
+    appRole === "assistant" ||
+    appRole === "khalil_hybrid" ||
+    appRole === "it" ||
+    appRole === "sales_ops";
+  const canSeeDocuments =
+    appRole === "owner" ||
+    appRole === "assistant" ||
+    appRole === "khalil_hybrid" ||
+    appRole === "it" ||
+    appRole === "garage_manager" ||
+    appRole === "sales_ops";
   const canSeePartsInventory =
-    isMark || isRequestAssistant || isKhalil || isOwner;
-  const canSeeGarageJobs = isMark || isRequestAssistant || isOwner;
-  const canSeeGarageHistory = isRequestAssistant || isOwner;
+    appRole === "owner" ||
+    appRole === "assistant" ||
+    appRole === "khalil_hybrid" ||
+    appRole === "it" ||
+    appRole === "garage_manager" ||
+    appRole === "garage_staff";
+  const canSeeGarageJobs =
+    appRole === "owner" ||
+    appRole === "assistant" ||
+    appRole === "garage_manager" ||
+    appRole === "garage_staff";
+  const canSeeGarageHistory =
+    appRole === "owner" ||
+    appRole === "assistant" ||
+    appRole === "garage_manager" ||
+    appRole === "sales_ops";
 
   return (
     <UserContext.Provider
@@ -255,6 +295,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         isMark,
         isKhalil,
         isOwner,
+        appRole,
         canSeeDashboard,
         canSeeCars,
         canSeeDocuments,

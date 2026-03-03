@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
+import { canPerform } from "@/lib/permissions";
 import {
   NOTE_TYPE_LABELS,
   NOTE_TYPE_ICONS,
@@ -46,7 +47,7 @@ interface CustomerNotesProps {
 }
 
 export function CustomerNotes({ customerId }: CustomerNotesProps) {
-  const { canEditInventory } = useUser();
+  const { canEditInventory, appRole } = useUser();
   const supabase = createClient();
   const [notes, setNotes] = useState<CustomerNoteRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,6 +55,8 @@ export function CustomerNotes({ customerId }: CustomerNotesProps) {
   const [noteType, setNoteType] = useState<string>("general");
   const [content, setContent] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  const canEditCustomer = canPerform("customers", "edit", appRole ?? null);
 
   async function fetchNotes() {
     setLoading(true);
@@ -120,7 +123,7 @@ export function CustomerNotes({ customerId }: CustomerNotesProps) {
             <CardTitle>Interaction History</CardTitle>
             <CardDescription>Notes and interactions with this customer</CardDescription>
           </div>
-          {canEditInventory && (
+          {canEditCustomer && (
             <Button size="sm" onClick={() => setAddOpen(!addOpen)}>
               Add Note
             </Button>

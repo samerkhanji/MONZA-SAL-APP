@@ -11,6 +11,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
+import { canPerform } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -82,8 +83,9 @@ function formatFileSize(bytes: number): string {
 }
 
 export function CustomerDocuments({ customerId }: CustomerDocumentsProps) {
-  const { canEditInventory, canDelete } = useUser();
-  const canUpload = canEditInventory; // Owner or Sales
+  const { canEditInventory, canDelete, appRole } = useUser();
+  const canUpload = canPerform("customers", "edit", appRole ?? null);
+  const canDeleteDocs = canPerform("customers", "delete", appRole ?? null);
   const supabase = createClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [documents, setDocuments] = useState<CustomerDocumentRow[]>([]);
@@ -154,7 +156,7 @@ export function CustomerDocuments({ customerId }: CustomerDocumentsProps) {
   }
 
   async function handleDelete(doc: CustomerDocumentRow) {
-    if (!canDelete) return;
+    if (!canDeleteDocs) return;
     if (!confirm(`Delete "${doc.file_name}"?`)) return;
 
     const { error: storageError } = await supabase.storage

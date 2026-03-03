@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
+import { canPerform } from "@/lib/permissions";
 import type { GarageJob } from "@/types/database";
 import {
   JOB_STATUS_COLORS,
@@ -71,7 +72,7 @@ export default function GarageJobsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const statusFromUrl = searchParams.get("status");
-  const { canManageGarage } = useUser();
+  const { canManageGarage, appRole } = useUser();
   const [jobs, setJobs] = useState<JobWithCar[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -372,6 +373,9 @@ export default function GarageJobsPage() {
   const doneCount = sortedJobs.filter((j) => j.status === "done").length;
   const inProgressCount = sortedJobs.filter((j) => j.status === "in_progress").length;
 
+  const canCreateJob = canPerform("garage_jobs", "create", appRole ?? null);
+  const canEditJob = canPerform("garage_jobs", "edit", appRole ?? null);
+
   return (
     <div className="container mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -388,7 +392,7 @@ export default function GarageJobsPage() {
             }}
             disabled={loading}
           />
-          {canManageGarage && (
+          {canCreateJob && (
             <>
               <Button
                 size="lg"
@@ -488,7 +492,7 @@ export default function GarageJobsPage() {
       ) : sortedJobs.length === 0 ? (
         <div className="rounded-lg border border-dashed py-16 text-center">
           <p className="text-muted-foreground">No jobs found.</p>
-          {canManageGarage && (
+          {canCreateJob && (
             <Button
               className="mt-4"
               onClick={() => setNewJobOpen(true)}
@@ -557,7 +561,7 @@ export default function GarageJobsPage() {
                       )}
                     </div>
                     <div className="mt-3 flex flex-wrap items-center gap-2">
-                      {canManageGarage && job.status === "pending" && (
+                      {canEditJob && job.status === "pending" && (
                         <Button
                           size="sm"
                           onClick={() => handleStatusChange(job, "in_progress")}
@@ -566,7 +570,7 @@ export default function GarageJobsPage() {
                           Start
                         </Button>
                       )}
-                      {canManageGarage && job.status === "in_progress" && (
+                      {canEditJob && job.status === "in_progress" && (
                         <Button
                           size="sm"
                           variant="secondary"

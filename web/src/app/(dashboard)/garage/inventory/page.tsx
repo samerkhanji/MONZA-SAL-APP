@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
+import { canPerform } from "@/lib/permissions";
 import type { Part } from "@/types/database";
 import { PART_STATUS_COLORS, PART_STATUS_LABELS } from "@/lib/constants/parts";
 import { Button } from "@/components/ui/button";
@@ -68,7 +69,7 @@ function matchesSearch(p: Part, q: string): boolean {
 
 export default function GarageInventoryPage() {
   const searchParams = useSearchParams();
-  const { canManageParts, canDelete, profile } = useUser();
+  const { canManageParts, canDelete, profile, appRole } = useUser();
   const [parts, setParts] = useState<Part[]>([]);
   const [pendingDeletes, setPendingDeletes] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
@@ -221,6 +222,10 @@ export default function GarageInventoryPage() {
 
   const totalQty = filteredParts.reduce((s, p) => s + p.quantity, 0);
 
+  const canCreatePart = canPerform("parts", "create", appRole ?? null);
+  const canEditPart = canPerform("parts", "edit", appRole ?? null);
+  const canDeletePart = canPerform("parts", "delete", appRole ?? null);
+
   return (
     <div className="container mx-auto max-w-[1800px] space-y-6 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       <h1 className="text-xl font-semibold sm:text-2xl">Garage Inventory</h1>
@@ -248,7 +253,7 @@ export default function GarageInventoryPage() {
               </CardDescription>
             </div>
             <div className="flex flex-wrap gap-2">
-              {canManageParts && (
+              {canCreatePart && (
                 <>
                   <Button size="sm" onClick={() => setAddOpen(true)}>
                     <Plus className="mr-2 size-4" />
@@ -457,7 +462,7 @@ export default function GarageInventoryPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            {canManageParts && (
+                            {canEditPart && (
                               <>
                                 <DropdownMenuItem
                                   onClick={() => {
@@ -487,7 +492,7 @@ export default function GarageInventoryPage() {
                             >
                               View History
                             </DropdownMenuItem>
-                            {canManageParts && (
+                            {canDeletePart && (
                               <DropdownMenuItem
                                 className="text-destructive"
                                 onClick={() => setDeletePart(p)}

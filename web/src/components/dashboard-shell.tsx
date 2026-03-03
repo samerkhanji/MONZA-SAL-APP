@@ -47,33 +47,51 @@ const BASE_NAV_ITEMS: Array<{
   icon: typeof LayoutDashboard;
   ownerOnly?: boolean;
   assistantDashboard?: boolean;
-  children?: Array<{ href: string; label: string; icon: typeof Package }>;
+  tourId?: string;
+  children?: Array<{ href: string; label: string; icon: typeof Package; tourId?: string }>;
 }> = [
-  { href: "/assistant-dashboard", label: "Assistant Dashboard", icon: BarChart3, assistantDashboard: true },
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  {
+    href: "/assistant-dashboard",
+    label: "Assistant Dashboard",
+    icon: BarChart3,
+    assistantDashboard: true,
+    tourId: "nav-assistant-dashboard",
+  },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, tourId: "nav-dashboard" },
   {
     href: "/requests",
     label: "Request Center",
     icon: ClipboardList,
+    tourId: "nav-requests",
     children: [
       { href: "/requests", label: "All Requests", icon: ClipboardList },
       { href: "/requests/pending", label: "Pending Requests", icon: FileCheck },
     ],
   },
-  { href: "/cars", label: "Inventory", icon: Car },
-  { href: "/documents", label: "Documents", icon: FileText },
-  { href: "/customers", label: "Customers", icon: Users },
+  { href: "/cars", label: "Inventory", icon: Car, tourId: "nav-cars" },
+  { href: "/documents", label: "Documents", icon: FileText, tourId: "nav-documents" },
+  { href: "/customers", label: "Customers", icon: Users, tourId: "nav-customers" },
   {
     href: "/garage",
     label: "Garage",
     icon: Wrench,
     children: [
-      { href: "/garage", label: "Jobs", icon: Wrench },
-      { href: "/garage/inventory", label: "Parts Inventory", icon: Package },
-      { href: "/garage/history", label: "Garage History", icon: History },
+      { href: "/garage", label: "Jobs", icon: Wrench, tourId: "nav-garage" },
+      {
+        href: "/garage/inventory",
+        label: "Parts Inventory",
+        icon: Package,
+        tourId: "nav-parts",
+      },
+      {
+        href: "/garage/history",
+        label: "Garage History",
+        icon: History,
+        tourId: "nav-garage-history",
+      },
     ],
   },
-  { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/settings", label: "Settings", icon: Settings, tourId: "nav-settings" },
 ];
 
 function getPageTitle(pathname: string): string {
@@ -111,45 +129,75 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     canSeeSettings,
     isRequestAssistant,
     isOwner,
+    appRole,
   } = useUser();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
 
-  const navItems = useMemo(() => BASE_NAV_ITEMS.filter((item) => {
-    if (item.assistantDashboard) {
-      return isRequestAssistant || isOwner;
-    }
-    if (item.href === "/dashboard") {
-      if (!canSeeDashboard) return false;
-      if (isRequestAssistant && !isOwner) return false;
-      return true;
-    }
-    if (item.href === "/cars" && !canSeeCars) return false;
-    if (item.href === "/documents" && !canSeeDocuments) return false;
-    if (item.href === "/customers") return true;
-    if (item.href === "/requests") return true;
-    if (item.href === "/garage") return canSeeGarageJobs;
-    if (item.children) {
-      const visibleChildren = item.children.filter((child) => {
-        if (child.href === "/garage/inventory") return canSeePartsInventory;
-        if (child.href === "/garage/history") return canSeeGarageJobs;
-        if (child.href === "/garage") return canSeeGarageJobs;
-        if (child.href === "/requests/pending") return canSeeSettings;
+  const navItems = useMemo(
+    () =>
+      BASE_NAV_ITEMS.filter((item) => {
+        if (!appRole) return false;
+        if (item.assistantDashboard) {
+          return appRole === "assistant" || appRole === "owner";
+        }
+        if (item.href === "/dashboard") {
+          return appRole === "owner";
+        }
+        if (item.href === "/requests")
+          return [
+            "owner",
+            "assistant",
+            "khalil_hybrid",
+            "it",
+            "garage_manager",
+            "garage_staff",
+            "sales_ops",
+          ].includes(appRole);
+        if (item.href === "/cars")
+          return ["owner", "assistant", "khalil_hybrid", "it", "sales_ops"].includes(
+            appRole
+          );
+        if (item.href === "/customers")
+          return ["owner", "assistant", "sales_ops"].includes(appRole);
+        if (item.href === "/documents")
+          return [
+            "owner",
+            "assistant",
+            "khalil_hybrid",
+            "it",
+            "garage_manager",
+            "sales_ops",
+          ].includes(appRole);
+        if (item.href === "/garage") {
+          // Parent is shown if any child is visible
+          const visibleChildren = item.children?.filter((child) => {
+            if (child.href === "/garage")
+              return ["owner", "assistant", "garage_manager", "garage_staff"].includes(
+                appRole
+              );
+            if (child.href === "/garage/inventory")
+              return [
+                "owner",
+                "assistant",
+                "khalil_hybrid",
+                "it",
+                "garage_manager",
+                "garage_staff",
+              ].includes(appRole);
+            if (child.href === "/garage/history")
+              return ["owner", "assistant", "garage_manager", "sales_ops"].includes(
+                appRole
+              );
+            return false;
+          });
+          return !!visibleChildren && visibleChildren.length > 0;
+        }
+        if (item.href === "/settings") return appRole === "owner";
         return true;
-      });
-      if (visibleChildren.length === 0) return false;
-    }
-    return true;
-  }), [
-    isRequestAssistant,
-    isOwner,
-    canSeeDashboard,
-    canSeeCars,
-    canSeeDocuments,
-    canSeePartsInventory,
-    canSeeGarageJobs,
-    canSeeSettings,
-  ]);
+      }),
+    [appRole]
+  );
 
   async function handleSignOut() {
     const supabase = createClient();
@@ -159,9 +207,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   }
 
   const displayName = profile?.full_name ?? "User";
-  const displayRole = profile?.role
-    ? USER_ROLE_LABELS[profile.role]
-    : "Signed in";
+  const displayRole =
+    appRole && USER_ROLE_LABELS[appRole] ? USER_ROLE_LABELS[appRole] : "Signed in";
   const avatarInitial = (profile?.full_name?.[0] ?? "U").toUpperCase();
 
   const { showInstallOption, triggerInstall } = useInstall();
@@ -196,6 +243,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                       ? "border-l-4 border-l-primary bg-sidebar-accent text-sidebar-accent-foreground"
                       : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                   )}
+                  data-tour-id={item.tourId}
                   title={undefined}
                 >
                   <item.icon className="size-4 shrink-0" />
@@ -226,6 +274,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                             ? "font-medium border-l-2 border-l-primary bg-sidebar-accent/50 text-sidebar-accent-foreground"
                             : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
                         )}
+                        data-tour-id={child.tourId}
                       >
                         <child.icon className="size-3.5 shrink-0 opacity-70" />
                         {child.label}
@@ -246,8 +295,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                     "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors md:justify-center md:px-2 md:group-hover:justify-start md:group-hover:px-3 lg:justify-start lg:px-3",
                     isActive
                       ? "border-l-4 border-l-primary bg-sidebar-accent text-sidebar-accent-foreground"
-                      : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                    : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                   )}
+              data-tour-id={item.tourId}
               title={item.label}
             >
               <item.icon className="size-4 shrink-0" />

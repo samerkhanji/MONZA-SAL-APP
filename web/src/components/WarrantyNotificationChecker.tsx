@@ -37,22 +37,24 @@ export function WarrantyNotificationChecker() {
       const recipientIds = [laraId, samayaId, khalilId].filter(Boolean);
       if (recipientIds.length === 0) return;
 
-      const { data: cars } = await supabase
+      const { data } = await supabase
         .from("cars")
         .select("id, vin, brand, model, warranty_per_dms, warranty_expiry, warranty_monza_start_date")
         .is("deleted_at", null);
 
-      if (!cars || cars.length === 0) return;
+      const cars = (data ?? []).map((car: any) => ({
+        id: car.id as string,
+        vin: car.vin as string,
+        brand: car.brand as string,
+        model: car.model as string,
+        warranty_per_dms: car.warranty_per_dms as string | null,
+        warranty_expiry: car.warranty_expiry as string | null,
+        warranty_monza_start_date: car.warranty_monza_start_date as string | null,
+      }));
 
-      for (const car of cars as Array<{
-        id: string;
-        vin: string;
-        brand: string;
-        model: string;
-        warranty_per_dms: string | null;
-        warranty_expiry: string | null;
-        warranty_monza_start_date: string | null;
-      }>) {
+      if (cars.length === 0) return;
+
+      for (const car of cars) {
         const makeModel = `${car.brand} ${car.model}`.trim();
 
         for (const days of THRESHOLDS) {

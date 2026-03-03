@@ -103,7 +103,7 @@ function ThumbnailPreview({
 }
 
 export function JobDocuments({ jobId, onDocumentsChange }: JobDocumentsProps) {
-  const { canManageGarage, canDelete } = useUser();
+  const { canManageGarage, canDelete, appRole } = useUser();
   const supabase = createClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [documents, setDocuments] = useState<JobDocumentRow[]>([]);
@@ -114,6 +114,9 @@ export function JobDocuments({ jobId, onDocumentsChange }: JobDocumentsProps) {
   const [uploadNotes, setUploadNotes] = useState("");
   const [uploading, setUploading] = useState(false);
   const [typeFilter, setTypeFilter] = useState<string>("all");
+
+  const canUpload = canManageGarage || appRole === "garage_staff";
+  const canDeleteDocs = canManageGarage && canDelete;
 
   async function fetchDocuments() {
     setLoading(true);
@@ -178,7 +181,7 @@ export function JobDocuments({ jobId, onDocumentsChange }: JobDocumentsProps) {
   }
 
   async function handleDelete(doc: JobDocumentRow) {
-    if (!canManageGarage || !canDelete) return;
+    if (!canDeleteDocs) return;
     if (!confirm(`Delete "${doc.file_name}"?`)) return;
 
     const { error: storageError } = await supabase.storage
@@ -205,7 +208,7 @@ export function JobDocuments({ jobId, onDocumentsChange }: JobDocumentsProps) {
   }
 
   async function handleUpload() {
-    if (!uploadFile || !canManageGarage) return;
+    if (!uploadFile || !canUpload) return;
 
     const isPdf = uploadFile.type === "application/pdf";
     const isImage = ["image/jpeg", "image/png", "image/webp"].includes(
@@ -292,7 +295,7 @@ export function JobDocuments({ jobId, onDocumentsChange }: JobDocumentsProps) {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {canManageGarage && (
+            {canUpload && (
               <Button size="lg" onClick={() => setUploadOpen(true)}>
                 <Upload className="mr-2 size-4" />
                 Upload

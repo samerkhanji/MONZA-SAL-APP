@@ -13,6 +13,7 @@ import {
 } from "@/lib/constants/requests";
 import { getAllProfiles } from "@/lib/user-lookup";
 import { createNotification, createNotificationsForUsers } from "@/lib/notifications";
+import type { AppRole } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -49,6 +50,7 @@ interface RequestWithProfiles extends Request {
   assignee?: { full_name: string | null } | null;
   reviewer?: { full_name: string | null } | null;
   send_to_user?: { full_name: string | null } | null;
+  recipient_user?: { full_name: string | null } | null;
 }
 
 function PriorityBadge({ priority }: { priority: string }) {
@@ -75,7 +77,7 @@ const OWNER_SEND_TO_MAP: Record<string, string> = {
 };
 
 function getSendToLabel(r: RequestWithProfiles): string {
-  if (r.send_to_user?.full_name) return r.send_to_user.full_name;
+  if (r.recipient_user?.full_name) return r.recipient_user.full_name;
   if (r.send_to && OWNER_SEND_TO_MAP[r.send_to]) {
     const names: Record<string, string> = { houssam: "Houssam", kareem: "Kareem", samer: "Samer" };
     return names[r.send_to] ?? r.send_to;
@@ -85,7 +87,7 @@ function getSendToLabel(r: RequestWithProfiles): string {
 
 export default function RequestCenterPage() {
   const searchParams = useSearchParams();
-  const { profile, isRequestAssistant, isRequestManagement, isSamer, isKareem, isHoussam } = useUser();
+  const { profile, appRole } = useUser();
   const [requests, setRequests] = useState<RequestWithProfiles[]>([]);
   const [allProfiles, setAllProfiles] = useState<{ id: string; full_name: string | null }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -117,22 +119,14 @@ export default function RequestCenterPage() {
   const fetchRequests = useCallback(async () => {
     setLoading(true);
     const myId = profile?.id;
-    let query = supabase.from("requests").select("*").order("created_at", { ascending: false });
+    let query = supabase
+      .from("requests")
+      .select("*")
+      .order("created_at", { ascending: false });
 
-    if (myId) {
-      if (isRequestAssistant) {
-        query = query.or(
-          `send_to.eq.houssam,send_to.eq.kareem,submitted_by.eq.${myId},send_to_user_id.eq.${myId},assigned_to.eq.${myId}`
-        );
-      } else if (!isRequestManagement && !isSamer && !isKareem && !isHoussam) {
-        query = query.or(
-          `submitted_by.eq.${myId},send_to_user_id.eq.${myId},assigned_to.eq.${myId}`
-        );
-      }
-    } else if (!profile) {
+    if (!myId) {
       query = query.eq("id", "00000000-0000-0000-0000-000000000000");
     }
-
     const [reqResult, profilesResult] = await Promise.all([
       query,
       getAllProfiles(),
@@ -155,6 +149,7 @@ export default function RequestCenterPage() {
       if (r.assigned_to) userIds.add(r.assigned_to);
       if (r.reviewed_by) userIds.add(r.reviewed_by);
       if (r.send_to_user_id) userIds.add(r.send_to_user_id);
+      if (r.recipient_user_id) userIds.add(r.recipient_user_id);
     });
 
     let profilesMap: Record<string, { full_name: string | null }> = {};
@@ -177,11 +172,12 @@ export default function RequestCenterPage() {
       assignee: r.assigned_to ? (profilesMap[r.assigned_to] ?? null) : null,
       reviewer: r.reviewed_by ? (profilesMap[r.reviewed_by] ?? null) : null,
       send_to_user: r.send_to_user_id ? (profilesMap[r.send_to_user_id] ?? null) : null,
+      recipient_user: r.recipient_user_id ? (profilesMap[r.recipient_user_id] ?? null) : null,
     }));
 
     setRequests(withProfiles);
     setLoading(false);
-  }, [profile?.id, isRequestAssistant, isRequestManagement, isSamer, isKareem, isHoussam]);
+  }, [profile?.id]);
 
   useEffect(() => {
     fetchRequests();
@@ -205,52 +201,8 @@ export default function RequestCenterPage() {
     const myId = profile?.id;
     if (!myId) return [];
 
-    let list = [...requests];
-
-    if (isRequestAssistant) {
-      const forReview = list.filter(
-        (r) => r.send_to === "houssam" || r.send_to === "kareem"
-      );
-      const myPersonal = list.filter(
-        (r) =>
-          r.submitted_by === myId ||
-          r.send_to_user_id === myId ||
-          r.assigned_to === myId
-      );
-      const combined = [...forReview];
-      for (const r of myPersonal) {
-        if (!combined.find((x) => x.id === r.id)) combined.push(r);
-      }
-      return combined;
-    }
-
-    if (isRequestManagement || isSamer || isKareem || isHoussam) {
-      const forOwners = list.filter(
-        (r) =>
-          r.send_to === "samer" ||
-          r.send_to === "kareem" ||
-          (r.send_to === "houssam" && r.status === "awaiting_approval")
-      );
-      const myPersonal = list.filter(
-        (r) =>
-          r.submitted_by === myId ||
-          r.send_to_user_id === myId ||
-          r.assigned_to === myId
-      );
-      const combined = [...forOwners];
-      for (const r of myPersonal) {
-        if (!combined.find((x) => x.id === r.id)) combined.push(r);
-      }
-      return combined;
-    }
-
-    return list.filter(
-      (r) =>
-        r.submitted_by === myId ||
-        r.send_to_user_id === myId ||
-        r.assigned_to === myId
-    );
-  }, [requests, profile?.id, isRequestAssistant, isRequestManagement, isSamer, isKareem, isHoussam]);
+    return [...requests];
+  }, [requests, profile?.id]);
 
   const uniqueSubmitters = useMemo(() => {
     const map = new Map<string, string>();
@@ -418,6 +370,8 @@ export default function RequestCenterPage() {
         assigned_to: assignedTo,
         send_to: effectiveSendTo,
         send_to_user_id: newSendToUserId,
+        recipient_user_id: newSendToUserId,
+        recipient_role: isDirectToOwner || isToHoussam ? "owner" : null,
       });
 
     setNewSubmitting(false);
@@ -526,13 +480,14 @@ export default function RequestCenterPage() {
     const { data: { user } } = await supabase.auth.getUser();
 
     setActionSubmitting(true);
+    const isAssistant = appRole === "assistant";
     const updatePayload: Record<string, unknown> = {
       status: "approved",
-      management_comments: (isRequestAssistant ? assistantNotes : managementComments).trim() || null,
+      management_comments: (isAssistant ? assistantNotes : managementComments).trim() || null,
       resolved_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
-    if (user && isRequestAssistant) {
+    if (user && isAssistant) {
       updatePayload.reviewed_by = user.id;
       updatePayload.assistant_notes = assistantNotes.trim() || null;
       updatePayload.priority = assistantPriority || null;
@@ -570,13 +525,14 @@ export default function RequestCenterPage() {
     const { data: { user } } = await supabase.auth.getUser();
 
     setActionSubmitting(true);
+    const isAssistant = appRole === "assistant";
     const updatePayload: Record<string, unknown> = {
       status: "rejected",
-      management_comments: (isRequestAssistant ? assistantNotes : managementComments).trim() || null,
+      management_comments: (isAssistant ? assistantNotes : managementComments).trim() || null,
       resolved_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
-    if (user && isRequestAssistant) {
+    if (user && isAssistant) {
       updatePayload.reviewed_by = user.id;
       updatePayload.assistant_notes = assistantNotes.trim() || null;
       updatePayload.priority = assistantPriority || null;
@@ -703,7 +659,7 @@ export default function RequestCenterPage() {
             <SelectItem value="low">🟢 Low</SelectItem>
             <SelectItem value="normal">🟡 Medium</SelectItem>
             <SelectItem value="urgent">🔴 Urgent</SelectItem>
-            {isRequestAssistant && (
+            {appRole === "assistant" && (
               <SelectItem value="unlabeled">Unlabeled</SelectItem>
             )}
           </SelectContent>
@@ -1021,7 +977,7 @@ export default function RequestCenterPage() {
                 </div>
               )}
 
-              {isRequestAssistant &&
+              {appRole === "assistant" &&
                 (detailOpen.status === "submitted" || detailOpen.status === "awaiting_approval") && (
                   <div className="space-y-4 border-t pt-4">
                     <h4 className="font-medium">Assistant Actions</h4>
@@ -1083,7 +1039,7 @@ export default function RequestCenterPage() {
                   </div>
                 )}
 
-              {(isRequestManagement || isSamer || isKareem || isHoussam) &&
+              {(appRole === "owner") &&
                 detailOpen.status === "awaiting_approval" && (
                   <div className="space-y-4 border-t pt-4">
                     <h4 className="font-medium">Management Actions</h4>

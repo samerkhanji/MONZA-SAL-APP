@@ -51,6 +51,7 @@ import {
 import { EditCustomerDialog } from "@/components/customers/EditCustomerDialog";
 import { ExportButton } from "@/components/ExportButton";
 import type { ExportColumn } from "@/lib/exportToExcel";
+import { canPerform } from "@/lib/permissions";
 
 interface SoldCar {
   id: string;
@@ -91,7 +92,7 @@ function matchesSearch(customer: CustomerDisplay, search: string): boolean {
 
 export default function CustomersPage() {
   const router = useRouter();
-  const { canEditInventory, canDelete } = useUser();
+  const { canEditInventory, canDelete, appRole } = useUser();
   const [customers, setCustomers] = useState<CustomerDisplay[]>([]);
   const [soldCars, setSoldCars] = useState<SoldCar[]>([]);
   const [loading, setLoading] = useState(true);
@@ -256,6 +257,10 @@ export default function CustomersPage() {
       language_display: c.language_display ?? c.preferred_language ?? "",
     }));
 
+  const canCreateCustomer = canPerform("customers", "create", appRole ?? null);
+  const canEditCustomer = canPerform("customers", "edit", appRole ?? null);
+  const canDeleteCustomer = canPerform("customers", "delete", appRole ?? null);
+
   function CustomerTable({ list }: { list: CustomerDisplay[] }) {
     return (
       <>
@@ -384,7 +389,7 @@ export default function CustomersPage() {
                           >
                             View
                           </DropdownMenuItem>
-                          {canEditInventory && (
+                          {canEditCustomer && (
                             <DropdownMenuItem
                               onClick={() => {
                                 setEditCustomer(customer);
@@ -394,7 +399,7 @@ export default function CustomersPage() {
                               Edit
                             </DropdownMenuItem>
                           )}
-                          {canDelete && (
+                          {canDeleteCustomer && (
                             <DropdownMenuItem
                               variant="destructive"
                               onClick={() => {
@@ -439,7 +444,7 @@ export default function CustomersPage() {
             }}
             disabled={loading}
           />
-          {canEditInventory && (
+          {canCreateCustomer && (
             <Button asChild>
               <Link href="/customers/add">Add Customer</Link>
             </Button>

@@ -170,6 +170,13 @@
   background: color-mix(in srgb, var(--muted-foreground) 50%, transparent);
 }
 
+.onboarding-highlight {
+  position: relative;
+  box-shadow: 0 0 0 3px var(--ring);
+  border-radius: 0.5rem;
+  z-index: 2001 !important;
+}
+
 /* Sonner toast - brand status colors */
 [data-sonner-toast][data-type="success"] {
   border-left: 4px solid #22C55E !important;

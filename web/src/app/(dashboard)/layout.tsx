@@ -6,6 +6,8 @@ import { PageAccessGuard } from "@/components/PageAccessGuard";
 import { FloatingScanButton } from "@/components/scanner/FloatingScanButton";
 import { WarrantyNotificationChecker } from "@/components/WarrantyNotificationChecker";
 import { SessionEnforcer } from "@/components/auth/SessionEnforcer";
+import { FirstLoginGuard } from "@/components/auth/FirstLoginGuard";
+import { OnboardingTour } from "@/components/OnboardingTour";
 
 export default function DashboardLayout({
   children,
@@ -19,10 +21,13 @@ export default function DashboardLayout({
           <InstallProvider>
             <DashboardShell>
               <WarrantyNotificationChecker />
-              <PageAccessGuard>
-                {children}
-                <FloatingScanButton />
-              </PageAccessGuard>
+              <FirstLoginGuard>
+                <PageAccessGuard>
+                  {children}
+                  <FloatingScanButton />
+                </PageAccessGuard>
+                <OnboardingTour />
+              </FirstLoginGuard>
             </DashboardShell>
           </InstallProvider>
         </SessionEnforcer>

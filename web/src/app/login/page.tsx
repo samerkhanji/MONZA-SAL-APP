@@ -8,6 +8,7 @@ import {
   clearAuthSessionMarkers,
   markAuthSessionUnlocked,
 } from "@/lib/auth-session";
+import { getAppRoleFromProfile } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,7 +26,8 @@ import { useTheme } from "@/lib/contexts/ThemeContext";
 
 function LoginForm() {
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get("redirectTo") ?? "/dashboard";
+  const redirectParam = searchParams.get("redirectTo");
+  const redirectTo = redirectParam ?? "/dashboard";
   const reason = searchParams.get("reason");
   const { theme } = useTheme();
 
@@ -51,7 +53,7 @@ function LoginForm() {
     setLoading(true);
 
     const supabase = createClient();
-    const { error: signInError } = await supabase.auth.signInWithPassword({
+    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
@@ -68,7 +70,41 @@ function LoginForm() {
     }
 
     markAuthSessionUnlocked();
-    window.location.href = redirectTo.startsWith("/") ? redirectTo : `/${redirectTo}`;
+
+    // If an explicit redirectTo was provided, honor it.
+    if (redirectParam) {
+      const target = redirectTo.startsWith("/") ? redirectTo : `/${redirectTo}`;
+      window.location.href = target;
+      return;
+    }
+
+    // Otherwise, redirect based on user_role.
+    const { data: userResult } = await supabase.auth.getUser();
+    const authUser = userResult?.user ?? signInData?.user ?? null;
+
+    let target = "/requests";
+    if (authUser) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("id, full_name, role, user_role")
+        .eq("id", authUser.id)
+        .maybeSingle();
+      const appRole = getAppRoleFromProfile(profile as any);
+      const ROLE_HOME_ROUTES: Record<string, string> = {
+        owner: "/dashboard",
+        assistant: "/assistant-dashboard",
+        khalil_hybrid: "/requests",
+        it: "/requests",
+        garage_manager: "/garage",
+        garage_staff: "/garage",
+        sales_ops: "/customers",
+      };
+      if (appRole && ROLE_HOME_ROUTES[appRole]) {
+        target = ROLE_HOME_ROUTES[appRole];
+      }
+    }
+
+    window.location.href = target;
   }
 
   async function handleForgotPassword(e: React.FormEvent) {

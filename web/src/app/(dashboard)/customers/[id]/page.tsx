@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
+import { canPerform } from "@/lib/permissions";
 import type { CustomerDisplay } from "@/types/database";
 import { CAR_STATUS_LABELS } from "@/types/database";
 import {
@@ -67,7 +68,7 @@ interface EnrichedSaleOrder {
 export default function CustomerDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { canEditInventory, canDelete } = useUser();
+  const { canEditInventory, canDelete, appRole } = useUser();
   const id = params.id as string;
   const [customer, setCustomer] = useState<CustomerDisplay | null>(null);
   const [vehicles, setVehicles] = useState<EnrichedSaleOrder[]>([]);
@@ -144,13 +145,13 @@ export default function CustomerDetailPage() {
             .eq("to_value", "service"),
         ]);
 
-        const movedEvents = (movedEventsRes.data ?? []) as Array<{
-          id: string;
-          event_type: string;
-          from_value: string | null;
-          to_value: string | null;
-          created_at: string;
-        }>;
+        const movedEvents = (movedEventsRes.data ?? []).map((ev: any) => ({
+          id: ev.id as string,
+          event_type: ev.event_type as string,
+          from_value: ev.from_value as string | null,
+          to_value: ev.to_value as string | null,
+          created_at: ev.created_at as string,
+        }));
 
         const visitEvents: VisitEvent[] = movedEvents.map((ev) => {
           const toVal = (ev.to_value ?? "").toLowerCase();
@@ -236,6 +237,9 @@ export default function CustomerDetailPage() {
     LANGUAGE_LABELS[customer.preferred_language ?? "en"] ??
     "—";
 
+  const canEditCustomer = canPerform("customers", "edit", appRole ?? null);
+  const canDeleteCustomer = canPerform("customers", "delete", appRole ?? null);
+
   return (
     <div className="container mx-auto space-y-6 px-4 py-6 sm:px-6 sm:py-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -249,12 +253,12 @@ export default function CustomerDetailPage() {
           </div>
         </div>
         <div className="flex gap-2">
-          {canEditInventory && (
+          {canEditCustomer && (
             <Button variant="outline" onClick={() => setEditOpen(true)}>
               Edit
             </Button>
           )}
-          {canDelete && (
+          {canDeleteCustomer && (
             <Button variant="destructive" onClick={() => setDeleteOpen(true)}>
               Delete
             </Button>

@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
+import { canPerform } from "@/lib/permissions";
 import type { GarageJob, JobPart } from "@/types/database";
 import {
   JOB_STATUS_COLORS,
@@ -58,7 +59,7 @@ export default function JobDetailPage() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
-  const { canManageGarage, canDelete } = useUser();
+  const { canManageGarage, canDelete, appRole, profile } = useUser();
   const [job, setJob] = useState<JobWithCar | null>(null);
   const [parts, setParts] = useState<JobPartWithPart[]>([]);
   const [loading, setLoading] = useState(true);
@@ -314,6 +315,13 @@ export default function JobDetailPage() {
     );
   }
 
+  const canEditJob = canPerform("garage_jobs", "edit", appRole ?? null);
+  const canDeleteJob = canPerform("garage_jobs", "delete", appRole ?? null);
+  const isGarageStaff = appRole === "garage_staff";
+  const isAssignedToMe =
+    job.assigned_to && profile?.id && job.assigned_to === profile.id;
+  const canGarageStaffEditLimited = isGarageStaff && !!isAssignedToMe;
+
   const car = job.cars;
   const isOverdue =
     job.due_date &&
@@ -349,7 +357,7 @@ export default function JobDetailPage() {
       )}
 
       <div className="flex flex-wrap gap-2">
-        {canManageGarage && (
+        {(canEditJob || canGarageStaffEditLimited) && (
           <>
             {job.status === "pending" && (
               <Button size="lg" onClick={handleStartTimer}>
@@ -371,7 +379,7 @@ export default function JobDetailPage() {
             )}
           </>
         )}
-        {canDelete && (
+        {canDeleteJob && (
           <Button
             size="lg"
             variant="destructive"
@@ -440,7 +448,7 @@ export default function JobDetailPage() {
               }
               placeholder="Enter diagnosis..."
               rows={4}
-              disabled={!canManageGarage}
+              disabled={!(canEditJob || canGarageStaffEditLimited)}
             />
           </div>
           <div>
@@ -455,7 +463,7 @@ export default function JobDetailPage() {
               }
               placeholder="Describe work performed..."
               rows={4}
-              disabled={!canManageGarage}
+              disabled={!(canEditJob || canGarageStaffEditLimited)}
             />
           </div>
         </CardContent>
