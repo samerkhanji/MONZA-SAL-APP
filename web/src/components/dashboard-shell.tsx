@@ -23,6 +23,7 @@ import {
   Bell,
   BarChart3,
   FileCheck,
+  CreditCard,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
@@ -71,6 +72,7 @@ const BASE_NAV_ITEMS: Array<{
   { href: "/cars", label: "Inventory", icon: Car, tourId: "nav-cars" },
   { href: "/documents", label: "Documents", icon: FileText, tourId: "nav-documents" },
   { href: "/customers", label: "Customers", icon: Users, tourId: "nav-customers" },
+  { href: "/installments", label: "Installments", icon: CreditCard, tourId: "nav-installments" },
   {
     href: "/garage",
     label: "Garage",
@@ -102,6 +104,7 @@ function getPageTitle(pathname: string): string {
   if (pathname.startsWith("/cars")) return "Car Inventory";
   if (pathname.startsWith("/documents")) return "Documents";
   if (pathname.startsWith("/customers")) return "Customers";
+  if (pathname.startsWith("/installments")) return "Installments";
   if (pathname.startsWith("/requests/pending")) return "Pending Requests";
   if (pathname.startsWith("/requests")) return "Request Center";
   if (pathname.startsWith("/garage/jobs/")) return "Job Details";
@@ -159,6 +162,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             appRole
           );
         if (item.href === "/customers")
+          return ["owner", "assistant", "sales_ops"].includes(appRole);
+        if (item.href === "/installments")
           return ["owner", "assistant", "sales_ops"].includes(appRole);
         if (item.href === "/documents")
           return [

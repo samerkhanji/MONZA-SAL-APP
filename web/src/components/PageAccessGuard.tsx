@@ -11,6 +11,7 @@ function getPageKeyFromPathname(pathname: string):
   | "assistant_dashboard"
   | "requests"
   | "cars"
+  | "installments"
   | "parts"
   | "customers"
   | "garage"
@@ -23,6 +24,7 @@ function getPageKeyFromPathname(pathname: string):
   if (pathname.startsWith("/cars")) return "cars";
   if (pathname.startsWith("/documents")) return "documents";
   if (pathname.startsWith("/customers")) return "customers";
+  if (pathname.startsWith("/installments")) return "installments";
   if (pathname.startsWith("/requests")) return "requests";
   if (pathname.startsWith("/garage/inventory")) return "parts";
   if (pathname.startsWith("/garage/history")) return "garage_history";

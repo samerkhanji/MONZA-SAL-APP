@@ -14,6 +14,7 @@ export const PAGE_PERMISSIONS: Record<
   | "assistant_dashboard"
   | "requests"
   | "cars"
+  | "installments"
   | "parts"
   | "customers"
   | "garage"
@@ -34,6 +35,7 @@ export const PAGE_PERMISSIONS: Record<
     "sales_ops",
   ],
   cars: ["owner", "assistant", "khalil_hybrid", "it", "sales_ops"],
+  installments: ["owner", "assistant", "sales_ops"],
   parts: [
     "owner",
     "assistant",
@@ -88,10 +90,19 @@ export const CRUD_PERMISSIONS = {
     delete: ["owner"] as AppRole[],
     view: ["owner", "assistant", "garage_manager", "garage_staff"] as AppRole[],
   },
+  installments: {
+    create: ["owner", "assistant", "sales_ops"] as AppRole[],
+    edit: ["owner", "assistant"] as AppRole[],
+    delete: ["owner"] as AppRole[],
+    view: ["owner", "assistant", "sales_ops"] as AppRole[],
+    mark_paid: ["owner", "assistant", "sales_ops"] as AppRole[],
+  },
 } as const;
 
 export type CrudEntity = keyof typeof CRUD_PERMISSIONS;
-export type CrudAction = keyof (typeof CRUD_PERMISSIONS)["cars"];
+export type CrudAction =
+  | keyof (typeof CRUD_PERMISSIONS)["cars"]
+  | keyof (typeof CRUD_PERMISSIONS)["installments"];
 
 export function getAppRoleFromProfile(profile: UserProfile | null): AppRole | null {
   if (!profile) return null;
@@ -123,7 +134,8 @@ export function canPerform(
   role: AppRole | null
 ): boolean {
   if (!role) return false;
-  const allowed = CRUD_PERMISSIONS[entity][action];
+  const perms = CRUD_PERMISSIONS[entity] as Record<string, AppRole[]>;
+  const allowed = perms[action as string] ?? [];
   return allowed.includes(role);
 }
 

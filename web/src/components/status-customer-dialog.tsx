@@ -77,6 +77,13 @@ export function StatusCustomerDialog({
   const [newStatus, setNewStatus] = useState<CarStatus>("in_stock");
   const [sellingPrice, setSellingPrice] = useState("");
   const [currency, setCurrency] = useState("USD");
+  const [paymentType, setPaymentType] = useState<"full" | "installments">("full");
+  const [planTotalAmount, setPlanTotalAmount] = useState("");
+  const [planDownPayment, setPlanDownPayment] = useState("");
+  const [planMonths, setPlanMonths] = useState("");
+  const [planMonthlyAmount, setPlanMonthlyAmount] = useState("");
+  const [planStartDate, setPlanStartDate] = useState("");
+  const [planDueDay, setPlanDueDay] = useState("");
 
   const isSoldOrReserved = car && (car.status === "sold" || car.status === "reserved");
 
@@ -86,6 +93,15 @@ export function StatusCustomerDialog({
     setNewStatus(car.status);
     setPlateNumber(car.plate_number ?? "");
     setSubDealerName(car.sub_dealer_name ?? "");
+
+    // Reset payment plan fields on open
+    setPaymentType("full");
+    setPlanTotalAmount("");
+    setPlanDownPayment("");
+    setPlanMonths("");
+    setPlanMonthlyAmount("");
+    setPlanStartDate("");
+    setPlanDueDay("");
 
     if (isSoldOrReserved) {
       setLoading(true);
@@ -147,6 +163,20 @@ export function StatusCustomerDialog({
       setCurrency("USD");
     }
   }, [open, car, isSoldOrReserved]);
+
+  useEffect(() => {
+    const total = parseFloat(planTotalAmount || "0");
+    const down = parseFloat(planDownPayment || "0");
+    const months = parseInt(planMonths || "0", 10);
+    if (total > 0 && months > 0 && down >= 0 && down <= total) {
+      const base = (total - down) / months;
+      if (!Number.isNaN(base) && base > 0) {
+        if (!planMonthlyAmount || Number(planMonthlyAmount) === 0) {
+          setPlanMonthlyAmount(base.toFixed(2));
+        }
+      }
+    }
+  }, [planTotalAmount, planDownPayment, planMonths]);
 
   const needsCustomer = newStatus === "reserved" || newStatus === "sold";
   const showPlateField = ["sold", "delivered", "registered"].includes(newStatus);
@@ -240,6 +270,107 @@ export function StatusCustomerDialog({
           setSubmitting(false);
           toast.error("Failed to create sale: " + saleError.message);
           return;
+        }
+
+        if (newStatus === "sold" && paymentType === "installments") {
+          const totalNum = parseFloat(planTotalAmount || sellingPrice || "0");
+          const downNum = parseFloat(planDownPayment || "0");
+          const monthsNum = parseInt(planMonths || "0", 10);
+          const monthlyNum = parseFloat(planMonthlyAmount || "0");
+          const dueDayNum = parseInt(planDueDay || "0", 10);
+
+          if (!planStartDate) {
+            setSubmitting(false);
+            toast.error("Start date is required for installments.");
+            return;
+          }
+          if (!(totalNum > 0)) {
+            setSubmitting(false);
+            toast.error("Total amount must be greater than 0.");
+            return;
+          }
+          if (downNum < 0 || downNum > totalNum) {
+            setSubmitting(false);
+            toast.error("Down payment must be between 0 and total amount.");
+            return;
+          }
+          if (!(monthsNum > 0)) {
+            setSubmitting(false);
+            toast.error("Number of months must be greater than 0.");
+            return;
+          }
+          if (!(monthlyNum > 0)) {
+            setSubmitting(false);
+            toast.error("Monthly amount must be greater than 0.");
+            return;
+          }
+          if (dueDayNum < 1 || dueDayNum > 28) {
+            setSubmitting(false);
+            toast.error("Due day must be between 1 and 28.");
+            return;
+          }
+
+          const { data: planData, error: planError } = await supabase
+            .from("payment_plans")
+            .insert({
+              customer_id: newCustomer.id,
+              car_id: car.id,
+              status: "active",
+              total_amount: totalNum,
+              down_payment: downNum,
+              monthly_amount: monthlyNum,
+              months: monthsNum,
+              start_date: planStartDate,
+              due_day: dueDayNum,
+              created_by: user.id,
+            })
+            .select("id")
+            .single();
+
+          if (planError || !planData?.id) {
+            setSubmitting(false);
+            toast.error("Sale created but failed to create payment plan: " + (planError?.message ?? "Unknown error"));
+            return;
+          }
+
+          const installments: Record<string, unknown>[] = [];
+          const baseDate = new Date(planStartDate);
+
+          if (downNum > 0) {
+            installments.push({
+              plan_id: planData.id,
+              installment_no: 0,
+              due_date: planStartDate,
+              amount_due: downNum,
+              status: "paid",
+              paid_at: new Date().toISOString(),
+              paid_amount: downNum,
+            });
+          }
+
+          for (let i = 0; i < monthsNum; i += 1) {
+            const d = new Date(baseDate);
+            d.setMonth(d.getMonth() + i);
+            d.setDate(dueDayNum);
+            const dueDateStr = d.toISOString().split("T")[0];
+            installments.push({
+              plan_id: planData.id,
+              installment_no: i + 1,
+              due_date: dueDateStr,
+              amount_due: monthlyNum,
+              status: "upcoming",
+            });
+          }
+
+          const { error: instError } = await supabase
+            .from("installment_payments")
+            .insert(installments);
+
+          if (instError) {
+            setSubmitting(false);
+            toast.error("Plan created but failed to create installments: " + instError.message);
+            return;
+          }
         }
       }
     }
@@ -580,6 +711,96 @@ export function StatusCustomerDialog({
                           </Select>
                         </div>
                       </div>
+                      {newStatus === "sold" && (
+                        <div className="space-y-3 rounded-md border p-3">
+                          <p className="text-sm font-medium">Payment Type</p>
+                          <div className="grid gap-4 sm:grid-cols-2">
+                            <div className="space-y-2">
+                              <Label>Payment type</Label>
+                              <Select
+                                value={paymentType}
+                                onValueChange={(v) =>
+                                  setPaymentType(v as "full" | "installments")
+                                }
+                              >
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="full">Full</SelectItem>
+                                  <SelectItem value="installments">
+                                    Installments
+                                  </SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                          {paymentType === "installments" && (
+                            <div className="grid gap-4 sm:grid-cols-2">
+                              <div className="space-y-2">
+                                <Label>Total amount *</Label>
+                                <Input
+                                  value={planTotalAmount}
+                                  onChange={(e) => setPlanTotalAmount(e.target.value)}
+                                  type="number"
+                                  min={0}
+                                  step="0.01"
+                                  placeholder="Full car price"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Down payment</Label>
+                                <Input
+                                  value={planDownPayment}
+                                  onChange={(e) => setPlanDownPayment(e.target.value)}
+                                  type="number"
+                                  min={0}
+                                  step="0.01"
+                                  placeholder="0 if none"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Number of months *</Label>
+                                <Input
+                                  value={planMonths}
+                                  onChange={(e) => setPlanMonths(e.target.value)}
+                                  type="number"
+                                  min={1}
+                                  step={1}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Monthly amount *</Label>
+                                <Input
+                                  value={planMonthlyAmount}
+                                  onChange={(e) => setPlanMonthlyAmount(e.target.value)}
+                                  type="number"
+                                  min={0}
+                                  step="0.01"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Start date *</Label>
+                                <Input
+                                  value={planStartDate}
+                                  onChange={(e) => setPlanStartDate(e.target.value)}
+                                  type="date"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Due day (1–28) *</Label>
+                                <Input
+                                  value={planDueDay}
+                                  onChange={(e) => setPlanDueDay(e.target.value)}
+                                  type="number"
+                                  min={1}
+                                  max={28}
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </>
                   )}
                 </div>

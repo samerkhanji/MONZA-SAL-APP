@@ -351,3 +351,40 @@ export interface Request {
   created_at: string;
   updated_at: string;
 }
+
+export type PaymentPlanStatus = "active" | "completed" | "defaulted" | "cancelled";
+
+export interface PaymentPlan {
+  id: string;
+  customer_id: string;
+  car_id: string | null;
+  status: PaymentPlanStatus;
+  total_amount: number;
+  down_payment: number;
+  monthly_amount: number;
+  months: number;
+  start_date: string;
+  due_day: number;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type InstallmentStatus = "upcoming" | "due" | "overdue" | "paid";
+
+export interface InstallmentPayment {
+  id: string;
+  plan_id: string;
+  installment_no: number;
+  due_date: string;
+  amount_due: number;
+  status: InstallmentStatus;
+  paid_at: string | null;
+  paid_amount: number | null;
+  payment_method: string | null;
+  receipt_url: string | null;
+  note: string | null;
+  marked_paid_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
