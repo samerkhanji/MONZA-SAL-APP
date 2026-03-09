@@ -147,7 +147,9 @@ export default function AssistantDashboardPage() {
         .eq("status", "pending"),
       supabase
         .from("cars")
-        .select("id, vin, brand, model, warranty_per_dms, warranty_monza_start_date")
+        .select(
+          "id, vin, brand, model, warranty_per_dms, warranty_vehicle_expiry, warranty_battery_expiry, warranty_expiry, warranty_monza_start_date"
+        )
         .is("deleted_at", null),
       supabase
         .from("requests")
@@ -193,15 +195,19 @@ export default function AssistantDashboardPage() {
         brand: string;
         model: string;
         warranty_per_dms: string | null;
+        warranty_vehicle_expiry: string | null;
+        warranty_battery_expiry: string | null;
+        warranty_expiry: string | null;
         warranty_monza_start_date: string | null;
       };
       const dates: Array<{ type: string; date: string }> = [];
-      if (c.warranty_per_dms) dates.push({ type: "DMS (per)", date: c.warranty_per_dms });
-      if (c.warranty_monza_start_date) {
-        const start = new Date(c.warranty_monza_start_date);
-        start.setFullYear(start.getFullYear() + 2);
-        dates.push({ type: "Monza", date: start.toISOString().slice(0, 10) });
-      }
+      if (c.warranty_per_dms) dates.push({ type: "DMS", date: c.warranty_per_dms });
+      const vehicleExpiry =
+        c.warranty_vehicle_expiry ??
+        c.warranty_expiry ??
+        c.warranty_monza_start_date;
+      if (vehicleExpiry) dates.push({ type: "Vehicle", date: vehicleExpiry });
+      if (c.warranty_battery_expiry) dates.push({ type: "Battery", date: c.warranty_battery_expiry });
       for (const d of dates) {
         const expiry = new Date(d.date);
         const daysLeft = Math.ceil((expiry.getTime() - now.getTime()) / 86400000);

@@ -52,19 +52,19 @@ import {
   CheckCircle2,
   FileText,
   Inbox,
+  Users,
+  UserPlus,
 } from "lucide-react";
 import { LEAD_SOURCE_LABELS, LANGUAGE_LABELS } from "@/lib/constants/customers";
 
-interface InstallmentWithRelations extends InstallmentPayment {
-  plan: PaymentPlan;
-  customer: Customer;
-  car: Car | null;
-}
-
 interface PlanWithRelations extends PaymentPlan {
-  customer: Customer;
+  customer: Customer | null;
   car: Car | null;
   installments: InstallmentPayment[];
+}
+
+interface InstallmentWithRelations extends InstallmentPayment {
+  plan: PlanWithRelations | null;
 }
 
 const currencyFormatter = new Intl.NumberFormat("en-US", {
@@ -125,6 +125,7 @@ export default function InstallmentsPage() {
       modelYear: number | null;
       status: string;
       exterior_color: string | null;
+      client_name?: string | null;
     }[]
   >([]);
   const [loadingCustomerCars, setLoadingCustomerCars] = useState(false);
@@ -168,6 +169,7 @@ export default function InstallmentsPage() {
           due_date,
           status,
           plan:payment_plans(
+            *,
             customer:customers(first_name, last_name),
             car:cars(model, vin)
           )
@@ -219,6 +221,7 @@ export default function InstallmentsPage() {
           due_date,
           status,
           plan:payment_plans(
+            *,
             customer:customers(first_name, last_name),
             car:cars(model, vin)
           )
@@ -291,9 +294,11 @@ export default function InstallmentsPage() {
             .select(
               `
           *,
-          plan:payment_plans(*),
-          customer:customers(*),
-          car:cars(*)
+          plan:payment_plans(
+            *,
+            customer:customers(*),
+            car:cars(*)
+          )
         `
             ),
           supabase
@@ -430,6 +435,13 @@ export default function InstallmentsPage() {
     [plans]
   );
 
+  // Auto-load initial cars when entering the link-car step with no search term/results yet.
+  useEffect(() => {
+    if (newPlanStep === "linkCar" && !linkCarSearch && linkCarResults.length === 0) {
+      void searchCarsForLinking("");
+    }
+  }, [newPlanStep, linkCarSearch, linkCarResults.length]);
+
   function openNewPlan() {
     if (!canCreatePlan) return;
     setNewPlanOpen(true);
@@ -495,19 +507,40 @@ export default function InstallmentsPage() {
             model_year?: number | null;
             exterior_color?: string | null;
             status?: string;
+            client_name?: string | null;
           }
         | null;
       if (!car?.id) return;
-      if (car.status !== "sold") return;
-      if (activePlanCarIds.has(car.id)) return;
-      options.push({
+      if (
+        ![
+          "sold",
+          "in_stock",
+          "showroom",
+          "registered",
+          "under_registration",
+        ].includes((car.status ?? "") as string)
+      )
+        return;
+      const option: {
+        carId: string;
+        model: string;
+        vin: string;
+        modelYear: number | null;
+        status: string;
+        exterior_color: string | null;
+        client_name?: string | null;
+      } = {
         carId: car.id,
         model: car.model ?? "",
         vin: car.vin ?? "",
         modelYear: car.model_year ?? null,
         status: car.status ?? "",
         exterior_color: car.exterior_color ?? null,
-      });
+      };
+      if (typeof car.client_name !== "undefined") {
+        option.client_name = car.client_name ?? null;
+      }
+      options.push(option);
     });
 
     setCustomerCarOptions(options);
@@ -515,23 +548,40 @@ export default function InstallmentsPage() {
 
   async function searchCarsForLinking(term: string) {
     setLinkCarSearch(term);
-    if (!term.trim()) {
-      setLinkCarResults([]);
-      return;
-    }
     setLinkCarLoading(true);
-    const { data, error } = await supabase
+
+    const trimmed = term.trim();
+
+    let query = supabase
       .from("cars")
-      .select("*")
-      .eq("status", "sold")
-      .or(`vin.ilike.%${term}%,model.ilike.%${term}%`);
+      .select(
+        "id, vin, brand, model, model_year, exterior_color, interior_color, status, client_name"
+      )
+      .in("status", [
+        "available",
+        "in_stock",
+        "showroom",
+        "inbound",
+        "registered",
+        "under_registration",
+      ])
+      .order("model_year", { ascending: false })
+      .limit(20);
+
+    if (trimmed) {
+      query = query.or(
+        `vin.ilike.%${trimmed}%,model.ilike.%${trimmed}%,brand.ilike.%${trimmed}%`
+      );
+    }
+
+    const { data, error } = await query;
+
     setLinkCarLoading(false);
     if (error || !data) {
       setLinkCarResults([]);
       return;
     }
-    const filtered = (data as Car[]).filter((c) => !activePlanCarIds.has(c.id));
-    setLinkCarResults(filtered);
+    setLinkCarResults(data as Car[]);
   }
 
   const schedulePreview = useMemo(() => {
@@ -636,9 +686,11 @@ export default function InstallmentsPage() {
         ? remaining.every((r) => r.status === "paid")
         : false;
 
-    const customerName = formatName(selectedInstallment.customer);
-    const carModel = selectedInstallment.car
-      ? `${selectedInstallment.car.model} (${selectedInstallment.car.vin})`
+    const planCustomer = selectedInstallment.plan?.customer ?? null;
+    const planCar = selectedInstallment.plan?.car ?? null;
+    const customerName = planCustomer ? formatName(planCustomer) : "Customer";
+    const carModel = planCar
+      ? `${planCar.model} (${planCar.vin})`
       : "N/A";
 
     if (allPaid) {
@@ -688,9 +740,11 @@ export default function InstallmentsPage() {
       .select(
         `
         *,
-        plan:payment_plans(*),
-        customer:customers(*),
-        car:cars(*)
+        plan:payment_plans(
+          *,
+          customer:customers(*),
+          car:cars(*)
+        )
       `
       );
     setInstallments((refreshed as InstallmentWithRelations[]) || []);
@@ -718,16 +772,20 @@ export default function InstallmentsPage() {
   ];
 
   const mapDueForExport = (rows: InstallmentWithRelations[]) =>
-    rows.map((i) => ({
-      customer_name: formatName(i.customer),
-      customer_phone: i.customer.phone_primary,
-      car_label: i.car ? `${i.car.model} (${i.car.vin})` : "—",
-      installment_label: `#${i.installment_no} of ${i.plan.months}`,
-      due_date: i.due_date,
-      amount_due: i.amount_due,
-      status: i.status,
-      days_late: i.status === "overdue" ? daysLate(i.due_date) : 0,
-    }));
+    rows.map((i) => {
+      const customer = i.plan?.customer as Customer | null;
+      const car = i.plan?.car as Car | null;
+      return {
+        customer_name: customer ? formatName(customer) : "Customer",
+        customer_phone: customer?.phone_primary ?? "",
+        car_label: car ? `${car.model} (${car.vin})` : "—",
+        installment_label: `#${i.installment_no} of ${i.plan?.months ?? ""}`,
+        due_date: i.due_date,
+        amount_due: i.amount_due,
+        status: i.status,
+        days_late: i.status === "overdue" ? daysLate(i.due_date) : 0,
+      };
+    });
 
   const upcomingColumns: ExportColumn[] = [
     { key: "customer_name", header: "Customer" },
@@ -739,14 +797,18 @@ export default function InstallmentsPage() {
   ];
 
   const mapUpcomingForExport = (rows: InstallmentWithRelations[]) =>
-    rows.map((i) => ({
-      customer_name: formatName(i.customer),
-      customer_phone: i.customer.phone_primary,
-      car_label: i.car ? `${i.car.model} (${i.car.vin})` : "—",
-      installment_label: `#${i.installment_no} of ${i.plan.months}`,
-      due_date: i.due_date,
-      amount_due: i.amount_due,
-    }));
+    rows.map((i) => {
+      const customer = i.plan?.customer as Customer | null;
+      const car = i.plan?.car as Car | null;
+      return {
+        customer_name: customer ? formatName(customer) : "Customer",
+        customer_phone: customer?.phone_primary ?? "",
+        car_label: car ? `${car.model} (${car.vin})` : "—",
+        installment_label: `#${i.installment_no} of ${i.plan?.months ?? ""}`,
+        due_date: i.due_date,
+        amount_due: i.amount_due,
+      };
+    });
 
   const paidColumns: ExportColumn[] = [
     { key: "customer_name", header: "Customer" },
@@ -759,15 +821,19 @@ export default function InstallmentsPage() {
   ];
 
   const mapPaidForExport = (rows: InstallmentWithRelations[]) =>
-    rows.map((i) => ({
-      customer_name: formatName(i.customer),
-      car_label: i.car ? `${i.car.model} (${i.car.vin})` : "—",
-      installment_label: `#${i.installment_no} of ${i.plan.months}`,
-      due_date: i.due_date,
-      paid_date: i.paid_at,
-      amount_paid: i.paid_amount ?? 0,
-      payment_method: i.payment_method ?? "",
-    }));
+    rows.map((i) => {
+      const customer = i.plan?.customer as Customer | null;
+      const car = i.plan?.car as Car | null;
+      return {
+        customer_name: customer ? formatName(customer) : "Customer",
+        car_label: car ? `${car.model} (${car.vin})` : "—",
+        installment_label: `#${i.installment_no} of ${i.plan?.months ?? ""}`,
+        due_date: i.due_date,
+        paid_date: i.paid_at,
+        amount_paid: i.paid_amount ?? 0,
+        payment_method: i.payment_method ?? "",
+      };
+    });
 
   const plansColumns: ExportColumn[] = [
     { key: "customer_name", header: "Customer" },
@@ -788,7 +854,7 @@ export default function InstallmentsPage() {
       const paidCount = p.installments.filter((i) => i.status === "paid").length;
       const totalCount = p.installments.length;
       return {
-        customer_name: formatName(p.customer),
+        customer_name: p.customer ? formatName(p.customer) : "Customer",
         car_label: p.car ? `${p.car.model} (${p.car.vin})` : "—",
         status: p.status,
         total_amount: p.total_amount,
@@ -827,9 +893,10 @@ export default function InstallmentsPage() {
         )}
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+      <div className="overflow-x-auto">
+        <div className="grid min-w-[960px] gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
         <Card
-          className={`flex flex-col justify-between rounded-lg border bg-card p-4 ${
+          className={`flex flex-col justify-between rounded-lg border bg-card p-6 ${
             hasOverdue
               ? "border-l-4 border-l-red-500"
               : dueCount > 0
@@ -846,13 +913,13 @@ export default function InstallmentsPage() {
             </div>
           </CardHeader>
           <CardContent className="mt-3 p-0">
-            <div className="text-2xl font-semibold">
+            <div className="text-2xl font-bold">
               {currencyFormatter.format(overview.totalDue || 0)}
             </div>
           </CardContent>
         </Card>
 
-        <Card className="flex flex-col justify-between rounded-lg border border-l-4 border-l-red-500 bg-card p-4">
+        <Card className="flex flex-col justify-between rounded-lg border border-l-4 border-l-red-500 bg-card p-6">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 p-0">
             <div className="flex items-center gap-2">
               <AlertTriangle className="size-4 text-muted-foreground" />
@@ -862,13 +929,13 @@ export default function InstallmentsPage() {
             </div>
           </CardHeader>
           <CardContent className="mt-3 p-0">
-            <div className="text-2xl font-semibold text-red-600">
+            <div className="text-2xl font-bold text-red-600">
               {overview.overdueCount}
             </div>
           </CardContent>
         </Card>
 
-        <Card className="flex flex-col justify-between rounded-lg border border-l-4 border-l-amber-400 bg-card p-4">
+        <Card className="flex flex-col justify-between rounded-lg border border-l-4 border-l-amber-400 bg-card p-6">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 p-0">
             <div className="flex items-center gap-2">
               <Calendar className="size-4 text-muted-foreground" />
@@ -878,13 +945,13 @@ export default function InstallmentsPage() {
             </div>
           </CardHeader>
           <CardContent className="mt-3 p-0">
-            <div className="text-2xl font-semibold text-amber-600">
+            <div className="text-2xl font-bold text-amber-600">
               {overview.dueThisMonth}
             </div>
           </CardContent>
         </Card>
 
-        <Card className="flex flex-col justify-between rounded-lg border border-l-4 border-l-emerald-500 bg-card p-4">
+        <Card className="flex flex-col justify-between rounded-lg border border-l-4 border-l-emerald-500 bg-card p-6">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 p-0">
             <div className="flex items-center gap-2">
               <CheckCircle2 className="size-4 text-muted-foreground" />
@@ -894,13 +961,13 @@ export default function InstallmentsPage() {
             </div>
           </CardHeader>
           <CardContent className="mt-3 p-0">
-            <div className="text-2xl font-semibold text-green-600">
+            <div className="text-2xl font-bold text-green-600">
               {currencyFormatter.format(overview.collectedThisMonth || 0)}
             </div>
           </CardContent>
         </Card>
 
-        <Card className="flex flex-col justify-between rounded-lg border border-l-4 border-l-slate-500 bg-card p-4">
+        <Card className="flex flex-col justify-between rounded-lg border border-l-4 border-l-slate-500 bg-card p-6">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 p-0">
             <div className="flex items-center gap-2">
               <FileText className="size-4 text-muted-foreground" />
@@ -910,19 +977,20 @@ export default function InstallmentsPage() {
             </div>
           </CardHeader>
           <CardContent className="mt-3 p-0">
-            <div className="text-2xl font-semibold">
+            <div className="text-2xl font-bold">
               {overview.activePlans}
             </div>
           </CardContent>
         </Card>
+        </div>
       </div>
 
       <Tabs defaultValue={defaultTab} className="space-y-4">
-        <div className="border-b border-border">
-          <TabsList className="h-auto gap-2 border-b-0 bg-transparent p-0">
+        <div className="border-b border-border overflow-x-auto">
+          <TabsList className="inline-flex h-auto gap-2 border-b-0 bg-transparent p-0">
             <TabsTrigger
               value="due"
-              className="relative rounded-none border-b-2 border-transparent px-3 py-2 text-sm font-medium text-muted-foreground data-[state=active]:border-amber-500 data-[state=active]:text-foreground"
+              className="relative rounded-none border-b-[3px] border-transparent px-3 py-2 text-sm font-medium text-muted-foreground data-[state=active]:border-amber-500 data-[state=active]:text-foreground outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
             >
               <span>Due</span>
               <Badge
@@ -940,7 +1008,7 @@ export default function InstallmentsPage() {
             </TabsTrigger>
             <TabsTrigger
               value="upcoming"
-              className="relative rounded-none border-b-2 border-transparent px-3 py-2 text-sm font-medium text-muted-foreground data-[state=active]:border-amber-500 data-[state=active]:text-foreground"
+              className="relative rounded-none border-b-[3px] border-transparent px-3 py-2 text-sm font-medium text-muted-foreground data-[state=active]:border-amber-500 data-[state=active]:text-foreground outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
             >
               <span>Upcoming</span>
               <Badge
@@ -952,19 +1020,21 @@ export default function InstallmentsPage() {
             </TabsTrigger>
             <TabsTrigger
               value="paid"
-              className="relative rounded-none border-b-2 border-transparent px-3 py-2 text-sm font-medium text-muted-foreground data-[state=active]:border-amber-500 data-[state=active]:text-foreground"
+              className="relative rounded-none border-b-[3px] border-transparent px-3 py-2 text-sm font-medium text-muted-foreground data-[state=active]:border-amber-500 data-[state=active]:text-foreground outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
             >
               <span>Paid</span>
               <Badge
                 variant="secondary"
-                className="ml-2 h-5 px-2 text-xs font-semibold bg-emerald-500 text-white"
+                className={`ml-2 h-5 px-2 text-xs font-semibold ${
+                  paidCount > 0 ? "bg-emerald-500 text-white" : ""
+                }`}
               >
                 {paidCount}
               </Badge>
             </TabsTrigger>
             <TabsTrigger
               value="plans"
-              className="relative rounded-none border-b-2 border-transparent px-3 py-2 text-sm font-medium text-muted-foreground data-[state=active]:border-amber-500 data-[state=active]:text-foreground"
+              className="relative rounded-none border-b-[3px] border-transparent px-3 py-2 text-sm font-medium text-muted-foreground data-[state=active]:border-amber-500 data-[state=active]:text-foreground outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
             >
               <span>Plans</span>
               <Badge
@@ -1014,14 +1084,22 @@ export default function InstallmentsPage() {
                       className={`${rowClass} hover:bg-slate-100`}
                     >
                       <TableCell className="font-medium">
-                        {formatName(i.customer)}
-                      </TableCell>
-                      <TableCell>{i.customer.phone_primary}</TableCell>
-                      <TableCell>
-                        {i.car ? `${i.car.model} (${i.car.vin})` : "—"}
+                        {i.plan?.customer
+                          ? formatName(i.plan.customer as Customer)
+                          : "Customer"}
                       </TableCell>
                       <TableCell>
-                        #{i.installment_no} of {i.plan.months}
+                        {i.plan?.customer
+                          ? (i.plan.customer as Customer).phone_primary
+                          : ""}
+                      </TableCell>
+                      <TableCell>
+                        {i.plan?.car
+                          ? `${(i.plan.car as Car).model} (${(i.plan.car as Car).vin})`
+                          : "—"}
+                      </TableCell>
+                      <TableCell>
+                        #{i.installment_no} of {i.plan?.months ?? ""}
                       </TableCell>
                       <TableCell className="text-center">
                         {format(new Date(i.due_date), "dd/MM/yyyy")}
@@ -1102,14 +1180,22 @@ export default function InstallmentsPage() {
                     className="odd:bg-slate-50 hover:bg-slate-100"
                   >
                     <TableCell className="font-medium">
-                      {formatName(i.customer)}
-                    </TableCell>
-                    <TableCell>{i.customer.phone_primary}</TableCell>
-                    <TableCell>
-                      {i.car ? `${i.car.model} (${i.car.vin})` : "—"}
+                      {i.plan?.customer
+                        ? formatName(i.plan.customer as Customer)
+                        : "Customer"}
                     </TableCell>
                     <TableCell>
-                      #{i.installment_no} of {i.plan.months}
+                      {i.plan?.customer
+                        ? (i.plan.customer as Customer).phone_primary
+                        : ""}
+                    </TableCell>
+                    <TableCell>
+                      {i.plan?.car
+                        ? `${(i.plan.car as Car).model} (${(i.plan.car as Car).vin})`
+                        : "—"}
+                    </TableCell>
+                    <TableCell>
+                      #{i.installment_no} of {i.plan?.months ?? ""}
                     </TableCell>
                     <TableCell className="text-center">
                       {format(new Date(i.due_date), "dd/MM/yyyy")}
@@ -1180,13 +1266,17 @@ export default function InstallmentsPage() {
                     className="bg-emerald-50 odd:bg-emerald-50 hover:bg-emerald-100"
                   >
                     <TableCell className="font-medium">
-                      {formatName(i.customer)}
+                      {i.plan?.customer
+                        ? formatName(i.plan.customer as Customer)
+                        : "Customer"}
                     </TableCell>
                     <TableCell>
-                      {i.car ? `${i.car.model} (${i.car.vin})` : "—"}
+                      {i.plan?.car
+                        ? `${(i.plan.car as Car).model} (${(i.plan.car as Car).vin})`
+                        : "—"}
                     </TableCell>
                     <TableCell>
-                      #{i.installment_no} of {i.plan.months}
+                      #{i.installment_no} of {i.plan?.months ?? ""}
                     </TableCell>
                     <TableCell className="text-center">
                       {format(new Date(i.due_date), "dd/MM/yyyy")}
@@ -1266,13 +1356,13 @@ export default function InstallmentsPage() {
                   if (p.status === "cancelled") badgeColor = "bg-slate-100 text-slate-800";
 
                   return (
-                    <TableRow key={p.id}>
-                      <TableCell className="font-medium">
-                        {formatName(p.customer)}
-                      </TableCell>
-                      <TableCell>
-                        {p.car ? `${p.car.model} (${p.car.vin})` : "—"}
-                      </TableCell>
+                  <TableRow key={p.id}>
+                    <TableCell className="font-medium">
+                      {p.customer ? formatName(p.customer) : "Customer"}
+                    </TableCell>
+                    <TableCell>
+                      {p.car ? `${p.car.model} (${p.car.vin})` : "—"}
+                    </TableCell>
                       <TableCell>
                         <Badge className={badgeColor}>{p.status}</Badge>
                       </TableCell>
@@ -1331,7 +1421,7 @@ export default function InstallmentsPage() {
       </Tabs>
 
       <Dialog open={markPaidOpen} onOpenChange={setMarkPaidOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-xl bg-background p-6 sm:p-8">
           <DialogHeader>
             <DialogTitle>Mark Installment as Paid</DialogTitle>
           </DialogHeader>
@@ -1340,16 +1430,20 @@ export default function InstallmentsPage() {
               <div className="text-sm text-muted-foreground">
                 <div>
                   <span className="font-medium">
-                    {formatName(selectedInstallment.customer)}
+                    {selectedInstallment.plan?.customer
+                      ? formatName(selectedInstallment.plan.customer as Customer)
+                      : "Customer"}
                   </span>{" "}
                   ·{" "}
-                  {selectedInstallment.car
-                    ? `${selectedInstallment.car.model} (${selectedInstallment.car.vin})`
+                  {selectedInstallment.plan?.car
+                    ? `${(selectedInstallment.plan.car as Car).model} (${(
+                        selectedInstallment.plan.car as Car
+                      ).vin})`
                     : "No car linked"}
                 </div>
                 <div>
                   Installment #{selectedInstallment.installment_no} of{" "}
-                  {selectedInstallment.plan.months} · Due{" "}
+                  {selectedInstallment.plan?.months ?? ""} · Due{" "}
                   {format(new Date(selectedInstallment.due_date), "dd/MM/yyyy")}
                 </div>
                 <div>
@@ -1434,7 +1528,7 @@ export default function InstallmentsPage() {
           }
         }}
       >
-        <DialogContent>
+        <DialogContent className="max-w-2xl bg-background">
           <DialogHeader>
             <DialogTitle>New Payment Plan</DialogTitle>
           </DialogHeader>
@@ -1444,24 +1538,26 @@ export default function InstallmentsPage() {
                 <p className="text-sm text-muted-foreground">
                   How would you like to create this payment plan?
                 </p>
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-4 sm:grid-cols-2 items-stretch">
                   <Button
                     variant="outline"
-                    className="h-auto flex-col items-start gap-2 p-4 text-left"
+                    className="flex h-full min-h-[150px] w-full flex-col items-start gap-4 rounded-lg border bg-card p-6 text-left hover:border-amber-500 hover:bg-muted/60 focus-visible:outline-none"
                     onClick={() => setNewPlanStep("existingCustomer")}
                   >
+                    <Users className="mb-2 size-6 text-muted-foreground" />
                     <span className="font-medium">Existing Customer</span>
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-xs text-muted-foreground break-words whitespace-normal">
                       Search existing customers, pick a sold car, then create the plan.
                     </span>
                   </Button>
                   <Button
                     variant="outline"
-                    className="h-auto flex-col items-start gap-2 p-4 text-left"
+                    className="flex h-full min-h-[150px] w-full flex-col items-start gap-4 rounded-lg border bg-card p-6 text-left hover:border-amber-500 hover:bg-muted/60 focus-visible:outline-none"
                     onClick={() => setNewPlanStep("newCustomer")}
                   >
+                    <UserPlus className="mb-2 size-6 text-muted-foreground" />
                     <span className="font-medium">New Customer</span>
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-xs text-muted-foreground break-words whitespace-normal">
                       Add a new customer, optionally link a car, then create the plan.
                     </span>
                   </Button>
@@ -1604,6 +1700,19 @@ export default function InstallmentsPage() {
                           type="button"
                           className="flex w-full items-center justify-between border-b px-3 py-2 text-left text-sm hover:bg-muted"
                           onClick={() => {
+                            const hasPlan = activePlanCarIds.has(car.carId);
+                            if (hasPlan) {
+                              const ok = window.confirm(
+                                "This car already has an active payment plan. Do you want to create another plan for it?"
+                              );
+                              if (!ok) return;
+                            }
+                            if (car.client_name) {
+                              const okClient = window.confirm(
+                                `This car is currently linked to ${car.client_name}. Selecting it will reassign it to the current customer. Continue?`
+                              );
+                              if (!okClient) return;
+                            }
                             setSelectedCar({
                               id: car.carId,
                               model: car.model,
@@ -1623,6 +1732,11 @@ export default function InstallmentsPage() {
                               {car.modelYear ? `Year: ${car.modelYear} · ` : ""}
                               {car.exterior_color || ""}
                             </div>
+                            {car.client_name && (
+                              <div className="text-xs text-amber-700">
+                                Current client: {car.client_name}
+                              </div>
+                            )}
                           </div>
                           <div className="text-xs text-muted-foreground">
                             Status: {car.status}
@@ -2204,13 +2318,58 @@ export default function InstallmentsPage() {
                         return;
                       }
 
-                      const customerName =
+                      const customer =
                         selectedCustomer && selectedCustomer.id === newPlanCustomerId
-                          ? formatName(selectedCustomer)
-                          : "Customer";
+                          ? selectedCustomer
+                          : null;
+                      const customerName = customer
+                        ? formatName(customer)
+                        : "Customer";
                       const carLabel = selectedCar
                         ? `${selectedCar.model} (${selectedCar.vin})`
                         : "No car linked";
+
+                      // Link car and sales order if we have both customer and car
+                      if (customer && newPlanCarId) {
+                        const carUpdate: Record<string, unknown> = {
+                          status: "sold",
+                          sold_marker: "X",
+                          client_name: formatName(customer),
+                          client_phone: customer.phone_primary,
+                        };
+                        await supabase
+                          .from("cars")
+                          .update(carUpdate)
+                          .eq("id", newPlanCarId);
+
+                        const { data: existingSale } = await supabase
+                          .from("sales_orders")
+                          .select("id")
+                          .eq("car_id", newPlanCarId)
+                          .eq("customer_id", newPlanCustomerId)
+                          .not("status", "eq", "cancelled")
+                          .limit(1)
+                          .maybeSingle();
+
+                        if (!existingSale) {
+                          await supabase.from("sales_orders").insert({
+                            car_id: newPlanCarId,
+                            customer_id: newPlanCustomerId,
+                            status: "confirmed",
+                            selling_price: totalNum,
+                            currency: "USD",
+                            created_by: creatorId,
+                          });
+                        }
+                      }
+
+                      // Ensure customer status is converted
+                      if (newPlanCustomerId) {
+                        await supabase
+                          .from("customers")
+                          .update({ lead_status: "converted" })
+                          .eq("id", newPlanCustomerId);
+                      }
 
                       const { data: owners } = await supabase
                         .from("profiles")
@@ -2244,9 +2403,11 @@ export default function InstallmentsPage() {
                           .select(
                             `
                             *,
-                            plan:payment_plans(*),
-                            customer:customers(*),
-                            car:cars(*)
+                            plan:payment_plans(
+                              *,
+                              customer:customers(*),
+                              car:cars(*)
+                            )
                           `
                           ),
                         supabase

@@ -39,7 +39,9 @@ export function WarrantyNotificationChecker() {
 
       const { data } = await supabase
         .from("cars")
-        .select("id, vin, brand, model, warranty_per_dms, warranty_expiry, warranty_monza_start_date")
+        .select(
+          "id, vin, brand, model, warranty_per_dms, warranty_vehicle_expiry, warranty_battery_expiry, warranty_expiry, warranty_monza_start_date"
+        )
         .is("deleted_at", null);
 
       const cars = (data ?? []).map((car: any) => ({
@@ -48,6 +50,8 @@ export function WarrantyNotificationChecker() {
         brand: car.brand as string,
         model: car.model as string,
         warranty_per_dms: car.warranty_per_dms as string | null,
+        warranty_vehicle_expiry: car.warranty_vehicle_expiry as string | null,
+        warranty_battery_expiry: car.warranty_battery_expiry as string | null,
         warranty_expiry: car.warranty_expiry as string | null,
         warranty_monza_start_date: car.warranty_monza_start_date as string | null,
       }));
@@ -89,9 +93,12 @@ export function WarrantyNotificationChecker() {
             }
           }
 
-          const monzaExpiry = car.warranty_expiry ?? car.warranty_monza_start_date;
-          if (monzaExpiry) {
-            const expiry = new Date(monzaExpiry);
+          const vehicleExpiry =
+            car.warranty_vehicle_expiry ??
+            car.warranty_expiry ??
+            car.warranty_monza_start_date;
+          if (vehicleExpiry) {
+            const expiry = new Date(vehicleExpiry);
             expiry.setHours(0, 0, 0, 0);
             const diffDays = Math.round((expiry.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
             if (diffDays === days) {
@@ -99,20 +106,48 @@ export function WarrantyNotificationChecker() {
                 .from("warranty_notifications_sent")
                 .select("id")
                 .eq("car_id", car.id)
-                .eq("warranty_type", "monza")
+                .eq("warranty_type", "vehicle")
                 .eq("threshold_days", days)
                 .limit(1);
               if (existing && existing.length > 0) continue;
 
               await createNotificationsForUsers(
                 recipientIds,
-                "Warranty alert (Monza)",
-                `Warranty alert (Monza): VIN ${car.vin} — ${makeModel} warranty expires in ${days} days (${monzaExpiry})`,
+                "Warranty alert (Vehicle)",
+                `Warranty alert (Vehicle): VIN ${car.vin} — ${makeModel} warranty expires in ${days} days (${vehicleExpiry})`,
                 `/cars/${car.vin}`
               );
               await supabase.from("warranty_notifications_sent").insert({
                 car_id: car.id,
-                warranty_type: "monza",
+                warranty_type: "vehicle",
+                threshold_days: days,
+              });
+            }
+          }
+
+          if (car.warranty_battery_expiry) {
+            const expiry = new Date(car.warranty_battery_expiry);
+            expiry.setHours(0, 0, 0, 0);
+            const diffDays = Math.round((expiry.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
+            if (diffDays === days) {
+              const { data: existing } = await supabase
+                .from("warranty_notifications_sent")
+                .select("id")
+                .eq("car_id", car.id)
+                .eq("warranty_type", "battery")
+                .eq("threshold_days", days)
+                .limit(1);
+              if (existing && existing.length > 0) continue;
+
+              await createNotificationsForUsers(
+                recipientIds,
+                "Warranty alert (Battery)",
+                `Warranty alert (Battery): VIN ${car.vin} — ${makeModel} warranty expires in ${days} days (${car.warranty_battery_expiry})`,
+                `/cars/${car.vin}`
+              );
+              await supabase.from("warranty_notifications_sent").insert({
+                car_id: car.id,
+                warranty_type: "battery",
                 threshold_days: days,
               });
             }

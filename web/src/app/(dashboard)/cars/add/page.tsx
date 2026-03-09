@@ -81,6 +81,8 @@ export default function AddCarPage() {
   const [plateNumber, setPlateNumber] = useState("");
   const [dateArrived, setDateArrived] = useState(todayISO());
   const [warrantyPerDms, setWarrantyPerDms] = useState("");
+  const [warrantyVehicleExpiry, setWarrantyVehicleExpiry] = useState("");
+  const [warrantyBatteryExpiry, setWarrantyBatteryExpiry] = useState("");
   const [warrantyMonzaStartDate, setWarrantyMonzaStartDate] = useState("");
   const [customsStatus, setCustomsStatus] = useState<CustomsStatus>("pending");
   const [notes, setNotes] = useState("");
@@ -212,6 +214,9 @@ export default function AddCarPage() {
       ev_km: number;
       motor_km: number;
       warranty_per_dms: string;
+      warranty_vehicle_expiry: string;
+      warranty_battery_expiry: string;
+      warranty_expiry: string;
       warranty_monza_start_date: string;
       customs_status: string;
       issue: string;
@@ -247,6 +252,11 @@ export default function AddCarPage() {
     }
 
     if (warrantyPerDms) extraFields.warranty_per_dms = warrantyPerDms;
+    if (warrantyVehicleExpiry) {
+      extraFields.warranty_vehicle_expiry = warrantyVehicleExpiry;
+      extraFields.warranty_expiry = warrantyVehicleExpiry;
+    }
+    if (warrantyBatteryExpiry) extraFields.warranty_battery_expiry = warrantyBatteryExpiry;
     if (warrantyMonzaStartDate) extraFields.warranty_monza_start_date = warrantyMonzaStartDate;
     extraFields.customs_status = customsStatus;
     const batteryNum = batteryPercent ? parseInt(batteryPercent, 10) : undefined;
@@ -536,7 +546,7 @@ export default function AddCarPage() {
               </div>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <div className="space-y-2">
                 <Label htmlFor="car-date-arrived">Date Arrived</Label>
                 <Input
@@ -548,13 +558,33 @@ export default function AddCarPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="car-warranty-dms">Warranty as per DMS</Label>
+                <Label htmlFor="car-warranty-dms">Warranty DMS</Label>
                 <Input
                   id="car-warranty-dms"
                   name="car-warranty-dms"
                   type="date"
                   value={warrantyPerDms}
                   onChange={(e) => setWarrantyPerDms(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="car-warranty-vehicle">Warranty on Vehicle (Expiry)</Label>
+                <Input
+                  id="car-warranty-vehicle"
+                  name="car-warranty-vehicle"
+                  type="date"
+                  value={warrantyVehicleExpiry}
+                  onChange={(e) => setWarrantyVehicleExpiry(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="car-warranty-battery">Warranty on Battery (Expiry)</Label>
+                <Input
+                  id="car-warranty-battery"
+                  name="car-warranty-battery"
+                  type="date"
+                  value={warrantyBatteryExpiry}
+                  onChange={(e) => setWarrantyBatteryExpiry(e.target.value)}
                 />
               </div>
               <div className="space-y-2">

@@ -188,7 +188,9 @@ Files stored in storage bucket: `customer-documents`
 | currency | TEXT | | e.g. USD |
 | sale_date | DATE | | |
 | delivery_date | DATE | | |
-| reserved_until | DATE | | For reservations |
+| reserved_until | DATE | | For reservations (legacy end date) |
+| reservation_date | DATE | | When the reservation was created (optional) |
+| reserved_by | TEXT | | Who reserved the car (free text or staff name) |
 | deposit_amount | NUMERIC | | |
 | notes | TEXT | | |
 | created_by | UUID | | → auth.users |

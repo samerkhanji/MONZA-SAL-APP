@@ -69,6 +69,8 @@ export interface Car {
   price: number | null;
   price_currency: string | null;
   warranty_expiry: string | null;
+  warranty_vehicle_expiry: string | null;
+  warranty_battery_expiry: string | null;
   warranty_per_dms: string | null;
   warranty_monza_start_date: string | null;
   customs_status: CustomsStatus;

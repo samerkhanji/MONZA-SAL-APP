@@ -157,10 +157,27 @@ function computeChecklist(car: CarDisplay): ChecklistResult {
     },
     {
       key: "warranty_per_dms",
-      label: "Warranty per DMS",
+      label: "Warranty DMS",
       section: "inspections",
       isFilled: !!car.warranty_per_dms,
       editTarget: { type: "edit", fieldId: "editWarrantyDms" },
+    },
+    {
+      key: "warranty_vehicle_expiry",
+      label: "Warranty on Vehicle (Expiry)",
+      section: "inspections",
+      isFilled:
+        !!(car as any).warranty_vehicle_expiry ||
+        !!(car as any).warranty_expiry ||
+        !!car.warranty_monza_start_date,
+      editTarget: { type: "edit", fieldId: "editWarrantyVehicle" },
+    },
+    {
+      key: "warranty_battery_expiry",
+      label: "Warranty on Battery (Expiry)",
+      section: "inspections",
+      isFilled: !!(car as any).warranty_battery_expiry,
+      editTarget: { type: "edit", fieldId: "editWarrantyBattery" },
     },
     {
       key: "warranty_monza_start_date",
@@ -321,8 +338,17 @@ export default function CarProfilePage() {
     "garage" | "maintenance"
   >("garage");
   const [salesOrder, setSalesOrder] = useState<{
-    customer: { id: string; first_name: string; last_name: string | null };
+    customer: {
+      id: string;
+      first_name: string;
+      last_name: string | null;
+      phone_primary?: string | null;
+      email?: string | null;
+    };
     status?: string;
+    delivery_date?: string | null;
+    reservation_date?: string | null;
+    reserved_by?: string | null;
   } | null>(null);
   const [linkCustomerOpen, setLinkCustomerOpen] = useState(false);
   const [checklistOpen, setChecklistOpen] = useState(false);
@@ -443,15 +469,36 @@ export default function CarProfilePage() {
     (async () => {
       const { data } = await supabase
         .from("sales_orders")
-        .select("customer_id, status, customers(id, first_name, last_name)")
+        .select(
+          "customer_id, status, delivery_date, reservation_date, reserved_by, customers(id, first_name, last_name, phone_primary, email)"
+        )
         .eq("car_id", car.id)
         .not("status", "eq", "cancelled")
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
-      const row = data as { customer_id: string; status?: string; customers: { id: string; first_name: string; last_name: string | null } | null } | null;
+      const row = data as {
+        customer_id: string;
+        status?: string;
+        delivery_date?: string | null;
+        reservation_date?: string | null;
+        reserved_by?: string | null;
+        customers: {
+          id: string;
+          first_name: string;
+          last_name: string | null;
+          phone_primary?: string | null;
+          email?: string | null;
+        } | null;
+      } | null;
       if (row?.customers) {
-        setSalesOrder({ customer: row.customers, status: row.status });
+        setSalesOrder({
+          customer: row.customers,
+          status: row.status,
+          delivery_date: row.delivery_date,
+          reservation_date: row.reservation_date,
+          reserved_by: row.reserved_by,
+        });
       } else {
         setSalesOrder(null);
       }
@@ -498,16 +545,40 @@ export default function CarProfilePage() {
     if (car?.id) {
       supabase
         .from("sales_orders")
-        .select("customer_id, customers(id, first_name, last_name)")
+        .select(
+          "customer_id, status, delivery_date, reservation_date, reserved_by, customers(id, first_name, last_name, phone_primary, email)"
+        )
         .eq("car_id", car.id)
         .not("status", "eq", "cancelled")
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle()
         .then(({ data }) => {
-          const row = data as { customer_id: string; customers: { id: string; first_name: string; last_name: string | null } | null } | null;
-          if (row?.customers) setSalesOrder({ customer: row.customers });
-          else setSalesOrder(null);
+          const row = data as {
+            customer_id: string;
+            status?: string;
+            delivery_date?: string | null;
+            reservation_date?: string | null;
+            reserved_by?: string | null;
+            customers: {
+              id: string;
+              first_name: string;
+              last_name: string | null;
+              phone_primary?: string | null;
+              email?: string | null;
+            } | null;
+          } | null;
+          if (row?.customers) {
+            setSalesOrder({
+              customer: row.customers,
+              status: row.status,
+              delivery_date: row.delivery_date,
+              reservation_date: row.reservation_date,
+              reserved_by: row.reserved_by,
+            });
+          } else {
+            setSalesOrder(null);
+          }
         });
     }
   }
@@ -1196,7 +1267,7 @@ export default function CarProfilePage() {
             </CardContent>
           </Card>
 
-          {/* Section: Customer — only show add/link prompt for statuses that need a customer */}
+          {/* Section: Customer — relational first, legacy fallback */}
           {["sold", "reserved", "sent_to_sub_dealer"].includes(car.status) && (
             <Card>
               <CardHeader>
@@ -1206,15 +1277,54 @@ export default function CarProfilePage() {
               <CardContent>
                 {salesOrder?.customer ? (
                   <Link href={`/customers/${salesOrder.customer.id}`}>
-                    <div className="flex items-center gap-3 rounded-lg bg-muted p-3 transition-colors hover:bg-accent cursor-pointer">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-500/10">
-                        <User className="h-4 w-4 text-amber-500" />
+                    <div className="flex flex-col gap-3 rounded-lg bg-muted p-3 transition-colors hover:bg-accent cursor-pointer">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-500/10">
+                          <User className="h-4 w-4 text-amber-500" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium">
+                            {salesOrder.customer.first_name}{" "}
+                            {salesOrder.customer.last_name ?? ""}
+                          </p>
+                          <p className="text-muted-foreground text-xs">
+                            View customer profile →
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm font-medium">
-                          {salesOrder.customer.first_name} {salesOrder.customer.last_name ?? ""}
+                      <div className="grid gap-1 text-xs text-muted-foreground sm:grid-cols-2">
+                        <p>
+                          <span className="font-medium">Phone:</span>{" "}
+                          {salesOrder.customer.phone_primary ??
+                            (car as { client_phone?: string }).client_phone ??
+                            "—"}
                         </p>
-                        <p className="text-muted-foreground text-xs">View customer profile →</p>
+                        <p>
+                          <span className="font-medium">Email:</span>{" "}
+                          {salesOrder.customer.email ?? "—"}
+                        </p>
+                        <p>
+                          <span className="font-medium">Reservation Date:</span>{" "}
+                          {salesOrder.reservation_date ??
+                            (car as { reservation_date?: string }).reservation_date
+                              ? new Date(
+                                  (salesOrder.reservation_date ??
+                                    (car as { reservation_date?: string })
+                                      .reservation_date) as string
+                                ).toLocaleDateString()
+                              : "—"}
+                        </p>
+                        <p>
+                          <span className="font-medium">Delivery Date:</span>{" "}
+                          {salesOrder.delivery_date ??
+                            (car as { delivery_date?: string }).delivery_date
+                              ? new Date(
+                                  (salesOrder.delivery_date ??
+                                    (car as { delivery_date?: string })
+                                      .delivery_date) as string
+                                ).toLocaleDateString()
+                              : "—"}
+                        </p>
                       </div>
                     </div>
                   </Link>

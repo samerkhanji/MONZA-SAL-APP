@@ -61,6 +61,8 @@ export function EditCarDialog({
   const [price, setPrice] = useState("");
   const [priceCurrency, setPriceCurrency] = useState("USD");
   const [warrantyPerDms, setWarrantyPerDms] = useState("");
+  const [warrantyVehicleExpiry, setWarrantyVehicleExpiry] = useState("");
+  const [warrantyBatteryExpiry, setWarrantyBatteryExpiry] = useState("");
   const [warrantyMonzaStartDate, setWarrantyMonzaStartDate] = useState("");
   const [customsStatus, setCustomsStatus] = useState<CustomsStatus>("pending");
   const [locationType, setLocationType] = useState<LocationType>("storage");
@@ -98,6 +100,13 @@ export function EditCarDialog({
       setPrice(car.price != null ? String(car.price) : "");
       setPriceCurrency(car.price_currency ?? "USD");
       setWarrantyPerDms(car.warranty_per_dms ?? "");
+      const vehicleExpiry =
+        (car as any).warranty_vehicle_expiry ??
+        (car as any).warranty_expiry ??
+        (car as any).warranty_monza_start_date ??
+        "";
+      setWarrantyVehicleExpiry(vehicleExpiry ?? "");
+      setWarrantyBatteryExpiry((car as any).warranty_battery_expiry ?? "");
       setWarrantyMonzaStartDate(car.warranty_monza_start_date ?? "");
       setCustomsStatus(car.customs_status ?? "pending");
       setLocationType(car.location_type ?? "storage");
@@ -126,6 +135,9 @@ export function EditCarDialog({
       pdi_status: pdiStatus,
       customs_status: customsStatus,
       warranty_per_dms: warrantyPerDms || null,
+      warranty_vehicle_expiry: warrantyVehicleExpiry || null,
+      warranty_battery_expiry: warrantyBatteryExpiry || null,
+      warranty_expiry: warrantyVehicleExpiry || null,
       warranty_monza_start_date: warrantyMonzaStartDate || null,
       location_type: locationType,
       location_slot: locationSlot.trim() || null,
@@ -485,9 +497,9 @@ export function EditCarDialog({
             </div>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div className="space-y-2">
-              <Label htmlFor="editWarrantyDms">Warranty as per DMS</Label>
+              <Label htmlFor="editWarrantyDms">Warranty DMS</Label>
               <Input
                 id="editWarrantyDms"
                 type="date"
@@ -496,7 +508,25 @@ export function EditCarDialog({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="editWarrantyMonza">Warranty as per Monza (Start)</Label>
+              <Label htmlFor="editWarrantyVehicle">Warranty on Vehicle (Expiry)</Label>
+              <Input
+                id="editWarrantyVehicle"
+                type="date"
+                value={warrantyVehicleExpiry}
+                onChange={(e) => setWarrantyVehicleExpiry(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="editWarrantyBattery">Warranty on Battery (Expiry)</Label>
+              <Input
+                id="editWarrantyBattery"
+                type="date"
+                value={warrantyBatteryExpiry}
+                onChange={(e) => setWarrantyBatteryExpiry(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="editWarrantyMonza">Warranty Monza Start Date</Label>
               <Input
                 id="editWarrantyMonza"
                 type="date"

@@ -151,6 +151,16 @@
   }
 }
 
+/* Hide scrollbars everywhere */
+::-webkit-scrollbar {
+  display: none;
+}
+
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
 /* Taller horizontal scrollbar for easier grabbing */
 .scrollbar-thick {
   scrollbar-width: auto;

@@ -322,6 +322,9 @@ export default function CarsListPage() {
     { key: "reservation_date", header: "Reservation Date", type: "date" },
     { key: "reserved_by", header: "Reserved By" },
     { key: "location_display", header: "Location" },
+    { key: "warranty_per_dms", header: "Warranty DMS", type: "date" },
+    { key: "warranty_vehicle_expiry", header: "Warranty Vehicle", type: "date" },
+    { key: "warranty_battery_expiry", header: "Warranty Battery", type: "date" },
   ];
 
   const carExportData = (list: CarDisplay[]) =>
@@ -517,9 +520,13 @@ export default function CarsListPage() {
                     <TableHead className="hidden whitespace-nowrap xl:table-cell">Exterior</TableHead>
                     <TableHead className="hidden whitespace-nowrap xl:table-cell">Interior</TableHead>
                     <TableHead className="whitespace-nowrap">Status</TableHead>
+                    <TableHead className="hidden whitespace-nowrap xl:table-cell">Client</TableHead>
+                    <TableHead className="hidden whitespace-nowrap xl:table-cell">Client Phone</TableHead>
+                    <TableHead className="hidden whitespace-nowrap xl:table-cell">Delivery Date</TableHead>
                     <TableHead className="hidden whitespace-nowrap lg:table-cell">Location</TableHead>
-                    <TableHead className="hidden min-w-[100px] whitespace-nowrap xl:table-cell">Warranty (DMS)</TableHead>
-                    <TableHead className="hidden min-w-[110px] whitespace-nowrap xl:table-cell">Warranty (Monza)</TableHead>
+                    <TableHead className="hidden min-w-[100px] whitespace-nowrap xl:table-cell">Warranty DMS</TableHead>
+                    <TableHead className="hidden min-w-[110px] whitespace-nowrap xl:table-cell">Warranty Vehicle</TableHead>
+                    <TableHead className="hidden min-w-[110px] whitespace-nowrap xl:table-cell">Warranty Battery</TableHead>
                     <TableHead className="whitespace-nowrap">Battery %</TableHead>
                     <TableHead className="whitespace-nowrap">PDI</TableHead>
                     <TableHead className="hidden whitespace-nowrap xl:table-cell">Customs</TableHead>
@@ -593,6 +600,17 @@ export default function CarsListPage() {
                             )}
                           </div>
                         </TableCell>
+                        <TableCell className="hidden text-sm xl:table-cell">
+                          {car.client_name ?? "—"}
+                        </TableCell>
+                        <TableCell className="hidden text-sm xl:table-cell">
+                          {car.client_phone ?? "—"}
+                        </TableCell>
+                        <TableCell className="hidden text-sm xl:table-cell">
+                          {car.delivery_date
+                            ? new Date(car.delivery_date).toLocaleDateString()
+                            : "—"}
+                        </TableCell>
                         <TableCell className="hidden max-w-[100px] truncate text-sm lg:table-cell" title={car.location_full ?? undefined}>
                           {car.location_full || "—"}
                         </TableCell>
@@ -602,8 +620,19 @@ export default function CarsListPage() {
                             : "—"}
                         </TableCell>
                         <TableCell className="hidden text-sm xl:table-cell">
-                          {car.warranty_monza_start_date
-                            ? new Date(car.warranty_monza_start_date).toLocaleDateString()
+                          {((car as any).warranty_vehicle_expiry ??
+                            (car as any).warranty_expiry ??
+                            car.warranty_monza_start_date)
+                            ? new Date(
+                                ((car as any).warranty_vehicle_expiry ??
+                                  (car as any).warranty_expiry ??
+                                  car.warranty_monza_start_date) as string
+                              ).toLocaleDateString()
+                            : "—"}
+                        </TableCell>
+                        <TableCell className="hidden text-sm xl:table-cell">
+                          {(car as any).warranty_battery_expiry
+                            ? new Date((car as any).warranty_battery_expiry as string).toLocaleDateString()
                             : "—"}
                         </TableCell>
                         <TableCell>
