@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { ChangePasswordDialog } from "@/components/settings/ChangePasswordDialog";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -24,6 +24,7 @@ import {
   BarChart3,
   FileCheck,
   CreditCard,
+  Activity,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
@@ -41,6 +42,7 @@ import { NotificationBell } from "@/components/NotificationBell";
 import { useInstall } from "@/lib/contexts/InstallContext";
 import { clearAuthSessionMarkers } from "@/lib/auth-session";
 import { cn } from "@/lib/utils";
+import { ROLES_WITH_DATA_HEALTH_ACCESS } from "@/lib/data-health-config";
 
 const BASE_NAV_ITEMS: Array<{
   href: string;
@@ -72,6 +74,7 @@ const BASE_NAV_ITEMS: Array<{
   { href: "/cars", label: "Inventory", icon: Car, tourId: "nav-cars" },
   { href: "/documents", label: "Documents", icon: FileText, tourId: "nav-documents" },
   { href: "/customers", label: "Customers", icon: Users, tourId: "nav-customers" },
+  { href: "/data-health", label: "Data Health", icon: Activity, tourId: "nav-data-health" },
   { href: "/installments", label: "Installments", icon: CreditCard, tourId: "nav-installments" },
   {
     href: "/garage",
@@ -104,6 +107,7 @@ function getPageTitle(pathname: string): string {
   if (pathname.startsWith("/cars")) return "Car Inventory";
   if (pathname.startsWith("/documents")) return "Documents";
   if (pathname.startsWith("/customers")) return "Customers";
+  if (pathname.startsWith("/data-health")) return "Data Health";
   if (pathname.startsWith("/installments")) return "Installments";
   if (pathname.startsWith("/requests/pending")) return "Pending Requests";
   if (pathname.startsWith("/requests")) return "Request Center";
@@ -136,6 +140,15 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   } = useUser();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
+  const [dataHealthCount, setDataHealthCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!appRole || !ROLES_WITH_DATA_HEALTH_ACCESS.includes(appRole)) return;
+    fetch("/api/data-health/count")
+      .then((r) => r.json())
+      .then((d) => setDataHealthCount(d.count ?? 0))
+      .catch(() => setDataHealthCount(null));
+  }, [appRole]);
 
   const navItems = useMemo(
     () =>
@@ -146,6 +159,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         }
         if (item.href === "/dashboard") {
           return appRole === "owner";
+        }
+        if (item.href === "/data-health") {
+          return appRole && ROLES_WITH_DATA_HEALTH_ACCESS.includes(appRole);
         }
         if (item.href === "/requests")
           return [
@@ -307,7 +323,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             >
               <item.icon className="size-4 shrink-0" />
               <span className="md:hidden md:group-hover:inline lg:inline">
-                {item.label}
+                {item.href === "/data-health" && dataHealthCount != null && dataHealthCount > 0
+                  ? `${item.label} (${dataHealthCount})`
+                  : item.label}
               </span>
             </Link>
           );

@@ -226,7 +226,7 @@ export default function AssistantDashboardPage() {
     warrantyItems.sort((a, b) => a.days_left - b.days_left);
     setWarrantyAlerts(warrantyItems.slice(0, 10));
 
-    const reqList = (requestsWithProfiles.data ?? []).map((r: { id: string; subject: string; category: string | null; submitted_by: string; created_at: string; profiles?: unknown }) => ({
+    const reqList = (requestsWithProfiles.data ?? []).map((r: any) => ({
       id: r.id,
       subject: r.subject,
       category: r.category,

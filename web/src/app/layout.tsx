@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import type React from "react";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/lib/contexts/ThemeContext";
 import { ThemeToaster } from "@/components/theme-toaster";
@@ -27,11 +28,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning style={{ overscrollBehaviorX: "none" } as React.CSSProperties}>
       <head>
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#F59E0B" />
-        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="Monza S.A.L." />

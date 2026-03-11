@@ -162,6 +162,15 @@
 }
 
 /* Taller horizontal scrollbar for easier grabbing */
+/* Hide scrollbar but keep scrollability */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 .scrollbar-thick {
   scrollbar-width: auto;
 }
@@ -200,4 +209,24 @@
 [data-sonner-toast][data-type="info"] {
   border-left: 4px solid #F59E0B !important;
   background: #FFFBEB !important;
+}
+
+/* Disable swipe back/forward navigation on mobile (PWA) */
+html, body {
+  overscroll-behavior-x: none;
+  touch-action: pan-y;
+}
+
+/* Mobile: prevent horizontal scroll, min touch targets, readable text */
+@media (max-width: 768px) {
+  html, body {
+    overflow-x: hidden;
+  }
+  body {
+    font-size: 14px;
+  }
+  button:not([class*="size-"]),
+  [role="button"]:not([class*="size-"]) {
+    min-height: 44px;
+  }
 }

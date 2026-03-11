@@ -1267,110 +1267,156 @@ export default function CarProfilePage() {
             </CardContent>
           </Card>
 
-          {/* Section: Customer — relational first, legacy fallback */}
+          {/* Section: Customer — relational first, legacy clearly separated */}
           {["sold", "reserved", "sent_to_sub_dealer"].includes(car.status) && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Customer</CardTitle>
-                <CardDescription>Linked buyer for this vehicle</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {salesOrder?.customer ? (
-                  <Link href={`/customers/${salesOrder.customer.id}`}>
-                    <div className="flex flex-col gap-3 rounded-lg bg-muted p-3 transition-colors hover:bg-accent cursor-pointer">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-500/10">
-                          <User className="h-4 w-4 text-amber-500" />
+            <>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Customer</CardTitle>
+                  <CardDescription>Linked buyer for this vehicle</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {salesOrder?.customer ? (
+                    <Link href={`/customers/${salesOrder.customer.id}`}>
+                      <div className="flex flex-col gap-3 rounded-lg bg-muted p-3 transition-colors hover:bg-accent cursor-pointer">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-500/10">
+                            <User className="h-4 w-4 text-amber-500" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">
+                              {salesOrder.customer.first_name}{" "}
+                              {salesOrder.customer.last_name ?? ""}
+                            </p>
+                            <p className="text-muted-foreground text-xs">
+                              View customer profile →
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-sm font-medium">
-                            {salesOrder.customer.first_name}{" "}
-                            {salesOrder.customer.last_name ?? ""}
+                        <div className="grid gap-1 text-xs text-muted-foreground sm:grid-cols-2">
+                          <p>
+                            <span className="font-medium">Phone:</span>{" "}
+                            {salesOrder.customer.phone_primary ?? "—"}
                           </p>
-                          <p className="text-muted-foreground text-xs">
-                            View customer profile →
+                          <p>
+                            <span className="font-medium">Email:</span>{" "}
+                            {salesOrder.customer.email ?? "—"}
+                          </p>
+                          <p>
+                            <span className="font-medium">Reservation Date:</span>{" "}
+                            {salesOrder.reservation_date
+                              ? new Date(salesOrder.reservation_date).toLocaleDateString()
+                              : "—"}
+                          </p>
+                          <p>
+                            <span className="font-medium">Delivery Date:</span>{" "}
+                            {salesOrder.delivery_date
+                              ? new Date(salesOrder.delivery_date).toLocaleDateString()
+                              : "—"}
                           </p>
                         </div>
                       </div>
-                      <div className="grid gap-1 text-xs text-muted-foreground sm:grid-cols-2">
-                        <p>
-                          <span className="font-medium">Phone:</span>{" "}
-                          {salesOrder.customer.phone_primary ??
-                            (car as { client_phone?: string }).client_phone ??
-                            "—"}
-                        </p>
-                        <p>
-                          <span className="font-medium">Email:</span>{" "}
-                          {salesOrder.customer.email ?? "—"}
-                        </p>
-                        <p>
-                          <span className="font-medium">Reservation Date:</span>{" "}
-                          {salesOrder.reservation_date ??
-                            (car as { reservation_date?: string }).reservation_date
-                              ? new Date(
-                                  (salesOrder.reservation_date ??
-                                    (car as { reservation_date?: string })
-                                      .reservation_date) as string
-                                ).toLocaleDateString()
-                              : "—"}
-                        </p>
-                        <p>
-                          <span className="font-medium">Delivery Date:</span>{" "}
-                          {salesOrder.delivery_date ??
-                            (car as { delivery_date?: string }).delivery_date
-                              ? new Date(
-                                  (salesOrder.delivery_date ??
-                                    (car as { delivery_date?: string })
-                                      .delivery_date) as string
-                                ).toLocaleDateString()
-                              : "—"}
+                    </Link>
+                  ) : car.client_name ? (
+                    <div className="flex items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-500/10">
+                        <User className="h-4 w-4 text-amber-500" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium">{car.client_name}</p>
+                        <p className="text-amber-600 text-xs dark:text-amber-500">
+                          Not linked to a customer profile yet
                         </p>
                       </div>
+                      {canEditInventory && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="shrink-0 text-xs"
+                          onClick={() => setLinkCustomerOpen(true)}
+                        >
+                          Link
+                        </Button>
+                      )}
                     </div>
-                  </Link>
-                ) : car.client_name ? (
-                  <div className="flex items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-500/10">
-                      <User className="h-4 w-4 text-amber-500" />
+                  ) : (
+                    <div className="flex items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-500/10">
+                        <User className="h-4 w-4 text-amber-500" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-amber-700 dark:text-amber-400">
+                          Add customer
+                        </p>
+                        <p className="text-amber-600 text-xs dark:text-amber-500">
+                          This status requires customer data
+                        </p>
+                      </div>
+                      {canEditInventory && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="shrink-0 text-xs"
+                          onClick={() => setLinkCustomerOpen(true)}
+                        >
+                          Add customer
+                        </Button>
+                      )}
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium">{car.client_name}</p>
-                      <p className="text-amber-600 text-xs dark:text-amber-500">Not linked to a customer profile yet</p>
-                    </div>
-                    {canEditInventory && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="shrink-0 text-xs"
-                        onClick={() => setLinkCustomerOpen(true)}
-                      >
-                        Link
-                      </Button>
-                    )}
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-500/10">
-                      <User className="h-4 w-4 text-amber-500" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-amber-700 dark:text-amber-400">Add customer</p>
-                      <p className="text-amber-600 text-xs dark:text-amber-500">This status requires customer data</p>
-                    </div>
-                    {canEditInventory && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="shrink-0 text-xs"
-                        onClick={() => setLinkCustomerOpen(true)}
-                      >
-                        Add customer
-                      </Button>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Legacy customer data section (visible when legacy fields still exist) */}
+              {(car.client_name ||
+                (car as { client_phone?: string }).client_phone ||
+                (car as { delivery_date?: string }).delivery_date ||
+                (car as { reservation_date?: string }).reservation_date) && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm font-medium">
+                      Legacy customer data
+                    </CardTitle>
+                    <CardDescription>
+                      Historical fields stored directly on the car row. New data
+                      uses relational links only.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="grid gap-2 text-sm sm:grid-cols-2">
+                    <p>
+                      <span className="font-medium">Client Name:</span>{" "}
+                      {car.client_name ?? "—"}
+                    </p>
+                    <p>
+                      <span className="font-medium">Client Phone:</span>{" "}
+                      {(car as { client_phone?: string }).client_phone ?? "—"}
+                    </p>
+                    <p>
+                      <span className="font-medium">Reservation Date:</span>{" "}
+                      {(car as { reservation_date?: string }).reservation_date
+                        ? new Date(
+                            (car as { reservation_date?: string })
+                              .reservation_date as string
+                          ).toLocaleDateString()
+                        : "—"}
+                    </p>
+                    <p>
+                      <span className="font-medium">Delivery Date:</span>{" "}
+                      {(car as { delivery_date?: string }).delivery_date
+                        ? new Date(
+                            (car as { delivery_date?: string })
+                              .delivery_date as string
+                          ).toLocaleDateString()
+                        : "—"}
+                    </p>
+                    <p>
+                      <span className="font-medium">Reserved By:</span>{" "}
+                      {car.reserved_by ?? "—"}
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+            </>
           )}
 
           {/* Section 2: Location & Status */}

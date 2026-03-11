@@ -153,6 +153,7 @@ async function importCars() {
       const vin = safeStr(row[vinI]).toUpperCase();
       if (!vin || vin.length !== 17) continue;
 
+      // Legacy fields client_name/client_phone are read-only; use customers + sales_orders instead
       const car = {
         vin,
         brand: safeStr(row[brandI]) || "Voyah",
@@ -168,9 +169,7 @@ async function importCars() {
         software_update: safeStr(row[swI]) || null,
         dongle: safeStr(row[dongleI]) || null,
         sold_marker: /x|yes|1|sold/i.test(safeStr(row[soldI])) ? "X" : null,
-        client_name: clientI >= 0 ? safeStr(row[clientI]) || null : null,
         delivery_date: safeDate(row[deliveryI]),
-        client_phone: safeStr(row[phoneI]) || null,
         reserved_by: safeStr(row[reservedI]) || null,
       };
       if (plateI >= 0 && safeStr(row[plateI])) car.plate_number = safeStr(row[plateI]);
@@ -226,6 +225,7 @@ async function importCars() {
       if (!vin || vin.length !== 17) continue;
 
       const existing = carsByVin.get(vin) || {};
+      // Legacy fields client_name/client_phone are read-only; do not write
       const merge = {
         ...existing,
         vin,
@@ -242,9 +242,7 @@ async function importCars() {
         software_update: safeStr(row[swI]) || existing.software_update || null,
         dongle: existing.dongle || null,
         sold_marker: /x|yes|1|sold/i.test(safeStr(row[soldI])) ? "X" : existing.sold_marker || null,
-        client_name: clientI >= 0 ? (safeStr(row[clientI]) || existing.client_name) : existing.client_name,
         delivery_date: safeDate(row[deliveryI]) || existing.delivery_date,
-        client_phone: safeStr(row[phoneI]) || existing.client_phone || null,
         reserved_by: safeStr(row[reservedI]) || existing.reserved_by || null,
         reservation_date: safeDate(row[reservationI]) || existing.reservation_date,
         pdi_status: mapPdiStatus(row[pdiI]) || existing.pdi_status || "pending",
@@ -267,8 +265,10 @@ async function importCars() {
   // Upsert cars (on update: preserve existing DB values when Excel has empty)
   let inserted = 0, updated = 0, errors = 0;
   for (const [vin, car] of carsByVin) {
-    const { pdi_status, ...rest } = car;
+    const { pdi_status, client_name, client_phone, ...rest } = car;
     let payload = { ...rest, pdi_status: pdi_status || "pending" };
+    delete payload.client_name;
+    delete payload.client_phone;
 
     const { data: existing } = await supabase
       .from("cars")
@@ -278,8 +278,9 @@ async function importCars() {
 
     if (existing) {
       // Preserve existing values when import has empty (don't overwrite data patch / prior imports)
+      // Legacy client_name/client_phone are read-only; never overwrite
       const preserved = [
-        "client_name", "client_phone", "engine_number", "plate_number",
+        "engine_number", "plate_number",
         "reserved_by", "reservation_date", "delivery_date", "issue", "suffix",
         "battery_percent", "current_km", "ev_range_km", "motor",
         "warranty_per_dms", "warranty_monza_start_date", "date_arrived"

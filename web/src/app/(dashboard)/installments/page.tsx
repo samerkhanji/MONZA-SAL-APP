@@ -2330,17 +2330,15 @@ export default function InstallmentsPage() {
                         : "No car linked";
 
                       // Link car and sales order if we have both customer and car
-                      if (customer && newPlanCarId) {
-                        const carUpdate: Record<string, unknown> = {
-                          status: "sold",
-                          sold_marker: "X",
-                          client_name: formatName(customer),
-                          client_phone: customer.phone_primary,
-                        };
-                        await supabase
-                          .from("cars")
-                          .update(carUpdate)
-                          .eq("id", newPlanCarId);
+        if (customer && newPlanCarId) {
+          const carUpdate: Record<string, unknown> = {
+            status: "sold",
+            sold_marker: "X",
+          };
+          await supabase
+            .from("cars")
+            .update(carUpdate)
+            .eq("id", newPlanCarId);
 
                         const { data: existingSale } = await supabase
                           .from("sales_orders")

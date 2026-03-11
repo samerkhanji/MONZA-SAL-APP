@@ -322,9 +322,10 @@ export default function CarsListPage() {
     { key: "reservation_date", header: "Reservation Date", type: "date" },
     { key: "reserved_by", header: "Reserved By" },
     { key: "location_display", header: "Location" },
-    { key: "warranty_per_dms", header: "Warranty DMS", type: "date" },
-    { key: "warranty_vehicle_expiry", header: "Warranty Vehicle", type: "date" },
-    { key: "warranty_battery_expiry", header: "Warranty Battery", type: "date" },
+    { key: "warranty_per_dms", header: "Warranty Vehicle DMS", type: "date" },
+    { key: "warranty_vehicle_expiry", header: "Warranty V.M", type: "date" },
+    { key: "warranty_battery_dms", header: "Warranty Battery DMS", type: "date" },
+    { key: "warranty_battery_expiry", header: "Warranty B.M", type: "date" },
   ];
 
   const carExportData = (list: CarDisplay[]) =>
@@ -466,42 +467,63 @@ export default function CarsListPage() {
                   const statusClass =
                     STATUS_BADGE_COLORS[car.status] ??
                     "bg-muted text-muted-foreground";
+                  const clientName = car.client_name ?? (car as { client_phone?: string }).client_phone ? "Client linked" : null;
+                  const isSold = LINKED_STATUSES.includes(car.status as (typeof LINKED_STATUSES)[number]);
+                  const borderColor =
+                    ["in_stock", "showroom"].includes(car.status) ? "border-l-green-500" :
+                    car.status === "inbound" ? "border-l-amber-500" :
+                    ["sold", "delivered", "reserved", "registered"].includes(car.status) ? "border-l-blue-500" :
+                    car.status === "service" ? "border-l-red-500" :
+                    "border-l-muted-foreground/30";
+                  const modelName = `${car.brand ?? ""} ${car.model ?? ""}`.trim() || "—";
+                  const colorParts = [car.exterior_color, car.interior_color].filter(Boolean).join(" • ");
                   return (
                     <button
                       key={car.id}
                       type="button"
-                      className="flex w-full flex-col gap-2 rounded-lg border border-border/50 bg-card p-4 text-left transition-colors hover:bg-muted/50 active:bg-muted/70"
+                      className={`relative flex w-full flex-col gap-2 rounded-lg border border-border/50 border-l-4 bg-card p-4 text-left shadow-sm transition-colors hover:bg-muted/50 active:bg-muted/70 min-h-[44px] ${borderColor}`}
                       onClick={() => router.push(`/cars/${encodeURIComponent(car.vin ?? car.id)}`)}
                     >
                       <div className="flex items-start justify-between gap-2">
-                        <span className="font-mono text-sm font-medium text-muted-foreground">
-                          {car.vin ?? "—"}
-                        </span>
-                        <div className="flex shrink-0 flex-wrap items-center gap-1">
-                          <Badge
-                            className={`${statusClass} ${LINKED_STATUSES.includes(car.status as (typeof LINKED_STATUSES)[number]) ? "hover:ring-2 hover:ring-offset-1 cursor-pointer" : ""}`}
-                            onClick={(e) => {
-                              if (LINKED_STATUSES.includes(car.status as (typeof LINKED_STATUSES)[number])) {
-                                e.stopPropagation();
-                                void handleStatusClick(car);
-                              }
-                            }}
-                          >
-                            {CAR_STATUS_LABELS[car.status]}
-                            {LINKED_STATUSES.includes(car.status as (typeof LINKED_STATUSES)[number]) && (car.client_name || (car as { client_phone?: string }).client_phone) && (
-                              <ExternalLink className="ml-1 inline h-3 w-3 opacity-60" />
-                            )}
-                          </Badge>
-                        </div>
+                        <span className="font-mono text-xs text-muted-foreground truncate">{(car.vin ?? "—").slice(-17)}</span>
+                        <span className="text-xs text-muted-foreground shrink-0">{car.model_year ?? "—"}</span>
                       </div>
-                      <p className="text-base font-medium">
-                        {car.brand ?? "—"} {car.model ?? "—"}
-                      </p>
-                      {car.model_year && (
-                        <p className="text-sm text-muted-foreground">{car.model_year}</p>
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-lg font-bold text-foreground">
+                          {modelName}
+                        </p>
+                        <Badge
+                          className={`shrink-0 rounded-full px-3 py-0.5 text-xs font-medium ${statusClass} ${isSold ? "hover:ring-2 hover:ring-offset-1 cursor-pointer" : ""}`}
+                          onClick={(e) => {
+                            if (isSold) {
+                              e.stopPropagation();
+                              void handleStatusClick(car);
+                            }
+                          }}
+                        >
+                          {CAR_STATUS_LABELS[car.status]}
+                          {isSold && (car.client_name || (car as { client_phone?: string }).client_phone) && (
+                            <ExternalLink className="ml-1 inline h-3 w-3 opacity-60" />
+                          )}
+                        </Badge>
+                      </div>
+                      {colorParts && (
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+                          {[car.exterior_color, car.interior_color].filter(Boolean).map((c, i) => (
+                            <span key={`${c}-${i}`} className="flex items-center gap-1.5">
+                              {i > 0 && <span className="text-muted-foreground/50">•</span>}
+                              <span
+                                className="inline-block size-2 rounded-full border border-border shrink-0"
+                                style={{ backgroundColor: (c && /^#[0-9a-fA-F]{3,8}$/.test(c)) ? c : "var(--muted)" }}
+                                aria-hidden
+                              />
+                              {c}
+                            </span>
+                          ))}
+                        </div>
                       )}
-                      {car.client_name && (
-                        <p className="text-sm text-muted-foreground">Client: {car.client_name}</p>
+                      {clientName && isSold && (
+                        <p className="text-sm text-muted-foreground">Customer: {clientName}</p>
                       )}
                     </button>
                   );
@@ -524,9 +546,10 @@ export default function CarsListPage() {
                     <TableHead className="hidden whitespace-nowrap xl:table-cell">Client Phone</TableHead>
                     <TableHead className="hidden whitespace-nowrap xl:table-cell">Delivery Date</TableHead>
                     <TableHead className="hidden whitespace-nowrap lg:table-cell">Location</TableHead>
-                    <TableHead className="hidden min-w-[100px] whitespace-nowrap xl:table-cell">Warranty DMS</TableHead>
-                    <TableHead className="hidden min-w-[110px] whitespace-nowrap xl:table-cell">Warranty Vehicle</TableHead>
-                    <TableHead className="hidden min-w-[110px] whitespace-nowrap xl:table-cell">Warranty Battery</TableHead>
+                    <TableHead className="hidden min-w-[110px] whitespace-nowrap xl:table-cell">Warranty Vehicle DMS</TableHead>
+                    <TableHead className="hidden min-w-[100px] whitespace-nowrap xl:table-cell">Warranty V.M</TableHead>
+                    <TableHead className="hidden min-w-[120px] whitespace-nowrap xl:table-cell">Warranty Battery DMS</TableHead>
+                    <TableHead className="hidden min-w-[100px] whitespace-nowrap xl:table-cell">Warranty B.M</TableHead>
                     <TableHead className="whitespace-nowrap">Battery %</TableHead>
                     <TableHead className="whitespace-nowrap">PDI</TableHead>
                     <TableHead className="hidden whitespace-nowrap xl:table-cell">Customs</TableHead>
@@ -628,6 +651,11 @@ export default function CarsListPage() {
                                   (car as any).warranty_expiry ??
                                   car.warranty_monza_start_date) as string
                               ).toLocaleDateString()
+                            : "—"}
+                        </TableCell>
+                        <TableCell className="hidden text-sm xl:table-cell">
+                          {(car as any).warranty_battery_dms
+                            ? new Date((car as any).warranty_battery_dms as string).toLocaleDateString()
                             : "—"}
                         </TableCell>
                         <TableCell className="hidden text-sm xl:table-cell">

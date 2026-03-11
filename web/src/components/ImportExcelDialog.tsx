@@ -177,6 +177,7 @@ export function ImportExcelDialog({
             if (!vin || vin.length !== 17) continue;
 
             const status = mapStatus(arr[statusIdx] as string);
+            // Legacy fields client_name/client_phone are read-only fallback; use customers + sales_orders instead
             const car: Record<string, unknown> = {
               vin,
               brand: "Voyah",
@@ -189,7 +190,6 @@ export function ImportExcelDialog({
               issue: safeStr(arr[issueIdx]) || null,
               engine_number: safeStr(arr[engineIdx]) || null,
               suffix: safeStr(arr[suffixIdx]) || null,
-              client_name: safeStr(arr[clientIdx]) || null,
               software_update: safeStr(arr[swIdx]) || null,
               dongle: safeStr(arr[dongleIdx]) || null,
               sold_marker: /x|yes|1|sold/i.test(safeStr(arr[soldIdx])) ? "X" : "",
@@ -239,6 +239,7 @@ export function ImportExcelDialog({
           }
         }
 
+        // Voyah Report: create customers + sales_orders instead of writing legacy fields on cars
         const reportSheet = wb.Sheets["Voyah Report"];
         if (reportSheet) {
           const json = XLSX.utils.sheet_to_json(reportSheet, { header: 1, defval: "" }) as unknown[][];
@@ -254,21 +255,58 @@ export function ImportExcelDialog({
             const arr = row as unknown[];
             const vin = safeStr(arr[vinIdx]).toUpperCase();
             if (!vin) continue;
-            const updates: Record<string, unknown> = {};
             const client = safeStr(arr[clientIdx]);
-            if (client) updates.client_name = client;
-            const delivery = safeDate(arr[deliveryIdx]);
-            if (delivery) updates.delivery_date = delivery;
             const phone = safeStr(arr[phoneIdx]);
-            if (phone) updates.client_phone = phone;
+            const delivery = safeDate(arr[deliveryIdx]);
             const reserved = safeStr(arr[reservedIdx]);
-            if (reserved) updates.reserved_by = reserved;
             const resDate = safeDate(arr[resDateIdx]);
-            if (resDate) updates.reservation_date = resDate;
-            if (Object.keys(updates).length > 0) {
-              await supabase.from("cars").update(updates).eq("vin", vin);
-              recordsUpdated++;
+            if (!client && !phone) continue;
+
+            const { data: carRow } = await supabase.from("cars").select("id").eq("vin", vin).maybeSingle();
+            if (!carRow?.id) continue;
+
+            let customerId: string | null = null;
+            if (phone) {
+              const { data: existingCust } = await supabase.from("customers").select("id").eq("phone_primary", phone).limit(1).maybeSingle();
+              if (existingCust?.id) {
+                customerId = existingCust.id;
+              } else {
+                const parts = client.trim().split(/\s+/);
+                const { data: newCust } = await supabase.from("customers").insert({
+                  first_name: parts[0] ?? client,
+                  last_name: parts.slice(1).join(" ") || null,
+                  phone_primary: phone,
+                  created_by: user.id,
+                }).select("id").single();
+                if (newCust?.id) customerId = newCust.id;
+              }
+            } else if (client) {
+              const parts = client.trim().split(/\s+/);
+              const { data: newCust } = await supabase.from("customers").insert({
+                first_name: parts[0] ?? client,
+                last_name: parts.slice(1).join(" ") || null,
+                phone_primary: "N/A",
+                created_by: user.id,
+              }).select("id").single();
+              if (newCust?.id) customerId = newCust.id;
             }
+            if (!customerId) continue;
+
+            const { data: existingSale } = await supabase.from("sales_orders").select("id").eq("car_id", carRow.id).not("status", "eq", "cancelled").limit(1).maybeSingle();
+            if (existingSale) continue;
+
+            const salePayload: Record<string, unknown> = {
+              car_id: carRow.id,
+              customer_id: customerId,
+              status: "confirmed",
+              created_by: user.id,
+            };
+            if (delivery) salePayload.delivery_date = delivery;
+            if (reserved) salePayload.reserved_by = reserved;
+            if (resDate) salePayload.reserved_until = resDate;
+
+            const { error: saleErr } = await supabase.from("sales_orders").insert(salePayload);
+            if (!saleErr) recordsUpdated++;
           }
         }
 

@@ -225,9 +225,6 @@ export default function AddCarPage() {
       sold_marker: string;
       suffix: string;
       engine_number: string;
-      client_name: string;
-      delivery_date: string;
-      client_phone: string;
       reserved_by: string;
       reservation_date: string;
     }> = {};
@@ -243,13 +240,6 @@ export default function AddCarPage() {
     extraFields.sold_marker = soldMarker ? "X" : "";
     if (reservedBy.trim()) extraFields.reserved_by = reservedBy.trim();
     if (reservationDate) extraFields.reservation_date = reservationDate;
-    if (showCustomerSection || soldMarker) {
-      extraFields.client_name = `${clientFirstName.trim()} ${clientLastName.trim()}`.trim();
-      extraFields.client_phone = clientPhone.trim();
-      if (deliveryDate.trim()) extraFields.delivery_date = deliveryDate.trim();
-      if (reservedBy.trim()) extraFields.reserved_by = reservedBy.trim();
-      if (reservationDate) extraFields.reservation_date = reservationDate;
-    }
 
     if (warrantyPerDms) extraFields.warranty_per_dms = warrantyPerDms;
     if (warrantyVehicleExpiry) {

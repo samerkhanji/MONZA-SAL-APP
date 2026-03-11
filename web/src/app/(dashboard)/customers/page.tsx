@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { MoreHorizontal } from "lucide-react";
+import { MoreHorizontal, ChevronRight } from "lucide-react";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
 import type { CustomerDisplay } from "@/types/database";
@@ -226,7 +226,16 @@ export default function CustomersPage() {
 
   function getStatusLabel(c: CustomerDisplay): string {
     const orders = c.total_orders ?? 0;
-    return orders > 0 ? "Sold" : "Lead";
+    if (orders > 0) return "Sold";
+    if (c.lead_status === "new_lead") return "New";
+    return "Lead";
+  }
+
+  function getStatusBadgeClass(c: CustomerDisplay): string {
+    const orders = c.total_orders ?? 0;
+    if (orders > 0) return "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300";
+    if (c.lead_status === "new_lead") return "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300";
+    return "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300";
   }
 
   function getSourceLabel(c: CustomerDisplay): string {
@@ -270,28 +279,28 @@ export default function CustomersPage() {
             const fullName =
               customer.full_name ??
               `${customer.first_name} ${customer.last_name ?? ""}`.trim();
-            const isSold = (customer.total_orders ?? 0) > 0;
-            const statusClass = isSold
-              ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
-              : "bg-muted text-muted-foreground";
+            const statusClass = getStatusBadgeClass(customer);
             return (
               <button
                 key={customer.id}
                 type="button"
-                className="flex w-full flex-col gap-2 rounded-lg border border-border/50 bg-card p-4 text-left transition-colors hover:bg-muted/50 active:bg-muted/70"
+                className="flex w-full flex-col gap-2 rounded-lg border border-border/50 bg-card p-4 text-left shadow-sm transition-colors hover:bg-muted/50 active:bg-muted/70 min-h-[44px]"
                 onClick={() => router.push(`/customers/${customer.id}`)}
               >
-                <div className="flex items-start justify-between gap-2">
-                  <p className="font-medium">{fullName || "—"}</p>
-                  <Badge className={`shrink-0 ${statusClass}`}>
-                    {getStatusLabel(customer)}
-                  </Badge>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="font-bold text-lg text-foreground">{fullName || "—"}</p>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <Badge className={`rounded-full px-3 py-0.5 text-xs font-medium ${statusClass}`}>
+                      {getStatusLabel(customer)}
+                    </Badge>
+                    <ChevronRight className="size-5 text-muted-foreground" />
+                  </div>
                 </div>
                 {customer.phone_primary && (
                   <a
-                    href={`tel:${customer.phone_primary}`}
+                    href={`tel:${customer.phone_primary.replace(/\s/g, "")}`}
                     onClick={(e) => e.stopPropagation()}
-                    className="text-sm text-primary hover:underline"
+                    className="text-sm text-primary hover:underline flex items-center min-h-[36px]"
                   >
                     {customer.phone_primary}
                   </a>
@@ -318,11 +327,7 @@ export default function CustomersPage() {
             </TableHeader>
             <TableBody>
               {list.map((customer) => {
-                const orders = customer.total_orders ?? 0;
-                const isSold = orders > 0;
-                const statusClass = isSold
-                  ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
-                  : "bg-muted text-muted-foreground";
+                const statusClass = getStatusBadgeClass(customer);
                 const fullName =
                   customer.full_name ??
                   `${customer.first_name} ${customer.last_name ?? ""}`.trim();
@@ -334,13 +339,17 @@ export default function CustomersPage() {
                   >
                     <TableCell className="font-medium">{fullName || "—"}</TableCell>
                     <TableCell className="text-sm">
-                      <a
-                        href={`tel:${customer.phone_primary}`}
-                        onClick={(e) => e.stopPropagation()}
-                        className="text-primary hover:underline"
-                      >
-                        {customer.phone_primary}
-                      </a>
+                      {customer.phone_primary ? (
+                        <a
+                          href={`tel:${customer.phone_primary.replace(/\s/g, "")}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-primary hover:underline"
+                        >
+                          {customer.phone_primary}
+                        </a>
+                      ) : (
+                        "—"
+                      )}
                     </TableCell>
                     <TableCell className="text-sm">
                       {customer.email ? (

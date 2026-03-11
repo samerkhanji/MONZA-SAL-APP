@@ -55,13 +55,6 @@ const ROLE_COLORS: Record<string, string> = {
   assistant: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
 };
 
-const CAPABILITY_LABELS: Record<string, string> = {
-  garage: "Garage",
-  vehicle_software: "Software",
-  cashier: "Cashier",
-  events_ops: "Events",
-};
-
 interface ProfileRow {
   id: string;
   full_name: string;
@@ -316,9 +309,10 @@ export default function SettingsPage() {
       note_added: (e) => `Added note on ${e.cars?.brand ?? ""} ${e.cars?.model ?? ""}`,
     };
 
-    (carRes.data ?? []).forEach((ev: { id: string; car_id: string; event_type: string; created_at: string; profiles?: unknown; cars?: { vin?: string; brand?: string; model?: string }; from_value?: string; to_value?: string }) => {
+    (carRes.data ?? []).forEach((ev: any) => {
       if (cutoff && ev.created_at < cutoff) return;
-      const name = getProfileFullName(ev.profiles);
+      const profiles = Array.isArray(ev.profiles) ? ev.profiles[0] : ev.profiles;
+      const name = getProfileFullName(profiles);
       const user = name !== "Unknown" ? name : "System";
       const msg = carMessages[ev.event_type]?.(ev) ?? ev.event_type;
       items.push({
@@ -339,9 +333,10 @@ export default function SettingsPage() {
       return: (m) => `Returned ${m.quantity ?? 0}× ${(m.parts as { part_name?: string })?.part_name ?? ""}`,
     };
 
-    (partRes.data ?? []).forEach((mov: { id: string; part_id: string; created_at: string; movement_type: string; quantity?: number; profiles?: unknown; parts?: { part_name?: string }; cars?: { brand?: string; model?: string } }) => {
+    (partRes.data ?? []).forEach((mov: any) => {
       if (cutoff && mov.created_at < cutoff) return;
-      const name = getProfileFullName(mov.profiles);
+      const profiles = Array.isArray(mov.profiles) ? mov.profiles[0] : mov.profiles;
+      const name = getProfileFullName(profiles);
       const user = name !== "Unknown" ? name : "System";
       const msg = movementMessages[mov.movement_type]?.(mov) ?? mov.movement_type;
       items.push({
@@ -355,9 +350,10 @@ export default function SettingsPage() {
       });
     });
 
-    (noteRes.data ?? []).forEach((n: { id: string; customer_id: string; note_type: string; created_at: string; profiles?: unknown; customers?: { first_name?: string; last_name?: string } }) => {
+    (noteRes.data ?? []).forEach((n: any) => {
       if (cutoff && n.created_at < cutoff) return;
-      const name = getProfileFullName(n.profiles);
+      const profiles = Array.isArray(n.profiles) ? n.profiles[0] : n.profiles;
+      const name = getProfileFullName(profiles);
       const user = name !== "Unknown" ? name : "System";
       const cust = n.customers as { first_name?: string; last_name?: string };
       items.push({
@@ -447,21 +443,21 @@ export default function SettingsPage() {
 
   return (
     <div className="container mx-auto flex flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8 md:px-6 lg:flex-row">
-      {/* Tabs sidebar - scrollable on mobile when 8 tabs overflow */}
-      <nav className="flex shrink-0 flex-row gap-2 border-b pb-4 lg:flex-col lg:border-b-0 lg:border-r lg:pb-0 lg:pr-6 max-md:overflow-x-auto max-md:-mx-4 max-md:px-4 max-md:scrollbar-none max-md:min-w-max">
+      {/* Tabs sidebar - horizontally scrollable on mobile, vertical on desktop */}
+      <nav className="flex shrink-0 flex-row flex-nowrap gap-2 overflow-x-auto border-b pb-4 lg:flex-col lg:overflow-visible lg:border-b-0 lg:border-r lg:pb-0 lg:pr-6 max-md:-mx-4 max-md:px-4 max-md:scrollbar-hide">
         {TABS.map((tab) => (
           <button
             key={tab.id}
             type="button"
             onClick={() => setActiveTab(tab.id)}
             className={cn(
-              "flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors",
+              "flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition-colors min-h-[44px]",
               activeTab === tab.id
                 ? "bg-primary text-primary-foreground"
                 : "text-muted-foreground hover:bg-muted hover:text-foreground"
             )}
           >
-            <tab.icon className="size-4" />
+            <tab.icon className="size-4 shrink-0" />
             {tab.label}
           </button>
         ))}
@@ -477,41 +473,42 @@ export default function SettingsPage() {
                 Manage your account and preferences
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="flex flex-col gap-4 px-4 sm:px-6 md:gap-6">
               <div className="rounded-lg border p-4">
-                <p className="font-medium">{profile?.full_name ?? "User"}</p>
+                <p className="font-medium text-base">{profile?.full_name ?? "User"}</p>
                 <p className="text-sm text-muted-foreground">
                   {profile?.phone ?? "No phone"}{" "}
                   · {profile?.user_role ? USER_ROLE_LABELS[profile.user_role] : "Signed in"}
                 </p>
               </div>
-              <div className="flex items-center justify-between rounded-lg border p-4">
-                <div>
+              <div className="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0 flex-1">
                   <p className="font-medium">Password</p>
                   <p className="text-sm text-muted-foreground">
                     Change your password to keep your account secure
                   </p>
                 </div>
-                <Button variant="outline" onClick={() => setChangePasswordOpen(true)}>
+                <Button variant="outline" onClick={() => setChangePasswordOpen(true)} className="w-full min-h-[44px] sm:w-auto">
                   Change Password
                 </Button>
               </div>
-              <div className="flex flex-col gap-2 rounded-lg border p-4">
-                <div className="flex items-center justify-between gap-4">
-                  <div>
+              <div className="flex flex-col gap-3 rounded-lg border p-4">
+                <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                  <div className="min-w-0 flex-1">
                     <p className="font-medium">Onboarding Tour</p>
                     <p className="text-sm text-muted-foreground">
                       Walk through the main features of Monza CRM for your role.
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
                       Tour completed on:{" "}
-                      {profile?.onboarding_completed_at
+                      {profile?.onboarding_completed_at != null
                         ? new Date(profile.onboarding_completed_at).toLocaleString()
                         : "Not completed yet"}
                     </p>
                   </div>
                   <Button
                     variant="outline"
+                    className="w-full min-h-[44px] sm:w-auto"
                     onClick={async () => {
                       const { data: { user } } = await supabase.auth.getUser();
                       if (!user) {
@@ -526,7 +523,10 @@ export default function SettingsPage() {
                         })
                         .eq("id", user.id);
                       if (error) {
-                        toast.error(error.message);
+                        const msg = error.message?.includes("onboarding_completed_at")
+                          ? "Database migration needed. Run: supabase db push"
+                          : error.message;
+                        toast.error(msg);
                         return;
                       }
                       toast.success("Onboarding tour will start on your next page.");
@@ -557,93 +557,138 @@ export default function SettingsPage() {
               {profilesLoading ? (
                 <p className="text-muted-foreground">Loading...</p>
               ) : (
-                <div className="overflow-x-auto rounded-lg border">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b bg-muted/50">
-                        <th className="px-4 py-3 text-left font-medium">Name</th>
-                        <th className="px-4 py-3 text-left font-medium">Role</th>
-                        <th className="px-4 py-3 text-left font-medium">Capabilities</th>
-                        <th className="px-4 py-3 text-left font-medium">Phone</th>
-                        <th className="px-4 py-3 text-left font-medium">Active</th>
-                        <th className="px-4 py-3 text-left font-medium">Joined</th>
-                        <th className="px-4 py-3 text-right font-medium">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {profiles.map((p) => (
-                        <tr key={p.id} className="border-b last:border-0">
-                          <td className="px-4 py-3 font-medium">{p.full_name}</td>
-                          <td className="px-4 py-3">
-                            <span
-                              className={cn(
-                                "rounded px-2 py-0.5 text-xs font-medium",
-                                p.user_role ? ROLE_COLORS[p.user_role] ?? "bg-muted" : "bg-muted"
-                              )}
+                <>
+                  {/* Mobile: cards */}
+                  <div className="space-y-3 md:hidden">
+                    {profiles.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        className="flex w-full flex-col gap-2 rounded-lg border border-border/50 bg-card p-4 text-left transition-colors hover:bg-muted/50 active:bg-muted/70 min-h-[44px]"
+                        onClick={() => {
+                          setEditProfile(p);
+                          setEditOpen(true);
+                        }}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="font-medium text-base">{p.full_name}</p>
+                          <span
+                            className={cn(
+                              "shrink-0 rounded px-2 py-0.5 text-xs font-medium",
+                              p.user_role ? ROLE_COLORS[p.user_role] ?? "bg-muted" : "bg-muted"
+                            )}
+                          >
+                            {p.user_role ? USER_ROLE_LABELS[p.user_role] : "Unassigned"}
+                          </span>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {p.phone ? (
+                            <a
+                              href={`tel:${p.phone.replace(/\s/g, "")}`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-primary hover:underline"
                             >
-                              {p.user_role ? USER_ROLE_LABELS[p.user_role] : "Unassigned"}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex flex-wrap gap-1">
-                              {(p.capabilities ?? []).map((c) => (
-                                <span
-                                  key={c}
-                                  className="rounded bg-muted px-2 py-0.5 text-xs"
-                                >
-                                  {CAPABILITY_LABELS[c] ?? c}
-                                </span>
-                              ))}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 text-muted-foreground">
-                            {p.phone ?? "—"}
-                          </td>
-                          <td className="px-4 py-3">
-                            <span
-                              className={cn(
-                                "inline-block size-2 rounded-full",
-                                p.is_active ? "bg-green-500" : "bg-gray-400"
-                              )}
-                              aria-label={p.is_active ? "Active" : "Inactive"}
-                            />
-                          </td>
-                          <td className="px-4 py-3 text-muted-foreground">
-                            {p.created_at
-                              ? new Date(p.created_at).toLocaleDateString()
-                              : "—"}
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            <div className="flex justify-end gap-1">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                  setEditProfile(p);
-                                  setEditOpen(true);
-                                }}
-                              >
-                                <Pencil className="size-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleToggleActive(p)}
-                                title={p.is_active ? "Deactivate" : "Activate"}
-                              >
-                                {p.is_active ? (
-                                  <PowerOff className="size-4 text-muted-foreground" />
-                                ) : (
-                                  <Power className="size-4 text-green-600" />
-                                )}
-                              </Button>
-                            </div>
-                          </td>
+                              {p.phone}
+                            </a>
+                          ) : (
+                            "—"
+                          )}
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={cn(
+                              "inline-block size-2 rounded-full",
+                              p.is_active ? "bg-green-500" : "bg-gray-400"
+                            )}
+                            aria-label={p.is_active ? "Active" : "Inactive"}
+                          />
+                          <span className="text-xs text-muted-foreground">
+                            {p.created_at ? new Date(p.created_at).toLocaleDateString() : "—"}
+                          </span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                  {/* Desktop: table without capabilities */}
+                  <div className="hidden overflow-x-auto rounded-lg border md:block">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b bg-muted/50">
+                          <th className="px-4 py-3 text-left font-medium">Name</th>
+                          <th className="px-4 py-3 text-left font-medium">Role</th>
+                          <th className="px-4 py-3 text-left font-medium">Phone</th>
+                          <th className="px-4 py-3 text-left font-medium">Active</th>
+                          <th className="px-4 py-3 text-left font-medium">Joined</th>
+                          <th className="px-4 py-3 text-right font-medium">Actions</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {profiles.map((p) => (
+                          <tr key={p.id} className="border-b last:border-0">
+                            <td className="px-4 py-3 font-medium">{p.full_name}</td>
+                            <td className="px-4 py-3">
+                              <span
+                                className={cn(
+                                  "rounded px-2 py-0.5 text-xs font-medium",
+                                  p.user_role ? ROLE_COLORS[p.user_role] ?? "bg-muted" : "bg-muted"
+                                )}
+                              >
+                                {p.user_role ? USER_ROLE_LABELS[p.user_role] : "Unassigned"}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-muted-foreground">
+                              {p.phone ? (
+                                <a href={`tel:${p.phone.replace(/\s/g, "")}`} className="text-primary hover:underline">
+                                  {p.phone}
+                                </a>
+                              ) : (
+                                "—"
+                              )}
+                            </td>
+                            <td className="px-4 py-3">
+                              <span
+                                className={cn(
+                                  "inline-block size-2 rounded-full",
+                                  p.is_active ? "bg-green-500" : "bg-gray-400"
+                                )}
+                                aria-label={p.is_active ? "Active" : "Inactive"}
+                              />
+                            </td>
+                            <td className="px-4 py-3 text-muted-foreground">
+                              {p.created_at ? new Date(p.created_at).toLocaleDateString() : "—"}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <div className="flex justify-end gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setEditProfile(p);
+                                    setEditOpen(true);
+                                  }}
+                                >
+                                  <Pencil className="size-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleToggleActive(p)}
+                                  title={p.is_active ? "Deactivate" : "Activate"}
+                                >
+                                  {p.is_active ? (
+                                    <PowerOff className="size-4 text-muted-foreground" />
+                                  ) : (
+                                    <Power className="size-4 text-green-600" />
+                                  )}
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>

@@ -72,6 +72,19 @@ export default function CustomerDetailPage() {
   const id = params.id as string;
   const [customer, setCustomer] = useState<CustomerDisplay | null>(null);
   const [vehicles, setVehicles] = useState<EnrichedSaleOrder[]>([]);
+  const [legacyVehicles, setLegacyVehicles] = useState<
+    {
+      id: string;
+      vin: string;
+      brand: string;
+      model: string;
+      model_year: number | null;
+      exterior_color: string | null;
+      status: string;
+      client_name: string | null;
+      client_phone: string | null;
+    }[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -173,6 +186,68 @@ export default function CustomerDetailPage() {
     setVehicles(enrichedOrders);
   }
 
+  async function fetchLegacyVehicles(fullName: string) {
+    if (!fullName.trim()) {
+      setLegacyVehicles([]);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("cars")
+      .select(
+        `
+        id,
+        vin,
+        brand,
+        model,
+        model_year,
+        exterior_color,
+        status,
+        client_name,
+        client_phone,
+        sales_orders:car_id ( id )
+      `
+      )
+      .eq("client_name", fullName)
+      .is("deleted_at", null);
+
+    if (error || !data) {
+      setLegacyVehicles([]);
+      return;
+    }
+
+    const rows = data as unknown as {
+      id: string;
+      vin: string;
+      brand: string;
+      model: string;
+      model_year: number | null;
+      exterior_color: string | null;
+      status: string;
+      client_name: string | null;
+      client_phone: string | null;
+      sales_orders?: { id: string }[] | null;
+    }[];
+
+    const unlinked = rows.filter(
+      (row) => !row.sales_orders || row.sales_orders.length === 0
+    );
+
+    setLegacyVehicles(
+      unlinked.map((row) => ({
+        id: row.id,
+        vin: row.vin,
+        brand: row.brand,
+        model: row.model,
+        model_year: row.model_year,
+        exterior_color: row.exterior_color,
+        status: row.status,
+        client_name: row.client_name,
+        client_phone: row.client_phone,
+      }))
+    );
+  }
+
   useEffect(() => {
     if (!id) return;
     setLoading(true);
@@ -182,6 +257,10 @@ export default function CustomerDetailPage() {
   useEffect(() => {
     if (!customer?.id) return;
     fetchVehicles();
+    const fullName =
+      customer.full_name ??
+      `${customer.first_name} ${customer.last_name ?? ""}`.trim();
+    void fetchLegacyVehicles(fullName);
   }, [customer?.id]);
 
   async function handleDelete() {
@@ -595,6 +674,67 @@ export default function CustomerDetailPage() {
               )}
             </CardContent>
           </Card>
+
+          {legacyVehicles.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Legacy vehicles not yet linked</CardTitle>
+                <CardDescription>
+                  Cars where this name appears on the car row but no sales
+                  order exists yet.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {legacyVehicles.map((car) => {
+                    const statusClass =
+                      STATUS_BADGE_COLORS[car.status] ??
+                      "bg-muted text-muted-foreground";
+                    const statusLabel =
+                      CAR_STATUS_LABELS[car.status as keyof typeof CAR_STATUS_LABELS] ??
+                      car.status;
+
+                    return (
+                      <div
+                        key={car.id}
+                        className="flex items-start justify-between gap-4 rounded-lg border p-3"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium">
+                            {car.brand} {car.model}
+                            {car.model_year ? ` (${car.model_year})` : ""}
+                          </p>
+                          <p className="font-mono text-xs text-muted-foreground">
+                            VIN: {car.vin}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            Status:{" "}
+                            <Badge className={statusClass}>{statusLabel}</Badge>
+                          </p>
+                          {car.client_phone && (
+                            <p className="text-xs text-muted-foreground">
+                              Phone on car: {car.client_phone}
+                            </p>
+                          )}
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            router.push(
+                              `/cars/${encodeURIComponent(car.vin ?? car.id)}`
+                            )
+                          }
+                        >
+                          View & Link →
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="history" className="space-y-4">
