@@ -39,7 +39,7 @@ export function EditCarDialog({
   onOpenChange,
   onSuccess,
 }: EditCarDialogProps) {
-  const [status, setStatus] = useState<CarStatus>("inbound");
+  const [status, setStatus] = useState<CarStatus>("inventory");
   const [plateNumber, setPlateNumber] = useState("");
   const [exteriorColor, setExteriorColor] = useState("");
   const [interiorColor, setInteriorColor] = useState("");
@@ -64,6 +64,8 @@ export function EditCarDialog({
   const [warrantyVehicleExpiry, setWarrantyVehicleExpiry] = useState("");
   const [warrantyBatteryExpiry, setWarrantyBatteryExpiry] = useState("");
   const [warrantyMonzaStartDate, setWarrantyMonzaStartDate] = useState("");
+  const [warrantyVehicleKmLimit, setWarrantyVehicleKmLimit] = useState("");
+  const [warrantyBatteryKmLimit, setWarrantyBatteryKmLimit] = useState("");
   const [customsStatus, setCustomsStatus] = useState<CustomsStatus>("pending");
   const [locationType, setLocationType] = useState<LocationType>("storage");
   const [locationSlot, setLocationSlot] = useState("");
@@ -108,6 +110,16 @@ export function EditCarDialog({
       setWarrantyVehicleExpiry(vehicleExpiry ?? "");
       setWarrantyBatteryExpiry((car as any).warranty_battery_expiry ?? "");
       setWarrantyMonzaStartDate(car.warranty_monza_start_date ?? "");
+      setWarrantyVehicleKmLimit(
+        (car as any).warranty_vehicle_km_limit != null
+          ? String((car as any).warranty_vehicle_km_limit)
+          : ""
+      );
+      setWarrantyBatteryKmLimit(
+        (car as any).warranty_battery_km_limit != null
+          ? String((car as any).warranty_battery_km_limit)
+          : ""
+      );
       setCustomsStatus(car.customs_status ?? "pending");
       setLocationType(car.location_type ?? "storage");
       setLocationSlot(car.location_slot ?? "");
@@ -139,6 +151,14 @@ export function EditCarDialog({
       warranty_battery_expiry: warrantyBatteryExpiry || null,
       warranty_expiry: warrantyVehicleExpiry || null,
       warranty_monza_start_date: warrantyMonzaStartDate || null,
+      warranty_vehicle_km_limit:
+        warrantyVehicleKmLimit.trim() && !Number.isNaN(Number(warrantyVehicleKmLimit))
+          ? Number(warrantyVehicleKmLimit)
+          : null,
+      warranty_battery_km_limit:
+        warrantyBatteryKmLimit.trim() && !Number.isNaN(Number(warrantyBatteryKmLimit))
+          ? Number(warrantyBatteryKmLimit)
+          : null,
       location_type: locationType,
       location_slot: locationSlot.trim() || null,
     };
@@ -228,11 +248,13 @@ export function EditCarDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(CAR_STATUS_LABELS).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>
-                      {label}
-                    </SelectItem>
-                  ))}
+                  {Object.entries(CAR_STATUS_LABELS)
+                    .filter(([value]) => value !== "inbound")
+                    .map(([value, label]) => (
+                      <SelectItem key={value} value={value}>
+                        {label}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>

@@ -45,7 +45,7 @@ const LANGUAGES = [
   { value: "fr", label: "French" },
 ] as const;
 
-const INITIAL_STATUS: CarStatus = "inbound";
+const INITIAL_STATUS: CarStatus = "inventory";
 const INITIAL_LOCATION: LocationType = "storage";
 // PDI status is always "pending" on creation; checklist available on detail page
 

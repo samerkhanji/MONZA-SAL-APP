@@ -604,7 +604,7 @@ export function StatusCustomerDialog({
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="inbound">Inbound</SelectItem>
+                        <SelectItem value="inventory">Inventory</SelectItem>
                         <SelectItem value="in_stock">Available</SelectItem>
                         <SelectItem value="showroom">Showroom</SelectItem>
                         <SelectItem value="reserved">Reserved</SelectItem>

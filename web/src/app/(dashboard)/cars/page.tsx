@@ -7,7 +7,6 @@ import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { MoreHorizontal, FileText, ScanLine, FileSpreadsheet, Download, ExternalLink } from "lucide-react";
-import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
 import type { CarDisplay } from "@/types/database";
 import {
@@ -61,6 +60,8 @@ import {
 import { ExportButton } from "@/components/ExportButton";
 import type { ExportColumn } from "@/lib/exportToExcel";
 import { canPerform } from "@/lib/permissions";
+import { getCarsDisplay } from "@/lib/data/cars";
+import { createClient } from "@/lib/supabase";
 
 const ScannerDialog = dynamic(
   () => import("@/components/scanner/ScannerDialog").then((m) => ({ default: m.ScannerDialog })),
@@ -124,7 +125,7 @@ export default function CarsListPage() {
   useEffect(() => {
     if (
       statusFromUrl &&
-        /^(inbound|in_stock|showroom|reserved|sold|delivered|service|sent_to_sub_dealer|demo|registered|under_registration|sent_to_customs|company_car)$/.test(
+        /^(inventory|in_stock|showroom|reserved|sold|delivered|service|sent_to_sub_dealer|demo|registered|under_registration|sent_to_customs|company_car)$/.test(
           statusFromUrl
         )
     ) {
@@ -261,21 +262,29 @@ export default function CarsListPage() {
 
   const fetchCars = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("cars_display")
-      .select("*")
-      .order("created_at", { ascending: false });
+    const { data, error, aborted } = await getCarsDisplay();
+
+    if (aborted) {
+      setLoading(false);
+      return;
+    }
 
     if (error) {
-      if (error.name === "AbortError" || error.message?.includes("aborted")) {
-        setLoading(false);
-        return;
-      }
-      console.error("Failed to fetch cars:", error.message ?? error.code ?? error);
-      toast.error(error.message ?? "Failed to load cars");
+      const message =
+        (typeof error === "object" && error && "message" in error
+          ? (error as { message?: unknown }).message
+          : null) ??
+        (typeof error === "object" && error && "code" in error
+          ? (error as { code?: unknown }).code
+          : null) ??
+        "Failed to load cars";
+
+      // eslint-disable-next-line no-console
+      console.error("Failed to fetch cars:", message, error);
+      toast.error(String(message));
       setCars([]);
     } else {
-      setCars((data as CarDisplay[]) ?? []);
+      setCars(data);
     }
     setLoading(false);
   }, []);
@@ -407,7 +416,7 @@ export default function CarsListPage() {
             <SelectContent>
               <SelectItem value="all">All statuses</SelectItem>
               {Object.entries(CAR_STATUS_LABELS)
-                .filter(([value]) => value)
+                .filter(([value]) => value !== "inbound")
                 .map(([value, label]) => (
                   <SelectItem key={value} value={value}>
                     {label}
@@ -471,7 +480,7 @@ export default function CarsListPage() {
                   const isSold = LINKED_STATUSES.includes(car.status as (typeof LINKED_STATUSES)[number]);
                   const borderColor =
                     ["in_stock", "showroom"].includes(car.status) ? "border-l-green-500" :
-                    car.status === "inbound" ? "border-l-amber-500" :
+                    car.status === "inventory" ? "border-l-gray-400" :
                     ["sold", "delivered", "reserved", "registered"].includes(car.status) ? "border-l-blue-500" :
                     car.status === "service" ? "border-l-red-500" :
                     "border-l-muted-foreground/30";

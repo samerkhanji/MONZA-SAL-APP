@@ -76,7 +76,7 @@ function safeNum(v) {
 
 // Map STATUS (CRM) from Excel to car_status enum
 const STATUS_MAP = {
-  "inbound": "inbound",
+  "inbound": "inventory",
   "in_stock": "in_stock",
   "in stock": "in_stock",
   "available": "in_stock",

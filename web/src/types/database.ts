@@ -1,6 +1,7 @@
 // Enums matching Supabase
 export type CarStatus =
   | "inbound"
+  | "inventory"
   | "in_stock"
   | "showroom"
   | "reserved"
@@ -73,6 +74,9 @@ export interface Car {
   warranty_battery_expiry: string | null;
   warranty_per_dms: string | null;
   warranty_monza_start_date: string | null;
+  warranty_battery_dms?: string | null;
+  warranty_vehicle_km_limit: number | null;
+  warranty_battery_km_limit: number | null;
   customs_status: CustomsStatus;
   customs_amount_paid: number | null;
   customs_amount_currency: string | null;
@@ -123,6 +127,7 @@ export interface CarEvent {
 
 export const CAR_STATUS_LABELS: Record<CarStatus, string> = {
   inbound: "Inbound",
+  inventory: "Inventory",
   in_stock: "Available",
   showroom: "Showroom",
   reserved: "Reserved",

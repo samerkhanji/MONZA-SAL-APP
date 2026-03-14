@@ -1,35 +1,102 @@
 # Monza Tech CRM — Web App
 
-Internal-only Next.js app for car inventory. No external customers; staff use only.
+Internal-only Next.js app for Monza S.A.L. staff. No external customers; staff use only.
 
-## Setup
+---
 
-1. **Env**  
-   Copy `.env.local` and set:
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+## Local development
 
-2. **Auth**  
-   All users must sign in before accessing the CRM. Create staff users in the [Supabase Dashboard](https://supabase.com/dashboard) → Authentication → Users, or enable email signup if needed. RLS policies use `TO authenticated` — signed-in users have full access.
+### 1. Environment variables
 
-3. **Run**
+Create `web/.env.local` with at least:
 
-   ```bash
-   cd web
-   npm install
-   npm run dev
-   ```
+- `NEXT_PUBLIC_SUPABASE_URL` — your Supabase project URL
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` — anonymous public key
 
-   Open [http://localhost:3000](http://localhost:3000). You will be redirected to **Login** — sign in with your Supabase Auth credentials, then access the car inventory.
+For some admin/server flows you may also need:
 
-## Loop
+- `SUPABASE_SERVICE_ROLE_KEY` — **server-side only**, used in API routes (e.g. Add Employee)
 
-1. **Cars list** (`/cars`) — Filters (VIN, status, location), table, View / Add Car.
-2. **Add car** (`/cars/add`) — Form: VIN, brand, model, year, colors, location, status, date arrived. On submit → car profile.
-3. **Car profile** (`/cars/[id]`) — Overview (current state), Movement/Status history. **Move location** opens the move modal.
-4. **Move car** — Modal: new location + slot, optional status, note. Uses Supabase RPC `move_car` (updates car + logs event).
+### 2. Install & run
+
+From the repo root:
+
+```bash
+cd web
+npm install
+npm run dev
+```
+
+Then open `http://localhost:3000`.  
+You will be redirected to **Login** — sign in with your Supabase Auth credentials.
+
+### 3. Tests
+
+Vitest is configured:
+
+```bash
+cd web
+npm test
+```
+
+---
+
+## Core modules
+
+- **Cars / Inventory**
+  - `/cars` — list with filters (VIN, status, location, brand)
+  - `/cars/add` — add a new car
+  - `/cars/[id]` — car details, history, movement
+
+- **Customers**
+  - `/customers` — list and search customers
+  - `/customers/add` — add a new customer
+  - `/customers/[id]` — customer profile, notes, documents
+
+- **Sales / Installments**
+  - `/installments` — manage payment plans and installments
+  - `sales_orders` in Supabase link cars to customers
+
+- **Garage**
+  - `/garage` — active jobs overview
+  - `/garage/inventory` — parts inventory
+  - `/garage/jobs/[id]` — job details, parts usage
+  - `/garage/history` — completed jobs / history
+
+- **Requests & Documents**
+  - `/requests` and `/requests/pending` — internal request center
+  - `/documents` — document listing
+
+- **Settings & Data Health**
+  - `/settings` — team management (profiles, roles, capabilities)
+  - `/data-health` — data integrity and health dashboards
+
+---
 
 ## Stack
 
-- Next.js (App Router), TypeScript, Tailwind, shadcn/ui
-- Supabase (Postgres, RLS, RPC `move_car`)
+- **Frontend**
+  - Next.js 16 (App Router)
+  - React 19
+  - TypeScript
+  - Tailwind CSS 4
+  - Radix UI + shadcn-style components
+  - Sonner toasts, Lucide icons
+
+- **Backend**
+  - Supabase Postgres
+  - Supabase Auth
+  - RLS policies defined in Supabase (documented via migrations)
+  - RPCs such as `move_car` for complex operations
+
+---
+
+## Architecture & database docs
+
+- **System architecture**: see [`../docs/architecture.md`](../docs/architecture.md)
+- **Migrations**: see [`../supabase/migrations/README.md`](../supabase/migrations/README.md)
+
+Recommended future doc:
+
+- `../docs/database-schema.md` — describe all tables, triggers, RLS policies, and functions to make the data model explicit for humans and AI assistants.
+

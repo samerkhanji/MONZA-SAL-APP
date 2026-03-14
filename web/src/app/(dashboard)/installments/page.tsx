@@ -514,6 +514,7 @@ export default function InstallmentsPage() {
       if (
         ![
           "sold",
+          "inventory",
           "in_stock",
           "showroom",
           "registered",
@@ -559,9 +560,9 @@ export default function InstallmentsPage() {
       )
       .in("status", [
         "available",
+        "inventory",
         "in_stock",
         "showroom",
-        "inbound",
         "registered",
         "under_registration",
       ])

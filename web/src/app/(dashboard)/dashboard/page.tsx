@@ -83,7 +83,7 @@ interface RequestSummaryRow {
 }
 
 const CAR_STATUS_ORDER: CarStatus[] = [
-  "inbound",
+  "inventory",
   "in_stock",
   "showroom",
   "reserved",
@@ -106,6 +106,7 @@ const JOB_STATUS_DOT_COLORS: Record<string, string> = {
 
 const STATUS_DOT_COLORS: Record<string, string> = {
   inbound: "bg-gray-400",
+  inventory: "bg-gray-400",
   in_stock: "bg-blue-500",
   showroom: "bg-green-500",
   reserved: "bg-amber-500",

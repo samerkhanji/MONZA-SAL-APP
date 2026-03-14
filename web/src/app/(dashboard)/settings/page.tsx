@@ -11,6 +11,7 @@ import type { AppRole } from "@/lib/permissions";
 import { USER_ROLE_LABELS } from "@/lib/constants/user";
 import {
   Users,
+  UserPlus,
   Building2,
   Settings,
   FileText,
@@ -32,6 +33,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { EditTeamMemberDialog } from "@/components/settings/EditTeamMemberDialog";
+import { AddEmployeeDialog } from "@/components/settings/AddEmployeeDialog";
 import { ChangePasswordDialog } from "@/components/settings/ChangePasswordDialog";
 import { cn } from "@/lib/utils";
 import { getProfileFullName } from "@/lib/supabase-profile";
@@ -58,10 +60,15 @@ const ROLE_COLORS: Record<string, string> = {
 interface ProfileRow {
   id: string;
   full_name: string;
+  email: string | null;
   phone: string | null;
+  job_title?: string | null;
+  department?: string | null;
   user_role: AppRole | null;
   capabilities: UserCapability[];
   is_active: boolean;
+  employment_status?: string | null;
+  terminated_at?: string | null;
   created_at?: string;
 }
 
@@ -79,7 +86,7 @@ function timeAgo(date: string): string {
 export default function SettingsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { canSeeSettings, canSeeProfileSettings, canSeeMyRequests, profile } = useUser();
+  const { canSeeSettings, canSeeProfileSettings, canSeeMyRequests, profile, refreshProfile } = useUser();
   const tabFromUrl = searchParams.get("tab") as TabId | null;
   const defaultTab: TabId = canSeeSettings ? "team" : "profile";
   const [activeTab, setActiveTab] = useState<TabId>(tabFromUrl && ALL_TABS.some((t) => t.id === tabFromUrl) ? tabFromUrl : defaultTab);
@@ -105,6 +112,8 @@ export default function SettingsPage() {
   const [profilesLoading, setProfilesLoading] = useState(false);
   const [editProfile, setEditProfile] = useState<ProfileRow | null>(null);
   const [editOpen, setEditOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<"active" | "inactive" | "all">("active");
 
   // Company & prefs state
   const [companyName, setCompanyName] = useState("");
@@ -246,17 +255,24 @@ export default function SettingsPage() {
     ]);
   }
 
-  async function handleToggleActive(profile: ProfileRow) {
+  async function handleToggleActive(p: ProfileRow) {
+    const willActivate = !p.is_active;
     const { error } = await supabase
       .from("profiles")
-      .update({ is_active: !profile.is_active })
-      .eq("id", profile.id);
+      .update({
+        is_active: willActivate,
+        employment_status: willActivate ? "active" : "inactive",
+        terminated_at: willActivate ? null : new Date().toISOString(),
+        termination_reason: willActivate ? null : undefined,
+      })
+      .eq("id", p.id);
 
     if (error) {
       toast.error(error.message);
     } else {
-      toast.success(profile.is_active ? "User deactivated" : "User activated");
+      toast.success(willActivate ? "Employee reactivated" : "Employee deactivated");
       fetchProfiles();
+      if (p.id === profile?.id) refreshProfile();
     }
   }
 
@@ -550,17 +566,39 @@ export default function SettingsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm dark:border-amber-800 dark:bg-amber-950/30">
-                To add new team members, create their account in the Supabase
-                Dashboard first, then edit their profile here.
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as "active" | "inactive" | "all")}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                    <SelectItem value="all">All</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button onClick={() => setAddOpen(true)}>
+                  <UserPlus className="mr-2 size-4" />
+                  Add Employee
+                </Button>
               </div>
               {profilesLoading ? (
                 <p className="text-muted-foreground">Loading...</p>
               ) : (
                 <>
+                  {(() => {
+                    const filtered = statusFilter === "all"
+                      ? profiles
+                      : statusFilter === "active"
+                        ? profiles.filter((p) => p.is_active)
+                        : profiles.filter((p) => !p.is_active);
+                    return filtered.length === 0 ? (
+                      <p className="text-muted-foreground">No team members match the filter.</p>
+                    ) : (
+                    <>
                   {/* Mobile: cards */}
                   <div className="space-y-3 md:hidden">
-                    {profiles.map((p) => (
+                    {filtered.map((p) => (
                       <button
                         key={p.id}
                         type="button"
@@ -581,6 +619,19 @@ export default function SettingsPage() {
                             {p.user_role ? USER_ROLE_LABELS[p.user_role] : "Unassigned"}
                           </span>
                         </div>
+                        <p className="text-sm text-muted-foreground">
+                          {p.email ? (
+                            <a
+                              href={`mailto:${p.email}`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-primary hover:underline"
+                            >
+                              {p.email}
+                            </a>
+                          ) : (
+                            "—"
+                          )}
+                        </p>
                         <p className="text-sm text-muted-foreground">
                           {p.phone ? (
                             <a
@@ -616,14 +667,15 @@ export default function SettingsPage() {
                         <tr className="border-b bg-muted/50">
                           <th className="px-4 py-3 text-left font-medium">Name</th>
                           <th className="px-4 py-3 text-left font-medium">Role</th>
+                          <th className="px-4 py-3 text-left font-medium">Status</th>
+                          <th className="px-4 py-3 text-left font-medium">Email</th>
                           <th className="px-4 py-3 text-left font-medium">Phone</th>
-                          <th className="px-4 py-3 text-left font-medium">Active</th>
                           <th className="px-4 py-3 text-left font-medium">Joined</th>
                           <th className="px-4 py-3 text-right font-medium">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {profiles.map((p) => (
+                        {filtered.map((p) => (
                           <tr key={p.id} className="border-b last:border-0">
                             <td className="px-4 py-3 font-medium">{p.full_name}</td>
                             <td className="px-4 py-3">
@@ -636,6 +688,26 @@ export default function SettingsPage() {
                                 {p.user_role ? USER_ROLE_LABELS[p.user_role] : "Unassigned"}
                               </span>
                             </td>
+                            <td className="px-4 py-3">
+                              <span
+                                className={cn(
+                                  "inline-flex items-center gap-1.5 rounded px-2 py-0.5 text-xs font-medium",
+                                  p.is_active ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
+                                )}
+                              >
+                                <span className={cn("size-1.5 rounded-full", p.is_active ? "bg-green-500" : "bg-gray-400")} />
+                                {p.is_active ? "Active" : "Inactive"}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-muted-foreground">
+                              {p.email ? (
+                                <a href={`mailto:${p.email}`} className="text-primary hover:underline">
+                                  {p.email}
+                                </a>
+                              ) : (
+                                "—"
+                              )}
+                            </td>
                             <td className="px-4 py-3 text-muted-foreground">
                               {p.phone ? (
                                 <a href={`tel:${p.phone.replace(/\s/g, "")}`} className="text-primary hover:underline">
@@ -644,15 +716,6 @@ export default function SettingsPage() {
                               ) : (
                                 "—"
                               )}
-                            </td>
-                            <td className="px-4 py-3">
-                              <span
-                                className={cn(
-                                  "inline-block size-2 rounded-full",
-                                  p.is_active ? "bg-green-500" : "bg-gray-400"
-                                )}
-                                aria-label={p.is_active ? "Active" : "Inactive"}
-                              />
                             </td>
                             <td className="px-4 py-3 text-muted-foreground">
                               {p.created_at ? new Date(p.created_at).toLocaleDateString() : "—"}
@@ -688,6 +751,9 @@ export default function SettingsPage() {
                       </tbody>
                     </table>
                   </div>
+                </>
+                    );
+                  })()}
                 </>
               )}
             </CardContent>
@@ -962,6 +1028,13 @@ export default function SettingsPage() {
           setEditOpen(open);
           if (!open) setEditProfile(null);
         }}
+        onSuccess={fetchProfiles}
+        currentUserId={profile?.id}
+        onRefreshSelf={refreshProfile}
+      />
+      <AddEmployeeDialog
+        open={addOpen}
+        onOpenChange={setAddOpen}
         onSuccess={fetchProfiles}
       />
       <ChangePasswordDialog

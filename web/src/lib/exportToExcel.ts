@@ -27,6 +27,7 @@ const STATUS_BG: Record<string, string> = {
   approved: "FFEFF6FF",
   delivered: "FFEFF6FF",
   inbound: "FFFFFBEB",
+  inventory: "FFFFFBEB",
   in_stock: "FFF0FDF4",
   showroom: "FFEFF6FF",
   pending: "FFFFFBEB",

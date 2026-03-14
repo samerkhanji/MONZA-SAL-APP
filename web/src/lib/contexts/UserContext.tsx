@@ -31,6 +31,7 @@ export interface UserProfile {
   user_role?: AppRole | null;
   capabilities: UserCapability[];
   is_active: boolean;
+  employment_status?: string | null;
   must_change_password?: boolean;
   onboarding_completed?: boolean;
   onboarding_completed_at?: string | null;
@@ -41,6 +42,7 @@ export interface UserContextType {
   loading: boolean;
   connectionError: boolean;
   retryConnection: () => void;
+  refreshProfile: () => Promise<void>;
   canEditInventory: boolean;
   canDelete: boolean;
   canSeeSettings: boolean;
@@ -73,6 +75,7 @@ const UserContext = createContext<UserContextType>({
   loading: true,
   connectionError: false,
   retryConnection: () => {},
+  refreshProfile: async () => {},
   canEditInventory: false,
   canDelete: false,
   canSeeSettings: false,
@@ -173,6 +176,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const retryConnection = useCallback(() => {
     setLoading(true);
     loadProfile();
+  }, [loadProfile]);
+
+  const refreshProfile = useCallback(async () => {
+    await loadProfile();
   }, [loadProfile]);
 
   useEffect(() => {
@@ -277,6 +284,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         loading,
         connectionError,
         retryConnection,
+        refreshProfile,
         canEditInventory,
         canDelete,
         canSeeSettings,

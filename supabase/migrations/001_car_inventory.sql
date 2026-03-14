@@ -19,6 +19,7 @@ BEGIN
   ) THEN
     CREATE TYPE public.car_status AS ENUM (
       'inbound',
+      'inventory',
       'in_stock',
       'showroom',
       'reserved',
