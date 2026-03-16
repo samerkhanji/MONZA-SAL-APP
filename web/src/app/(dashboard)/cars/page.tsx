@@ -470,77 +470,8 @@ export default function CarsListPage() {
             <p className="text-muted-foreground">No cars found.</p>
           ) : (
             <>
-              {/* Mobile: card layout */}
-              <div className="space-y-3 md:hidden">
-                {filteredCars.map((car) => {
-                  const statusClass =
-                    STATUS_BADGE_COLORS[car.status] ??
-                    "bg-muted text-muted-foreground";
-                  const clientName = car.client_name ?? (car as { client_phone?: string }).client_phone ? "Client linked" : null;
-                  const isSold = LINKED_STATUSES.includes(car.status as (typeof LINKED_STATUSES)[number]);
-                  const borderColor =
-                    ["in_stock", "showroom"].includes(car.status) ? "border-l-green-500" :
-                    car.status === "inventory" ? "border-l-gray-400" :
-                    ["sold", "delivered", "reserved", "registered"].includes(car.status) ? "border-l-blue-500" :
-                    car.status === "service" ? "border-l-red-500" :
-                    "border-l-muted-foreground/30";
-                  const modelName = `${car.brand ?? ""} ${car.model ?? ""}`.trim() || "—";
-                  const colorParts = [car.exterior_color, car.interior_color].filter(Boolean).join(" • ");
-                  return (
-                    <button
-                      key={car.id}
-                      type="button"
-                      className={`relative flex w-full flex-col gap-2 rounded-lg border border-border/50 border-l-4 bg-card p-4 text-left shadow-sm transition-colors hover:bg-muted/50 active:bg-muted/70 min-h-[44px] ${borderColor}`}
-                      onClick={() => router.push(`/cars/${encodeURIComponent(car.vin ?? car.id)}`)}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <span className="font-mono text-xs text-muted-foreground truncate">{(car.vin ?? "—").slice(-17)}</span>
-                        <span className="text-xs text-muted-foreground shrink-0">{car.model_year ?? "—"}</span>
-                      </div>
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="text-lg font-bold text-foreground">
-                          {modelName}
-                        </p>
-                        <Badge
-                          className={`shrink-0 rounded-full px-3 py-0.5 text-xs font-medium ${statusClass} ${isSold ? "hover:ring-2 hover:ring-offset-1 cursor-pointer" : ""}`}
-                          onClick={(e) => {
-                            if (isSold) {
-                              e.stopPropagation();
-                              void handleStatusClick(car);
-                            }
-                          }}
-                        >
-                          {CAR_STATUS_LABELS[car.status]}
-                          {isSold && (car.client_name || (car as { client_phone?: string }).client_phone) && (
-                            <ExternalLink className="ml-1 inline h-3 w-3 opacity-60" />
-                          )}
-                        </Badge>
-                      </div>
-                      {colorParts && (
-                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
-                          {[car.exterior_color, car.interior_color].filter(Boolean).map((c, i) => (
-                            <span key={`${c}-${i}`} className="flex items-center gap-1.5">
-                              {i > 0 && <span className="text-muted-foreground/50">•</span>}
-                              <span
-                                className="inline-block size-2 rounded-full border border-border shrink-0"
-                                style={{ backgroundColor: (c && /^#[0-9a-fA-F]{3,8}$/.test(c)) ? c : "var(--muted)" }}
-                                aria-hidden
-                              />
-                              {c}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                      {clientName && isSold && (
-                        <p className="text-sm text-muted-foreground">Customer: {clientName}</p>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Tablet/Desktop: table */}
-              <div className="scrollbar-thick hidden overflow-x-auto overflow-visible rounded-lg border border-border/50 md:block">
+              {/* Unified table layout for all screen sizes (scrollable on mobile) */}
+              <div className="scrollbar-thick overflow-x-auto overflow-visible rounded-lg border border-border/50">
               <Table className="w-full min-w-[600px] overflow-visible xl:min-w-[1200px]">
                 <TableHeader>
                   <TableRow>
@@ -551,14 +482,14 @@ export default function CarsListPage() {
                     <TableHead className="hidden whitespace-nowrap xl:table-cell">Exterior</TableHead>
                     <TableHead className="hidden whitespace-nowrap xl:table-cell">Interior</TableHead>
                     <TableHead className="whitespace-nowrap">Status</TableHead>
-                    <TableHead className="hidden whitespace-nowrap xl:table-cell">Client</TableHead>
-                    <TableHead className="hidden whitespace-nowrap xl:table-cell">Client Phone</TableHead>
-                    <TableHead className="hidden whitespace-nowrap xl:table-cell">Delivery Date</TableHead>
-                    <TableHead className="hidden whitespace-nowrap lg:table-cell">Location</TableHead>
-                    <TableHead className="hidden min-w-[110px] whitespace-nowrap xl:table-cell">Warranty Vehicle DMS</TableHead>
-                    <TableHead className="hidden min-w-[100px] whitespace-nowrap xl:table-cell">Warranty V.M</TableHead>
-                    <TableHead className="hidden min-w-[120px] whitespace-nowrap xl:table-cell">Warranty Battery DMS</TableHead>
-                    <TableHead className="hidden min-w-[100px] whitespace-nowrap xl:table-cell">Warranty B.M</TableHead>
+                    <TableHead className="whitespace-nowrap">Client</TableHead>
+                    <TableHead className="whitespace-nowrap">Client Phone</TableHead>
+                    <TableHead className="whitespace-nowrap">Delivery Date</TableHead>
+                    <TableHead className="whitespace-nowrap">Location</TableHead>
+                    <TableHead className="min-w-[110px] whitespace-nowrap">Warranty Vehicle DMS</TableHead>
+                    <TableHead className="min-w-[100px] whitespace-nowrap">Warranty V.M</TableHead>
+                    <TableHead className="min-w-[120px] whitespace-nowrap">Warranty Battery DMS</TableHead>
+                    <TableHead className="min-w-[100px] whitespace-nowrap">Warranty B.M</TableHead>
                     <TableHead className="whitespace-nowrap">Battery %</TableHead>
                     <TableHead className="whitespace-nowrap">PDI</TableHead>
                     <TableHead className="hidden whitespace-nowrap xl:table-cell">Customs</TableHead>
@@ -643,15 +574,15 @@ export default function CarsListPage() {
                             ? new Date(car.delivery_date).toLocaleDateString()
                             : "—"}
                         </TableCell>
-                        <TableCell className="hidden max-w-[100px] truncate text-sm lg:table-cell" title={car.location_full ?? undefined}>
+                        <TableCell className="max-w-[100px] truncate text-sm" title={car.location_full ?? undefined}>
                           {car.location_full || "—"}
                         </TableCell>
-                        <TableCell className="hidden text-sm xl:table-cell">
+                        <TableCell className="text-sm">
                           {car.warranty_per_dms
                             ? new Date(car.warranty_per_dms).toLocaleDateString()
                             : "—"}
                         </TableCell>
-                        <TableCell className="hidden text-sm xl:table-cell">
+                        <TableCell className="text-sm">
                           {((car as any).warranty_vehicle_expiry ??
                             (car as any).warranty_expiry ??
                             car.warranty_monza_start_date)
@@ -662,12 +593,12 @@ export default function CarsListPage() {
                               ).toLocaleDateString()
                             : "—"}
                         </TableCell>
-                        <TableCell className="hidden text-sm xl:table-cell">
+                        <TableCell className="text-sm">
                           {(car as any).warranty_battery_dms
                             ? new Date((car as any).warranty_battery_dms as string).toLocaleDateString()
                             : "—"}
                         </TableCell>
-                        <TableCell className="hidden text-sm xl:table-cell">
+                        <TableCell className="text-sm">
                           {(car as any).warranty_battery_expiry
                             ? new Date((car as any).warranty_battery_expiry as string).toLocaleDateString()
                             : "—"}
