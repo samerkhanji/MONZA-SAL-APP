@@ -26,6 +26,8 @@ export const STATUS_BADGE_COLORS: Record<string, string> = {
     "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300",
   company_car:
     "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
+  test_drive:
+    "bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-200",
 };
 
 export const PDI_BADGE_COLORS: Record<string, string> = {

@@ -13,7 +13,8 @@ export type CarStatus =
   | "registered"
   | "under_registration"
   | "sent_to_customs"
-  | "company_car";
+  | "company_car"
+  | "test_drive";
 
 export type LocationType = "showroom1" | "showroom2" | "garage" | "storage" | "inventory";
 
@@ -144,7 +145,76 @@ export const CAR_STATUS_LABELS: Record<CarStatus, string> = {
   under_registration: "Under Registration",
   sent_to_customs: "Sent to Customs",
   company_car: "Company Car",
+  test_drive: "Test drive",
 };
+
+export type TestDriveStatus =
+  | "pending"
+  | "out_for_test_drive"
+  | "returned"
+  | "cancelled";
+
+export const TEST_DRIVE_STATUS_LABELS: Record<TestDriveStatus, string> = {
+  pending: "Pending",
+  out_for_test_drive: "Out",
+  returned: "Returned",
+  cancelled: "Cancelled",
+};
+
+/** Employee-defined accessory grouping (migration 035). */
+export interface AccessoryCustomTable {
+  id: string;
+  name: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  profiles?: { full_name: string | null } | Array<{ full_name: string | null }> | null;
+}
+
+/** Line items in accessory_custom_tables. */
+export interface AccessoryCustomItem {
+  id: string;
+  table_id: string;
+  label: string;
+  quantity: number;
+  note: string | null;
+  linked_plate: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Row shape for public.test_drives */
+export interface TestDriveRow {
+  id: string;
+  car_id: string;
+  vin: string;
+  employee_user_id: string;
+  customer_id: string | null;
+  customer_name: string | null;
+  customer_phone: string | null;
+  employee_name: string | null;
+  status: TestDriveStatus;
+  test_drive_start_at: string;
+  expected_return_at: string | null;
+  actual_return_at: string | null;
+  route: string | null;
+  purpose: string | null;
+  companion_employee: string | null;
+  odometer_out: number | null;
+  odometer_in: number | null;
+  battery_out: number | null;
+  battery_in: number | null;
+  fuel_out: number | null;
+  fuel_in: number | null;
+  driver_license_checked: boolean;
+  license_number: string | null;
+  waiver_signed: boolean;
+  incident_notes: string | null;
+  notes: string | null;
+  car_status_before_test_drive: CarStatus | null;
+  created_at: string;
+  updated_at: string;
+}
 
 export const LOCATION_LABELS: Record<LocationType, string> = {
   showroom1: "Showroom 1",

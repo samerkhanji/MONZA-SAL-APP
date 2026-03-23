@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
 import type { CarDisplay, CarEvent, CarStatus } from "@/types/database";
+import { fetchActiveTestDriveForCar } from "@/lib/data/test-drives";
 import { PDI_LABELS, type CarEventType } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -426,6 +427,11 @@ export default function CarProfilePage() {
   const [linkCustomerOpen, setLinkCustomerOpen] = useState(false);
   const [checklistOpen, setChecklistOpen] = useState(false);
   const [pendingFieldFocusId, setPendingFieldFocusId] = useState<string | null>(null);
+  const [activeTestDriveBanner, setActiveTestDriveBanner] = useState<{
+    id: string;
+    test_drive_start_at: string;
+    employee_name: string | null;
+  } | null>(null);
 
   const supabase = createClient();
 
@@ -694,6 +700,26 @@ export default function CarProfilePage() {
   useEffect(() => {
     if (!car?.id) return;
     fetchEvents();
+  }, [car?.id]);
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- supabase client stable; refetch when car changes
+  useEffect(() => {
+    if (!car?.id) {
+      setActiveTestDriveBanner(null);
+      return;
+    }
+    (async () => {
+      const { data, error } = await fetchActiveTestDriveForCar(supabase, car.id);
+      if (error || !data) {
+        setActiveTestDriveBanner(null);
+        return;
+      }
+      setActiveTestDriveBanner({
+        id: data.id,
+        test_drive_start_at: data.test_drive_start_at,
+        employee_name: data.employee_name,
+      });
+    })();
   }, [car?.id]);
 
   useEffect(() => {
@@ -1090,6 +1116,22 @@ export default function CarProfilePage() {
           </div>
         </div>
       </div>
+
+      {activeTestDriveBanner && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-violet-500/50 bg-violet-500/10 px-4 py-3 text-sm">
+          <p className="text-violet-950 dark:text-violet-100">
+            <strong>Test drive in progress</strong> since{" "}
+            {new Date(activeTestDriveBanner.test_drive_start_at).toLocaleString()}
+            {activeTestDriveBanner.employee_name ? (
+              <> · Staff: {activeTestDriveBanner.employee_name}</>
+            ) : null}
+            .
+          </p>
+          <Button size="sm" variant="secondary" asChild>
+            <Link href="/test-drive">Open Test Drive</Link>
+          </Button>
+        </div>
+      )}
 
       {hasConfirmedSaleButWrongStatus && canEditInventory && (
         <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-amber-500/50 bg-amber-500/10 p-4">

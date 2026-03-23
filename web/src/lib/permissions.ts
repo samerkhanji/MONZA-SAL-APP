@@ -14,6 +14,8 @@ export const PAGE_PERMISSIONS: Record<
   | "assistant_dashboard"
   | "requests"
   | "cars"
+  | "accessories"
+  | "test_drive"
   | "installments"
   | "parts"
   | "customers"
@@ -35,6 +37,8 @@ export const PAGE_PERMISSIONS: Record<
     "sales_ops",
   ],
   cars: ["owner", "assistant", "khalil_hybrid", "it", "sales_ops"],
+  accessories: ["owner", "assistant", "khalil_hybrid", "it", "sales_ops"],
+  test_drive: ["owner", "assistant", "khalil_hybrid", "it", "sales_ops"],
   installments: ["owner", "assistant", "sales_ops"],
   parts: [
     "owner",

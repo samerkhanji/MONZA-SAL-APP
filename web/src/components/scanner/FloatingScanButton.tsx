@@ -36,6 +36,12 @@ export function FloatingScanButton() {
         return;
       }
 
+      if (pathname.startsWith("/test-drive")) {
+        window.dispatchEvent(new CustomEvent("test-drive-scan-vin", { detail: trimmed }));
+        toast.success(`VIN ready: ${trimmed}`);
+        return;
+      }
+
       if (pathname.startsWith("/garage/jobs/")) {
         toast.success(`Found: ${(car as { brand: string }).brand} ${(car as { model: string }).model}`);
         router.push(`/cars/${encodeURIComponent((car as { vin: string }).vin ?? (car as { id: string }).id)}`);

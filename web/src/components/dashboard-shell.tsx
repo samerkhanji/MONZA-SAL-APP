@@ -25,6 +25,8 @@ import {
   FileCheck,
   CreditCard,
   Activity,
+  Boxes,
+  CarFront,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
@@ -72,6 +74,8 @@ const BASE_NAV_ITEMS: Array<{
     ],
   },
   { href: "/cars", label: "Inventory", icon: Car, tourId: "nav-cars" },
+  { href: "/test-drive", label: "Test Drive", icon: CarFront, tourId: "nav-test-drive" },
+  { href: "/accessories", label: "Accessories", icon: Boxes, tourId: "nav-accessories" },
   { href: "/documents", label: "Documents", icon: FileText, tourId: "nav-documents" },
   { href: "/customers", label: "Customers", icon: Users, tourId: "nav-customers" },
   { href: "/data-health", label: "Data Health", icon: Activity, tourId: "nav-data-health" },
@@ -105,6 +109,8 @@ function getPageTitle(pathname: string): string {
   if (pathname.startsWith("/cars/add")) return "Add Car";
   if (pathname.startsWith("/cars/") && pathname !== "/cars") return "Car Details";
   if (pathname.startsWith("/cars")) return "Car Inventory";
+  if (pathname.startsWith("/accessories")) return "Accessories";
+  if (pathname.startsWith("/test-drive")) return "Test Drive";
   if (pathname.startsWith("/documents")) return "Documents";
   if (pathname.startsWith("/customers")) return "Customers";
   if (pathname.startsWith("/data-health")) return "Data Health";

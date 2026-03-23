@@ -27,8 +27,19 @@ npm install
 npm run dev
 ```
 
-Then open `http://localhost:3000`.  
+Then open **`http://localhost:3000`** (or `http://127.0.0.1:3000`).  
 You will be redirected to **Login** — sign in with your Supabase Auth credentials.
+
+### Dev: HMR / “page keeps reloading” / WebSocket errors
+
+If the console shows `WebSocket ... /_next/webpack-hmr ... ERR_INVALID_HTTP_RESPONSE`:
+
+1. **Use localhost, not a WSL/Docker LAN IP** — `http://172.20.x.x:3000` often appears when Next prints “Network” URL on Windows+WSL. Prefer **`http://localhost:3000`** so the browser and HMR use the same host (WSL port forwarding is more reliable for `localhost`).
+2. **Proxies** — nginx, Cloudflare Tunnel, etc. must forward **WebSocket** upgrades (`Connection: upgrade`, `Upgrade: websocket`). Plain HTTP reverse proxies without that break HMR.
+3. **Clear cache** — stop dev server, delete `web/.next`, run `npm run dev` again.
+4. **LAN / phone** — set `NEXT_DEV_ALLOWED_ORIGINS=http://YOUR_LAN_IP:3000` in `.env.local` if you need a non-localhost origin (see `next.config.ts`).
+
+This repo’s middleware intentionally skips all `/_next/*` routes so dev HMR is not intercepted by auth.
 
 ### 3. Tests
 

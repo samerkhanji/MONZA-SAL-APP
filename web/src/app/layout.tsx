@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/lib/contexts/ThemeContext";
 import { ThemeToaster } from "@/components/theme-toaster";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
 import { AbortErrorHandler } from "@/components/AbortErrorHandler";
+import { DevHostBanner } from "@/components/dev-host-banner";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -67,6 +68,7 @@ export default function RootLayout({
           {children}
           <ThemeToaster />
           <ServiceWorkerRegistration />
+          {process.env.NODE_ENV === "development" ? <DevHostBanner /> : null}
         </ThemeProvider>
       </body>
     </html>
