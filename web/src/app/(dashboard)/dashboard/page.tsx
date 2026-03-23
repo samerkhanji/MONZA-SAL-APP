@@ -491,7 +491,7 @@ export default function DashboardPage() {
   if (shouldRedirect) return null;
 
   return (
-    <div className="container mx-auto space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+    <div className="container mx-auto space-y-6 overflow-x-hidden px-4 py-6 pb-20 sm:px-6 sm:pb-6 lg:px-8">
       <InstallBanner />
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -524,22 +524,22 @@ export default function DashboardPage() {
 
       {/* KPI Cards */}
       <div
-        className={`grid grid-cols-1 gap-4 sm:grid-cols-2 ${showPendingRequestsCard ? "lg:grid-cols-5" : "lg:grid-cols-4"}`}
+        className={`grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-2 ${showPendingRequestsCard ? "lg:grid-cols-5" : "lg:grid-cols-4"}`}
       >
         {kpiCards.map((card) => (
           <Link key={card.label} href={card.href}>
-            <Card className="transition-colors hover:bg-muted/50">
-              <CardContent className="flex items-center gap-4 p-6">
+            <Card className="h-full transition-colors hover:bg-muted/50">
+              <CardContent className="flex items-center gap-3 p-4 sm:gap-4 sm:p-6">
                 <div
-                  className={`flex size-12 shrink-0 items-center justify-center rounded-lg ${card.bgColor} ${card.color}`}
+                  className={`flex size-10 shrink-0 items-center justify-center rounded-lg sm:size-12 ${card.bgColor} ${card.color}`}
                 >
-                  <card.icon className="size-6" />
+                  <card.icon className="size-5 sm:size-6" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-2xl font-bold">{loading ? "—" : card.value}</p>
-                  <p className="text-sm text-muted-foreground">{card.label}</p>
+                  <p className="text-xl font-bold sm:text-2xl">{loading ? "—" : card.value}</p>
+                  <p className="text-xs text-muted-foreground sm:text-sm">{card.label}</p>
                 </div>
-                <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+                <ChevronRight className="size-4 shrink-0 text-muted-foreground max-sm:hidden" />
               </CardContent>
             </Card>
           </Link>
@@ -612,10 +612,10 @@ export default function DashboardPage() {
                   <Link
                     key={p.id}
                     href="/garage/inventory"
-                    className="flex items-center justify-between rounded-lg border p-3 transition-colors hover:bg-muted/50"
+                    className="flex flex-col gap-2 rounded-lg border p-3 transition-colors hover:bg-muted/50 sm:flex-row sm:items-center sm:justify-between"
                   >
-                    <span className="font-medium">{p.part_name}</span>
-                    <div className="flex items-center gap-2">
+                    <span className="min-w-0 font-medium">{p.part_name}</span>
+                    <div className="flex shrink-0 flex-wrap items-center gap-2">
                       <span className="text-muted-foreground">
                         {p.quantity} left
                       </span>
@@ -753,15 +753,17 @@ export default function DashboardPage() {
                 <li key={ev.id}>
                   <Link
                     href={`/cars/${ev.car_id}`}
-                    className="flex items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-muted/50"
+                    className="flex flex-col gap-1 rounded-lg px-3 py-2 transition-colors hover:bg-muted/50 sm:flex-row sm:items-center sm:gap-3"
                   >
-                    <span className="text-lg" aria-hidden>
-                      {getActivityIcon(ev.event_type)}
+                    <span className="flex items-start gap-2 sm:min-w-0 sm:flex-1">
+                      <span className="text-lg leading-none" aria-hidden>
+                        {getActivityIcon(ev.event_type)}
+                      </span>
+                      <span className="min-w-0 flex-1 text-sm sm:truncate">
+                        {formatActivityMessage(ev)}
+                      </span>
                     </span>
-                    <span className="min-w-0 flex-1 truncate">
-                      {formatActivityMessage(ev)}
-                    </span>
-                    <span className="shrink-0 text-sm text-muted-foreground">
+                    <span className="shrink-0 pl-7 text-xs text-muted-foreground sm:pl-0 sm:text-sm">
                       {timeAgo(ev.created_at)}
                     </span>
                   </Link>

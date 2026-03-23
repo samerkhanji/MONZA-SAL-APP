@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { MoreHorizontal, FileText, ScanLine, FileSpreadsheet, Download, ExternalLink } from "lucide-react";
+import { MoreHorizontal, FileText, ScanLine, FileSpreadsheet, Download, ExternalLink, ChevronRight } from "lucide-react";
 import { useUser } from "@/lib/contexts/UserContext";
 import type { CarDisplay } from "@/types/database";
 import {
@@ -91,6 +91,13 @@ const ImportExcelDialog = dynamic(
   () => import("@/components/ImportExcelDialog").then((m) => ({ default: m.ImportExcelDialog })),
   { ssr: false }
 );
+
+function formatVinShort(vin: string | null | undefined): string {
+  const v = (vin ?? "").trim();
+  if (!v) return "—";
+  if (v.length <= 12) return v;
+  return `…${v.slice(-8)}`;
+}
 
 function matchesSearch(
   car: CarDisplay,
@@ -350,7 +357,7 @@ export default function CarsListPage() {
   const canDeleteCar = canPerform("cars", "delete", appRole ?? null);
 
   return (
-    <div className="container mx-auto max-w-[1800px] space-y-6 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+    <div className="container mx-auto max-w-[1800px] space-y-6 overflow-x-hidden px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
         <div>
           <h1 className="text-xl font-semibold sm:text-2xl">Car Inventory</h1>
@@ -470,7 +477,236 @@ export default function CarsListPage() {
             <p className="text-muted-foreground">No cars found.</p>
           ) : (
             <>
-              {/* Unified table layout for all screen sizes (scrollable on mobile) */}
+              {/* Mobile: card list (tables don’t work well on phones) */}
+              <div className="space-y-3 pb-8 md:hidden">
+                {filteredCars.map((car) => {
+                  const statusClass =
+                    STATUS_BADGE_COLORS[car.status] ??
+                    "bg-muted text-muted-foreground";
+                  const pdiClass =
+                    PDI_BADGE_COLORS[car.pdi_status] ??
+                    "bg-muted text-muted-foreground";
+                  const customsClass =
+                    CUSTOMS_BADGE_COLORS[car.customs_status] ??
+                    "bg-muted text-muted-foreground";
+                  const batteryPercent = car.battery_percent;
+                  const customsLabel =
+                    car.customs_status === "cleared"
+                      ? "Complete"
+                      : car.customs_status === "in_progress"
+                        ? "Incomplete"
+                        : CUSTOMS_STATUS_LABELS[car.customs_status] ?? "Pending";
+                  const title =
+                    `${car.brand ?? ""} ${car.model ?? ""}`.trim() || "—";
+                  const clientPhone = (car as { client_phone?: string })
+                    .client_phone;
+                  const linkedHint =
+                    LINKED_STATUSES.includes(
+                      car.status as (typeof LINKED_STATUSES)[number]
+                    ) &&
+                    (car.client_name || clientPhone);
+
+                  return (
+                    <div
+                      key={car.id}
+                      role="button"
+                      tabIndex={0}
+                      className="rounded-xl border border-border/50 bg-card p-4 text-left shadow-sm outline-none transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring"
+                      onClick={() =>
+                        router.push(
+                          `/cars/${encodeURIComponent(car.vin ?? car.id)}`
+                        )
+                      }
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          router.push(
+                            `/cars/${encodeURIComponent(car.vin ?? car.id)}`
+                          );
+                        }
+                      }}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-semibold">{title}</p>
+                          <p
+                            className="mt-0.5 font-mono text-xs text-muted-foreground"
+                            title={car.vin ?? undefined}
+                          >
+                            {formatVinShort(car.vin)}
+                          </p>
+                          <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                            {car.location_full || "No location"}
+                            {car.model_year != null ? ` · ${car.model_year}` : ""}
+                          </p>
+                          {(car.client_name || clientPhone) && (
+                            <p className="mt-1 truncate text-xs text-foreground/90">
+                              {car.client_name ?? "—"}
+                              {clientPhone ? ` · ${clientPhone}` : ""}
+                            </p>
+                          )}
+                        </div>
+                        <div
+                          className="flex shrink-0 items-center gap-0.5"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-9 touch-manipulation"
+                            title="Documents"
+                            onClick={() =>
+                              router.push(
+                                `/cars/${encodeURIComponent(car.vin ?? car.id)}`
+                              )
+                            }
+                          >
+                            <FileText className="size-4" />
+                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="size-9 touch-manipulation"
+                              >
+                                <MoreHorizontal className="size-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-52">
+                              <DropdownMenuItem
+                                onClick={() =>
+                                  router.push(
+                                    `/cars/${encodeURIComponent(car.vin ?? car.id)}`
+                                  )
+                                }
+                              >
+                                View profile
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() =>
+                                  router.push(
+                                    `/cars/${encodeURIComponent(car.vin ?? car.id)}`
+                                  )
+                                }
+                              >
+                                <FileText className="mr-2 size-4" />
+                                Documents & PDFs
+                              </DropdownMenuItem>
+                              {canEditCar && (
+                                <>
+                                  <DropdownMenuItem
+                                    onClick={() => setEditCar(car)}
+                                  >
+                                    Edit
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() => setMoveCar(car)}
+                                  >
+                                    Move
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                              {canDeleteCar && (
+                                <DropdownMenuItem
+                                  variant="destructive"
+                                  onClick={() => setDeleteCar(car)}
+                                >
+                                  Delete
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                          <ChevronRight
+                            className="size-5 text-muted-foreground max-sm:hidden"
+                            aria-hidden
+                          />
+                        </div>
+                      </div>
+
+                      <div
+                        className="mt-3 flex flex-wrap gap-2"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <button
+                          type="button"
+                          className="inline-flex touch-manipulation"
+                          onClick={() => void handleStatusClick(car)}
+                        >
+                          <Badge className={`${statusClass} hover:opacity-90`}>
+                            {CAR_STATUS_LABELS[car.status]}
+                            {linkedHint && (
+                              <ExternalLink className="ml-1 inline size-3 opacity-70" />
+                            )}
+                          </Badge>
+                        </button>
+                        {pendingDeletes[car.id] && (
+                          <Badge
+                            variant="outline"
+                            className="border-amber-400 text-amber-600 dark:border-amber-500 dark:text-amber-400"
+                          >
+                            Pending
+                          </Badge>
+                        )}
+                        <button
+                          type="button"
+                          className="inline-flex touch-manipulation"
+                          onClick={() => {
+                            setPdiDialogCar(car);
+                            setPdiDialogOpen(true);
+                          }}
+                        >
+                          <Badge className={`${pdiClass} hover:opacity-90`}>
+                            {PDI_LABELS[car.pdi_status]}
+                          </Badge>
+                        </button>
+                        <button
+                          type="button"
+                          className="inline-flex touch-manipulation"
+                          onClick={() => {
+                            setCustomsDialogCar(car);
+                            setCustomsDialogOpen(true);
+                          }}
+                        >
+                          <Badge
+                            className={`${customsClass} hover:opacity-90`}
+                          >
+                            {customsLabel}
+                          </Badge>
+                        </button>
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border/50 pt-3 text-sm">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <span className="text-muted-foreground">Battery</span>
+                          <span className="font-medium tabular-nums">
+                            {batteryPercent != null ? `${batteryPercent}%` : "—"}
+                          </span>
+                          {batteryPercent != null && (
+                            <div className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
+                              <div
+                                className="h-full bg-primary"
+                                style={{
+                                  width: `${Math.min(100, Math.max(0, batteryPercent))}%`,
+                                }}
+                              />
+                            </div>
+                          )}
+                        </div>
+                        {car.date_arrived && (
+                          <span className="shrink-0 text-xs text-muted-foreground">
+                            Arrived{" "}
+                            {new Date(car.date_arrived).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Desktop: full table */}
+              <div className="hidden md:block">
               <div className="scrollbar-thick overflow-x-auto overflow-visible rounded-lg border border-border/50">
               <Table className="w-full min-w-[600px] overflow-visible xl:min-w-[1200px]">
                 <TableHeader>
@@ -732,6 +968,7 @@ export default function CarsListPage() {
                 </TableBody>
               </Table>
             </div>
+              </div>
             </>
           )}
         </CardContent>

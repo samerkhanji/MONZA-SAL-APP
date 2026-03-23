@@ -41,7 +41,9 @@ interface SaleData {
   selling_price: number | null;
   currency: string | null;
   sale_date: string | null;
+  date_bought?: string | null;
   delivery_date: string | null;
+  reservation_date?: string | null;
   reserved_until: string | null;
   deposit_amount: number | null;
 }
@@ -84,8 +86,24 @@ export function StatusCustomerDialog({
   const [planMonthlyAmount, setPlanMonthlyAmount] = useState("");
   const [planStartDate, setPlanStartDate] = useState("");
   const [planDueDay, setPlanDueDay] = useState("");
+  const [dateBought, setDateBought] = useState("");
+  const [reservationDateStr, setReservationDateStr] = useState("");
+  const [deliveryDateStr, setDeliveryDateStr] = useState("");
 
   const isSoldOrReserved = car && (car.status === "sold" || car.status === "reserved");
+
+  function normalizeOptionalDateForDb(value: string): string | null {
+    const t = value.trim();
+    return t.length === 0 ? null : t;
+  }
+
+  function validateOptionalIsoDate(value: string, label: string): string | null {
+    const t = value.trim();
+    if (!t) return null;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(t)) return `${label}: use YYYY-MM-DD.`;
+    if (Number.isNaN(Date.parse(`${t}T12:00:00`))) return `${label}: invalid date.`;
+    return null;
+  }
 
   useEffect(() => {
     if (!open || !car) return;
@@ -102,6 +120,9 @@ export function StatusCustomerDialog({
     setPlanMonthlyAmount("");
     setPlanStartDate("");
     setPlanDueDay("");
+    setDateBought("");
+    setReservationDateStr("");
+    setDeliveryDateStr("");
 
     if (isSoldOrReserved) {
       setLoading(true);
@@ -109,7 +130,9 @@ export function StatusCustomerDialog({
         try {
           const { data: saleData } = await supabase
             .from("sales_orders")
-            .select("id, customer_id, status, selling_price, currency, sale_date, delivery_date, reserved_until, deposit_amount")
+            .select(
+              "id, customer_id, status, selling_price, currency, sale_date, date_bought, delivery_date, reservation_date, reserved_until, deposit_amount"
+            )
             .eq("car_id", car.id)
             .not("status", "eq", "cancelled")
             .order("created_at", { ascending: false })
@@ -127,6 +150,19 @@ export function StatusCustomerDialog({
             setCustomer(custData as CustomerData | null);
             setSellingPrice(saleData.selling_price != null ? String(saleData.selling_price) : "");
             setCurrency(saleData.currency ?? "USD");
+            const bought =
+              (saleData as { date_bought?: string | null }).date_bought ??
+              car.date_bought ??
+              (saleData as { sale_date?: string | null }).sale_date;
+            setDateBought(bought ? String(bought).slice(0, 10) : "");
+            const resD = (saleData as { reservation_date?: string | null }).reservation_date;
+            const delD = (saleData as { delivery_date?: string | null }).delivery_date;
+            setReservationDateStr(
+              resD ? String(resD).slice(0, 10) : car.reservation_date ? String(car.reservation_date).slice(0, 10) : ""
+            );
+            setDeliveryDateStr(
+              delD ? String(delD).slice(0, 10) : car.delivery_date ? String(car.delivery_date).slice(0, 10) : ""
+            );
             if (custData) {
               setFirstName(custData.first_name);
               setLastName(custData.last_name ?? "");
@@ -138,6 +174,14 @@ export function StatusCustomerDialog({
             setSale(null);
             setCustomer(null);
             setNewStatus(car.status === "reserved" ? "reserved" : "sold");
+            const displayBought = car.date_bought
+              ? String(car.date_bought).slice(0, 10)
+              : "";
+            setDateBought(displayBought);
+            setReservationDateStr(
+              car.reservation_date ? String(car.reservation_date).slice(0, 10) : ""
+            );
+            setDeliveryDateStr(car.delivery_date ? String(car.delivery_date).slice(0, 10) : "");
             if ((car as { client_name?: string }).client_name) {
               const parts = (car as { client_name: string }).client_name.trim().split(/\s+/);
               setFirstName(parts[0] ?? "");
@@ -196,6 +240,18 @@ export function StatusCustomerDialog({
       return;
     }
 
+    for (const msg of [
+      validateOptionalIsoDate(dateBought, "Date Bought"),
+      validateOptionalIsoDate(reservationDateStr, "Reservation date"),
+      validateOptionalIsoDate(deliveryDateStr, "Delivery date"),
+    ]) {
+      if (msg) {
+        setSubmitting(false);
+        toast.error(msg);
+        return;
+      }
+    }
+
     if (needsCustomer) {
       if (customer) {
         const { error: custError } = await supabase
@@ -214,6 +270,56 @@ export function StatusCustomerDialog({
           toast.error("Failed to update customer: " + custError.message);
           return;
         }
+
+        const dbBought = normalizeOptionalDateForDb(dateBought);
+        const dbReservation = normalizeOptionalDateForDb(reservationDateStr);
+        const dbDelivery = normalizeOptionalDateForDb(deliveryDateStr);
+        const { data: latestSo } = await supabase
+          .from("sales_orders")
+          .select("id")
+          .eq("car_id", car.id)
+          .not("status", "eq", "cancelled")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (latestSo?.id) {
+          const { error: saleUpdErr } = await supabase
+            .from("sales_orders")
+            .update({
+              date_bought: dbBought,
+              reservation_date: dbReservation,
+              delivery_date: dbDelivery,
+            })
+            .eq("id", latestSo.id);
+          if (saleUpdErr) {
+            setSubmitting(false);
+            toast.error("Failed to update sales order dates: " + saleUpdErr.message);
+            return;
+          }
+        } else if (customer.id) {
+          if (dbBought || dbReservation || dbDelivery) {
+            const { error: saleInsErr } = await supabase.from("sales_orders").insert({
+              car_id: car.id,
+              customer_id: customer.id,
+              status: car.status === "reserved" ? "reserved" : "confirmed",
+              created_by: user.id,
+              currency: currency || "USD",
+              date_bought: dbBought,
+              reservation_date: dbReservation,
+              delivery_date: dbDelivery,
+            });
+            if (saleInsErr) {
+              setSubmitting(false);
+              toast.error("Failed to save sales order dates: " + saleInsErr.message);
+              return;
+            }
+          }
+        } else if (dbBought || dbReservation || dbDelivery) {
+          setSubmitting(false);
+          toast.error("Link a customer before setting sales order dates.");
+          return;
+        }
       } else {
         // Safeguard: Check if this car is already linked to another customer
         const { data: existingSale } = await supabase
@@ -221,6 +327,7 @@ export function StatusCustomerDialog({
           .select("id, customer_id, customers(first_name, last_name)")
           .eq("car_id", car.id)
           .not("status", "eq", "cancelled")
+          .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
 
@@ -261,6 +368,12 @@ export function StatusCustomerDialog({
         const priceNum = sellingPrice ? parseFloat(sellingPrice) : undefined;
         if (priceNum !== undefined && !Number.isNaN(priceNum)) salePayload.selling_price = priceNum;
         salePayload.currency = currency;
+        const dbBought = normalizeOptionalDateForDb(dateBought);
+        const dbReservation = normalizeOptionalDateForDb(reservationDateStr);
+        const dbDelivery = normalizeOptionalDateForDb(deliveryDateStr);
+        salePayload.date_bought = dbBought;
+        salePayload.reservation_date = dbReservation;
+        salePayload.delivery_date = dbDelivery;
 
         const { error: saleError } = await supabase
           .from("sales_orders")
@@ -489,6 +602,39 @@ export function StatusCustomerDialog({
                         />
                       </div>
                     )}
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="status-dialog-reservation">Reservation date</Label>
+                        <Input
+                          id="status-dialog-reservation"
+                          type="date"
+                          value={reservationDateStr}
+                          onChange={(e) => setReservationDateStr(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="status-dialog-delivery">Delivery date</Label>
+                        <Input
+                          id="status-dialog-delivery"
+                          type="date"
+                          value={deliveryDateStr}
+                          onChange={(e) => setDeliveryDateStr(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="status-dialog-date-bought">Date Bought</Label>
+                        <Input
+                          id="status-dialog-date-bought"
+                          type="date"
+                          value={dateBought}
+                          onChange={(e) => setDateBought(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <p className="text-muted-foreground text-xs">
+                      Writes <span className="font-mono text-[11px]">public.sales_orders</span> only (not{" "}
+                      <span className="font-mono text-[11px]">cars_display</span>).
+                    </p>
                     {sale && (
                       <div className="rounded-md border p-3 text-sm">
                         <p className="font-medium">Sale info</p>
@@ -510,6 +656,30 @@ export function StatusCustomerDialog({
                     {phone2 && <p><span className="font-medium">Phone 2:</span> {phone2}</p>}
                     {email && <p><span className="font-medium">Email:</span> {email}</p>}
                     {showPlateField && <p><span className="font-medium">Plate:</span> {car.plate_number ?? "—"}</p>}
+                    {(sale?.reservation_date ?? car.reservation_date) && (
+                      <p>
+                        <span className="font-medium">Reservation:</span>{" "}
+                        {new Date(
+                          (sale?.reservation_date ?? car.reservation_date) as string
+                        ).toLocaleDateString()}
+                      </p>
+                    )}
+                    {(sale?.delivery_date ?? car.delivery_date) && (
+                      <p>
+                        <span className="font-medium">Delivery:</span>{" "}
+                        {new Date((sale?.delivery_date ?? car.delivery_date) as string).toLocaleDateString()}
+                      </p>
+                    )}
+                    {(sale?.date_bought ?? sale?.sale_date ?? car.date_bought) && (
+                      <p>
+                        <span className="font-medium">Date Bought:</span>{" "}
+                        {new Date(
+                          (sale?.date_bought ??
+                            sale?.sale_date ??
+                            car.date_bought) as string
+                        ).toLocaleDateString()}
+                      </p>
+                    )}
                     {sale?.selling_price != null && (
                       <p><span className="font-medium">Price:</span> {sale.selling_price} {sale.currency ?? "USD"}</p>
                     )}
@@ -584,6 +754,38 @@ export function StatusCustomerDialog({
                       placeholder="Optional"
                     />
                   </div>
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="status-dialog-reservation-new">Reservation date</Label>
+                      <Input
+                        id="status-dialog-reservation-new"
+                        type="date"
+                        value={reservationDateStr}
+                        onChange={(e) => setReservationDateStr(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="status-dialog-delivery-new">Delivery date</Label>
+                      <Input
+                        id="status-dialog-delivery-new"
+                        type="date"
+                        value={deliveryDateStr}
+                        onChange={(e) => setDeliveryDateStr(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="status-dialog-date-bought-new">Date Bought</Label>
+                      <Input
+                        id="status-dialog-date-bought-new"
+                        type="date"
+                        value={dateBought}
+                        onChange={(e) => setDateBought(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <p className="text-muted-foreground text-xs">
+                    Writes <span className="font-mono text-[11px]">public.sales_orders</span> only.
+                  </p>
                   <DialogFooter>
                     <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
                     <Button onClick={() => void handleSaveCustomer()} disabled={submitting || !firstName.trim() || !phone.trim()}>

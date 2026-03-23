@@ -49,6 +49,7 @@ interface EnrichedSaleOrder {
   selling_price: number | null;
   currency: string | null;
   sale_date: string | null;
+  date_bought: string | null;
   delivery_date: string | null;
   visits: number;
   maintenance: number;
@@ -116,6 +117,7 @@ export default function CustomerDetailPage() {
         selling_price,
         currency,
         sale_date,
+        date_bought,
         delivery_date,
         cars:car_id (
           id,
@@ -534,6 +536,7 @@ export default function CustomerDetailPage() {
                   const carStatusLabel =
                     CAR_STATUS_LABELS[car.status as keyof typeof CAR_STATUS_LABELS] ??
                     car.status;
+                  const dateBoughtDisplay = so.date_bought ?? so.sale_date;
                     return (
                       <div
                         key={so.id}
@@ -575,8 +578,8 @@ export default function CustomerDetailPage() {
                               </p>
                               <p>
                                 Date Bought:{" "}
-                                {so.sale_date
-                                  ? new Date(so.sale_date).toLocaleDateString()
+                                {dateBoughtDisplay
+                                  ? new Date(dateBoughtDisplay).toLocaleDateString()
                                   : "—"}
                               </p>
                               <p>

@@ -61,7 +61,9 @@ interface SoldCar {
   selling_price: number | null;
   currency: string | null;
   sale_date: string | null;
+  date_bought: string | null;
   delivery_date: string | null;
+  reservation_date: string | null;
   cars: {
     vin: string;
     brand: string;
@@ -135,7 +137,9 @@ export default function CustomersPage() {
         selling_price,
         currency,
         sale_date,
+        date_bought,
         delivery_date,
+        reservation_date,
         cars:car_id (
           vin, brand, model, model_year, exterior_color, status
         ),
@@ -433,7 +437,7 @@ export default function CustomersPage() {
   }
 
   return (
-    <div className="container mx-auto max-w-[1600px] space-y-6 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+    <div className="container mx-auto max-w-[1600px] space-y-6 overflow-x-hidden px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-semibold sm:text-2xl">Customers</h1>
@@ -576,126 +580,250 @@ export default function CustomersPage() {
               ) : soldCustomers.length === 0 ? (
                 <p className="text-muted-foreground">No sold cars found.</p>
               ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Vehicle</TableHead>
-                        <TableHead>VIN</TableHead>
-                        <TableHead>Color</TableHead>
-                        <TableHead>Customer</TableHead>
-                        <TableHead>Phone</TableHead>
-                        <TableHead>Price</TableHead>
-                        <TableHead>Sale Date</TableHead>
-                        <TableHead>Delivery Date</TableHead>
-                        <TableHead>Order Status</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {convertedSoldCars.map((so) => {
-                        const car = so.cars;
-                        const customer = so.customers;
-                        const fullName = customer
-                          ? `${customer.first_name} ${customer.last_name ?? ""}`.trim()
-                          : "—";
-                        const isSubDealer = car?.status === "sent_to_sub_dealer";
-                        return (
-                          <TableRow key={so.id}>
-                            <TableCell className="font-medium">
-                              {car ? `${car.brand} ${car.model}${car.model_year ? ` (${car.model_year})` : ""}` : "—"}
-                            </TableCell>
-                            <TableCell className="font-mono text-xs text-muted-foreground">
-                              {car?.vin ?? "—"}
-                            </TableCell>
-                            <TableCell className="text-sm text-muted-foreground">
-                              {car?.exterior_color ?? "—"}
-                            </TableCell>
-                            <TableCell>
-                              {customer ? (
-                                <button
-                                  type="button"
-                                  className="text-primary hover:underline text-sm font-medium"
-                                  onClick={() => router.push(`/customers/${customer.id}`)}
-                                >
-                                  {fullName}
-                                </button>
-                              ) : (
-                                <span className="text-muted-foreground text-sm">—</span>
+                <>
+                  <div className="space-y-3 pb-6 md:hidden">
+                    {convertedSoldCars.map((so) => {
+                      const car = so.cars;
+                      const customer = so.customers;
+                      const fullName = customer
+                        ? `${customer.first_name} ${customer.last_name ?? ""}`.trim()
+                        : "—";
+                      const isSubDealer = car?.status === "sent_to_sub_dealer";
+                      const vehicleTitle = car
+                        ? `${car.brand} ${car.model}${car.model_year ? ` (${car.model_year})` : ""}`
+                        : "—";
+                      const vinShort =
+                        car?.vin && car.vin.length > 12
+                          ? `…${car.vin.slice(-8)}`
+                          : (car?.vin ?? "—");
+                      const dateBoughtDisplay = so.date_bought ?? so.sale_date;
+
+                      return (
+                        <div
+                          key={so.id}
+                          className="rounded-xl border border-border/50 bg-card p-4 shadow-sm"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0 flex-1">
+                              <p className="font-semibold">{vehicleTitle}</p>
+                              <p
+                                className="mt-0.5 font-mono text-xs text-muted-foreground"
+                                title={car?.vin}
+                              >
+                                {vinShort}
+                              </p>
+                              {car?.exterior_color && (
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                  {car.exterior_color}
+                                </p>
                               )}
-                            </TableCell>
-                            <TableCell className="text-sm">
-                              {customer?.phone_primary ? (
-                                <a
-                                  href={`tel:${customer.phone_primary}`}
-                                  className="text-primary hover:underline"
-                                >
-                                  {customer.phone_primary}
-                                </a>
-                              ) : (
-                                "—"
+                            </div>
+                            <div className="flex shrink-0 flex-col items-end gap-1">
+                              <Badge variant="secondary">{so.status}</Badge>
+                              {isSubDealer && (
+                                <Badge variant="outline" className="text-xs">
+                                  Sub-dealer
+                                </Badge>
                               )}
-                            </TableCell>
-                            <TableCell className="text-sm">
+                            </div>
+                          </div>
+
+                          <div className="mt-3 border-t border-border/50 pt-3 text-sm">
+                            {customer ? (
+                              <button
+                                type="button"
+                                className="text-left font-medium text-primary hover:underline"
+                                onClick={() => router.push(`/customers/${customer.id}`)}
+                              >
+                                {fullName}
+                              </button>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                            {customer?.phone_primary && (
+                              <a
+                                href={`tel:${customer.phone_primary.replace(/\s/g, "")}`}
+                                className="mt-1 block text-primary hover:underline"
+                              >
+                                {customer.phone_primary}
+                              </a>
+                            )}
+                          </div>
+
+                          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                            <span>
+                              Price:{" "}
                               {so.selling_price != null
                                 ? `${Number(so.selling_price).toLocaleString()} ${so.currency ?? "USD"}`
                                 : "—"}
-                            </TableCell>
-                            <TableCell className="text-sm">
-                              {so.sale_date
-                                ? new Date(so.sale_date).toLocaleDateString()
+                            </span>
+                            <span>
+                              Date bought:{" "}
+                              {dateBoughtDisplay
+                                ? new Date(dateBoughtDisplay).toLocaleDateString()
                                 : "—"}
-                            </TableCell>
-                            <TableCell className="text-sm">
+                            </span>
+                            <span>
+                              Delivery:{" "}
                               {so.delivery_date
                                 ? new Date(so.delivery_date).toLocaleDateString()
                                 : "—"}
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex flex-wrap items-center gap-1">
-                                <Badge variant="secondary">{so.status}</Badge>
-                                {isSubDealer && (
-                                  <Badge
-                                    variant="outline"
-                                    className="bg-muted text-muted-foreground"
-                                  >
-                                    Sub-dealer
-                                  </Badge>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex items-center justify-end gap-1">
-                                {customer && (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
+                            </span>
+                          </div>
+
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {customer && (
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                className="touch-manipulation"
+                                onClick={() => router.push(`/customers/${customer.id}`)}
+                              >
+                                Customer
+                              </Button>
+                            )}
+                            {car && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="touch-manipulation"
+                                onClick={() =>
+                                  router.push(
+                                    `/cars/${encodeURIComponent(car.vin ?? so.car_id)}`
+                                  )
+                                }
+                              >
+                                Car
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="hidden overflow-x-auto md:block">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Vehicle</TableHead>
+                          <TableHead>VIN</TableHead>
+                          <TableHead>Color</TableHead>
+                          <TableHead>Customer</TableHead>
+                          <TableHead>Phone</TableHead>
+                          <TableHead>Price</TableHead>
+                          <TableHead>Date bought</TableHead>
+                          <TableHead>Delivery Date</TableHead>
+                          <TableHead>Order Status</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {convertedSoldCars.map((so) => {
+                          const car = so.cars;
+                          const customer = so.customers;
+                          const fullName = customer
+                            ? `${customer.first_name} ${customer.last_name ?? ""}`.trim()
+                            : "—";
+                          const isSubDealer = car?.status === "sent_to_sub_dealer";
+                          const dateBoughtDisplay = so.date_bought ?? so.sale_date;
+                          return (
+                            <TableRow key={so.id}>
+                              <TableCell className="font-medium">
+                                {car ? `${car.brand} ${car.model}${car.model_year ? ` (${car.model_year})` : ""}` : "—"}
+                              </TableCell>
+                              <TableCell className="font-mono text-xs text-muted-foreground">
+                                {car?.vin ?? "—"}
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {car?.exterior_color ?? "—"}
+                              </TableCell>
+                              <TableCell>
+                                {customer ? (
+                                  <button
+                                    type="button"
+                                    className="text-primary hover:underline text-sm font-medium"
                                     onClick={() => router.push(`/customers/${customer.id}`)}
                                   >
-                                    Customer →
-                                  </Button>
+                                    {fullName}
+                                  </button>
+                                ) : (
+                                  <span className="text-muted-foreground text-sm">—</span>
                                 )}
-                                {car && (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() =>
-                                      router.push(
-                                        `/cars/${encodeURIComponent(car.vin ?? so.car_id)}`
-                                      )
-                                    }
+                              </TableCell>
+                              <TableCell className="text-sm">
+                                {customer?.phone_primary ? (
+                                  <a
+                                    href={`tel:${customer.phone_primary}`}
+                                    className="text-primary hover:underline"
                                   >
-                                    Car →
-                                  </Button>
+                                    {customer.phone_primary}
+                                  </a>
+                                ) : (
+                                  "—"
                                 )}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
+                              </TableCell>
+                              <TableCell className="text-sm">
+                                {so.selling_price != null
+                                  ? `${Number(so.selling_price).toLocaleString()} ${so.currency ?? "USD"}`
+                                  : "—"}
+                              </TableCell>
+                              <TableCell className="text-sm">
+                                {dateBoughtDisplay
+                                  ? new Date(dateBoughtDisplay).toLocaleDateString()
+                                  : "—"}
+                              </TableCell>
+                              <TableCell className="text-sm">
+                                {so.delivery_date
+                                  ? new Date(so.delivery_date).toLocaleDateString()
+                                  : "—"}
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex flex-wrap items-center gap-1">
+                                  <Badge variant="secondary">{so.status}</Badge>
+                                  {isSubDealer && (
+                                    <Badge
+                                      variant="outline"
+                                      className="bg-muted text-muted-foreground"
+                                    >
+                                      Sub-dealer
+                                    </Badge>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex items-center justify-end gap-1">
+                                  {customer && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => router.push(`/customers/${customer.id}`)}
+                                    >
+                                      Customer →
+                                    </Button>
+                                  )}
+                                  {car && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() =>
+                                        router.push(
+                                          `/cars/${encodeURIComponent(car.vin ?? so.car_id)}`
+                                        )
+                                      }
+                                    >
+                                      Car →
+                                    </Button>
+                                  )}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>

@@ -6,6 +6,7 @@ import {
   clearAuthSessionMarkers,
   hasAuthSessionUnlocked,
   IDLE_TIMEOUT_MS,
+  markAuthSessionUnlocked,
   readLastActivity,
   updateLastActivity,
 } from "@/lib/auth-session";
@@ -33,8 +34,28 @@ export function SessionEnforcer({ children }: { children: React.ReactNode }) {
     let cancelled = false;
 
     const bootstrap = async () => {
-      const unlocked = hasAuthSessionUnlocked();
-      const lastActivity = readLastActivity();
+      let unlocked = hasAuthSessionUnlocked();
+      let lastActivity = readLastActivity();
+
+      // sessionStorage is per-tab: a new tab can have Supabase cookies/session but no
+      // "unlocked" marker. Sync marker from an existing session instead of signing out.
+      if (!unlocked || !lastActivity) {
+        const supabase = createClient();
+        let session = null as Awaited<
+          ReturnType<typeof supabase.auth.getSession>
+        >["data"]["session"];
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const { data } = await supabase.auth.getSession();
+          session = data.session;
+          if (session) break;
+          await new Promise((r) => setTimeout(r, 120));
+        }
+        if (session) {
+          markAuthSessionUnlocked();
+          unlocked = true;
+          lastActivity = readLastActivity();
+        }
+      }
 
       if (!unlocked || !lastActivity) {
         await forceLogout("reauth");

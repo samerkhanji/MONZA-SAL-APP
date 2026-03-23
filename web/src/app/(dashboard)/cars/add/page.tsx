@@ -309,7 +309,10 @@ export default function AddCarPage() {
         };
 
         saleFields.currency = "USD";
-        if (saleDate) saleFields.sale_date = saleDate;
+        if (saleDate) {
+          saleFields.sale_date = saleDate;
+          saleFields.date_bought = saleDate;
+        }
         if (deliveryDate) saleFields.delivery_date = deliveryDate;
         if (saleNotes.trim()) saleFields.notes = saleNotes.trim();
 

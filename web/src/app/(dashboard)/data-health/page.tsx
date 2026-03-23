@@ -366,7 +366,12 @@ export default function DataHealthPage() {
         { data: reqData },
       ] = await Promise.all([
         supabase.from("cars_display").select(carSelect).is("deleted_at", null),
-        supabase.from("sales_orders").select("id, car_id, customer_id, selling_price, currency, sale_date, status, created_at, updated_at").not("status", "eq", "cancelled"),
+        supabase
+          .from("sales_orders")
+          .select(
+            "id, car_id, customer_id, selling_price, currency, sale_date, date_bought, delivery_date, reservation_date, status, created_at, updated_at"
+          )
+          .not("status", "eq", "cancelled"),
         supabase.from("customers").select("id, first_name, last_name, phone_primary, email, address, deleted_at, created_at, updated_at").is("deleted_at", null),
         supabase.from("payment_plans").select("id, customer_id, car_id, status, total_amount, installments:installment_payments(due_date, status)"),
         jobsQuery,

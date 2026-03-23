@@ -37,11 +37,14 @@ function HomePageContent() {
   const [forgotError, setForgotError] = useState<string | null>(null);
   const [forgotSuccess, setForgotSuccess] = useState(false);
 
+  // Only clear session markers + sign out when SessionEnforcer sent us here (reauth/inactive).
+  // Signing out on every "/" mount caused unnecessary reloads and could fight a valid session.
   useEffect(() => {
+    if (reason !== "reauth" && reason !== "inactive") return;
     const supabase = createClient();
     clearAuthSessionMarkers();
     void supabase.auth.signOut();
-  }, []);
+  }, [reason]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

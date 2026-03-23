@@ -72,6 +72,23 @@ const currencyFormatter = new Intl.NumberFormat("en-US", {
   currency: "USD",
 });
 
+function formatVinShort(vin: string | null | undefined): string {
+  const v = (vin ?? "").trim();
+  if (!v) return "—";
+  if (v.length <= 12) return v;
+  return `…${v.slice(-8)}`;
+}
+
+function carLabelShort(car: Car | null | undefined): string {
+  if (!car) return "—";
+  return `${car.model ?? "—"} (${formatVinShort(car.vin)})`;
+}
+
+function carTitleAttr(car: Car | null | undefined): string | undefined {
+  if (!car?.vin) return undefined;
+  return `${car.model ?? ""} (${car.vin})`.trim();
+}
+
 export default function InstallmentsPage() {
   const supabase = createClient();
   const { appRole, profile } = useUser();
@@ -876,7 +893,7 @@ export default function InstallmentsPage() {
   const hasOverdue = overview.overdueCount > 0;
 
   return (
-    <div className="container mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
+    <div className="container mx-auto max-w-6xl space-y-6 overflow-x-hidden px-4 py-6 sm:px-6 sm:py-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-semibold sm:text-2xl">Installments</h1>
@@ -894,8 +911,8 @@ export default function InstallmentsPage() {
         )}
       </div>
 
-      <div className="overflow-x-auto">
-        <div className="grid min-w-[960px] gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+      <div>
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-5">
         <Card
           className={`flex flex-col justify-between rounded-lg border bg-card p-6 ${
             hasOverdue
@@ -1058,31 +1075,275 @@ export default function InstallmentsPage() {
               allData={mapDueForExport(dueInstallments)}
             />
           </div>
-          <div className="overflow-x-auto rounded-lg border bg-card">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Phone</TableHead>
-                  <TableHead>Car</TableHead>
-                  <TableHead>Installment</TableHead>
-                  <TableHead className="text-center">Due Date</TableHead>
-                  <TableHead className="text-right">Amount Due</TableHead>
-                  <TableHead className="text-center">Status</TableHead>
-                  <TableHead className="text-center">Days Late</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {dueInstallments.map((i) => {
-                  const isOverdue = i.status === "overdue";
-                  const rowClass = isOverdue
-                    ? "border-l-4 border-red-400 bg-red-50 odd:bg-red-50"
-                    : "border-l-4 border-amber-300 odd:bg-slate-50";
-                  return (
+          <>
+            <div className="space-y-3 pb-6 md:hidden">
+              {dueInstallments.map((i) => {
+                const isOverdue = i.status === "overdue";
+                const customer = i.plan?.customer as Customer | null | undefined;
+                const car = i.plan?.car as Car | null | undefined;
+                const borderClass = isOverdue
+                  ? "border-l-4 border-red-500 bg-red-50/80 dark:bg-red-950/20"
+                  : "border-l-4 border-amber-400 bg-amber-50/50 dark:bg-amber-950/20";
+                return (
+                  <div
+                    key={i.id}
+                    className={`rounded-xl border border-border/50 p-4 shadow-sm ${borderClass}`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold">
+                          {customer ? formatName(customer) : "Customer"}
+                        </p>
+                        {customer?.phone_primary && (
+                          <a
+                            href={`tel:${customer.phone_primary.replace(/\s/g, "")}`}
+                            className="mt-1 block text-sm text-primary hover:underline"
+                          >
+                            {customer.phone_primary}
+                          </a>
+                        )}
+                        <p
+                          className="mt-1 text-sm text-muted-foreground"
+                          title={carTitleAttr(car ?? null)}
+                        >
+                          {carLabelShort(car ?? null)}
+                        </p>
+                      </div>
+                      <Badge
+                        className={
+                          isOverdue
+                            ? "shrink-0 bg-red-100 text-red-800"
+                            : "shrink-0 bg-amber-100 text-amber-800"
+                        }
+                      >
+                        {isOverdue ? "Overdue" : "Due"}
+                      </Badge>
+                    </div>
+                    <div className="mt-3 space-y-1 border-t border-border/50 pt-3 text-sm">
+                      <p>
+                        <span className="text-muted-foreground">Installment:</span>{" "}
+                        #{i.installment_no} of {i.plan?.months ?? ""}
+                      </p>
+                      <p>
+                        <span className="text-muted-foreground">Due:</span>{" "}
+                        {format(new Date(i.due_date), "dd/MM/yyyy")}
+                      </p>
+                      <p className="font-medium">
+                        {currencyFormatter.format(i.amount_due)}
+                      </p>
+                      {isOverdue && (
+                        <p className="text-destructive">
+                          {daysLate(i.due_date)} days late
+                        </p>
+                      )}
+                    </div>
+                    {canMarkPaid && (
+                      <Button
+                        className="mt-3 w-full touch-manipulation"
+                        size="sm"
+                        onClick={() => onOpenMarkPaid(i)}
+                      >
+                        Mark Paid
+                      </Button>
+                    )}
+                  </div>
+                );
+              })}
+              {dueInstallments.length === 0 && (
+                <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-10 text-center text-sm text-muted-foreground">
+                  <CheckCircle2 className="mb-2 size-6" />
+                  <p className="font-medium">No due or overdue installments</p>
+                  <p className="text-xs">All payments are up to date.</p>
+                </div>
+              )}
+            </div>
+
+            <div className="hidden overflow-x-auto rounded-lg border bg-card md:block">
+              <Table className="min-w-[920px] w-full">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Customer</TableHead>
+                    <TableHead>Phone</TableHead>
+                    <TableHead>Car</TableHead>
+                    <TableHead>Installment</TableHead>
+                    <TableHead className="text-center">Due Date</TableHead>
+                    <TableHead className="text-right">Amount Due</TableHead>
+                    <TableHead className="text-center">Status</TableHead>
+                    <TableHead className="text-center">Days Late</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {dueInstallments.map((i) => {
+                    const isOverdue = i.status === "overdue";
+                    const rowClass = isOverdue
+                      ? "border-l-4 border-red-400 bg-red-50 odd:bg-red-50"
+                      : "border-l-4 border-amber-300 odd:bg-slate-50";
+                    return (
+                      <TableRow
+                        key={i.id}
+                        className={`${rowClass} hover:bg-slate-100`}
+                      >
+                        <TableCell className="font-medium">
+                          {i.plan?.customer
+                            ? formatName(i.plan.customer as Customer)
+                            : "Customer"}
+                        </TableCell>
+                        <TableCell>
+                          {i.plan?.customer
+                            ? (i.plan.customer as Customer).phone_primary
+                            : ""}
+                        </TableCell>
+                        <TableCell>
+                          {i.plan?.car
+                            ? `${(i.plan.car as Car).model} (${(i.plan.car as Car).vin})`
+                            : "—"}
+                        </TableCell>
+                        <TableCell>
+                          #{i.installment_no} of {i.plan?.months ?? ""}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {format(new Date(i.due_date), "dd/MM/yyyy")}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {currencyFormatter.format(i.amount_due)}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge
+                            className={
+                              isOverdue
+                                ? "bg-red-100 text-red-800"
+                                : "bg-amber-100 text-amber-800"
+                            }
+                          >
+                            {isOverdue ? "Overdue" : "Due"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {isOverdue ? daysLate(i.due_date) : 0}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {canMarkPaid && (
+                            <Button size="sm" onClick={() => onOpenMarkPaid(i)}>
+                              Mark Paid
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                  {dueInstallments.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={9} className="py-10">
+                        <div className="flex flex-col items-center justify-center text-center text-sm text-muted-foreground">
+                          <CheckCircle2 className="mb-2 size-6" />
+                          <p className="font-medium">No due or overdue installments</p>
+                          <p className="text-xs">
+                            All payments are up to date.
+                          </p>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </>
+        </TabsContent>
+
+        <TabsContent value="upcoming" className="space-y-4">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-lg font-semibold">Upcoming Installments</h2>
+            <ExportButton
+              filename="installments-upcoming"
+              columns={upcomingColumns}
+              data={mapUpcomingForExport(upcomingInstallments)}
+              allData={mapUpcomingForExport(upcomingInstallments)}
+            />
+          </div>
+          <>
+            <div className="space-y-3 pb-6 md:hidden">
+              {upcomingInstallments.map((i) => {
+                const customer = i.plan?.customer as Customer | null | undefined;
+                const car = i.plan?.car as Car | null | undefined;
+                return (
+                  <div
+                    key={i.id}
+                    className="rounded-xl border border-border/50 bg-card p-4 shadow-sm"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold">
+                          {customer ? formatName(customer) : "Customer"}
+                        </p>
+                        {customer?.phone_primary && (
+                          <a
+                            href={`tel:${customer.phone_primary.replace(/\s/g, "")}`}
+                            className="mt-1 block text-sm text-primary hover:underline"
+                          >
+                            {customer.phone_primary}
+                          </a>
+                        )}
+                        <p
+                          className="mt-1 text-sm text-muted-foreground"
+                          title={carTitleAttr(car ?? null)}
+                        >
+                          {carLabelShort(car ?? null)}
+                        </p>
+                      </div>
+                      <Badge className="shrink-0 bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-100">
+                        Upcoming
+                      </Badge>
+                    </div>
+                    <div className="mt-3 space-y-1 border-t border-border/50 pt-3 text-sm">
+                      <p>
+                        #{i.installment_no} of {i.plan?.months ?? ""} · Due{" "}
+                        {format(new Date(i.due_date), "dd/MM/yyyy")}
+                      </p>
+                      <p className="font-medium">
+                        {currencyFormatter.format(i.amount_due)}
+                      </p>
+                    </div>
+                    {canMarkPaid && (
+                      <Button
+                        className="mt-3 w-full touch-manipulation"
+                        size="sm"
+                        onClick={() => onOpenMarkPaid(i)}
+                      >
+                        Mark Paid
+                      </Button>
+                    )}
+                  </div>
+                );
+              })}
+              {upcomingInstallments.length === 0 && (
+                <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-10 text-center text-sm text-muted-foreground">
+                  <Inbox className="mb-2 size-6" />
+                  <p className="font-medium">No upcoming installments</p>
+                  <p className="text-xs">There are no future payments scheduled.</p>
+                </div>
+              )}
+            </div>
+
+            <div className="hidden overflow-x-auto rounded-lg border bg-card md:block">
+              <Table className="min-w-[800px] w-full">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Customer</TableHead>
+                    <TableHead>Phone</TableHead>
+                    <TableHead>Car</TableHead>
+                    <TableHead>Installment</TableHead>
+                    <TableHead className="text-center">Due Date</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
+                    <TableHead className="text-center">Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {upcomingInstallments.map((i) => (
                     <TableRow
                       key={i.id}
-                      className={`${rowClass} hover:bg-slate-100`}
+                      className="odd:bg-slate-50 hover:bg-slate-100"
                     >
                       <TableCell className="font-medium">
                         {i.plan?.customer
@@ -1109,18 +1370,9 @@ export default function InstallmentsPage() {
                         {currencyFormatter.format(i.amount_due)}
                       </TableCell>
                       <TableCell className="text-center">
-                        <Badge
-                          className={
-                            isOverdue
-                              ? "bg-red-100 text-red-800"
-                              : "bg-amber-100 text-amber-800"
-                          }
-                        >
-                          {isOverdue ? "Overdue" : "Due"}
+                        <Badge className="bg-slate-100 text-slate-800">
+                          Upcoming
                         </Badge>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {isOverdue ? daysLate(i.due_date) : 0}
                       </TableCell>
                       <TableCell className="text-right">
                         {canMarkPaid && (
@@ -1130,110 +1382,24 @@ export default function InstallmentsPage() {
                         )}
                       </TableCell>
                     </TableRow>
-                  );
-                })}
-                {dueInstallments.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={9} className="py-10">
-                      <div className="flex flex-col items-center justify-center text-center text-sm text-muted-foreground">
-                        <CheckCircle2 className="mb-2 size-6" />
-                        <p className="font-medium">No due or overdue installments</p>
-                        <p className="text-xs">
-                          All payments are up to date.
-                        </p>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="upcoming" className="space-y-4">
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="text-lg font-semibold">Upcoming Installments</h2>
-            <ExportButton
-              filename="installments-upcoming"
-              columns={upcomingColumns}
-              data={mapUpcomingForExport(upcomingInstallments)}
-              allData={mapUpcomingForExport(upcomingInstallments)}
-            />
-          </div>
-          <div className="overflow-x-auto rounded-lg border bg-card">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Phone</TableHead>
-                  <TableHead>Car</TableHead>
-                  <TableHead>Installment</TableHead>
-                  <TableHead className="text-center">Due Date</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                  <TableHead className="text-center">Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {upcomingInstallments.map((i) => (
-                  <TableRow
-                    key={i.id}
-                    className="odd:bg-slate-50 hover:bg-slate-100"
-                  >
-                    <TableCell className="font-medium">
-                      {i.plan?.customer
-                        ? formatName(i.plan.customer as Customer)
-                        : "Customer"}
-                    </TableCell>
-                    <TableCell>
-                      {i.plan?.customer
-                        ? (i.plan.customer as Customer).phone_primary
-                        : ""}
-                    </TableCell>
-                    <TableCell>
-                      {i.plan?.car
-                        ? `${(i.plan.car as Car).model} (${(i.plan.car as Car).vin})`
-                        : "—"}
-                    </TableCell>
-                    <TableCell>
-                      #{i.installment_no} of {i.plan?.months ?? ""}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {format(new Date(i.due_date), "dd/MM/yyyy")}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {currencyFormatter.format(i.amount_due)}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Badge className="bg-slate-100 text-slate-800">
-                        Upcoming
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {canMarkPaid && (
-                        <Button size="sm" onClick={() => onOpenMarkPaid(i)}>
-                          Mark Paid
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {upcomingInstallments.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={8} className="py-10">
-                      <div className="flex flex-col items-center justify-center text-center text-sm text-muted-foreground">
-                        <Inbox className="mb-2 size-6" />
-                        <p className="font-medium">No upcoming installments</p>
-                        <p className="text-xs">
-                          There are no future payments scheduled.
-                        </p>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                  ))}
+                  {upcomingInstallments.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={8} className="py-10">
+                        <div className="flex flex-col items-center justify-center text-center text-sm text-muted-foreground">
+                          <Inbox className="mb-2 size-6" />
+                          <p className="font-medium">No upcoming installments</p>
+                          <p className="text-xs">
+                            There are no future payments scheduled.
+                          </p>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </>
         </TabsContent>
 
         <TabsContent value="paid" className="space-y-4">
@@ -1246,68 +1412,123 @@ export default function InstallmentsPage() {
               allData={mapPaidForExport(paidInstallments)}
             />
           </div>
-          <div className="overflow-x-auto rounded-lg border bg-card">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Car</TableHead>
-                  <TableHead>Installment</TableHead>
-                  <TableHead className="text-center">Due Date</TableHead>
-                  <TableHead className="text-center">Paid Date</TableHead>
-                  <TableHead className="text-right">Amount Paid</TableHead>
-                  <TableHead>Payment Method</TableHead>
-                  <TableHead>Marked By</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {paidInstallments.map((i) => (
-                  <TableRow
+          <>
+            <div className="space-y-3 pb-6 md:hidden">
+              {paidInstallments.map((i) => {
+                const customer = i.plan?.customer as Customer | null | undefined;
+                const car = i.plan?.car as Car | null | undefined;
+                return (
+                  <div
                     key={i.id}
-                    className="bg-emerald-50 odd:bg-emerald-50 hover:bg-emerald-100"
+                    className="rounded-xl border border-emerald-500/30 bg-emerald-50/80 p-4 shadow-sm dark:bg-emerald-950/20"
                   >
-                    <TableCell className="font-medium">
-                      {i.plan?.customer
-                        ? formatName(i.plan.customer as Customer)
-                        : "Customer"}
-                    </TableCell>
-                    <TableCell>
-                      {i.plan?.car
-                        ? `${(i.plan.car as Car).model} (${(i.plan.car as Car).vin})`
-                        : "—"}
-                    </TableCell>
-                    <TableCell>
-                      #{i.installment_no} of {i.plan?.months ?? ""}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {format(new Date(i.due_date), "dd/MM/yyyy")}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {i.paid_at ? format(new Date(i.paid_at), "dd/MM/yyyy") : "—"}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {currencyFormatter.format(i.paid_amount || 0)}
-                    </TableCell>
-                    <TableCell>{i.payment_method || "—"}</TableCell>
-                    <TableCell>—</TableCell>
-                  </TableRow>
-                ))}
-                {paidInstallments.length === 0 && (
+                    <p className="font-semibold">
+                      {customer ? formatName(customer) : "Customer"}
+                    </p>
+                    <p
+                      className="mt-1 text-sm text-muted-foreground"
+                      title={carTitleAttr(car ?? null)}
+                    >
+                      {carLabelShort(car ?? null)}
+                    </p>
+                    <div className="mt-3 space-y-1 border-t border-border/50 pt-3 text-sm">
+                      <p>
+                        #{i.installment_no} of {i.plan?.months ?? ""}
+                      </p>
+                      <p>
+                        <span className="text-muted-foreground">Due:</span>{" "}
+                        {format(new Date(i.due_date), "dd/MM/yyyy")}
+                      </p>
+                      <p>
+                        <span className="text-muted-foreground">Paid:</span>{" "}
+                        {i.paid_at
+                          ? format(new Date(i.paid_at), "dd/MM/yyyy")
+                          : "—"}
+                      </p>
+                      <p className="font-medium text-emerald-800 dark:text-emerald-300">
+                        {currencyFormatter.format(i.paid_amount || 0)}
+                      </p>
+                      <p className="text-muted-foreground">
+                        {i.payment_method || "—"}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+              {paidInstallments.length === 0 && (
+                <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-10 text-center text-sm text-muted-foreground">
+                  <Inbox className="mb-2 size-6" />
+                  <p className="font-medium">No paid installments yet</p>
+                  <p className="text-xs">
+                    Payments will appear here after they are recorded.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="hidden overflow-x-auto rounded-lg border bg-card md:block">
+              <Table className="min-w-[880px] w-full">
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={8} className="py-10">
-                      <div className="flex flex-col items-center justify-center text-center text-sm text-muted-foreground">
-                        <Inbox className="mb-2 size-6" />
-                        <p className="font-medium">No paid installments yet</p>
-                        <p className="text-xs">
-                          Payments will appear here after they are recorded.
-                        </p>
-                      </div>
-                    </TableCell>
+                    <TableHead>Customer</TableHead>
+                    <TableHead>Car</TableHead>
+                    <TableHead>Installment</TableHead>
+                    <TableHead className="text-center">Due Date</TableHead>
+                    <TableHead className="text-center">Paid Date</TableHead>
+                    <TableHead className="text-right">Amount Paid</TableHead>
+                    <TableHead>Payment Method</TableHead>
+                    <TableHead>Marked By</TableHead>
                   </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {paidInstallments.map((i) => (
+                    <TableRow
+                      key={i.id}
+                      className="bg-emerald-50 odd:bg-emerald-50 hover:bg-emerald-100"
+                    >
+                      <TableCell className="font-medium">
+                        {i.plan?.customer
+                          ? formatName(i.plan.customer as Customer)
+                          : "Customer"}
+                      </TableCell>
+                      <TableCell>
+                        {i.plan?.car
+                          ? `${(i.plan.car as Car).model} (${(i.plan.car as Car).vin})`
+                          : "—"}
+                      </TableCell>
+                      <TableCell>
+                        #{i.installment_no} of {i.plan?.months ?? ""}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {format(new Date(i.due_date), "dd/MM/yyyy")}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {i.paid_at ? format(new Date(i.paid_at), "dd/MM/yyyy") : "—"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {currencyFormatter.format(i.paid_amount || 0)}
+                      </TableCell>
+                      <TableCell>{i.payment_method || "—"}</TableCell>
+                      <TableCell>—</TableCell>
+                    </TableRow>
+                  ))}
+                  {paidInstallments.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={8} className="py-10">
+                        <div className="flex flex-col items-center justify-center text-center text-sm text-muted-foreground">
+                          <Inbox className="mb-2 size-6" />
+                          <p className="font-medium">No paid installments yet</p>
+                          <p className="text-xs">
+                            Payments will appear here after they are recorded.
+                          </p>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </>
         </TabsContent>
 
         <TabsContent value="plans" className="space-y-4">
@@ -1328,96 +1549,180 @@ export default function InstallmentsPage() {
               )}
             </div>
           </div>
-          <div className="overflow-x-auto rounded-lg border bg-card">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Car</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                  <TableHead className="text-right">Down Payment</TableHead>
-                  <TableHead className="text-right">Monthly</TableHead>
-                  <TableHead className="text-center">Months</TableHead>
-                  <TableHead>Progress</TableHead>
-                  <TableHead className="text-center">Start Date</TableHead>
-                  <TableHead className="text-center">Due Day</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {plans.map((p) => {
-                  const paidCount = p.installments.filter((i) => i.status === "paid").length;
-                  const totalCount = p.installments.length;
-                  const pct = totalCount > 0 ? (paidCount / totalCount) * 100 : 0;
+          <>
+            <div className="space-y-3 pb-6 md:hidden">
+              {plans.map((p) => {
+                const paidCount = p.installments.filter((i) => i.status === "paid").length;
+                const totalCount = p.installments.length;
+                const pct = totalCount > 0 ? (paidCount / totalCount) * 100 : 0;
 
-                  let badgeColor = "bg-emerald-100 text-emerald-800";
-                  if (p.status === "completed") badgeColor = "bg-blue-100 text-blue-800";
-                  if (p.status === "defaulted") badgeColor = "bg-red-100 text-red-800";
-                  if (p.status === "cancelled") badgeColor = "bg-slate-100 text-slate-800";
+                let badgeColor = "bg-emerald-100 text-emerald-800";
+                if (p.status === "completed") badgeColor = "bg-blue-100 text-blue-800";
+                if (p.status === "defaulted") badgeColor = "bg-red-100 text-red-800";
+                if (p.status === "cancelled") badgeColor = "bg-slate-100 text-slate-800";
 
-                  return (
-                  <TableRow key={p.id}>
-                    <TableCell className="font-medium">
-                      {p.customer ? formatName(p.customer) : "Customer"}
-                    </TableCell>
-                    <TableCell>
-                      {p.car ? `${p.car.model} (${p.car.vin})` : "—"}
-                    </TableCell>
-                      <TableCell>
-                        <Badge className={badgeColor}>{p.status}</Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {currencyFormatter.format(p.total_amount)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {currencyFormatter.format(p.down_payment)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {currencyFormatter.format(p.monthly_amount)}
-                      </TableCell>
-                      <TableCell className="text-center">{p.months}</TableCell>
-                      <TableCell>
-                        <div className="space-y-1">
-                          <div className="text-xs">
-                            {paidCount} of {totalCount} paid
-                          </div>
-                          <div className="h-1.5 w-24 overflow-hidden rounded-full bg-muted">
-                            <div
-                              className="h-full rounded-full bg-emerald-500"
-                              style={{ width: `${pct}%` }}
-                            />
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {format(new Date(p.start_date), "dd/MM/yyyy")}
-                      </TableCell>
-                      <TableCell className="text-center">{p.due_day}</TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="outline" size="sm">
-                          View Details
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-                {plans.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={11} className="py-10">
-                      <div className="flex flex-col items-center justify-center text-center text-sm text-muted-foreground">
-                        <Inbox className="mb-2 size-6" />
-                        <p className="font-medium">No payment plans yet</p>
-                        <p className="text-xs">
-                          Create a payment plan to get started.
+                return (
+                  <div
+                    key={p.id}
+                    className="rounded-xl border border-border/50 bg-card p-4 shadow-sm"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold">
+                          {p.customer ? formatName(p.customer) : "Customer"}
+                        </p>
+                        <p
+                          className="mt-1 text-sm text-muted-foreground"
+                          title={carTitleAttr(p.car ?? null)}
+                        >
+                          {carLabelShort(p.car ?? null)}
                         </p>
                       </div>
-                    </TableCell>
+                      <Badge className={`shrink-0 ${badgeColor}`}>{p.status}</Badge>
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                      <div>
+                        <p className="text-xs text-muted-foreground">Total</p>
+                        <p className="font-medium">
+                          {currencyFormatter.format(p.total_amount)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Monthly</p>
+                        <p className="font-medium">
+                          {currencyFormatter.format(p.monthly_amount)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Down</p>
+                        <p>{currencyFormatter.format(p.down_payment)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Months</p>
+                        <p>{p.months}</p>
+                      </div>
+                    </div>
+                    <div className="mt-3 space-y-1">
+                      <div className="text-xs text-muted-foreground">
+                        {paidCount} of {totalCount} paid
+                      </div>
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                        <div
+                          className="h-full rounded-full bg-emerald-500"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Start {format(new Date(p.start_date), "dd/MM/yyyy")} · Due day{" "}
+                      {p.due_day}
+                    </p>
+                    <Button variant="outline" size="sm" className="mt-3 w-full touch-manipulation">
+                      View Details
+                    </Button>
+                  </div>
+                );
+              })}
+              {plans.length === 0 && (
+                <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-10 text-center text-sm text-muted-foreground">
+                  <Inbox className="mb-2 size-6" />
+                  <p className="font-medium">No payment plans yet</p>
+                  <p className="text-xs">Create a payment plan to get started.</p>
+                </div>
+              )}
+            </div>
+
+            <div className="hidden overflow-x-auto rounded-lg border bg-card md:block">
+              <Table className="min-w-[1000px] w-full">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Customer</TableHead>
+                    <TableHead>Car</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                    <TableHead className="text-right">Down Payment</TableHead>
+                    <TableHead className="text-right">Monthly</TableHead>
+                    <TableHead className="text-center">Months</TableHead>
+                    <TableHead>Progress</TableHead>
+                    <TableHead className="text-center">Start Date</TableHead>
+                    <TableHead className="text-center">Due Day</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {plans.map((p) => {
+                    const paidCount = p.installments.filter((i) => i.status === "paid").length;
+                    const totalCount = p.installments.length;
+                    const pct = totalCount > 0 ? (paidCount / totalCount) * 100 : 0;
+
+                    let badgeColor = "bg-emerald-100 text-emerald-800";
+                    if (p.status === "completed") badgeColor = "bg-blue-100 text-blue-800";
+                    if (p.status === "defaulted") badgeColor = "bg-red-100 text-red-800";
+                    if (p.status === "cancelled") badgeColor = "bg-slate-100 text-slate-800";
+
+                    return (
+                      <TableRow key={p.id}>
+                        <TableCell className="font-medium">
+                          {p.customer ? formatName(p.customer) : "Customer"}
+                        </TableCell>
+                        <TableCell>
+                          {p.car ? `${p.car.model} (${p.car.vin})` : "—"}
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={badgeColor}>{p.status}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {currencyFormatter.format(p.total_amount)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {currencyFormatter.format(p.down_payment)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {currencyFormatter.format(p.monthly_amount)}
+                        </TableCell>
+                        <TableCell className="text-center">{p.months}</TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            <div className="text-xs">
+                              {paidCount} of {totalCount} paid
+                            </div>
+                            <div className="h-1.5 w-24 overflow-hidden rounded-full bg-muted">
+                              <div
+                                className="h-full rounded-full bg-emerald-500"
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {format(new Date(p.start_date), "dd/MM/yyyy")}
+                        </TableCell>
+                        <TableCell className="text-center">{p.due_day}</TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="outline" size="sm">
+                            View Details
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                  {plans.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={11} className="py-10">
+                        <div className="flex flex-col items-center justify-center text-center text-sm text-muted-foreground">
+                          <Inbox className="mb-2 size-6" />
+                          <p className="font-medium">No payment plans yet</p>
+                          <p className="text-xs">
+                            Create a payment plan to get started.
+                          </p>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </>
         </TabsContent>
       </Tabs>
 

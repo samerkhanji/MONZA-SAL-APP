@@ -42,7 +42,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, RefreshCw, Upload, Download, MoreHorizontal, ScanLine } from "lucide-react";
+import { Plus, RefreshCw, Upload, MoreHorizontal, ScanLine, ChevronRight } from "lucide-react";
 import { ScannerDialog } from "@/components/scanner/ScannerDialog";
 import { AddPartDialog } from "@/components/garage/AddPartDialog";
 import { StockMovementDialog } from "@/components/garage/StockMovementDialog";
@@ -56,6 +56,13 @@ import {
 } from "@/lib/delete-requests";
 import { ExportButton } from "@/components/ExportButton";
 import type { ExportColumn } from "@/lib/exportToExcel";
+
+function formatOeShort(oe: string | null | undefined): string {
+  const v = (oe ?? "").trim();
+  if (!v) return "—";
+  if (v.length <= 12) return v;
+  return `…${v.slice(-8)}`;
+}
 
 function matchesSearch(p: Part, q: string): boolean {
   const s = q.trim().toLowerCase();
@@ -227,7 +234,7 @@ export default function GarageInventoryPage() {
   const canDeletePart = canPerform("parts", "delete", appRole ?? null);
 
   return (
-    <div className="container mx-auto max-w-[1800px] space-y-6 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+    <div className="container mx-auto max-w-[1800px] space-y-6 overflow-x-hidden px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       <h1 className="text-xl font-semibold sm:text-2xl">Garage Inventory</h1>
 
       {lowStockCount > 0 && (
@@ -353,47 +360,155 @@ export default function GarageInventoryPage() {
             </p>
           ) : (
             <>
-              {/* Mobile: card layout */}
-              <div className="space-y-3 md:hidden">
+              {/* Mobile: cards (same actions as table — Phase 2 spec) */}
+              <div className="space-y-3 pb-8 md:hidden">
                 {filteredParts.map((p) => (
-                  <button
+                  <div
                     key={p.id}
-                    type="button"
-                    className="flex w-full flex-col gap-2 rounded-lg border border-border/50 bg-card p-4 text-left transition-colors hover:bg-muted/50 active:bg-muted/70"
+                    role="button"
+                    tabIndex={0}
+                    className="rounded-xl border border-border/50 bg-card p-4 text-left shadow-sm outline-none transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring"
                     onClick={() => setHistoryPart(p)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setHistoryPart(p);
+                      }
+                    }}
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <p className="font-medium">{p.part_name}</p>
-                      <div className="flex flex-wrap gap-1 justify-end">
-                        <Badge
-                          className={
-                            PART_STATUS_COLORS[p.status] ??
-                            "bg-muted text-muted-foreground"
-                          }
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold leading-snug">{p.part_name}</p>
+                        <p
+                          className="mt-0.5 font-mono text-xs text-muted-foreground"
+                          title={p.oe_number ?? undefined}
                         >
-                          {PART_STATUS_LABELS[p.status] ?? p.status}
-                        </Badge>
-                        {pendingDeletes[p.id] && (
-                          <Badge variant="outline" className="text-amber-600 border-amber-400 dark:text-amber-400 dark:border-amber-500">
-                            Pending Request
-                          </Badge>
-                        )}
+                          {formatOeShort(p.oe_number)}
+                        </p>
+                      </div>
+                      <div
+                        className="flex shrink-0 items-center gap-0.5"
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                      >
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="size-9 touch-manipulation"
+                              aria-label="Part actions"
+                            >
+                              <MoreHorizontal className="size-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-52">
+                            {canEditPart && (
+                              <>
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    setStockDialogPart(p);
+                                    setStockDialogType("stock_in");
+                                  }}
+                                >
+                                  Stock In
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    setStockDialogPart(p);
+                                    setStockDialogType("stock_out");
+                                  }}
+                                >
+                                  Stock Out
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => setEditPart(p)}>
+                                  Edit
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                            <DropdownMenuItem onClick={() => setHistoryPart(p)}>
+                              View History
+                            </DropdownMenuItem>
+                            {canDeletePart && (
+                              <DropdownMenuItem
+                                className="text-destructive"
+                                onClick={() => setDeletePart(p)}
+                              >
+                                Delete
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                        <ChevronRight
+                          className="size-5 text-muted-foreground max-sm:hidden"
+                          aria-hidden
+                        />
                       </div>
                     </div>
-                    <p className="font-mono text-sm text-muted-foreground">
-                      {p.oe_number ?? "—"}
-                    </p>
-                    <p className={`text-sm font-medium ${quantityColor(p)}`}>
-                      Qty: {p.quantity}
-                      {p.min_quantity != null && ` / min ${p.min_quantity}`}
-                    </p>
-                  </button>
+
+                    <div
+                      className="mt-2 flex flex-wrap gap-2"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Badge
+                        className={
+                          PART_STATUS_COLORS[p.status] ??
+                          "bg-muted text-muted-foreground"
+                        }
+                      >
+                        {PART_STATUS_LABELS[p.status] ?? p.status}
+                      </Badge>
+                      {pendingDeletes[p.id] && (
+                        <Badge
+                          variant="outline"
+                          className="border-amber-400 text-amber-600 dark:border-amber-500 dark:text-amber-400"
+                        >
+                          Pending
+                        </Badge>
+                      )}
+                    </div>
+
+                    <div className="mt-3 space-y-1 text-sm text-muted-foreground">
+                      {p.car_model && (
+                        <p>
+                          <span className="text-foreground/80">Model:</span>{" "}
+                          {p.car_model}
+                        </p>
+                      )}
+                      <p>
+                        <span className="text-foreground/80">Location:</span>{" "}
+                        {p.storage_zone ?? "—"}
+                      </p>
+                      <p>
+                        <span className="text-foreground/80">Supplier:</span>{" "}
+                        {p.supplier ?? "—"}
+                      </p>
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border/50 pt-3 text-sm">
+                      <p className={`font-medium tabular-nums ${quantityColor(p)}`}>
+                        Qty {p.quantity}
+                        {p.min_quantity != null ? ` · Min ${p.min_quantity}` : ""}
+                      </p>
+                      <p className="text-muted-foreground">
+                        {p.unit_cost != null
+                          ? `${p.unit_cost} ${p.currency ?? "USD"}`
+                          : "—"}
+                      </p>
+                    </div>
+                    {p.order_date && (
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        Arrived{" "}
+                        {new Date(p.order_date).toLocaleDateString()}
+                      </p>
+                    )}
+                  </div>
                 ))}
               </div>
 
               {/* Tablet/Desktop: table */}
-              <div className="hidden overflow-x-auto rounded border md:block">
-              <Table>
+              <div className="scrollbar-thick hidden overflow-x-auto rounded-lg border border-border/50 md:block">
+              <Table className="min-w-[900px] w-full">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Part Name</TableHead>

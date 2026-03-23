@@ -6,7 +6,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
-import type { CarDisplay, CarEvent } from "@/types/database";
+import type { CarDisplay, CarEvent, CarStatus } from "@/types/database";
 import { PDI_LABELS, type CarEventType } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,7 +32,7 @@ import { DayDetailDialog } from "@/components/car-day-detail-dialog";
 import { VisitsMaintenanceDialog } from "@/components/visits-maintenance-dialog";
 import { STATUS_BADGE_COLORS, PDI_BADGE_COLORS } from "@/lib/constants/badges";
 import { getProfileFullName } from "@/lib/supabase-profile";
-import { AlertCircle, Check, User, X } from "lucide-react";
+import { AlertCircle, Check, Loader2, User, X } from "lucide-react";
 import dynamic from "next/dynamic";
 import {
   Dialog,
@@ -269,6 +269,85 @@ function getEventActor(ev: CarEvent): string {
   return (name !== "Unknown" && name.trim() && ev.created_by) ? name : "System";
 }
 
+/** Statuses that show the customer / sale dates section on the vehicle page */
+const CUSTOMER_RELATED_STATUSES: CarStatus[] = [
+  "sold",
+  "reserved",
+  "sent_to_sub_dealer",
+  "delivered",
+  "registered",
+  "under_registration",
+];
+
+/** Empty string → null for Postgres DATE */
+function normalizeDateForDb(value: string): string | null {
+  const t = value.trim();
+  return t.length === 0 ? null : t;
+}
+
+/** Client-side validation for optional date inputs (YYYY-MM-DD). */
+function validateOptionalIsoDate(value: string, fieldLabel: string): string | null {
+  const t = value.trim();
+  if (!t) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(t)) {
+    return `${fieldLabel}: use a valid date (YYYY-MM-DD).`;
+  }
+  const time = Date.parse(`${t}T12:00:00`);
+  if (Number.isNaN(time)) return `${fieldLabel}: invalid date.`;
+  return null;
+}
+
+/** Default sales_orders.status when inserting from the vehicle page (matches status dialog). */
+function defaultSalesOrderStatusForCar(carStatus: CarStatus): "reserved" | "confirmed" {
+  return carStatus === "reserved" ? "reserved" : "confirmed";
+}
+
+function validateSaleOrderDateOrdering(
+  reservation: string | null,
+  delivery: string | null,
+  bought: string | null
+): string | null {
+  const parse = (s: string | null) =>
+    s && /^\d{4}-\d{2}-\d{2}$/.test(s) ? Date.parse(`${s}T12:00:00`) : NaN;
+  const r = parse(reservation);
+  const d = parse(delivery);
+  const b = parse(bought);
+  if (!Number.isNaN(r) && !Number.isNaN(d) && r > d) {
+    return "Reservation date cannot be after delivery date.";
+  }
+  if (!Number.isNaN(b) && !Number.isNaN(d) && b > d) {
+    return "Date Bought cannot be after delivery date.";
+  }
+  return null;
+}
+
+/** Raw public.cars columns (not cars_display) for legacy display + date prefill when no sales_orders row */
+type LegacyCarFields = {
+  customer_id: string | null;
+  client_name: string | null;
+  client_phone: string | null;
+  reservation_date: string | null;
+  delivery_date: string | null;
+  reserved_by: string | null;
+};
+
+type SalesOrderDetail = {
+  id: string;
+  customer_id: string | null;
+  customer: {
+    id: string;
+    first_name: string;
+    last_name: string | null;
+    phone_primary?: string | null;
+    email?: string | null;
+  } | null;
+  status?: string;
+  date_bought: string | null;
+  delivery_date: string | null;
+  reservation_date: string | null;
+  reserved_by: string | null;
+};
+
 function formatEventDisplay(ev: CarEvent): string {
   const actor = getEventActor(ev);
   const from = ev.from_value ?? "";
@@ -337,24 +416,235 @@ export default function CarProfilePage() {
   const [visitsMaintenanceMode, setVisitsMaintenanceMode] = useState<
     "garage" | "maintenance"
   >("garage");
-  const [salesOrder, setSalesOrder] = useState<{
-    customer: {
-      id: string;
-      first_name: string;
-      last_name: string | null;
-      phone_primary?: string | null;
-      email?: string | null;
-    };
-    status?: string;
-    delivery_date?: string | null;
-    reservation_date?: string | null;
-    reserved_by?: string | null;
-  } | null>(null);
+  const [salesOrder, setSalesOrder] = useState<SalesOrderDetail | null>(null);
+  const [legacyCarSnapshot, setLegacyCarSnapshot] = useState<LegacyCarFields | null>(null);
+  const [reservationDateInput, setReservationDateInput] = useState("");
+  const [deliveryDateInput, setDeliveryDateInput] = useState("");
+  const [dateBoughtInput, setDateBoughtInput] = useState("");
+  const [saleDatesSaving, setSaleDatesSaving] = useState(false);
+  const [saleDatesError, setSaleDatesError] = useState<string | null>(null);
   const [linkCustomerOpen, setLinkCustomerOpen] = useState(false);
   const [checklistOpen, setChecklistOpen] = useState(false);
   const [pendingFieldFocusId, setPendingFieldFocusId] = useState<string | null>(null);
 
   const supabase = createClient();
+
+  async function fetchLegacyCarSnapshot(carId: string) {
+    const { data, error } = await supabase
+      .from("cars")
+      .select(
+        "customer_id, client_name, client_phone, reservation_date, delivery_date, reserved_by"
+      )
+      .eq("id", carId)
+      .maybeSingle();
+    if (error || !data) {
+      setLegacyCarSnapshot(null);
+      return;
+    }
+    setLegacyCarSnapshot(data as LegacyCarFields);
+  }
+
+  async function fetchSalesOrderForCar(carId: string) {
+    const { data, error } = await supabase
+      .from("sales_orders")
+      .select(
+        "id, car_id, customer_id, reservation_date, delivery_date, date_bought, created_at, status, reserved_by, customers(id, first_name, last_name, phone_primary, email)"
+      )
+      .eq("car_id", carId)
+      .not("status", "eq", "cancelled")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      console.error(error);
+      setSalesOrder(null);
+      return;
+    }
+
+    type Row = {
+      id: string;
+      car_id: string;
+      customer_id: string | null;
+      reservation_date?: string | null;
+      delivery_date?: string | null;
+      date_bought?: string | null;
+      created_at: string;
+      status?: string;
+      reserved_by?: string | null;
+      customers: SalesOrderDetail["customer"];
+    };
+
+    if (!data) {
+      setSalesOrder(null);
+      return;
+    }
+
+    const row = data as unknown as Row;
+
+    let customer = row.customers;
+    if (Array.isArray(customer)) {
+      customer = customer[0] ?? null;
+    }
+    setSalesOrder({
+      id: row.id,
+      customer_id: row.customer_id ?? null,
+      customer,
+      status: row.status,
+      date_bought: row.date_bought ?? null,
+      delivery_date: row.delivery_date ?? null,
+      reservation_date: row.reservation_date ?? null,
+      reserved_by: row.reserved_by ?? null,
+    });
+  }
+
+  /**
+   * For INSERT into sales_orders: cars.customer_id → latest sales_orders row (any status) → payment_plans.
+   */
+  async function resolveCustomerIdForNewSalesOrder(carId: string): Promise<string | null> {
+    const { data: carRow, error: carErr } = await supabase
+      .from("cars")
+      .select("customer_id")
+      .eq("id", carId)
+      .maybeSingle();
+    if (!carErr && carRow && (carRow as { customer_id?: string | null }).customer_id) {
+      return (carRow as { customer_id: string }).customer_id;
+    }
+    const { data: anyOrder } = await supabase
+      .from("sales_orders")
+      .select("customer_id")
+      .eq("car_id", carId)
+      .not("customer_id", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (anyOrder && (anyOrder as { customer_id?: string | null }).customer_id) {
+      return (anyOrder as { customer_id: string }).customer_id;
+    }
+    const { data: plan } = await supabase
+      .from("payment_plans")
+      .select("customer_id")
+      .eq("car_id", carId)
+      .not("customer_id", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    return plan?.customer_id ?? null;
+  }
+
+  async function handleSaveSaleDates() {
+    if (!car || !canEditInventory) return;
+    const carId = car.id;
+    setSaleDatesSaving(true);
+    setSaleDatesError(null);
+    try {
+      const reservation_date = normalizeDateForDb(reservationDateInput);
+      const delivery_date = normalizeDateForDb(deliveryDateInput);
+      const date_bought = normalizeDateForDb(dateBoughtInput);
+
+      for (const err of [
+        validateOptionalIsoDate(reservationDateInput, "Reservation date"),
+        validateOptionalIsoDate(deliveryDateInput, "Delivery date"),
+        validateOptionalIsoDate(dateBoughtInput, "Date Bought"),
+      ]) {
+        if (err) {
+          setSaleDatesError(err);
+          toast.error(err);
+          return;
+        }
+      }
+      const orderErr = validateSaleOrderDateOrdering(
+        reservation_date,
+        delivery_date,
+        date_bought
+      );
+      if (orderErr) {
+        setSaleDatesError(orderErr);
+        toast.error(orderErr);
+        return;
+      }
+
+      const { data: salesOrder, error: fetchError } = await supabase
+        .from("sales_orders")
+        .select("id, car_id, customer_id, reservation_date, delivery_date, date_bought, created_at")
+        .eq("car_id", carId)
+        .not("status", "eq", "cancelled")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (fetchError) {
+        const m =
+          fetchError && typeof fetchError === "object" && "message" in fetchError
+            ? String((fetchError as { message: string }).message)
+            : "Could not load sales order";
+        throw new Error(m);
+      }
+
+      if (salesOrder?.id) {
+        const { error: updateError } = await supabase
+          .from("sales_orders")
+          .update({
+            reservation_date,
+            delivery_date,
+            date_bought,
+          })
+          .eq("id", salesOrder.id);
+
+        if (updateError) {
+          const m =
+            updateError.message ||
+            (typeof updateError === "object" && "details" in updateError
+              ? String((updateError as { details?: string }).details)
+              : "Update failed");
+          throw new Error(m);
+        }
+      } else {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) {
+          throw new Error("Not authenticated");
+        }
+        const customerId = await resolveCustomerIdForNewSalesOrder(carId);
+        const { error: insertError } = await supabase.from("sales_orders").insert({
+          car_id: carId,
+          customer_id: customerId ?? null,
+          status: defaultSalesOrderStatusForCar(car.status),
+          created_by: user.id,
+          currency: "USD",
+          reservation_date,
+          delivery_date,
+          date_bought,
+        });
+
+        if (insertError) {
+          const m =
+            insertError.message ||
+            (typeof insertError === "object" && "details" in insertError
+              ? String((insertError as { details?: string }).details)
+              : "Insert failed");
+          throw new Error(m);
+        }
+      }
+
+      toast.success("Saved reservation, delivery, and date bought to public.sales_orders.");
+      await fetchCar();
+      await fetchSalesOrderForCar(carId);
+      await fetchLegacyCarSnapshot(carId);
+      await fetchEvents();
+      router.refresh();
+    } catch (e: unknown) {
+      const msg =
+        e && typeof e === "object" && "message" in e
+          ? String((e as { message: string }).message)
+          : "Failed to save to sales_orders";
+      setSaleDatesError(msg);
+      toast.error(msg, { description: "Only public.sales_orders is updated (not cars_display)." });
+    } finally {
+      setSaleDatesSaving(false);
+    }
+  }
 
   async function copyVinToClipboard() {
     if (!car?.vin) return;
@@ -466,44 +756,41 @@ export default function CarProfilePage() {
 
   useEffect(() => {
     if (!car?.id) return;
-    (async () => {
-      const { data } = await supabase
-        .from("sales_orders")
-        .select(
-          "customer_id, status, delivery_date, reservation_date, reserved_by, customers(id, first_name, last_name, phone_primary, email)"
-        )
-        .eq("car_id", car.id)
-        .not("status", "eq", "cancelled")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      const row = data as {
-        customer_id: string;
-        status?: string;
-        delivery_date?: string | null;
-        reservation_date?: string | null;
-        reserved_by?: string | null;
-        customers: {
-          id: string;
-          first_name: string;
-          last_name: string | null;
-          phone_primary?: string | null;
-          email?: string | null;
-        } | null;
-      } | null;
-      if (row?.customers) {
-        setSalesOrder({
-          customer: row.customers,
-          status: row.status,
-          delivery_date: row.delivery_date,
-          reservation_date: row.reservation_date,
-          reserved_by: row.reserved_by,
-        });
-      } else {
-        setSalesOrder(null);
-      }
-    })();
+    void fetchSalesOrderForCar(car.id);
+    void fetchLegacyCarSnapshot(car.id);
   }, [car?.id]);
+
+  // Prefill dates: latest sales_orders row wins; reservation/delivery may fall back to public.cars;
+  // Date Bought on cars_display reflects sales_orders and prefills when there is no row yet.
+  useEffect(() => {
+    if (salesOrder) {
+      setReservationDateInput(
+        salesOrder.reservation_date ? salesOrder.reservation_date.slice(0, 10) : ""
+      );
+      setDeliveryDateInput(
+        salesOrder.delivery_date ? salesOrder.delivery_date.slice(0, 10) : ""
+      );
+      setDateBoughtInput(
+        salesOrder.date_bought
+          ? salesOrder.date_bought.slice(0, 10)
+          : car?.date_bought
+            ? car.date_bought.slice(0, 10)
+            : ""
+      );
+      return;
+    }
+    setReservationDateInput(
+      legacyCarSnapshot?.reservation_date
+        ? legacyCarSnapshot.reservation_date.slice(0, 10)
+        : ""
+    );
+    setDeliveryDateInput(
+      legacyCarSnapshot?.delivery_date
+        ? legacyCarSnapshot.delivery_date.slice(0, 10)
+        : ""
+    );
+    setDateBoughtInput(car?.date_bought ? car.date_bought.slice(0, 10) : "");
+  }, [salesOrder, legacyCarSnapshot, car?.date_bought]);
 
   const hasConfirmedSaleButWrongStatus =
     car &&
@@ -540,47 +827,13 @@ export default function CarProfilePage() {
 
   function onLinkCustomerSuccess() {
     setLinkCustomerOpen(false);
-    fetchCar();
-    // Refetch sales order
+    void fetchCar();
     if (car?.id) {
-      supabase
-        .from("sales_orders")
-        .select(
-          "customer_id, status, delivery_date, reservation_date, reserved_by, customers(id, first_name, last_name, phone_primary, email)"
-        )
-        .eq("car_id", car.id)
-        .not("status", "eq", "cancelled")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle()
-        .then(({ data }) => {
-          const row = data as {
-            customer_id: string;
-            status?: string;
-            delivery_date?: string | null;
-            reservation_date?: string | null;
-            reserved_by?: string | null;
-            customers: {
-              id: string;
-              first_name: string;
-              last_name: string | null;
-              phone_primary?: string | null;
-              email?: string | null;
-            } | null;
-          } | null;
-          if (row?.customers) {
-            setSalesOrder({
-              customer: row.customers,
-              status: row.status,
-              delivery_date: row.delivery_date,
-              reservation_date: row.reservation_date,
-              reserved_by: row.reserved_by,
-            });
-          } else {
-            setSalesOrder(null);
-          }
-        });
+      void fetchSalesOrderForCar(car.id);
+      void fetchLegacyCarSnapshot(car.id);
+      void fetchEvents();
     }
+    router.refresh();
   }
 
   const [deletePassword, setDeletePassword] = useState("");
@@ -1267,17 +1520,126 @@ export default function CarProfilePage() {
             </CardContent>
           </Card>
 
+          {/* Sales order dates — always shown; writes only to public.sales_orders (views are read-only) */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Sales order dates</CardTitle>
+              <CardDescription>
+                Loads the latest non-cancelled <span className="font-mono text-[11px]">sales_orders</span> row for
+                this <span className="font-mono text-[11px]">car_id</span>. Saving updates that row or inserts a new
+                one. Do not write to <span className="font-mono text-[11px]">cars_display</span> /{" "}
+                <span className="font-mono text-[11px]">cars_with_sales</span> — they are read-only.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {canEditInventory ? (
+                <>
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="sale-reservation-date-global">Reservation date</Label>
+                      <Input
+                        id="sale-reservation-date-global"
+                        type="date"
+                        value={reservationDateInput}
+                        onChange={(e) => setReservationDateInput(e.target.value)}
+                        disabled={saleDatesSaving}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="sale-delivery-date-global">Delivery date</Label>
+                      <Input
+                        id="sale-delivery-date-global"
+                        type="date"
+                        value={deliveryDateInput}
+                        onChange={(e) => setDeliveryDateInput(e.target.value)}
+                        disabled={saleDatesSaving}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="sale-date-bought-global">Date Bought</Label>
+                      <Input
+                        id="sale-date-bought-global"
+                        type="date"
+                        value={dateBoughtInput}
+                        onChange={(e) => setDateBoughtInput(e.target.value)}
+                        disabled={saleDatesSaving}
+                      />
+                    </div>
+                  </div>
+                  {saleDatesError && (
+                    <p className="flex items-start gap-2 text-sm text-destructive">
+                      <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                      <span>{saleDatesError}</span>
+                    </p>
+                  )}
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => void handleSaveSaleDates()}
+                    disabled={saleDatesSaving}
+                  >
+                    {saleDatesSaving ? (
+                      <>
+                        <Loader2 className="mr-2 size-4 animate-spin" />
+                        Saving…
+                      </>
+                    ) : (
+                      "Save to sales_orders"
+                    )}
+                  </Button>
+                </>
+              ) : (
+                <div className="grid gap-1 text-sm text-muted-foreground sm:grid-cols-2 lg:grid-cols-3">
+                  <p>
+                    <span className="font-medium text-foreground">Reservation:</span>{" "}
+                    {salesOrder?.reservation_date
+                      ? new Date(salesOrder.reservation_date).toLocaleDateString()
+                      : legacyCarSnapshot?.reservation_date
+                        ? new Date(legacyCarSnapshot.reservation_date).toLocaleDateString()
+                        : "—"}
+                    {!salesOrder && legacyCarSnapshot?.reservation_date && (
+                      <span className="ml-1 text-[10px] uppercase tracking-wide text-amber-600 dark:text-amber-500">
+                        (car row)
+                      </span>
+                    )}
+                  </p>
+                  <p>
+                    <span className="font-medium text-foreground">Delivery:</span>{" "}
+                    {salesOrder?.delivery_date
+                      ? new Date(salesOrder.delivery_date).toLocaleDateString()
+                      : legacyCarSnapshot?.delivery_date
+                        ? new Date(legacyCarSnapshot.delivery_date).toLocaleDateString()
+                        : "—"}
+                    {!salesOrder && legacyCarSnapshot?.delivery_date && (
+                      <span className="ml-1 text-[10px] uppercase tracking-wide text-amber-600 dark:text-amber-500">
+                        (car row)
+                      </span>
+                    )}
+                  </p>
+                  <p>
+                    <span className="font-medium text-foreground">Date Bought:</span>{" "}
+                    {car.date_bought
+                      ? new Date(car.date_bought).toLocaleDateString()
+                      : salesOrder?.date_bought
+                        ? new Date(salesOrder.date_bought).toLocaleDateString()
+                        : "—"}
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Section: Customer — relational first, legacy clearly separated */}
-          {["sold", "reserved", "sent_to_sub_dealer"].includes(car.status) && (
+          {CUSTOMER_RELATED_STATUSES.includes(car.status) && (
             <>
               <Card>
                 <CardHeader>
                   <CardTitle>Customer</CardTitle>
                   <CardDescription>Linked buyer for this vehicle</CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-6">
                   {salesOrder?.customer ? (
-                    <Link href={`/customers/${salesOrder.customer.id}`}>
+                    <Link href={`/customers/${salesOrder.customer.id}`} className="block">
                       <div className="flex flex-col gap-3 rounded-lg bg-muted p-3 transition-colors hover:bg-accent cursor-pointer">
                         <div className="flex items-center gap-3">
                           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-500/10">
@@ -1302,21 +1664,37 @@ export default function CarProfilePage() {
                             <span className="font-medium">Email:</span>{" "}
                             {salesOrder.customer.email ?? "—"}
                           </p>
-                          <p>
-                            <span className="font-medium">Reservation Date:</span>{" "}
-                            {salesOrder.reservation_date
-                              ? new Date(salesOrder.reservation_date).toLocaleDateString()
-                              : "—"}
-                          </p>
-                          <p>
-                            <span className="font-medium">Delivery Date:</span>{" "}
-                            {salesOrder.delivery_date
-                              ? new Date(salesOrder.delivery_date).toLocaleDateString()
-                              : "—"}
-                          </p>
                         </div>
                       </div>
                     </Link>
+                  ) : salesOrder?.customer_id ? (
+                    <div className="flex flex-col gap-2 rounded-lg border border-border p-3">
+                      <p className="text-sm text-muted-foreground">
+                        Linked sales order exists, but the customer record could not be loaded.
+                      </p>
+                      <Button variant="outline" size="sm" className="w-fit" asChild>
+                        <Link href={`/customers/${salesOrder.customer_id}`}>
+                          Open customer by ID
+                        </Link>
+                      </Button>
+                    </div>
+                  ) : salesOrder?.id ? (
+                    <div className="flex flex-col gap-2 rounded-lg border border-border p-3">
+                      <p className="text-sm text-muted-foreground">
+                        A sales order exists for this vehicle. Reservation and delivery dates can be
+                        edited below. Link a customer to see profile details here.
+                      </p>
+                      {canEditInventory && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="w-fit text-xs"
+                          onClick={() => setLinkCustomerOpen(true)}
+                        >
+                          Link customer
+                        </Button>
+                      )}
+                    </div>
                   ) : car.client_name ? (
                     <div className="flex items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
                       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-500/10">
@@ -1364,58 +1742,64 @@ export default function CarProfilePage() {
                       )}
                     </div>
                   )}
+                  <p className="text-muted-foreground border-t border-border pt-4 text-xs">
+                    Edit reservation, delivery, and date bought in the <span className="font-medium">Sales order dates</span>{" "}
+                    section above (writes to <span className="font-mono text-[11px]">public.sales_orders</span> only).
+                  </p>
                 </CardContent>
               </Card>
 
-              {/* Legacy customer data section (visible when legacy fields still exist) */}
-              {(car.client_name ||
-                (car as { client_phone?: string }).client_phone ||
-                (car as { delivery_date?: string }).delivery_date ||
-                (car as { reservation_date?: string }).reservation_date) && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-sm font-medium">
-                      Legacy customer data
-                    </CardTitle>
-                    <CardDescription>
-                      Historical fields stored directly on the car row. New data
-                      uses relational links only.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="grid gap-2 text-sm sm:grid-cols-2">
-                    <p>
-                      <span className="font-medium">Client Name:</span>{" "}
-                      {car.client_name ?? "—"}
-                    </p>
-                    <p>
-                      <span className="font-medium">Client Phone:</span>{" "}
-                      {(car as { client_phone?: string }).client_phone ?? "—"}
-                    </p>
-                    <p>
-                      <span className="font-medium">Reservation Date:</span>{" "}
-                      {(car as { reservation_date?: string }).reservation_date
-                        ? new Date(
-                            (car as { reservation_date?: string })
-                              .reservation_date as string
-                          ).toLocaleDateString()
-                        : "—"}
-                    </p>
-                    <p>
-                      <span className="font-medium">Delivery Date:</span>{" "}
-                      {(car as { delivery_date?: string }).delivery_date
-                        ? new Date(
-                            (car as { delivery_date?: string })
-                              .delivery_date as string
-                          ).toLocaleDateString()
-                        : "—"}
-                    </p>
-                    <p>
-                      <span className="font-medium">Reserved By:</span>{" "}
-                      {car.reserved_by ?? "—"}
-                    </p>
-                  </CardContent>
-                </Card>
-              )}
+              {/* Legacy customer data — raw columns from public.cars (read-only) */}
+              {legacyCarSnapshot &&
+                (legacyCarSnapshot.customer_id ||
+                  legacyCarSnapshot.client_name ||
+                  legacyCarSnapshot.client_phone ||
+                  legacyCarSnapshot.reservation_date ||
+                  legacyCarSnapshot.delivery_date ||
+                  legacyCarSnapshot.reserved_by) && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-sm font-medium">
+                        Legacy / car-row reference
+                      </CardTitle>
+                      <CardDescription>
+                        Raw <span className="font-mono text-[11px]">public.cars</span> fields (read-only in this
+                        UI). Canonical sale dates live on <span className="font-mono text-[11px]">sales_orders</span>{" "}
+                        after you save above.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="grid gap-2 text-sm sm:grid-cols-2">
+                      <p>
+                        <span className="font-medium">Customer ID (car row):</span>{" "}
+                        {legacyCarSnapshot.customer_id ?? "—"}
+                      </p>
+                      <p>
+                        <span className="font-medium">Client Name:</span>{" "}
+                        {legacyCarSnapshot.client_name ?? "—"}
+                      </p>
+                      <p>
+                        <span className="font-medium">Client Phone:</span>{" "}
+                        {legacyCarSnapshot.client_phone ?? "—"}
+                      </p>
+                      <p>
+                        <span className="font-medium">Reservation Date (car row):</span>{" "}
+                        {legacyCarSnapshot.reservation_date
+                          ? new Date(legacyCarSnapshot.reservation_date).toLocaleDateString()
+                          : "—"}
+                      </p>
+                      <p>
+                        <span className="font-medium">Delivery Date (car row):</span>{" "}
+                        {legacyCarSnapshot.delivery_date
+                          ? new Date(legacyCarSnapshot.delivery_date).toLocaleDateString()
+                          : "—"}
+                      </p>
+                      <p>
+                        <span className="font-medium">Reserved By:</span>{" "}
+                        {legacyCarSnapshot.reserved_by ?? "—"}
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
             </>
           )}
 

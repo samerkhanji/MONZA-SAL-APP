@@ -45,6 +45,13 @@ function daysSince(date: string): number {
   return Math.floor((Date.now() - new Date(date).getTime()) / 86400000);
 }
 
+function formatVinShort(vin: string | null | undefined): string {
+  const v = (vin ?? "").trim();
+  if (!v) return "—";
+  if (v.length <= 12) return v;
+  return `…${v.slice(-8)}`;
+}
+
 interface JobWithCar {
   id: string;
   title: string;
@@ -277,7 +284,7 @@ export default function AssistantDashboardPage() {
   ];
 
   return (
-    <div className="container mx-auto space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+    <div className="container mx-auto space-y-6 overflow-x-hidden px-4 py-6 pb-20 sm:px-6 sm:pb-6 lg:px-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-semibold sm:text-2xl">Assistant Dashboard</h1>
@@ -295,8 +302,8 @@ export default function AssistantDashboardPage() {
         </div>
       </div>
 
-      {/* Tab bar */}
-      <div className="mb-6 flex flex-wrap items-center gap-2 border-b border-border pb-4">
+      {/* Tab bar — scroll on narrow screens */}
+      <div className="-mx-4 mb-6 flex flex-nowrap items-center gap-2 overflow-x-auto border-b border-border px-4 pb-4 sm:mx-0 sm:flex-wrap sm:px-0">
         {[
           { label: "Review Requests", icon: FileCheck, action: () => { setActiveTab("Review Requests"); scrollTo(pendingRequestsRef); } },
           { label: "Cars Ready", icon: Car, action: () => { setActiveTab("Cars Ready"); scrollTo(carsReadyRef); } },
@@ -380,42 +387,70 @@ export default function AssistantDashboardPage() {
             ) : pendingRequests.length === 0 ? (
               <p className="py-8 text-center text-muted-foreground">No pending requests</p>
             ) : (
-              <div className="overflow-x-auto rounded-lg border">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b bg-muted/50">
-                      <th className="px-4 py-3 text-left font-medium">Subject</th>
-                      <th className="px-4 py-3 text-left font-medium">Submitted By</th>
-                      <th className="px-4 py-3 text-left font-medium">Date</th>
-                      <th className="px-4 py-3 text-left font-medium">Category</th>
-                      <th className="px-4 py-3 text-right font-medium">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pendingRequests.map((r) => (
-                      <tr key={r.id} className="border-b last:border-0">
-                        <td className="px-4 py-3 font-medium">{r.subject}</td>
-                        <td className="px-4 py-3">{r.submitter_name}</td>
-                        <td className="px-4 py-3 text-muted-foreground">
-                          {new Date(r.created_at).toLocaleString()}
-                        </td>
-                        <td className="px-4 py-3">
-                          {REQUEST_CATEGORIES.includes(r.category as never)
-                            ? r.category
-                            : r.category ?? "—"}
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <Button size="sm" variant="outline" asChild>
-                            <Link href={`/requests?detail=${r.id}`}>
-                              Review <ChevronRight className="ml-1 size-4" />
-                            </Link>
-                          </Button>
-                        </td>
+              <>
+                <div className="space-y-3 pb-2 md:hidden">
+                  {pendingRequests.map((r) => (
+                    <div
+                      key={r.id}
+                      className="rounded-xl border border-border/50 bg-card p-4 shadow-sm"
+                    >
+                      <p className="font-semibold leading-snug">{r.subject}</p>
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        By {r.submitter_name ?? "—"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(r.created_at).toLocaleString()}
+                      </p>
+                      <p className="mt-1 text-sm">
+                        {REQUEST_CATEGORIES.includes(r.category as never)
+                          ? r.category
+                          : r.category ?? "—"}
+                      </p>
+                      <Button className="mt-3 w-full touch-manipulation" size="sm" variant="outline" asChild>
+                        <Link href={`/requests?detail=${r.id}`}>
+                          Review <ChevronRight className="ml-1 size-4" />
+                        </Link>
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+                <div className="hidden overflow-x-auto rounded-lg border md:block">
+                  <table className="w-full min-w-[640px] text-sm">
+                    <thead>
+                      <tr className="border-b bg-muted/50">
+                        <th className="px-4 py-3 text-left font-medium">Subject</th>
+                        <th className="px-4 py-3 text-left font-medium">Submitted By</th>
+                        <th className="px-4 py-3 text-left font-medium">Date</th>
+                        <th className="px-4 py-3 text-left font-medium">Category</th>
+                        <th className="px-4 py-3 text-right font-medium">Action</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {pendingRequests.map((r) => (
+                        <tr key={r.id} className="border-b last:border-0">
+                          <td className="px-4 py-3 font-medium">{r.subject}</td>
+                          <td className="px-4 py-3">{r.submitter_name}</td>
+                          <td className="px-4 py-3 text-muted-foreground">
+                            {new Date(r.created_at).toLocaleString()}
+                          </td>
+                          <td className="px-4 py-3">
+                            {REQUEST_CATEGORIES.includes(r.category as never)
+                              ? r.category
+                              : r.category ?? "—"}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <Button size="sm" variant="outline" asChild>
+                              <Link href={`/requests?detail=${r.id}`}>
+                                Review <ChevronRight className="ml-1 size-4" />
+                              </Link>
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
@@ -474,82 +509,153 @@ export default function AssistantDashboardPage() {
             ) : workshopJobs.length === 0 ? (
               <p className="py-8 text-center text-muted-foreground">No cars in workshop</p>
             ) : (
-              <div className="overflow-x-auto rounded-lg border">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b bg-muted/50">
-                      <th className="px-4 py-3 text-left font-medium">VIN</th>
-                      <th className="px-4 py-3 text-left font-medium">Model</th>
-                      <th className="px-4 py-3 text-left font-medium">Reason</th>
-                      <th className="px-4 py-3 text-left font-medium">Status</th>
-                      <th className="px-4 py-3 text-left font-medium">Due</th>
-                      <th className="px-4 py-3 text-left font-medium">Est. Hrs</th>
-                      <th className="px-4 py-3 text-left font-medium">Assigned</th>
-                      <th className="px-4 py-3 text-right font-medium">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {workshopJobs.map((job) => {
-                      const car = Array.isArray(job.cars) ? job.cars[0] : job.cars;
-                      const isOvertime =
-                        job.status === "in_progress" &&
-                        job.started_at &&
-                        (job.estimated_hours ?? 0) > 0 &&
-                        Date.now() >
-                          new Date(job.started_at).getTime() +
-                            (job.estimated_hours ?? 0) * 3600000;
-                      return (
-                        <tr key={job.id} className="border-b last:border-0">
-                          <td className="px-4 py-3 font-mono text-xs">
-                            {car?.vin ? `...${String(car.vin).slice(-6)}` : "—"}
-                          </td>
-                          <td className="px-4 py-3">
-                            {car ? `${car.brand} ${car.model}` : "—"}
-                          </td>
-                          <td className="px-4 py-3">{job.title}</td>
-                          <td className="px-4 py-3">
-                            <Badge
-                              variant={
-                                job.status === "done"
-                                  ? "default"
-                                  : job.status === "in_progress"
-                                    ? "secondary"
-                                    : "outline"
-                              }
-                              className={
-                                job.status === "done"
-                                  ? "bg-green-600"
-                                  : isOvertime
-                                    ? "bg-orange-500"
-                                    : ""
-                              }
+              <>
+                <div className="space-y-3 pb-2 md:hidden">
+                  {workshopJobs.map((job) => {
+                    const car = Array.isArray(job.cars) ? job.cars[0] : job.cars;
+                    const isOvertime =
+                      job.status === "in_progress" &&
+                      job.started_at &&
+                      (job.estimated_hours ?? 0) > 0 &&
+                      Date.now() >
+                        new Date(job.started_at).getTime() +
+                          (job.estimated_hours ?? 0) * 3600000;
+                    return (
+                      <div
+                        key={job.id}
+                        className="rounded-xl border border-border/50 bg-card p-4 shadow-sm"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <p className="font-semibold">{job.title}</p>
+                            <p className="mt-1 text-sm text-muted-foreground">
+                              {car ? `${car.brand} ${car.model}` : "—"}
+                            </p>
+                            <p
+                              className="font-mono text-xs text-muted-foreground"
+                              title={car?.vin}
                             >
-                              {job.status === "done"
-                                ? "Ready for Pickup"
-                                : JOB_STATUS_LABELS[job.status] ?? job.status}
-                              {isOvertime && " (Overtime)"}
-                            </Badge>
-                          </td>
-                          <td className="px-4 py-3 text-muted-foreground">
+                              {formatVinShort(car?.vin)}
+                            </p>
+                          </div>
+                          <Badge
+                            variant={
+                              job.status === "done"
+                                ? "default"
+                                : job.status === "in_progress"
+                                  ? "secondary"
+                                  : "outline"
+                            }
+                            className={
+                              job.status === "done"
+                                ? "shrink-0 bg-green-600"
+                                : isOvertime
+                                  ? "shrink-0 bg-orange-500"
+                                  : "shrink-0"
+                            }
+                          >
+                            {job.status === "done"
+                              ? "Ready for Pickup"
+                              : JOB_STATUS_LABELS[job.status] ?? job.status}
+                            {isOvertime && " (OT)"}
+                          </Badge>
+                        </div>
+                        <div className="mt-3 space-y-1 border-t border-border/50 pt-3 text-sm text-muted-foreground">
+                          <p>
+                            Due:{" "}
                             {job.due_date
                               ? new Date(job.due_date).toLocaleDateString()
                               : "—"}
-                          </td>
-                          <td className="px-4 py-3">{job.estimated_hours ?? "—"}</td>
-                          <td className="px-4 py-3">{job.assigned_to ?? "—"}</td>
-                          <td className="px-4 py-3 text-right">
-                            <Button size="sm" variant="ghost" asChild>
-                              <Link href={`/garage/jobs/${job.id}`}>
-                                View <ChevronRight className="ml-1 size-4" />
-                              </Link>
-                            </Button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                          </p>
+                          <p>Est. hrs: {job.estimated_hours ?? "—"}</p>
+                          <p>Assigned: {job.assigned_to ?? "—"}</p>
+                        </div>
+                        <Button className="mt-3 w-full touch-manipulation" size="sm" variant="outline" asChild>
+                          <Link href={`/garage/jobs/${job.id}`}>
+                            View job <ChevronRight className="ml-1 size-4" />
+                          </Link>
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="hidden overflow-x-auto rounded-lg border md:block">
+                  <table className="w-full min-w-[900px] text-sm">
+                    <thead>
+                      <tr className="border-b bg-muted/50">
+                        <th className="px-4 py-3 text-left font-medium">VIN</th>
+                        <th className="px-4 py-3 text-left font-medium">Model</th>
+                        <th className="px-4 py-3 text-left font-medium">Reason</th>
+                        <th className="px-4 py-3 text-left font-medium">Status</th>
+                        <th className="px-4 py-3 text-left font-medium">Due</th>
+                        <th className="px-4 py-3 text-left font-medium">Est. Hrs</th>
+                        <th className="px-4 py-3 text-left font-medium">Assigned</th>
+                        <th className="px-4 py-3 text-right font-medium">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {workshopJobs.map((job) => {
+                        const car = Array.isArray(job.cars) ? job.cars[0] : job.cars;
+                        const isOvertime =
+                          job.status === "in_progress" &&
+                          job.started_at &&
+                          (job.estimated_hours ?? 0) > 0 &&
+                          Date.now() >
+                            new Date(job.started_at).getTime() +
+                              (job.estimated_hours ?? 0) * 3600000;
+                        return (
+                          <tr key={job.id} className="border-b last:border-0">
+                            <td className="px-4 py-3 font-mono text-xs">
+                              {car?.vin ? `...${String(car.vin).slice(-6)}` : "—"}
+                            </td>
+                            <td className="px-4 py-3">
+                              {car ? `${car.brand} ${car.model}` : "—"}
+                            </td>
+                            <td className="px-4 py-3">{job.title}</td>
+                            <td className="px-4 py-3">
+                              <Badge
+                                variant={
+                                  job.status === "done"
+                                    ? "default"
+                                    : job.status === "in_progress"
+                                      ? "secondary"
+                                      : "outline"
+                                }
+                                className={
+                                  job.status === "done"
+                                    ? "bg-green-600"
+                                    : isOvertime
+                                      ? "bg-orange-500"
+                                      : ""
+                                }
+                              >
+                                {job.status === "done"
+                                  ? "Ready for Pickup"
+                                  : JOB_STATUS_LABELS[job.status] ?? job.status}
+                                {isOvertime && " (Overtime)"}
+                              </Badge>
+                            </td>
+                            <td className="px-4 py-3 text-muted-foreground">
+                              {job.due_date
+                                ? new Date(job.due_date).toLocaleDateString()
+                                : "—"}
+                            </td>
+                            <td className="px-4 py-3">{job.estimated_hours ?? "—"}</td>
+                            <td className="px-4 py-3">{job.assigned_to ?? "—"}</td>
+                            <td className="px-4 py-3 text-right">
+                              <Button size="sm" variant="ghost" asChild>
+                                <Link href={`/garage/jobs/${job.id}`}>
+                                  View <ChevronRight className="ml-1 size-4" />
+                                </Link>
+                              </Button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
@@ -618,20 +724,21 @@ export default function AssistantDashboardPage() {
                   return (
                     <div
                       key={job.id}
-                      className="flex flex-wrap items-center justify-between gap-4 rounded-lg border p-4"
+                      className="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-4"
                     >
-                      <div>
+                      <div className="min-w-0">
                         <p className="font-medium">
-                          {car ? `${car.brand} ${car.model}` : "—"} · VIN ...{car?.vin?.slice(-6) ?? "—"}
+                          {car ? `${car.brand} ${car.model}` : "—"}
                         </p>
-                        <p className="text-sm text-muted-foreground">
-                          —
+                        <p className="font-mono text-xs text-muted-foreground" title={car?.vin}>
+                          VIN {formatVinShort(car?.vin)}
                         </p>
+                        <p className="text-sm text-muted-foreground">—</p>
                         <p className="text-xs text-muted-foreground">
                           Completed {timeAgo(completed)} · {daysWaiting} days waiting
                         </p>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-2">
                         {isOverdue && (
                           <Badge variant="destructive">Overdue Pickup</Badge>
                         )}
@@ -691,12 +798,15 @@ export default function AssistantDashboardPage() {
                 <Link
                   key={`${w.vin}-${w.warranty_type}-${i}`}
                   href="/cars"
-                  className="flex items-center justify-between rounded-lg border p-3 transition-colors hover:bg-muted/50"
+                  className="flex flex-col gap-2 rounded-lg border p-3 transition-colors hover:bg-muted/50 sm:flex-row sm:items-center sm:justify-between"
                 >
-                  <span>
-                    {w.brand} {w.model} · VIN ...{w.vin.slice(-6)}
+                  <span className="min-w-0 font-medium">
+                    {w.brand} {w.model}
+                    <span className="mt-0.5 block font-mono text-xs font-normal text-muted-foreground" title={w.vin}>
+                      {formatVinShort(w.vin)}
+                    </span>
                   </span>
-                  <span className="text-sm">
+                  <span className="shrink-0 text-sm">
                     {w.warranty_type} · {w.expiry} ·{" "}
                     <span
                       className={

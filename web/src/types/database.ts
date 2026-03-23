@@ -48,6 +48,10 @@ export interface Car {
   suffix: string | null;
   engine_number: string | null;
   client_name: string | null;
+  /** Relational link on public.cars; may be exposed via cars_display */
+  customer_id?: string | null;
+  /** From sales_orders via cars_display (latest non-cancelled order) */
+  date_bought?: string | null;
   delivery_date: string | null;
   client_phone: string | null;
   reserved_by: string | null;
@@ -220,6 +224,23 @@ export interface CustomerNote {
   content: string;
   created_by: string | null;
   created_at: string;
+}
+
+/** Row shape for public.sales_orders (partial — extend as needed) */
+export interface SalesOrderRow {
+  id: string;
+  car_id: string;
+  customer_id: string | null;
+  status: string;
+  selling_price: number | null;
+  currency: string | null;
+  sale_date: string | null;
+  date_bought: string | null;
+  delivery_date: string | null;
+  reservation_date: string | null;
+  reserved_by?: string | null;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export type PartStatus =

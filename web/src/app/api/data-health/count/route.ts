@@ -52,7 +52,12 @@ export async function GET() {
     { data: requests },
   ] = await Promise.all([
     supabase.from("cars_display").select(carSelect).is("deleted_at", null),
-    supabase.from("sales_orders").select("id, car_id, customer_id, selling_price, currency, sale_date").not("status", "eq", "cancelled"),
+    supabase
+      .from("sales_orders")
+      .select(
+        "id, car_id, customer_id, selling_price, currency, sale_date, date_bought, delivery_date, reservation_date"
+      )
+      .not("status", "eq", "cancelled"),
     supabase.from("customers").select("id, first_name, last_name, phone_primary, email, address").is("deleted_at", null),
     supabase.from("payment_plans").select("id, installments:installment_payments(due_date, status)"),
     jobsQuery,

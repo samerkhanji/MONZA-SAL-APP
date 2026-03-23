@@ -7,6 +7,10 @@ type CarsDisplayResult = {
   aborted: boolean;
 };
 
+/**
+ * Read-only list from the cars_display view. Do not use for mutating reservation/delivery dates;
+ * those belong on public.sales_orders (see vehicle detail page).
+ */
 export async function getCarsDisplay(): Promise<CarsDisplayResult> {
   const supabase = createClient();
 
