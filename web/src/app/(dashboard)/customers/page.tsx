@@ -30,6 +30,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import {
+  CrmTableScroll,
+  CustomersColgroup,
+  CUSTOMERS_TABLE_WIDTH_PX,
+  SoldCarsColgroup,
+  SOLD_CARS_TABLE_WIDTH_PX,
+} from "@/components/crm/CrmTableScroll";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -276,20 +283,24 @@ export default function CustomersPage() {
 
   function CustomerTable({ list }: { list: CustomerDisplay[] }) {
     return (
-      <div className="scrollbar-thick w-full max-md:max-h-[min(75dvh,640px)] max-md:overflow-y-auto overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch] touch-pan-x md:max-h-none md:overflow-y-visible rounded-lg border border-border/50">
-        <table className="w-full min-w-[1100px] caption-bottom border-collapse text-sm">
+      <CrmTableScroll>
+        <table
+          className="table-fixed border-collapse text-sm caption-bottom whitespace-nowrap"
+          style={{ width: CUSTOMERS_TABLE_WIDTH_PX }}
+        >
+          <CustomersColgroup />
           <TableHeader className="sticky top-0 z-30 shadow-[0_1px_0_0_hsl(var(--border))]">
             <TableRow>
-              <TableHead className="sticky left-0 z-40 min-w-[200px] border-r border-border/80 bg-[var(--table-header)] px-3 py-2 whitespace-nowrap text-[var(--table-header-text)] shadow-[2px_0_8px_-4px_rgba(0,0,0,0.15)] dark:shadow-[2px_0_8px_-4px_rgba(0,0,0,0.4)]">
+              <TableHead className="sticky left-0 z-40 border-r border-border/80 bg-[var(--table-header)] px-3 py-2 text-left align-middle whitespace-nowrap text-[var(--table-header-text)] shadow-[2px_0_8px_-4px_rgba(0,0,0,0.15)] dark:shadow-[2px_0_8px_-4px_rgba(0,0,0,0.4)]">
                 Name
               </TableHead>
-              <TableHead className="px-3 py-2 whitespace-nowrap">Phone</TableHead>
-              <TableHead className="px-3 py-2 whitespace-nowrap">Email</TableHead>
-              <TableHead className="px-3 py-2 whitespace-nowrap">Status</TableHead>
-              <TableHead className="px-3 py-2 whitespace-nowrap">Source</TableHead>
-              <TableHead className="px-3 py-2 whitespace-nowrap">Orders</TableHead>
-              <TableHead className="px-3 py-2 whitespace-nowrap">Last Visit</TableHead>
-              <TableHead className="w-[72px] px-3 py-2 text-right whitespace-nowrap">Actions</TableHead>
+              <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Phone</TableHead>
+              <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Email</TableHead>
+              <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Status</TableHead>
+              <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Source</TableHead>
+              <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Orders</TableHead>
+              <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Last Visit</TableHead>
+              <TableHead className="px-3 py-2 text-right align-middle whitespace-nowrap">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -306,14 +317,15 @@ export default function CustomersPage() {
                 >
                   <TableCell
                     className={cn(
-                      "sticky left-0 z-10 min-w-[200px] border-r border-border/80 px-3 py-2 font-medium whitespace-nowrap shadow-[2px_0_8px_-4px_rgba(0,0,0,0.12)] dark:shadow-[2px_0_8px_-4px_rgba(0,0,0,0.35)]",
+                      "sticky left-0 z-10 overflow-hidden border-r border-border/80 px-3 py-2 align-middle font-medium text-ellipsis whitespace-nowrap shadow-[2px_0_8px_-4px_rgba(0,0,0,0.12)] dark:shadow-[2px_0_8px_-4px_rgba(0,0,0,0.35)]",
                       rowIndex % 2 === 1 ? "bg-muted/30" : "bg-card",
                       "group-hover:bg-accent"
                     )}
+                    title={fullName || undefined}
                   >
                     {fullName || "—"}
                   </TableCell>
-                  <TableCell className="px-3 py-2 text-sm whitespace-nowrap">
+                  <TableCell className="px-3 py-2 align-middle text-sm whitespace-nowrap">
                     {customer.phone_primary ? (
                       <a
                         href={`tel:${customer.phone_primary.replace(/\s/g, "")}`}
@@ -326,12 +338,13 @@ export default function CustomersPage() {
                       "—"
                     )}
                   </TableCell>
-                  <TableCell className="px-3 py-2 text-sm whitespace-nowrap">
+                  <TableCell className="overflow-hidden px-3 py-2 align-middle text-sm whitespace-nowrap">
                     {customer.email ? (
                       <a
                         href={`mailto:${customer.email}`}
                         onClick={(e) => e.stopPropagation()}
-                        className="text-primary hover:underline"
+                        className="block truncate text-primary hover:underline"
+                        title={customer.email}
                       >
                         {customer.email}
                       </a>
@@ -339,26 +352,29 @@ export default function CustomersPage() {
                       "—"
                     )}
                   </TableCell>
-                  <TableCell className="px-3 py-2 whitespace-nowrap">
-                    <Badge className={statusClass}>{getStatusLabel(customer)}</Badge>
+                  <TableCell className="px-3 py-2 align-middle whitespace-nowrap">
+                    <Badge className={cn(statusClass, "shrink-0")}>{getStatusLabel(customer)}</Badge>
                   </TableCell>
-                  <TableCell className="px-3 py-2 text-sm whitespace-nowrap text-muted-foreground">
+                  <TableCell
+                    className="overflow-hidden px-3 py-2 align-middle text-sm text-ellipsis whitespace-nowrap text-muted-foreground"
+                    title={getSourceLabel(customer) || undefined}
+                  >
                     {getSourceLabel(customer) || "—"}
                   </TableCell>
-                  <TableCell className="px-3 py-2 whitespace-nowrap">
+                  <TableCell className="px-3 py-2 align-middle whitespace-nowrap">
                     {customer.total_orders != null ? (
                       <Badge variant="secondary">{customer.total_orders}</Badge>
                     ) : (
                       "—"
                     )}
                   </TableCell>
-                  <TableCell className="px-3 py-2 text-sm whitespace-nowrap">
+                  <TableCell className="px-3 py-2 align-middle text-sm whitespace-nowrap">
                     {customer.last_visit_date
                       ? new Date(customer.last_visit_date).toLocaleDateString()
                       : "—"}
                   </TableCell>
                   <TableCell
-                    className="px-3 py-2 text-right whitespace-nowrap"
+                    className="px-3 py-2 text-right align-middle whitespace-nowrap"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <DropdownMenu>
@@ -402,7 +418,7 @@ export default function CustomersPage() {
             })}
           </TableBody>
         </table>
-      </div>
+      </CrmTableScroll>
     );
   }
 
@@ -550,22 +566,26 @@ export default function CustomersPage() {
               ) : soldCustomers.length === 0 ? (
                 <p className="text-muted-foreground">No sold cars found.</p>
               ) : (
-                <div className="scrollbar-thick w-full max-md:max-h-[min(75dvh,640px)] max-md:overflow-y-auto overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch] touch-pan-x md:max-h-none md:overflow-y-visible rounded-lg border border-border/50">
-                  <table className="w-full min-w-[1400px] caption-bottom border-collapse text-sm">
+                <CrmTableScroll>
+                  <table
+                    className="table-fixed border-collapse text-sm caption-bottom whitespace-nowrap"
+                    style={{ width: SOLD_CARS_TABLE_WIDTH_PX }}
+                  >
+                    <SoldCarsColgroup />
                     <TableHeader className="sticky top-0 z-30 shadow-[0_1px_0_0_hsl(var(--border))]">
                       <TableRow>
-                        <TableHead className="sticky left-0 z-40 min-w-[220px] border-r border-border/80 bg-[var(--table-header)] px-3 py-2 whitespace-nowrap text-[var(--table-header-text)] shadow-[2px_0_8px_-4px_rgba(0,0,0,0.15)] dark:shadow-[2px_0_8px_-4px_rgba(0,0,0,0.4)]">
+                        <TableHead className="sticky left-0 z-40 border-r border-border/80 bg-[var(--table-header)] px-3 py-2 text-left align-middle whitespace-nowrap text-[var(--table-header-text)] shadow-[2px_0_8px_-4px_rgba(0,0,0,0.15)] dark:shadow-[2px_0_8px_-4px_rgba(0,0,0,0.4)]">
                           Vehicle
                         </TableHead>
-                        <TableHead className="px-3 py-2 whitespace-nowrap">VIN</TableHead>
-                        <TableHead className="px-3 py-2 whitespace-nowrap">Color</TableHead>
-                        <TableHead className="px-3 py-2 whitespace-nowrap">Customer</TableHead>
-                        <TableHead className="px-3 py-2 whitespace-nowrap">Phone</TableHead>
-                        <TableHead className="px-3 py-2 whitespace-nowrap">Price</TableHead>
-                        <TableHead className="px-3 py-2 whitespace-nowrap">Date bought</TableHead>
-                        <TableHead className="px-3 py-2 whitespace-nowrap">Delivery Date</TableHead>
-                        <TableHead className="px-3 py-2 whitespace-nowrap">Order Status</TableHead>
-                        <TableHead className="min-w-[200px] px-3 py-2 text-right whitespace-nowrap">
+                        <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">VIN</TableHead>
+                        <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Color</TableHead>
+                        <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Customer</TableHead>
+                        <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Phone</TableHead>
+                        <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Price</TableHead>
+                        <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Date bought</TableHead>
+                        <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Delivery Date</TableHead>
+                        <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Order Status</TableHead>
+                        <TableHead className="px-3 py-2 text-right align-middle whitespace-nowrap">
                           Actions
                         </TableHead>
                       </TableRow>
@@ -583,35 +603,43 @@ export default function CustomersPage() {
                           <TableRow key={so.id} className="group">
                             <TableCell
                               className={cn(
-                                "sticky left-0 z-10 min-w-[220px] border-r border-border/80 px-3 py-2 font-medium whitespace-nowrap shadow-[2px_0_8px_-4px_rgba(0,0,0,0.12)] dark:shadow-[2px_0_8px_-4px_rgba(0,0,0,0.35)]",
+                                "sticky left-0 z-10 overflow-hidden border-r border-border/80 px-3 py-2 align-middle font-medium text-ellipsis whitespace-nowrap shadow-[2px_0_8px_-4px_rgba(0,0,0,0.12)] dark:shadow-[2px_0_8px_-4px_rgba(0,0,0,0.35)]",
                                 rowIndex % 2 === 1 ? "bg-muted/30" : "bg-card",
                                 "group-hover:bg-accent"
                               )}
+                              title={
+                                car
+                                  ? `${car.brand} ${car.model}${car.model_year ? ` (${car.model_year})` : ""}`
+                                  : undefined
+                              }
                             >
                               {car
                                 ? `${car.brand} ${car.model}${car.model_year ? ` (${car.model_year})` : ""}`
                                 : "—"}
                             </TableCell>
-                            <TableCell className="px-3 py-2 font-mono text-xs whitespace-nowrap text-muted-foreground">
+                            <TableCell className="px-3 py-2 align-middle font-mono text-xs whitespace-nowrap text-muted-foreground">
                               {car?.vin ?? "—"}
                             </TableCell>
-                            <TableCell className="px-3 py-2 text-sm whitespace-nowrap text-muted-foreground">
+                            <TableCell className="px-3 py-2 align-middle text-sm whitespace-nowrap text-muted-foreground">
                               {car?.exterior_color ?? "—"}
                             </TableCell>
-                            <TableCell className="px-3 py-2 whitespace-nowrap">
+                            <TableCell
+                              className="overflow-hidden px-3 py-2 align-middle text-sm whitespace-nowrap"
+                              title={fullName !== "—" ? fullName : undefined}
+                            >
                               {customer ? (
                                 <button
                                   type="button"
-                                  className="text-sm font-medium text-primary hover:underline"
+                                  className="block w-full truncate text-left font-medium text-primary hover:underline"
                                   onClick={() => router.push(`/customers/${customer.id}`)}
                                 >
                                   {fullName}
                                 </button>
                               ) : (
-                                <span className="text-sm text-muted-foreground">—</span>
+                                <span className="text-muted-foreground">—</span>
                               )}
                             </TableCell>
-                            <TableCell className="px-3 py-2 text-sm whitespace-nowrap">
+                            <TableCell className="px-3 py-2 align-middle text-sm whitespace-nowrap">
                               {customer?.phone_primary ? (
                                 <a
                                   href={`tel:${customer.phone_primary.replace(/\s/g, "")}`}
@@ -623,23 +651,23 @@ export default function CustomersPage() {
                                 "—"
                               )}
                             </TableCell>
-                            <TableCell className="px-3 py-2 text-sm whitespace-nowrap">
+                            <TableCell className="px-3 py-2 align-middle text-sm whitespace-nowrap">
                               {so.selling_price != null
                                 ? `${Number(so.selling_price).toLocaleString()} ${so.currency ?? "USD"}`
                                 : "—"}
                             </TableCell>
-                            <TableCell className="px-3 py-2 text-sm whitespace-nowrap">
+                            <TableCell className="px-3 py-2 align-middle text-sm whitespace-nowrap">
                               {dateBoughtDisplay
                                 ? new Date(dateBoughtDisplay).toLocaleDateString()
                                 : "—"}
                             </TableCell>
-                            <TableCell className="px-3 py-2 text-sm whitespace-nowrap">
+                            <TableCell className="px-3 py-2 align-middle text-sm whitespace-nowrap">
                               {so.delivery_date
                                 ? new Date(so.delivery_date).toLocaleDateString()
                                 : "—"}
                             </TableCell>
-                            <TableCell className="px-3 py-2 whitespace-nowrap">
-                              <div className="flex flex-wrap items-center gap-1">
+                            <TableCell className="px-3 py-2 align-middle whitespace-nowrap">
+                              <div className="flex flex-nowrap items-center gap-1">
                                 <Badge variant="secondary">{so.status}</Badge>
                                 {isSubDealer && (
                                   <Badge
@@ -651,7 +679,7 @@ export default function CustomersPage() {
                                 )}
                               </div>
                             </TableCell>
-                            <TableCell className="min-w-[200px] px-3 py-2 text-right whitespace-nowrap">
+                            <TableCell className="px-3 py-2 text-right align-middle whitespace-nowrap">
                               <div className="flex items-center justify-end gap-1">
                                 {customer && (
                                   <Button
@@ -682,7 +710,7 @@ export default function CustomersPage() {
                       })}
                     </TableBody>
                   </table>
-                </div>
+                </CrmTableScroll>
               )}
             </CardContent>
           </Card>

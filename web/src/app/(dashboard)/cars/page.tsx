@@ -34,6 +34,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import {
+  CrmTableScroll,
+  CarsInventoryColgroup,
+  CARS_INVENTORY_TABLE_WIDTH_PX,
+} from "@/components/crm/CrmTableScroll";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -470,32 +475,36 @@ export default function CarsListPage() {
             <p className="text-muted-foreground">No cars found.</p>
           ) : (
             <>
-              <div className="scrollbar-thick w-full max-md:max-h-[min(75dvh,640px)] max-md:overflow-y-auto overflow-x-auto overscroll-x-contain rounded-lg border border-border/50 [-webkit-overflow-scrolling:touch] touch-pan-x md:max-h-none md:overflow-y-visible">
-                <table className="w-full min-w-[1600px] caption-bottom border-collapse text-sm">
+              <CrmTableScroll>
+                <table
+                  className="table-fixed border-collapse text-sm caption-bottom whitespace-nowrap"
+                  style={{ width: CARS_INVENTORY_TABLE_WIDTH_PX }}
+                >
+                  <CarsInventoryColgroup />
                   <TableHeader className="sticky top-0 z-30 shadow-[0_1px_0_0_hsl(var(--border))]">
                   <TableRow>
-                    <TableHead className="sticky left-0 z-40 min-w-[200px] border-r border-border/80 bg-[var(--table-header)] px-3 py-2 whitespace-nowrap text-[var(--table-header-text)] shadow-[2px_0_8px_-4px_rgba(0,0,0,0.15)] dark:shadow-[2px_0_8px_-4px_rgba(0,0,0,0.4)]">
+                    <TableHead className="sticky left-0 z-40 border-r border-border/80 bg-[var(--table-header)] px-3 py-2 text-left align-middle whitespace-nowrap text-[var(--table-header-text)] shadow-[2px_0_8px_-4px_rgba(0,0,0,0.15)] dark:shadow-[2px_0_8px_-4px_rgba(0,0,0,0.4)]">
                       VIN
                     </TableHead>
-                    <TableHead className="px-3 py-2 whitespace-nowrap">Brand</TableHead>
-                    <TableHead className="px-3 py-2 whitespace-nowrap">Model</TableHead>
-                    <TableHead className="px-3 py-2 whitespace-nowrap">Year</TableHead>
-                    <TableHead className="px-3 py-2 whitespace-nowrap">Exterior</TableHead>
-                    <TableHead className="px-3 py-2 whitespace-nowrap">Interior</TableHead>
-                    <TableHead className="px-3 py-2 whitespace-nowrap">Status</TableHead>
-                    <TableHead className="px-3 py-2 whitespace-nowrap">Client</TableHead>
-                    <TableHead className="px-3 py-2 whitespace-nowrap">Client Phone</TableHead>
-                    <TableHead className="px-3 py-2 whitespace-nowrap">Delivery Date</TableHead>
-                    <TableHead className="px-3 py-2 whitespace-nowrap">Location</TableHead>
-                    <TableHead className="min-w-[110px] px-3 py-2 whitespace-nowrap">Warranty Vehicle DMS</TableHead>
-                    <TableHead className="min-w-[100px] px-3 py-2 whitespace-nowrap">Warranty V.M</TableHead>
-                    <TableHead className="min-w-[120px] px-3 py-2 whitespace-nowrap">Warranty Battery DMS</TableHead>
-                    <TableHead className="min-w-[100px] px-3 py-2 whitespace-nowrap">Warranty B.M</TableHead>
-                    <TableHead className="px-3 py-2 whitespace-nowrap">Battery %</TableHead>
-                    <TableHead className="px-3 py-2 whitespace-nowrap">PDI</TableHead>
-                    <TableHead className="px-3 py-2 whitespace-nowrap">Customs</TableHead>
-                    <TableHead className="px-3 py-2 whitespace-nowrap">Date Arrived</TableHead>
-                    <TableHead className="w-[80px] px-3 py-2 text-right whitespace-nowrap">Actions</TableHead>
+                    <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Brand</TableHead>
+                    <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Model</TableHead>
+                    <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Year</TableHead>
+                    <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Exterior</TableHead>
+                    <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Interior</TableHead>
+                    <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Status</TableHead>
+                    <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Client</TableHead>
+                    <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Client Phone</TableHead>
+                    <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Delivery Date</TableHead>
+                    <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Location</TableHead>
+                    <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Warranty Vehicle DMS</TableHead>
+                    <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Warranty V.M</TableHead>
+                    <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Warranty Battery DMS</TableHead>
+                    <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Warranty B.M</TableHead>
+                    <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Battery %</TableHead>
+                    <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">PDI</TableHead>
+                    <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Customs</TableHead>
+                    <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Date Arrived</TableHead>
+                    <TableHead className="px-3 py-2 text-right align-middle whitespace-nowrap">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -519,37 +528,37 @@ export default function CarsListPage() {
                       >
                         <TableCell
                           className={cn(
-                            "sticky left-0 z-10 min-w-[200px] border-r border-border/80 px-3 py-2 font-mono text-sm font-medium whitespace-nowrap shadow-[2px_0_8px_-4px_rgba(0,0,0,0.12)] dark:shadow-[2px_0_8px_-4px_rgba(0,0,0,0.35)]",
+                            "sticky left-0 z-10 border-r border-border/80 px-3 py-2 align-middle font-mono text-sm font-medium whitespace-nowrap shadow-[2px_0_8px_-4px_rgba(0,0,0,0.12)] dark:shadow-[2px_0_8px_-4px_rgba(0,0,0,0.35)]",
                             rowIndex % 2 === 1 ? "bg-muted/30" : "bg-card",
                             "group-hover:bg-accent"
                           )}
                         >
                           {car.vin ?? "—"}
                         </TableCell>
-                        <TableCell className="px-3 py-2 text-sm whitespace-nowrap">
+                        <TableCell className="px-3 py-2 align-middle text-sm whitespace-nowrap">
                           {car.brand ?? "—"}
                         </TableCell>
-                        <TableCell className="px-3 py-2 text-sm whitespace-nowrap">
+                        <TableCell className="overflow-hidden px-3 py-2 align-middle text-sm text-ellipsis whitespace-nowrap">
                           {car.model ?? "—"}
                         </TableCell>
-                        <TableCell className="px-3 py-2 text-sm whitespace-nowrap">
+                        <TableCell className="px-3 py-2 align-middle text-sm whitespace-nowrap">
                           {car.model_year ?? "—"}
                         </TableCell>
-                        <TableCell className="px-3 py-2 text-sm whitespace-nowrap text-muted-foreground">
+                        <TableCell className="px-3 py-2 align-middle text-sm whitespace-nowrap text-muted-foreground">
                           {car.exterior_color ?? "—"}
                         </TableCell>
-                        <TableCell className="px-3 py-2 text-sm whitespace-nowrap text-muted-foreground">
+                        <TableCell className="px-3 py-2 align-middle text-sm whitespace-nowrap text-muted-foreground">
                           {car.interior_color ?? "—"}
                         </TableCell>
                         <TableCell
-                          className="cursor-pointer px-3 py-2 whitespace-nowrap"
+                          className="cursor-pointer px-3 py-2 align-middle whitespace-nowrap"
                           onClick={(e) => {
                             e.stopPropagation();
                             void handleStatusClick(car);
                           }}
                         >
-                          <div className="flex items-center gap-1">
-                            <div className="flex flex-wrap items-center gap-1">
+                          <div className="flex min-w-0 flex-nowrap items-center gap-1">
+                            <div className="flex shrink-0 flex-nowrap items-center gap-1">
                               <Badge
                                 className={
                                   LINKED_STATUSES.includes(car.status as (typeof LINKED_STATUSES)[number]) && (car.client_name || (car as { client_phone?: string }).client_phone)
@@ -570,26 +579,26 @@ export default function CarsListPage() {
                             )}
                           </div>
                         </TableCell>
-                        <TableCell className="px-3 py-2 text-sm whitespace-nowrap">
+                        <TableCell className="overflow-hidden px-3 py-2 align-middle text-sm text-ellipsis whitespace-nowrap">
                           {car.client_name ?? "—"}
                         </TableCell>
-                        <TableCell className="px-3 py-2 text-sm whitespace-nowrap">
+                        <TableCell className="px-3 py-2 align-middle text-sm whitespace-nowrap">
                           {car.client_phone ?? "—"}
                         </TableCell>
-                        <TableCell className="px-3 py-2 text-sm whitespace-nowrap">
+                        <TableCell className="px-3 py-2 align-middle text-sm whitespace-nowrap">
                           {car.delivery_date
                             ? new Date(car.delivery_date).toLocaleDateString()
                             : "—"}
                         </TableCell>
-                        <TableCell className="px-3 py-2 text-sm whitespace-nowrap">
+                        <TableCell className="overflow-hidden px-3 py-2 align-middle text-sm text-ellipsis whitespace-nowrap">
                           {car.location_full || "—"}
                         </TableCell>
-                        <TableCell className="px-3 py-2 text-sm whitespace-nowrap">
+                        <TableCell className="px-3 py-2 align-middle text-sm whitespace-nowrap">
                           {car.warranty_per_dms
                             ? new Date(car.warranty_per_dms).toLocaleDateString()
                             : "—"}
                         </TableCell>
-                        <TableCell className="px-3 py-2 text-sm whitespace-nowrap">
+                        <TableCell className="px-3 py-2 align-middle text-sm whitespace-nowrap">
                           {((car as any).warranty_vehicle_expiry ??
                             (car as any).warranty_expiry ??
                             car.warranty_monza_start_date)
@@ -600,17 +609,17 @@ export default function CarsListPage() {
                               ).toLocaleDateString()
                             : "—"}
                         </TableCell>
-                        <TableCell className="px-3 py-2 text-sm whitespace-nowrap">
+                        <TableCell className="px-3 py-2 align-middle text-sm whitespace-nowrap">
                           {(car as any).warranty_battery_dms
                             ? new Date((car as any).warranty_battery_dms as string).toLocaleDateString()
                             : "—"}
                         </TableCell>
-                        <TableCell className="px-3 py-2 text-sm whitespace-nowrap">
+                        <TableCell className="px-3 py-2 align-middle text-sm whitespace-nowrap">
                           {(car as any).warranty_battery_expiry
                             ? new Date((car as any).warranty_battery_expiry as string).toLocaleDateString()
                             : "—"}
                         </TableCell>
-                        <TableCell className="px-3 py-2 whitespace-nowrap">
+                        <TableCell className="px-3 py-2 align-middle whitespace-nowrap">
                           <div className="flex items-center gap-2">
                             <span className="text-sm">
                               {batteryPercent != null ? `${batteryPercent}%` : "—"}
@@ -628,7 +637,7 @@ export default function CarsListPage() {
                           </div>
                         </TableCell>
                         <TableCell
-                          className="cursor-pointer px-3 py-2 whitespace-nowrap"
+                          className="cursor-pointer px-3 py-2 align-middle whitespace-nowrap"
                           onClick={(e) => {
                             e.stopPropagation();
                             setPdiDialogCar(car);
@@ -640,7 +649,7 @@ export default function CarsListPage() {
                           </Badge>
                         </TableCell>
                         <TableCell
-                          className="cursor-pointer px-3 py-2 whitespace-nowrap"
+                          className="cursor-pointer px-3 py-2 align-middle whitespace-nowrap"
                           onClick={(e) => {
                             e.stopPropagation();
                             setCustomsDialogCar(car);
@@ -655,13 +664,13 @@ export default function CarsListPage() {
                                 : CUSTOMS_STATUS_LABELS[car.customs_status] ?? "Pending"}
                           </Badge>
                         </TableCell>
-                        <TableCell className="px-3 py-2 text-sm whitespace-nowrap">
+                        <TableCell className="px-3 py-2 align-middle text-sm whitespace-nowrap">
                           {car.date_arrived
                             ? new Date(car.date_arrived).toLocaleDateString()
                             : "—"}
                         </TableCell>
                         <TableCell
-                          className="min-w-[80px] w-[80px] px-3 py-2 text-right whitespace-nowrap"
+                          className="px-3 py-2 text-right align-middle whitespace-nowrap"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <div className="flex items-center justify-end gap-1">
@@ -738,7 +747,7 @@ export default function CarsListPage() {
                   })}
                 </TableBody>
                 </table>
-              </div>
+              </CrmTableScroll>
             </>
           )}
         </CardContent>
