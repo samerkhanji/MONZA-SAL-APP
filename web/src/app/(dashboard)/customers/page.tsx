@@ -8,11 +8,7 @@ import { MoreHorizontal } from "lucide-react";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
 import type { CustomerDisplay } from "@/types/database";
-import {
-  LEAD_STATUS_LABELS,
-  LEAD_SOURCE_LABELS,
-  LEAD_STATUS_COLORS,
-} from "@/lib/constants/customers";
+import { LEAD_STATUS_LABELS, LEAD_SOURCE_LABELS } from "@/lib/constants/customers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -22,21 +18,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { cn } from "@/lib/utils";
-import {
-  CrmTableScroll,
-  CustomersColgroup,
-  CUSTOMERS_TABLE_WIDTH_PX,
-  SoldCarsColgroup,
-  SOLD_CARS_TABLE_WIDTH_PX,
-} from "@/components/crm/CrmTableScroll";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -99,9 +80,17 @@ function matchesSearch(customer: CustomerDisplay, search: string): boolean {
   return fullName.includes(q) || phone.includes(q) || email.includes(q);
 }
 
+const CUSTOMERS_TABLE_COL_PX = [240, 180, 320, 110, 200, 80, 130, 110] as const;
+const SOLD_TABLE_COL_PX = [220, 200, 130, 240, 160, 140, 120, 120, 170, 110] as const;
+
+const CRM_TH =
+  "sticky top-0 z-10 box-border min-w-0 max-w-full border-b-2 border-r border-border bg-[var(--table-header)] px-2 py-2 text-left align-middle text-[11px] font-semibold text-[var(--table-header-text)] whitespace-nowrap overflow-hidden text-ellipsis";
+const CRM_TD =
+  "box-border min-w-0 max-w-full border-b border-r border-border bg-card px-2 py-2 text-left align-middle text-xs whitespace-nowrap overflow-hidden text-ellipsis";
+
 export default function CustomersPage() {
   const router = useRouter();
-  const { canEditInventory, canDelete, appRole } = useUser();
+  const { appRole } = useUser();
   const [customers, setCustomers] = useState<CustomerDisplay[]>([]);
   const [soldCars, setSoldCars] = useState<SoldCar[]>([]);
   const [loading, setLoading] = useState(true);
@@ -242,13 +231,6 @@ export default function CustomersPage() {
     return "Lead";
   }
 
-  function getStatusBadgeClass(c: CustomerDisplay): string {
-    const orders = c.total_orders ?? 0;
-    if (orders > 0) return "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300";
-    if (c.lead_status === "new_lead") return "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300";
-    return "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300";
-  }
-
   function getSourceLabel(c: CustomerDisplay): string {
     return (
       c.source_display ?? (c.lead_source ? LEAD_SOURCE_LABELS[c.lead_source] : "") ?? "—"
@@ -283,110 +265,111 @@ export default function CustomersPage() {
 
   function CustomerTable({ list }: { list: CustomerDisplay[] }) {
     return (
-      <CrmTableScroll>
-        <table
-          className="table-fixed border-collapse text-sm caption-bottom whitespace-nowrap"
-          style={{ width: CUSTOMERS_TABLE_WIDTH_PX }}
-        >
-          <CustomersColgroup />
-          <TableHeader className="sticky top-0 z-30 shadow-[0_1px_0_0_hsl(var(--border))]">
-            <TableRow>
-              <TableHead className="sticky left-0 z-40 border-r border-border/80 bg-[var(--table-header)] px-3 py-2 text-left align-middle whitespace-nowrap text-[var(--table-header-text)] shadow-[2px_0_8px_-4px_rgba(0,0,0,0.15)] dark:shadow-[2px_0_8px_-4px_rgba(0,0,0,0.4)]">
+      <div className="scrollbar-thick w-full min-w-0 max-h-[min(72vh,calc(100dvh-14rem))] overflow-x-auto overflow-y-auto rounded-md border border-border bg-card [-webkit-overflow-scrolling:touch]">
+        <table className="w-max min-w-full table-fixed border-collapse">
+          <colgroup>
+            {CUSTOMERS_TABLE_COL_PX.map((w, i) => (
+              <col key={i} style={{ width: `${w}px` }} />
+            ))}
+          </colgroup>
+          <thead>
+            <tr>
+              <th scope="col" className={CRM_TH}>
                 Name
-              </TableHead>
-              <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Phone</TableHead>
-              <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Email</TableHead>
-              <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Status</TableHead>
-              <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Source</TableHead>
-              <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Orders</TableHead>
-              <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Last Visit</TableHead>
-              <TableHead className="px-3 py-2 text-right align-middle whitespace-nowrap">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {list.map((customer, rowIndex) => {
-              const statusClass = getStatusBadgeClass(customer);
+              </th>
+              <th scope="col" className={CRM_TH}>
+                Phone
+              </th>
+              <th scope="col" className={CRM_TH}>
+                Email
+              </th>
+              <th scope="col" className={CRM_TH}>
+                Status
+              </th>
+              <th scope="col" className={CRM_TH}>
+                Source
+              </th>
+              <th scope="col" className={CRM_TH}>
+                Orders
+              </th>
+              <th scope="col" className={CRM_TH}>
+                Last Visit
+              </th>
+              <th scope="col" className={`${CRM_TH} text-right`}>
+                Actions
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {list.map((customer) => {
               const fullName =
                 customer.full_name ??
                 `${customer.first_name} ${customer.last_name ?? ""}`.trim();
+              const statusLabel = getStatusLabel(customer);
               return (
-                <TableRow
+                <tr
                   key={customer.id}
-                  className="group cursor-pointer"
+                  className="cursor-pointer hover:bg-muted/30"
                   onClick={() => router.push(`/customers/${customer.id}`)}
                 >
-                  <TableCell
-                    className={cn(
-                      "sticky left-0 z-10 overflow-hidden border-r border-border/80 px-3 py-2 align-middle font-medium text-ellipsis whitespace-nowrap shadow-[2px_0_8px_-4px_rgba(0,0,0,0.12)] dark:shadow-[2px_0_8px_-4px_rgba(0,0,0,0.35)]",
-                      rowIndex % 2 === 1 ? "bg-muted/30" : "bg-card",
-                      "group-hover:bg-accent"
-                    )}
-                    title={fullName || undefined}
-                  >
+                  <td title={fullName || undefined} className={`${CRM_TD} font-medium`}>
                     {fullName || "—"}
-                  </TableCell>
-                  <TableCell className="px-3 py-2 align-middle text-sm whitespace-nowrap">
+                  </td>
+                  <td className={CRM_TD}>
                     {customer.phone_primary ? (
                       <a
                         href={`tel:${customer.phone_primary.replace(/\s/g, "")}`}
                         onClick={(e) => e.stopPropagation()}
-                        className="text-primary hover:underline"
+                        className="block max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-primary hover:underline"
                       >
                         {customer.phone_primary}
                       </a>
                     ) : (
                       "—"
                     )}
-                  </TableCell>
-                  <TableCell className="overflow-hidden px-3 py-2 align-middle text-sm whitespace-nowrap">
+                  </td>
+                  <td title={customer.email ?? undefined} className={CRM_TD}>
                     {customer.email ? (
                       <a
                         href={`mailto:${customer.email}`}
                         onClick={(e) => e.stopPropagation()}
-                        className="block truncate text-primary hover:underline"
-                        title={customer.email}
+                        className="block max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-primary hover:underline"
                       >
                         {customer.email}
                       </a>
                     ) : (
                       "—"
                     )}
-                  </TableCell>
-                  <TableCell className="px-3 py-2 align-middle whitespace-nowrap">
-                    <Badge className={cn(statusClass, "shrink-0")}>{getStatusLabel(customer)}</Badge>
-                  </TableCell>
-                  <TableCell
-                    className="overflow-hidden px-3 py-2 align-middle text-sm text-ellipsis whitespace-nowrap text-muted-foreground"
+                  </td>
+                  <td title={statusLabel} className={CRM_TD}>
+                    {statusLabel}
+                  </td>
+                  <td
                     title={getSourceLabel(customer) || undefined}
+                    className={`${CRM_TD} text-muted-foreground`}
                   >
                     {getSourceLabel(customer) || "—"}
-                  </TableCell>
-                  <TableCell className="px-3 py-2 align-middle whitespace-nowrap">
-                    {customer.total_orders != null ? (
-                      <Badge variant="secondary">{customer.total_orders}</Badge>
-                    ) : (
-                      "—"
-                    )}
-                  </TableCell>
-                  <TableCell className="px-3 py-2 align-middle text-sm whitespace-nowrap">
+                  </td>
+                  <td className={`${CRM_TD} tabular-nums`}>
+                    {customer.total_orders != null ? String(customer.total_orders) : "—"}
+                  </td>
+                  <td className={`${CRM_TD} tabular-nums`}>
                     {customer.last_visit_date
                       ? new Date(customer.last_visit_date).toLocaleDateString()
                       : "—"}
-                  </TableCell>
-                  <TableCell
-                    className="px-3 py-2 text-right align-middle whitespace-nowrap"
+                  </td>
+                  <td
+                    className={`${CRM_TD} overflow-hidden text-right`}
                     onClick={(e) => e.stopPropagation()}
                   >
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="size-8">
-                          <MoreHorizontal className="size-4" />
+                        <Button variant="ghost" size="icon" className="size-7">
+                          <MoreHorizontal className="size-3.5" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={() => router.push(`/customers/${customer.id}`)}
-                        >
+                        <DropdownMenuItem onClick={() => router.push(`/customers/${customer.id}`)}>
                           View
                         </DropdownMenuItem>
                         {canEditCustomer && (
@@ -412,18 +395,18 @@ export default function CustomersPage() {
                         )}
                       </DropdownMenuContent>
                     </DropdownMenu>
-                  </TableCell>
-                </TableRow>
+                  </td>
+                </tr>
               );
             })}
-          </TableBody>
+          </tbody>
         </table>
-      </CrmTableScroll>
+      </div>
     );
   }
 
   return (
-    <div className="container mx-auto max-w-[1600px] min-w-0 space-y-6 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+    <div className="container mx-auto max-w-[1600px] space-y-6 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-semibold sm:text-2xl">Customers</h1>
@@ -536,7 +519,7 @@ export default function CustomersPage() {
                 {loading ? "Loading..." : `${filteredCustomers.length} contact(s)`}
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="min-w-0 overflow-hidden">
               {loading ? (
                 <p className="text-muted-foreground">Loading...</p>
               ) : filteredCustomers.length === 0 ? (
@@ -560,38 +543,55 @@ export default function CustomersPage() {
                   : `${soldCustomers.length} customer(s) with sold cars (converted)`}
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="min-w-0 overflow-hidden">
               {soldLoading ? (
                 <p className="text-muted-foreground">Loading...</p>
               ) : soldCustomers.length === 0 ? (
                 <p className="text-muted-foreground">No sold cars found.</p>
               ) : (
-                <CrmTableScroll>
-                  <table
-                    className="table-fixed border-collapse text-sm caption-bottom whitespace-nowrap"
-                    style={{ width: SOLD_CARS_TABLE_WIDTH_PX }}
-                  >
-                    <SoldCarsColgroup />
-                    <TableHeader className="sticky top-0 z-30 shadow-[0_1px_0_0_hsl(var(--border))]">
-                      <TableRow>
-                        <TableHead className="sticky left-0 z-40 border-r border-border/80 bg-[var(--table-header)] px-3 py-2 text-left align-middle whitespace-nowrap text-[var(--table-header-text)] shadow-[2px_0_8px_-4px_rgba(0,0,0,0.15)] dark:shadow-[2px_0_8px_-4px_rgba(0,0,0,0.4)]">
+                <div className="scrollbar-thick w-full min-w-0 max-h-[min(72vh,calc(100dvh-14rem))] overflow-x-auto overflow-y-auto rounded-md border border-border bg-card [-webkit-overflow-scrolling:touch]">
+                  <table className="w-max min-w-full table-fixed border-collapse">
+                    <colgroup>
+                      {SOLD_TABLE_COL_PX.map((w, i) => (
+                        <col key={i} style={{ width: `${w}px` }} />
+                      ))}
+                    </colgroup>
+                    <thead>
+                      <tr>
+                        <th scope="col" className={CRM_TH}>
                           Vehicle
-                        </TableHead>
-                        <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">VIN</TableHead>
-                        <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Color</TableHead>
-                        <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Customer</TableHead>
-                        <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Phone</TableHead>
-                        <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Price</TableHead>
-                        <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Date bought</TableHead>
-                        <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Delivery Date</TableHead>
-                        <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Order Status</TableHead>
-                        <TableHead className="px-3 py-2 text-right align-middle whitespace-nowrap">
+                        </th>
+                        <th scope="col" className={`${CRM_TH} font-mono`}>
+                          VIN
+                        </th>
+                        <th scope="col" className={CRM_TH}>
+                          Color
+                        </th>
+                        <th scope="col" className={CRM_TH}>
+                          Customer
+                        </th>
+                        <th scope="col" className={CRM_TH}>
+                          Phone
+                        </th>
+                        <th scope="col" className={CRM_TH}>
+                          Price
+                        </th>
+                        <th scope="col" className={CRM_TH}>
+                          Date bought
+                        </th>
+                        <th scope="col" className={CRM_TH}>
+                          Delivery Date
+                        </th>
+                        <th scope="col" className={CRM_TH}>
+                          Order Status
+                        </th>
+                        <th scope="col" className={`${CRM_TH} text-right`}>
                           Actions
-                        </TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {convertedSoldCars.map((so, rowIndex) => {
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {convertedSoldCars.map((so) => {
                         const car = so.cars;
                         const customer = so.customers;
                         const fullName = customer
@@ -599,38 +599,28 @@ export default function CustomersPage() {
                           : "—";
                         const isSubDealer = car?.status === "sent_to_sub_dealer";
                         const dateBoughtDisplay = so.date_bought ?? so.sale_date;
+                        const vehicleTitle = car
+                          ? `${car.brand} ${car.model}${car.model_year ? ` (${car.model_year})` : ""}`
+                          : "—";
+                        const orderStatusText = isSubDealer
+                          ? `${so.status} · Sub-dealer`
+                          : so.status;
                         return (
-                          <TableRow key={so.id} className="group">
-                            <TableCell
-                              className={cn(
-                                "sticky left-0 z-10 overflow-hidden border-r border-border/80 px-3 py-2 align-middle font-medium text-ellipsis whitespace-nowrap shadow-[2px_0_8px_-4px_rgba(0,0,0,0.12)] dark:shadow-[2px_0_8px_-4px_rgba(0,0,0,0.35)]",
-                                rowIndex % 2 === 1 ? "bg-muted/30" : "bg-card",
-                                "group-hover:bg-accent"
-                              )}
-                              title={
-                                car
-                                  ? `${car.brand} ${car.model}${car.model_year ? ` (${car.model_year})` : ""}`
-                                  : undefined
-                              }
-                            >
-                              {car
-                                ? `${car.brand} ${car.model}${car.model_year ? ` (${car.model_year})` : ""}`
-                                : "—"}
-                            </TableCell>
-                            <TableCell className="px-3 py-2 align-middle font-mono text-xs whitespace-nowrap text-muted-foreground">
+                          <tr key={so.id} className="hover:bg-muted/30">
+                            <td title={vehicleTitle} className={`${CRM_TD} font-medium`}>
+                              {vehicleTitle}
+                            </td>
+                            <td title={car?.vin ?? ""} className={`${CRM_TD} font-mono text-[10px] text-muted-foreground`}>
                               {car?.vin ?? "—"}
-                            </TableCell>
-                            <TableCell className="px-3 py-2 align-middle text-sm whitespace-nowrap text-muted-foreground">
+                            </td>
+                            <td title={car?.exterior_color ?? undefined} className={`${CRM_TD} text-muted-foreground`}>
                               {car?.exterior_color ?? "—"}
-                            </TableCell>
-                            <TableCell
-                              className="overflow-hidden px-3 py-2 align-middle text-sm whitespace-nowrap"
-                              title={fullName !== "—" ? fullName : undefined}
-                            >
+                            </td>
+                            <td className={CRM_TD}>
                               {customer ? (
                                 <button
                                   type="button"
-                                  className="block w-full truncate text-left font-medium text-primary hover:underline"
+                                  className="block max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-left text-primary hover:underline"
                                   onClick={() => router.push(`/customers/${customer.id}`)}
                                 >
                                   {fullName}
@@ -638,79 +628,69 @@ export default function CustomersPage() {
                               ) : (
                                 <span className="text-muted-foreground">—</span>
                               )}
-                            </TableCell>
-                            <TableCell className="px-3 py-2 align-middle text-sm whitespace-nowrap">
+                            </td>
+                            <td className={CRM_TD}>
                               {customer?.phone_primary ? (
                                 <a
-                                  href={`tel:${customer.phone_primary.replace(/\s/g, "")}`}
-                                  className="text-primary hover:underline"
+                                  href={`tel:${customer.phone_primary}`}
+                                  className="block max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-primary hover:underline"
                                 >
                                   {customer.phone_primary}
                                 </a>
                               ) : (
                                 "—"
                               )}
-                            </TableCell>
-                            <TableCell className="px-3 py-2 align-middle text-sm whitespace-nowrap">
+                            </td>
+                            <td className={`${CRM_TD} tabular-nums`}>
                               {so.selling_price != null
                                 ? `${Number(so.selling_price).toLocaleString()} ${so.currency ?? "USD"}`
                                 : "—"}
-                            </TableCell>
-                            <TableCell className="px-3 py-2 align-middle text-sm whitespace-nowrap">
+                            </td>
+                            <td className={`${CRM_TD} tabular-nums`}>
                               {dateBoughtDisplay
                                 ? new Date(dateBoughtDisplay).toLocaleDateString()
                                 : "—"}
-                            </TableCell>
-                            <TableCell className="px-3 py-2 align-middle text-sm whitespace-nowrap">
+                            </td>
+                            <td className={`${CRM_TD} tabular-nums`}>
                               {so.delivery_date
                                 ? new Date(so.delivery_date).toLocaleDateString()
                                 : "—"}
-                            </TableCell>
-                            <TableCell className="px-3 py-2 align-middle whitespace-nowrap">
-                              <div className="flex flex-nowrap items-center gap-1">
-                                <Badge variant="secondary">{so.status}</Badge>
-                                {isSubDealer && (
-                                  <Badge
-                                    variant="outline"
-                                    className="bg-muted text-muted-foreground"
-                                  >
-                                    Sub-dealer
-                                  </Badge>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell className="px-3 py-2 text-right align-middle whitespace-nowrap">
-                              <div className="flex items-center justify-end gap-1">
+                            </td>
+                            <td title={orderStatusText} className={CRM_TD}>
+                              {orderStatusText}
+                            </td>
+                            <td className={`${CRM_TD} overflow-hidden text-right`}>
+                              <span className="inline-flex max-w-full flex-nowrap items-center justify-end gap-0.5 overflow-hidden">
                                 {customer && (
                                   <Button
                                     variant="ghost"
                                     size="sm"
+                                    className="h-7 shrink-0 px-1.5 text-[10px]"
                                     onClick={() => router.push(`/customers/${customer.id}`)}
                                   >
-                                    Customer →
+                                    Cust.
                                   </Button>
                                 )}
                                 {car && (
                                   <Button
                                     variant="ghost"
                                     size="sm"
+                                    className="h-7 shrink-0 px-1.5 text-[10px]"
                                     onClick={() =>
-                                      router.push(
-                                        `/cars/${encodeURIComponent(car.vin ?? so.car_id)}`
-                                      )
+                                      router.push(`/cars/${encodeURIComponent(car.vin ?? so.car_id)}`)
                                     }
                                   >
-                                    Car →
+                                    Car
                                   </Button>
                                 )}
-                              </div>
-                            </TableCell>
-                          </TableRow>
+                              </span>
+                            </td>
+                          </tr>
                         );
                       })}
-                    </TableBody>
+                    </tbody>
                   </table>
-                </CrmTableScroll>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -724,7 +704,7 @@ export default function CustomersPage() {
                 {loading ? "Loading..." : `${exclusiveLeadCustomers.length} lead contact(s)`}
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="min-w-0 overflow-hidden">
               {loading ? (
                 <p className="text-muted-foreground">Loading...</p>
               ) : exclusiveLeadCustomers.length === 0 ? (

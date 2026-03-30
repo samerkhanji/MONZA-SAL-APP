@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { MoreHorizontal, FileText, ScanLine, FileSpreadsheet, Download, ExternalLink } from "lucide-react";
+import { MoreHorizontal, FileText, ScanLine, FileSpreadsheet } from "lucide-react";
 import { useUser } from "@/lib/contexts/UserContext";
 import type { CarDisplay } from "@/types/database";
 import {
@@ -15,7 +15,6 @@ import {
   PDI_LABELS,
   CUSTOMS_STATUS_LABELS,
 } from "@/types/database";
-import { STATUS_BADGE_COLORS, PDI_BADGE_COLORS, CUSTOMS_BADGE_COLORS } from "@/lib/constants/badges";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,20 +25,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { cn } from "@/lib/utils";
-import {
-  CrmTableScroll,
-  CarsInventoryColgroup,
-  CARS_INVENTORY_TABLE_WIDTH_PX,
-} from "@/components/crm/CrmTableScroll";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -57,11 +42,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  createDeleteRequest,
-  getPendingDeleteRequestsForItems,
-  type CarDeleteDetails,
-} from "@/lib/delete-requests";
+import { getPendingDeleteRequestsForItems } from "@/lib/delete-requests";
 import { ExportButton } from "@/components/ExportButton";
 import type { ExportColumn } from "@/lib/exportToExcel";
 import { canPerform } from "@/lib/permissions";
@@ -70,10 +51,6 @@ import { createClient } from "@/lib/supabase";
 
 const ScannerDialog = dynamic(
   () => import("@/components/scanner/ScannerDialog").then((m) => ({ default: m.ScannerDialog })),
-  { ssr: false }
-);
-const StatusCustomerDialog = dynamic(
-  () => import("@/components/status-customer-dialog").then((m) => ({ default: m.StatusCustomerDialog })),
   { ssr: false }
 );
 const CustomsDialog = dynamic(
@@ -97,6 +74,32 @@ const ImportExcelDialog = dynamic(
   { ssr: false }
 );
 
+function fmtSheetDate(value: string | null | undefined): string {
+  if (!value) return "—";
+  try {
+    return new Date(value).toLocaleDateString();
+  } catch {
+    return "—";
+  }
+}
+
+function warrantyVehicleExpiry(car: CarDisplay): string {
+  const v =
+    car.warranty_vehicle_expiry ?? car.warranty_expiry ?? car.warranty_monza_start_date;
+  return fmtSheetDate(v ?? null);
+}
+
+/** Pixel widths — single source of truth via <colgroup> (header + body). 20 columns. */
+const CARS_TABLE_COL_PX = [
+  220, 120, 150, 90, 140, 140, 130, 220, 140, 140, 130, 190, 140, 190, 140, 120, 140,
+  140, 140, 100,
+] as const;
+
+const CARS_TH =
+  "sticky top-0 z-10 box-border min-w-0 max-w-full border-b-2 border-r border-border bg-[var(--table-header)] px-2 py-2 text-left align-middle text-[11px] font-semibold text-[var(--table-header-text)] whitespace-nowrap overflow-hidden text-ellipsis";
+const CARS_TD =
+  "box-border min-w-0 max-w-full border-b border-r border-border bg-card px-2 py-2 text-left align-middle text-xs whitespace-nowrap overflow-hidden text-ellipsis";
+
 function matchesSearch(
   car: CarDisplay,
   search: string
@@ -107,11 +110,15 @@ function matchesSearch(
   const plate = (car.plate_number ?? "").toLowerCase();
   const brand = (car.brand ?? "").toLowerCase();
   const model = (car.model ?? "").toLowerCase();
+  const issue = (car.issue ?? "").toLowerCase();
+  const notes = (car.notes ?? "").toLowerCase();
   return (
     vin.includes(q) ||
     plate.includes(q) ||
     brand.includes(q) ||
-    model.includes(q)
+    model.includes(q) ||
+    issue.includes(q) ||
+    notes.includes(q)
   );
 }
 
@@ -138,8 +145,6 @@ export default function CarsListPage() {
     }
   }, [statusFromUrl]);
   const [brandFilter, setBrandFilter] = useState<string>("all");
-  const [statusDialogCar, setStatusDialogCar] = useState<CarDisplay | null>(null);
-  const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [customsDialogCar, setCustomsDialogCar] = useState<CarDisplay | null>(null);
   const [customsDialogOpen, setCustomsDialogOpen] = useState(false);
   const [pdiDialogCar, setPdiDialogCar] = useState<CarDisplay | null>(null);
@@ -151,47 +156,6 @@ export default function CarsListPage() {
   const [scanVinOpen, setScanVinOpen] = useState(false);
 
   const supabase = createClient();
-
-  const LINKED_STATUSES = ["sold", "delivered", "registered"] as const;
-
-  async function handleStatusClick(car: CarDisplay) {
-    if (!LINKED_STATUSES.includes(car.status as typeof LINKED_STATUSES[number])) {
-      setStatusDialogCar(car);
-      setStatusDialogOpen(true);
-      return;
-    }
-    // 1. Find linked customer via sales_orders (any non-cancelled order)
-    const { data: order } = await supabase
-      .from("sales_orders")
-      .select("customer_id")
-      .eq("car_id", car.id)
-      .not("status", "eq", "cancelled")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (order?.customer_id) {
-      router.push(`/customers/${order.customer_id}`);
-      return;
-    }
-    // 2. Fallback: exact match by phone if we have client_phone (no fuzzy matching)
-    const clientPhone = (car as { client_phone?: string }).client_phone;
-    if (clientPhone?.trim()) {
-      const { data: byPhone } = await supabase
-        .from("customers")
-        .select("id")
-        .eq("phone_primary", clientPhone.trim())
-        .limit(1)
-        .maybeSingle();
-      if (byPhone) {
-        router.push(`/customers/${byPhone.id}`);
-        return;
-      }
-    }
-    // No fuzzy first-name match — it can incorrectly link to wrong customers (e.g. OMAR HAOUCHI vs OMAR AKAR)
-    setStatusDialogCar(car);
-    setStatusDialogOpen(true);
-  }
 
   async function handleVinScan(vin: string) {
     const { data: car } = await supabase
@@ -321,41 +285,60 @@ export default function CarsListPage() {
   }, [cars, search, statusFilter, locationFilter, brandFilter]);
 
   const carExportColumns: ExportColumn[] = [
-    { key: "vin", header: "VIN Number", width: 22 },
+    { key: "vin", header: "VIN", width: 22 },
+    { key: "brand", header: "Brand" },
     { key: "model", header: "Model" },
-    { key: "suffix", header: "Suffix / Trim" },
     { key: "model_year", header: "Year" },
-    { key: "exterior_color", header: "Exterior Color" },
-    { key: "interior_color", header: "Interior Color" },
+    { key: "exterior_color", header: "Exterior" },
+    { key: "interior_color", header: "Interior" },
     { key: "status_display", header: "Status" },
-    { key: "engine_number", header: "Engine Number" },
-    { key: "issue", header: "Issue" },
     { key: "client_name", header: "Client" },
     { key: "client_phone", header: "Client Phone", width: 18 },
     { key: "delivery_date", header: "Delivery Date", type: "date" },
-    { key: "reservation_date", header: "Reservation Date", type: "date" },
-    { key: "reserved_by", header: "Reserved By" },
     { key: "location_display", header: "Location" },
     { key: "warranty_per_dms", header: "Warranty Vehicle DMS", type: "date" },
-    { key: "warranty_vehicle_expiry", header: "Warranty V.M", type: "date" },
+    { key: "warranty_vm_display", header: "W.V.M", type: "date" },
     { key: "warranty_battery_dms", header: "Warranty Battery DMS", type: "date" },
-    { key: "warranty_battery_expiry", header: "Warranty B.M", type: "date" },
+    { key: "warranty_battery_expiry", header: "W.B.M", type: "date" },
+    { key: "battery_percent_display", header: "Battery %" },
+    { key: "pdi_display", header: "PDI" },
+    { key: "customs_display", header: "Customs" },
+    { key: "date_arrived", header: "Date Arrived", type: "date" },
   ];
 
   const carExportData = (list: CarDisplay[]) =>
-    list.map((c) => ({
-      ...c,
-      status_display: CAR_STATUS_LABELS[c.status as keyof typeof CAR_STATUS_LABELS] ?? c.status,
-      location_display: c.location_full ?? (c.location_type ? `${LOCATION_LABELS[c.location_type as keyof typeof LOCATION_LABELS] ?? c.location_type}${c.location_slot ? ` ${c.location_slot}` : ""}` : ""),
-      model: `${c.brand ?? ""} ${c.model ?? ""}`.trim(),
-    }));
+    list.map((c) => {
+      const wvm =
+        c.warranty_vehicle_expiry ?? c.warranty_expiry ?? c.warranty_monza_start_date;
+      const clientPhone = (c as { client_phone?: string }).client_phone;
+      return {
+        ...c,
+        status_display: CAR_STATUS_LABELS[c.status as keyof typeof CAR_STATUS_LABELS] ?? c.status,
+        client_phone: clientPhone ?? "",
+        location_display:
+          c.location_full ??
+          (c.location_type
+            ? `${LOCATION_LABELS[c.location_type as keyof typeof LOCATION_LABELS] ?? c.location_type}${c.location_slot ? ` ${c.location_slot}` : ""}`
+            : ""),
+        warranty_vm_display: wvm ?? null,
+        battery_percent_display:
+          c.battery_percent != null ? `${c.battery_percent}%` : "",
+        pdi_display: PDI_LABELS[c.pdi_status],
+        customs_display:
+          c.customs_status === "cleared"
+            ? "Complete"
+            : c.customs_status === "in_progress"
+              ? "Incomplete"
+              : CUSTOMS_STATUS_LABELS[c.customs_status] ?? "Pending",
+      };
+    });
 
   const canCreateCar = canPerform("cars", "create", appRole ?? null);
   const canEditCar = canPerform("cars", "edit", appRole ?? null);
   const canDeleteCar = canPerform("cars", "delete", appRole ?? null);
 
   return (
-    <div className="container mx-auto max-w-[1800px] min-w-0 space-y-6 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+    <div className="container mx-auto max-w-[1800px] space-y-6 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
         <div>
           <h1 className="text-xl font-semibold sm:text-2xl">Car Inventory</h1>
@@ -464,7 +447,7 @@ export default function CarsListPage() {
             {loading ? "Loading..." : `${filteredCars.length} car(s)`}
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="min-w-0 overflow-hidden">
           {loading ? (
             <div className="space-y-2">
               {[1, 2, 3, 4, 5].map((i) => (
@@ -474,227 +457,202 @@ export default function CarsListPage() {
           ) : filteredCars.length === 0 ? (
             <p className="text-muted-foreground">No cars found.</p>
           ) : (
-            <>
-              <CrmTableScroll>
-                <table
-                  className="table-fixed border-collapse text-sm caption-bottom whitespace-nowrap"
-                  style={{ width: CARS_INVENTORY_TABLE_WIDTH_PX }}
-                >
-                  <CarsInventoryColgroup />
-                  <TableHeader className="sticky top-0 z-30 shadow-[0_1px_0_0_hsl(var(--border))]">
-                  <TableRow>
-                    <TableHead className="sticky left-0 z-40 border-r border-border/80 bg-[var(--table-header)] px-3 py-2 text-left align-middle whitespace-nowrap text-[var(--table-header-text)] shadow-[2px_0_8px_-4px_rgba(0,0,0,0.15)] dark:shadow-[2px_0_8px_-4px_rgba(0,0,0,0.4)]">
+            <div className="scrollbar-thick w-full min-w-0 max-h-[min(72vh,calc(100dvh-14rem))] overflow-x-auto overflow-y-auto rounded-md border border-border bg-card [-webkit-overflow-scrolling:touch]">
+              <table className="w-max min-w-full table-fixed border-collapse">
+                <colgroup>
+                  {CARS_TABLE_COL_PX.map((w, i) => (
+                    <col key={i} style={{ width: `${w}px` }} />
+                  ))}
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th scope="col" className={`${CARS_TH} font-mono`}>
                       VIN
-                    </TableHead>
-                    <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Brand</TableHead>
-                    <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Model</TableHead>
-                    <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Year</TableHead>
-                    <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Exterior</TableHead>
-                    <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Interior</TableHead>
-                    <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Status</TableHead>
-                    <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Client</TableHead>
-                    <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Client Phone</TableHead>
-                    <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Delivery Date</TableHead>
-                    <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Location</TableHead>
-                    <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Warranty Vehicle DMS</TableHead>
-                    <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Warranty V.M</TableHead>
-                    <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Warranty Battery DMS</TableHead>
-                    <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Warranty B.M</TableHead>
-                    <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Battery %</TableHead>
-                    <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">PDI</TableHead>
-                    <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Customs</TableHead>
-                    <TableHead className="px-3 py-2 text-left align-middle whitespace-nowrap">Date Arrived</TableHead>
-                    <TableHead className="px-3 py-2 text-right align-middle whitespace-nowrap">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredCars.map((car, rowIndex) => {
-                    const statusClass =
-                      STATUS_BADGE_COLORS[car.status] ??
-                      "bg-muted text-muted-foreground";
-                    const pdiClass =
-                      PDI_BADGE_COLORS[car.pdi_status] ??
-                      "bg-muted text-muted-foreground";
-                    const customsClass =
-                      CUSTOMS_BADGE_COLORS[car.customs_status] ??
-                      "bg-muted text-muted-foreground";
+                    </th>
+                    <th scope="col" className={CARS_TH}>
+                      Brand
+                    </th>
+                    <th scope="col" className={CARS_TH}>
+                      Model
+                    </th>
+                    <th scope="col" className={CARS_TH}>
+                      Year
+                    </th>
+                    <th scope="col" className={CARS_TH}>
+                      Exterior
+                    </th>
+                    <th scope="col" className={CARS_TH}>
+                      Interior
+                    </th>
+                    <th scope="col" className={CARS_TH}>
+                      Status
+                    </th>
+                    <th scope="col" className={CARS_TH}>
+                      Client
+                    </th>
+                    <th scope="col" className={CARS_TH}>
+                      Client Phone
+                    </th>
+                    <th scope="col" className={CARS_TH}>
+                      Delivery Date
+                    </th>
+                    <th scope="col" className={CARS_TH}>
+                      Location
+                    </th>
+                    <th scope="col" className={CARS_TH}>
+                      Warranty Vehicle DMS
+                    </th>
+                    <th scope="col" title="Warranty V.M" className={CARS_TH}>
+                      W.V.M
+                    </th>
+                    <th scope="col" className={CARS_TH}>
+                      Warranty Battery DMS
+                    </th>
+                    <th scope="col" title="Warranty B.M" className={CARS_TH}>
+                      W.B.M
+                    </th>
+                    <th scope="col" className={CARS_TH}>
+                      Battery %
+                    </th>
+                    <th scope="col" className={CARS_TH}>
+                      PDI
+                    </th>
+                    <th scope="col" className={CARS_TH}>
+                      Customs
+                    </th>
+                    <th scope="col" className={CARS_TH}>
+                      Date Arrived
+                    </th>
+                    <th scope="col" className={`${CARS_TH} text-right`}>
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredCars.map((car) => {
+                    const customsLabel =
+                      car.customs_status === "cleared"
+                        ? "Complete"
+                        : car.customs_status === "in_progress"
+                          ? "Incomplete"
+                          : CUSTOMS_STATUS_LABELS[car.customs_status] ?? "Pending";
                     const batteryPercent = car.battery_percent;
+                    const clientPhone = (car as { client_phone?: string }).client_phone;
+                    const locationText =
+                      car.location_full ??
+                      (car.location_type
+                        ? `${LOCATION_LABELS[car.location_type as keyof typeof LOCATION_LABELS] ?? car.location_type}${car.location_slot ? ` ${car.location_slot}` : ""}`
+                        : "—");
+                    const clientDisplay = pendingDeletes[car.id]
+                      ? `(!) ${car.client_name ?? "—"}`
+                      : (car.client_name ?? "—");
+                    const statusLabel =
+                      CAR_STATUS_LABELS[car.status as keyof typeof CAR_STATUS_LABELS] ?? car.status;
+                    const statusCellText = pendingDeletes[car.id]
+                      ? `${statusLabel} · Pending`
+                      : statusLabel;
 
                     return (
-                      <TableRow
+                      <tr
                         key={car.id}
-                        className="group cursor-pointer"
+                        className="cursor-pointer hover:bg-muted/30"
+                        title={pendingDeletes[car.id] ? "Pending delete request" : undefined}
                         onClick={() => router.push(`/cars/${encodeURIComponent(car.vin ?? car.id)}`)}
                       >
-                        <TableCell
-                          className={cn(
-                            "sticky left-0 z-10 border-r border-border/80 px-3 py-2 align-middle font-mono text-sm font-medium whitespace-nowrap shadow-[2px_0_8px_-4px_rgba(0,0,0,0.12)] dark:shadow-[2px_0_8px_-4px_rgba(0,0,0,0.35)]",
-                            rowIndex % 2 === 1 ? "bg-muted/30" : "bg-card",
-                            "group-hover:bg-accent"
-                          )}
-                        >
+                        <td title={car.vin ?? ""} className={`${CARS_TD} font-mono`}>
                           {car.vin ?? "—"}
-                        </TableCell>
-                        <TableCell className="px-3 py-2 align-middle text-sm whitespace-nowrap">
+                        </td>
+                        <td title={car.brand ?? undefined} className={CARS_TD}>
                           {car.brand ?? "—"}
-                        </TableCell>
-                        <TableCell className="overflow-hidden px-3 py-2 align-middle text-sm text-ellipsis whitespace-nowrap">
-                          {car.model ?? "—"}
-                        </TableCell>
-                        <TableCell className="px-3 py-2 align-middle text-sm whitespace-nowrap">
+                        </td>
+                        <td title={car.model ?? undefined} className={CARS_TD}>
+                          {car.model}
+                        </td>
+                        <td className={`${CARS_TD} tabular-nums`}>
                           {car.model_year ?? "—"}
-                        </TableCell>
-                        <TableCell className="px-3 py-2 align-middle text-sm whitespace-nowrap text-muted-foreground">
+                        </td>
+                        <td title={car.exterior_color ?? undefined} className={CARS_TD}>
                           {car.exterior_color ?? "—"}
-                        </TableCell>
-                        <TableCell className="px-3 py-2 align-middle text-sm whitespace-nowrap text-muted-foreground">
+                        </td>
+                        <td title={car.interior_color ?? undefined} className={CARS_TD}>
                           {car.interior_color ?? "—"}
-                        </TableCell>
-                        <TableCell
-                          className="cursor-pointer px-3 py-2 align-middle whitespace-nowrap"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            void handleStatusClick(car);
-                          }}
-                        >
-                          <div className="flex min-w-0 flex-nowrap items-center gap-1">
-                            <div className="flex shrink-0 flex-nowrap items-center gap-1">
-                              <Badge
-                                className={
-                                  LINKED_STATUSES.includes(car.status as (typeof LINKED_STATUSES)[number]) && (car.client_name || (car as { client_phone?: string }).client_phone)
-                                    ? `${statusClass} hover:opacity-80 hover:ring-2 hover:ring-offset-1 hover:ring-current`
-                                    : `${statusClass} hover:opacity-80`
-                                }
-                              >
-                                {CAR_STATUS_LABELS[car.status]}
-                                {LINKED_STATUSES.includes(car.status as (typeof LINKED_STATUSES)[number]) && (car.client_name || (car as { client_phone?: string }).client_phone) && (
-                                  <ExternalLink className="ml-1 inline h-3 w-3 opacity-60" />
-                                )}
-                              </Badge>
-                            </div>
-                            {pendingDeletes[car.id] && (
-                              <Badge variant="outline" className="text-amber-600 border-amber-400 dark:text-amber-400 dark:border-amber-500">
-                                Pending Request
-                              </Badge>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="overflow-hidden px-3 py-2 align-middle text-sm text-ellipsis whitespace-nowrap">
-                          {car.client_name ?? "—"}
-                        </TableCell>
-                        <TableCell className="px-3 py-2 align-middle text-sm whitespace-nowrap">
-                          {car.client_phone ?? "—"}
-                        </TableCell>
-                        <TableCell className="px-3 py-2 align-middle text-sm whitespace-nowrap">
-                          {car.delivery_date
-                            ? new Date(car.delivery_date).toLocaleDateString()
-                            : "—"}
-                        </TableCell>
-                        <TableCell className="overflow-hidden px-3 py-2 align-middle text-sm text-ellipsis whitespace-nowrap">
-                          {car.location_full || "—"}
-                        </TableCell>
-                        <TableCell className="px-3 py-2 align-middle text-sm whitespace-nowrap">
-                          {car.warranty_per_dms
-                            ? new Date(car.warranty_per_dms).toLocaleDateString()
-                            : "—"}
-                        </TableCell>
-                        <TableCell className="px-3 py-2 align-middle text-sm whitespace-nowrap">
-                          {((car as any).warranty_vehicle_expiry ??
-                            (car as any).warranty_expiry ??
-                            car.warranty_monza_start_date)
-                            ? new Date(
-                                ((car as any).warranty_vehicle_expiry ??
-                                  (car as any).warranty_expiry ??
-                                  car.warranty_monza_start_date) as string
-                              ).toLocaleDateString()
-                            : "—"}
-                        </TableCell>
-                        <TableCell className="px-3 py-2 align-middle text-sm whitespace-nowrap">
-                          {(car as any).warranty_battery_dms
-                            ? new Date((car as any).warranty_battery_dms as string).toLocaleDateString()
-                            : "—"}
-                        </TableCell>
-                        <TableCell className="px-3 py-2 align-middle text-sm whitespace-nowrap">
-                          {(car as any).warranty_battery_expiry
-                            ? new Date((car as any).warranty_battery_expiry as string).toLocaleDateString()
-                            : "—"}
-                        </TableCell>
-                        <TableCell className="px-3 py-2 align-middle whitespace-nowrap">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm">
-                              {batteryPercent != null ? `${batteryPercent}%` : "—"}
-                            </span>
-                            {batteryPercent != null && (
-                              <div className="h-1.5 w-12 overflow-hidden rounded-full bg-muted">
-                                <div
-                                  className="h-full bg-primary"
-                                  style={{
-                                    width: `${Math.min(100, Math.max(0, batteryPercent))}%`,
-                                  }}
-                                />
-                              </div>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell
-                          className="cursor-pointer px-3 py-2 align-middle whitespace-nowrap"
+                        </td>
+                        <td title={statusCellText} className={CARS_TD}>
+                          {statusCellText}
+                        </td>
+                        <td title={car.client_name ?? undefined} className={CARS_TD}>
+                          {clientDisplay}
+                        </td>
+                        <td title={clientPhone ?? undefined} className={CARS_TD}>
+                          {clientPhone ?? "—"}
+                        </td>
+                        <td className={`${CARS_TD} tabular-nums`}>
+                          {fmtSheetDate(car.delivery_date)}
+                        </td>
+                        <td title={locationText !== "—" ? locationText : undefined} className={CARS_TD}>
+                          {locationText}
+                        </td>
+                        <td className={`${CARS_TD} tabular-nums`}>
+                          {fmtSheetDate(car.warranty_per_dms)}
+                        </td>
+                        <td className={`${CARS_TD} tabular-nums`}>
+                          {warrantyVehicleExpiry(car)}
+                        </td>
+                        <td className={`${CARS_TD} tabular-nums`}>
+                          {fmtSheetDate(car.warranty_battery_dms)}
+                        </td>
+                        <td className={`${CARS_TD} tabular-nums`}>
+                          {fmtSheetDate(car.warranty_battery_expiry)}
+                        </td>
+                        <td className={`${CARS_TD} tabular-nums`}>
+                          {batteryPercent != null ? `${batteryPercent}%` : "—"}
+                        </td>
+                        <td
+                          title={PDI_LABELS[car.pdi_status]}
+                          className={`${CARS_TD} cursor-pointer text-primary hover:underline`}
                           onClick={(e) => {
                             e.stopPropagation();
                             setPdiDialogCar(car);
                             setPdiDialogOpen(true);
                           }}
                         >
-                          <Badge className={`${pdiClass} hover:opacity-80`}>
-                            {PDI_LABELS[car.pdi_status]}
-                          </Badge>
-                        </TableCell>
-                        <TableCell
-                          className="cursor-pointer px-3 py-2 align-middle whitespace-nowrap"
+                          {PDI_LABELS[car.pdi_status]}
+                        </td>
+                        <td
+                          title={customsLabel}
+                          className={`${CARS_TD} cursor-pointer text-primary hover:underline`}
                           onClick={(e) => {
                             e.stopPropagation();
                             setCustomsDialogCar(car);
                             setCustomsDialogOpen(true);
                           }}
                         >
-                          <Badge className={`${customsClass} hover:opacity-80`}>
-                            {car.customs_status === "cleared"
-                              ? "Complete"
-                              : car.customs_status === "in_progress"
-                                ? "Incomplete"
-                                : CUSTOMS_STATUS_LABELS[car.customs_status] ?? "Pending"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="px-3 py-2 align-middle text-sm whitespace-nowrap">
-                          {car.date_arrived
-                            ? new Date(car.date_arrived).toLocaleDateString()
-                            : "—"}
-                        </TableCell>
-                        <TableCell
-                          className="px-3 py-2 text-right align-middle whitespace-nowrap"
+                          {customsLabel}
+                        </td>
+                        <td className={`${CARS_TD} tabular-nums`}>
+                          {fmtSheetDate(car.date_arrived)}
+                        </td>
+                        <td
+                          className={`${CARS_TD} overflow-hidden text-right`}
                           onClick={(e) => e.stopPropagation()}
                         >
-                          <div className="flex items-center justify-end gap-1">
+                          <span className="inline-flex max-w-full flex-nowrap items-center justify-end gap-0.5 overflow-hidden">
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="size-8 shrink-0"
+                              className="size-7 shrink-0"
                               title="Open documents & files"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 router.push(`/cars/${encodeURIComponent(car.vin ?? car.id)}`);
                               }}
                             >
-                              <FileText className="size-4" />
+                              <FileText className="size-3.5" />
                             </Button>
-                            <div className="relative w-8 shrink-0">
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="size-8"
-                                >
-                                  <MoreHorizontal className="size-4" />
+                                <Button variant="ghost" size="icon" className="size-7 shrink-0">
+                                  <MoreHorizontal className="size-3.5" />
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" side="left" sideOffset={4}>
@@ -713,52 +671,28 @@ export default function CarsListPage() {
                                 </DropdownMenuItem>
                                 {canEditCar && (
                                   <>
-                                    <DropdownMenuItem
-                                      onClick={() => {
-                                        setEditCar(car);
-                                      }}
-                                    >
-                                      Edit
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem
-                                      onClick={() => {
-                                        setMoveCar(car);
-                                      }}
-                                    >
-                                      Move
-                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => setEditCar(car)}>Edit</DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => setMoveCar(car)}>Move</DropdownMenuItem>
                                   </>
                                 )}
                                 {canDeleteCar && (
-                                  <DropdownMenuItem
-                                    variant="destructive"
-                                    onClick={() => setDeleteCar(car)}
-                                  >
+                                  <DropdownMenuItem variant="destructive" onClick={() => setDeleteCar(car)}>
                                     Delete
                                   </DropdownMenuItem>
                                 )}
                               </DropdownMenuContent>
                             </DropdownMenu>
-                            </div>
-                          </div>
-                        </TableCell>
-                      </TableRow>
+                          </span>
+                        </td>
+                      </tr>
                     );
                   })}
-                </TableBody>
-                </table>
-              </CrmTableScroll>
-            </>
+                </tbody>
+              </table>
+            </div>
           )}
         </CardContent>
       </Card>
-
-      <StatusCustomerDialog
-        car={statusDialogCar}
-        open={statusDialogOpen}
-        onOpenChange={setStatusDialogOpen}
-        onSuccess={fetchCars}
-      />
 
       <CustomsDialog
         car={customsDialogCar}
