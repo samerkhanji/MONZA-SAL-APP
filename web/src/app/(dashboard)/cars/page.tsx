@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { MoreHorizontal, FileText, ScanLine, FileSpreadsheet, Download, ExternalLink, ChevronRight } from "lucide-react";
+import { MoreHorizontal, FileText, ScanLine, FileSpreadsheet, Download, ExternalLink } from "lucide-react";
 import { useUser } from "@/lib/contexts/UserContext";
 import type { CarDisplay } from "@/types/database";
 import {
@@ -27,13 +27,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -91,13 +91,6 @@ const ImportExcelDialog = dynamic(
   () => import("@/components/ImportExcelDialog").then((m) => ({ default: m.ImportExcelDialog })),
   { ssr: false }
 );
-
-function formatVinShort(vin: string | null | undefined): string {
-  const v = (vin ?? "").trim();
-  if (!v) return "—";
-  if (v.length <= 12) return v;
-  return `…${v.slice(-8)}`;
-}
 
 function matchesSearch(
   car: CarDisplay,
@@ -357,7 +350,7 @@ export default function CarsListPage() {
   const canDeleteCar = canPerform("cars", "delete", appRole ?? null);
 
   return (
-    <div className="container mx-auto max-w-[1800px] space-y-6 overflow-x-hidden px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+    <div className="container mx-auto max-w-[1800px] min-w-0 space-y-6 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
         <div>
           <h1 className="text-xl font-semibold sm:text-2xl">Car Inventory</h1>
@@ -477,264 +470,36 @@ export default function CarsListPage() {
             <p className="text-muted-foreground">No cars found.</p>
           ) : (
             <>
-              {/* Mobile: card list (tables don’t work well on phones) */}
-              <div className="space-y-3 pb-8 md:hidden">
-                {filteredCars.map((car) => {
-                  const statusClass =
-                    STATUS_BADGE_COLORS[car.status] ??
-                    "bg-muted text-muted-foreground";
-                  const pdiClass =
-                    PDI_BADGE_COLORS[car.pdi_status] ??
-                    "bg-muted text-muted-foreground";
-                  const customsClass =
-                    CUSTOMS_BADGE_COLORS[car.customs_status] ??
-                    "bg-muted text-muted-foreground";
-                  const batteryPercent = car.battery_percent;
-                  const customsLabel =
-                    car.customs_status === "cleared"
-                      ? "Complete"
-                      : car.customs_status === "in_progress"
-                        ? "Incomplete"
-                        : CUSTOMS_STATUS_LABELS[car.customs_status] ?? "Pending";
-                  const title =
-                    `${car.brand ?? ""} ${car.model ?? ""}`.trim() || "—";
-                  const clientPhone = (car as { client_phone?: string })
-                    .client_phone;
-                  const linkedHint =
-                    LINKED_STATUSES.includes(
-                      car.status as (typeof LINKED_STATUSES)[number]
-                    ) &&
-                    (car.client_name || clientPhone);
-
-                  return (
-                    <div
-                      key={car.id}
-                      role="button"
-                      tabIndex={0}
-                      className="rounded-xl border border-border/50 bg-card p-4 text-left shadow-sm outline-none transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring"
-                      onClick={() =>
-                        router.push(
-                          `/cars/${encodeURIComponent(car.vin ?? car.id)}`
-                        )
-                      }
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          router.push(
-                            `/cars/${encodeURIComponent(car.vin ?? car.id)}`
-                          );
-                        }
-                      }}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate font-semibold">{title}</p>
-                          <p
-                            className="mt-0.5 font-mono text-xs text-muted-foreground"
-                            title={car.vin ?? undefined}
-                          >
-                            {formatVinShort(car.vin)}
-                          </p>
-                          <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
-                            {car.location_full || "No location"}
-                            {car.model_year != null ? ` · ${car.model_year}` : ""}
-                          </p>
-                          {(car.client_name || clientPhone) && (
-                            <p className="mt-1 truncate text-xs text-foreground/90">
-                              {car.client_name ?? "—"}
-                              {clientPhone ? ` · ${clientPhone}` : ""}
-                            </p>
-                          )}
-                        </div>
-                        <div
-                          className="flex shrink-0 items-center gap-0.5"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-9 touch-manipulation"
-                            title="Documents"
-                            onClick={() =>
-                              router.push(
-                                `/cars/${encodeURIComponent(car.vin ?? car.id)}`
-                              )
-                            }
-                          >
-                            <FileText className="size-4" />
-                          </Button>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="size-9 touch-manipulation"
-                              >
-                                <MoreHorizontal className="size-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-52">
-                              <DropdownMenuItem
-                                onClick={() =>
-                                  router.push(
-                                    `/cars/${encodeURIComponent(car.vin ?? car.id)}`
-                                  )
-                                }
-                              >
-                                View profile
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() =>
-                                  router.push(
-                                    `/cars/${encodeURIComponent(car.vin ?? car.id)}`
-                                  )
-                                }
-                              >
-                                <FileText className="mr-2 size-4" />
-                                Documents & PDFs
-                              </DropdownMenuItem>
-                              {canEditCar && (
-                                <>
-                                  <DropdownMenuItem
-                                    onClick={() => setEditCar(car)}
-                                  >
-                                    Edit
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    onClick={() => setMoveCar(car)}
-                                  >
-                                    Move
-                                  </DropdownMenuItem>
-                                </>
-                              )}
-                              {canDeleteCar && (
-                                <DropdownMenuItem
-                                  variant="destructive"
-                                  onClick={() => setDeleteCar(car)}
-                                >
-                                  Delete
-                                </DropdownMenuItem>
-                              )}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                          <ChevronRight
-                            className="size-5 text-muted-foreground max-sm:hidden"
-                            aria-hidden
-                          />
-                        </div>
-                      </div>
-
-                      <div
-                        className="mt-3 flex flex-wrap gap-2"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <button
-                          type="button"
-                          className="inline-flex touch-manipulation"
-                          onClick={() => void handleStatusClick(car)}
-                        >
-                          <Badge className={`${statusClass} hover:opacity-90`}>
-                            {CAR_STATUS_LABELS[car.status]}
-                            {linkedHint && (
-                              <ExternalLink className="ml-1 inline size-3 opacity-70" />
-                            )}
-                          </Badge>
-                        </button>
-                        {pendingDeletes[car.id] && (
-                          <Badge
-                            variant="outline"
-                            className="border-amber-400 text-amber-600 dark:border-amber-500 dark:text-amber-400"
-                          >
-                            Pending
-                          </Badge>
-                        )}
-                        <button
-                          type="button"
-                          className="inline-flex touch-manipulation"
-                          onClick={() => {
-                            setPdiDialogCar(car);
-                            setPdiDialogOpen(true);
-                          }}
-                        >
-                          <Badge className={`${pdiClass} hover:opacity-90`}>
-                            {PDI_LABELS[car.pdi_status]}
-                          </Badge>
-                        </button>
-                        <button
-                          type="button"
-                          className="inline-flex touch-manipulation"
-                          onClick={() => {
-                            setCustomsDialogCar(car);
-                            setCustomsDialogOpen(true);
-                          }}
-                        >
-                          <Badge
-                            className={`${customsClass} hover:opacity-90`}
-                          >
-                            {customsLabel}
-                          </Badge>
-                        </button>
-                      </div>
-
-                      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border/50 pt-3 text-sm">
-                        <div className="flex min-w-0 items-center gap-2">
-                          <span className="text-muted-foreground">Battery</span>
-                          <span className="font-medium tabular-nums">
-                            {batteryPercent != null ? `${batteryPercent}%` : "—"}
-                          </span>
-                          {batteryPercent != null && (
-                            <div className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
-                              <div
-                                className="h-full bg-primary"
-                                style={{
-                                  width: `${Math.min(100, Math.max(0, batteryPercent))}%`,
-                                }}
-                              />
-                            </div>
-                          )}
-                        </div>
-                        {car.date_arrived && (
-                          <span className="shrink-0 text-xs text-muted-foreground">
-                            Arrived{" "}
-                            {new Date(car.date_arrived).toLocaleDateString()}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Desktop: full table */}
-              <div className="hidden md:block">
-              <div className="scrollbar-thick overflow-x-auto overflow-visible rounded-lg border border-border/50">
-              <Table className="w-full min-w-[600px] overflow-visible xl:min-w-[1200px]">
-                <TableHeader>
+              <div className="scrollbar-thick w-full max-md:max-h-[min(75dvh,640px)] max-md:overflow-y-auto overflow-x-auto overscroll-x-contain rounded-lg border border-border/50 [-webkit-overflow-scrolling:touch] touch-pan-x md:max-h-none md:overflow-y-visible">
+                <table className="w-full min-w-[1600px] caption-bottom border-collapse text-sm">
+                  <TableHeader className="sticky top-0 z-30 shadow-[0_1px_0_0_hsl(var(--border))]">
                   <TableRow>
-                    <TableHead className="min-w-[140px] whitespace-nowrap">VIN</TableHead>
-                    <TableHead className="whitespace-nowrap">Brand</TableHead>
-                    <TableHead className="whitespace-nowrap">Model</TableHead>
-                    <TableHead className="whitespace-nowrap">Year</TableHead>
-                    <TableHead className="hidden whitespace-nowrap xl:table-cell">Exterior</TableHead>
-                    <TableHead className="hidden whitespace-nowrap xl:table-cell">Interior</TableHead>
-                    <TableHead className="whitespace-nowrap">Status</TableHead>
-                    <TableHead className="whitespace-nowrap">Client</TableHead>
-                    <TableHead className="whitespace-nowrap">Client Phone</TableHead>
-                    <TableHead className="whitespace-nowrap">Delivery Date</TableHead>
-                    <TableHead className="whitespace-nowrap">Location</TableHead>
-                    <TableHead className="min-w-[110px] whitespace-nowrap">Warranty Vehicle DMS</TableHead>
-                    <TableHead className="min-w-[100px] whitespace-nowrap">Warranty V.M</TableHead>
-                    <TableHead className="min-w-[120px] whitespace-nowrap">Warranty Battery DMS</TableHead>
-                    <TableHead className="min-w-[100px] whitespace-nowrap">Warranty B.M</TableHead>
-                    <TableHead className="whitespace-nowrap">Battery %</TableHead>
-                    <TableHead className="whitespace-nowrap">PDI</TableHead>
-                    <TableHead className="hidden whitespace-nowrap xl:table-cell">Customs</TableHead>
-                    <TableHead className="whitespace-nowrap">Date Arrived</TableHead>
-                    <TableHead className="text-right w-[80px]">Actions</TableHead>
+                    <TableHead className="sticky left-0 z-40 min-w-[200px] border-r border-border/80 bg-[var(--table-header)] px-3 py-2 whitespace-nowrap text-[var(--table-header-text)] shadow-[2px_0_8px_-4px_rgba(0,0,0,0.15)] dark:shadow-[2px_0_8px_-4px_rgba(0,0,0,0.4)]">
+                      VIN
+                    </TableHead>
+                    <TableHead className="px-3 py-2 whitespace-nowrap">Brand</TableHead>
+                    <TableHead className="px-3 py-2 whitespace-nowrap">Model</TableHead>
+                    <TableHead className="px-3 py-2 whitespace-nowrap">Year</TableHead>
+                    <TableHead className="px-3 py-2 whitespace-nowrap">Exterior</TableHead>
+                    <TableHead className="px-3 py-2 whitespace-nowrap">Interior</TableHead>
+                    <TableHead className="px-3 py-2 whitespace-nowrap">Status</TableHead>
+                    <TableHead className="px-3 py-2 whitespace-nowrap">Client</TableHead>
+                    <TableHead className="px-3 py-2 whitespace-nowrap">Client Phone</TableHead>
+                    <TableHead className="px-3 py-2 whitespace-nowrap">Delivery Date</TableHead>
+                    <TableHead className="px-3 py-2 whitespace-nowrap">Location</TableHead>
+                    <TableHead className="min-w-[110px] px-3 py-2 whitespace-nowrap">Warranty Vehicle DMS</TableHead>
+                    <TableHead className="min-w-[100px] px-3 py-2 whitespace-nowrap">Warranty V.M</TableHead>
+                    <TableHead className="min-w-[120px] px-3 py-2 whitespace-nowrap">Warranty Battery DMS</TableHead>
+                    <TableHead className="min-w-[100px] px-3 py-2 whitespace-nowrap">Warranty B.M</TableHead>
+                    <TableHead className="px-3 py-2 whitespace-nowrap">Battery %</TableHead>
+                    <TableHead className="px-3 py-2 whitespace-nowrap">PDI</TableHead>
+                    <TableHead className="px-3 py-2 whitespace-nowrap">Customs</TableHead>
+                    <TableHead className="px-3 py-2 whitespace-nowrap">Date Arrived</TableHead>
+                    <TableHead className="w-[80px] px-3 py-2 text-right whitespace-nowrap">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredCars.map((car) => {
+                  {filteredCars.map((car, rowIndex) => {
                     const statusClass =
                       STATUS_BADGE_COLORS[car.status] ??
                       "bg-muted text-muted-foreground";
@@ -749,29 +514,35 @@ export default function CarsListPage() {
                     return (
                       <TableRow
                         key={car.id}
-                        className="cursor-pointer"
+                        className="group cursor-pointer"
                         onClick={() => router.push(`/cars/${encodeURIComponent(car.vin ?? car.id)}`)}
                       >
-                        <TableCell className="min-w-[180px] font-mono text-sm font-medium whitespace-nowrap">
+                        <TableCell
+                          className={cn(
+                            "sticky left-0 z-10 min-w-[200px] border-r border-border/80 px-3 py-2 font-mono text-sm font-medium whitespace-nowrap shadow-[2px_0_8px_-4px_rgba(0,0,0,0.12)] dark:shadow-[2px_0_8px_-4px_rgba(0,0,0,0.35)]",
+                            rowIndex % 2 === 1 ? "bg-muted/30" : "bg-card",
+                            "group-hover:bg-accent"
+                          )}
+                        >
                           {car.vin ?? "—"}
                         </TableCell>
-                        <TableCell className="max-w-[80px] truncate text-sm" title={car.brand ?? undefined}>
+                        <TableCell className="px-3 py-2 text-sm whitespace-nowrap">
                           {car.brand ?? "—"}
                         </TableCell>
-                        <TableCell className="max-w-[90px] truncate text-sm" title={car.model ?? undefined}>
-                          {car.model}
+                        <TableCell className="px-3 py-2 text-sm whitespace-nowrap">
+                          {car.model ?? "—"}
                         </TableCell>
-                        <TableCell className="text-sm">
+                        <TableCell className="px-3 py-2 text-sm whitespace-nowrap">
                           {car.model_year ?? "—"}
                         </TableCell>
-                        <TableCell className="hidden text-sm text-muted-foreground xl:table-cell">
+                        <TableCell className="px-3 py-2 text-sm whitespace-nowrap text-muted-foreground">
                           {car.exterior_color ?? "—"}
                         </TableCell>
-                        <TableCell className="hidden text-sm text-muted-foreground xl:table-cell">
+                        <TableCell className="px-3 py-2 text-sm whitespace-nowrap text-muted-foreground">
                           {car.interior_color ?? "—"}
                         </TableCell>
                         <TableCell
-                          className="cursor-pointer"
+                          className="cursor-pointer px-3 py-2 whitespace-nowrap"
                           onClick={(e) => {
                             e.stopPropagation();
                             void handleStatusClick(car);
@@ -799,26 +570,26 @@ export default function CarsListPage() {
                             )}
                           </div>
                         </TableCell>
-                        <TableCell className="hidden text-sm xl:table-cell">
+                        <TableCell className="px-3 py-2 text-sm whitespace-nowrap">
                           {car.client_name ?? "—"}
                         </TableCell>
-                        <TableCell className="hidden text-sm xl:table-cell">
+                        <TableCell className="px-3 py-2 text-sm whitespace-nowrap">
                           {car.client_phone ?? "—"}
                         </TableCell>
-                        <TableCell className="hidden text-sm xl:table-cell">
+                        <TableCell className="px-3 py-2 text-sm whitespace-nowrap">
                           {car.delivery_date
                             ? new Date(car.delivery_date).toLocaleDateString()
                             : "—"}
                         </TableCell>
-                        <TableCell className="max-w-[100px] truncate text-sm" title={car.location_full ?? undefined}>
+                        <TableCell className="px-3 py-2 text-sm whitespace-nowrap">
                           {car.location_full || "—"}
                         </TableCell>
-                        <TableCell className="text-sm">
+                        <TableCell className="px-3 py-2 text-sm whitespace-nowrap">
                           {car.warranty_per_dms
                             ? new Date(car.warranty_per_dms).toLocaleDateString()
                             : "—"}
                         </TableCell>
-                        <TableCell className="text-sm">
+                        <TableCell className="px-3 py-2 text-sm whitespace-nowrap">
                           {((car as any).warranty_vehicle_expiry ??
                             (car as any).warranty_expiry ??
                             car.warranty_monza_start_date)
@@ -829,17 +600,17 @@ export default function CarsListPage() {
                               ).toLocaleDateString()
                             : "—"}
                         </TableCell>
-                        <TableCell className="text-sm">
+                        <TableCell className="px-3 py-2 text-sm whitespace-nowrap">
                           {(car as any).warranty_battery_dms
                             ? new Date((car as any).warranty_battery_dms as string).toLocaleDateString()
                             : "—"}
                         </TableCell>
-                        <TableCell className="text-sm">
+                        <TableCell className="px-3 py-2 text-sm whitespace-nowrap">
                           {(car as any).warranty_battery_expiry
                             ? new Date((car as any).warranty_battery_expiry as string).toLocaleDateString()
                             : "—"}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="px-3 py-2 whitespace-nowrap">
                           <div className="flex items-center gap-2">
                             <span className="text-sm">
                               {batteryPercent != null ? `${batteryPercent}%` : "—"}
@@ -857,7 +628,7 @@ export default function CarsListPage() {
                           </div>
                         </TableCell>
                         <TableCell
-                          className="cursor-pointer"
+                          className="cursor-pointer px-3 py-2 whitespace-nowrap"
                           onClick={(e) => {
                             e.stopPropagation();
                             setPdiDialogCar(car);
@@ -869,7 +640,7 @@ export default function CarsListPage() {
                           </Badge>
                         </TableCell>
                         <TableCell
-                          className="hidden cursor-pointer xl:table-cell"
+                          className="cursor-pointer px-3 py-2 whitespace-nowrap"
                           onClick={(e) => {
                             e.stopPropagation();
                             setCustomsDialogCar(car);
@@ -884,13 +655,13 @@ export default function CarsListPage() {
                                 : CUSTOMS_STATUS_LABELS[car.customs_status] ?? "Pending"}
                           </Badge>
                         </TableCell>
-                        <TableCell className="whitespace-nowrap text-sm">
+                        <TableCell className="px-3 py-2 text-sm whitespace-nowrap">
                           {car.date_arrived
                             ? new Date(car.date_arrived).toLocaleDateString()
                             : "—"}
                         </TableCell>
                         <TableCell
-                          className="min-w-[80px] w-[80px] text-right"
+                          className="min-w-[80px] w-[80px] px-3 py-2 text-right whitespace-nowrap"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <div className="flex items-center justify-end gap-1">
@@ -966,8 +737,7 @@ export default function CarsListPage() {
                     );
                   })}
                 </TableBody>
-              </Table>
-            </div>
+                </table>
               </div>
             </>
           )}

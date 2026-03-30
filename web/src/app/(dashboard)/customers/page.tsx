@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { MoreHorizontal, ChevronRight } from "lucide-react";
+import { MoreHorizontal } from "lucide-react";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
 import type { CustomerDisplay } from "@/types/database";
@@ -23,13 +23,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -276,168 +276,138 @@ export default function CustomersPage() {
 
   function CustomerTable({ list }: { list: CustomerDisplay[] }) {
     return (
-      <>
-        {/* Mobile */}
-        <div className="space-y-3 md:hidden">
-          {list.map((customer) => {
-            const fullName =
-              customer.full_name ??
-              `${customer.first_name} ${customer.last_name ?? ""}`.trim();
-            const statusClass = getStatusBadgeClass(customer);
-            return (
-              <button
-                key={customer.id}
-                type="button"
-                className="flex w-full flex-col gap-2 rounded-lg border border-border/50 bg-card p-4 text-left shadow-sm transition-colors hover:bg-muted/50 active:bg-muted/70 min-h-[44px]"
-                onClick={() => router.push(`/customers/${customer.id}`)}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <p className="font-bold text-lg text-foreground">{fullName || "—"}</p>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <Badge className={`rounded-full px-3 py-0.5 text-xs font-medium ${statusClass}`}>
-                      {getStatusLabel(customer)}
-                    </Badge>
-                    <ChevronRight className="size-5 text-muted-foreground" />
-                  </div>
-                </div>
-                {customer.phone_primary && (
-                  <a
-                    href={`tel:${customer.phone_primary.replace(/\s/g, "")}`}
+      <div className="scrollbar-thick w-full max-md:max-h-[min(75dvh,640px)] max-md:overflow-y-auto overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch] touch-pan-x md:max-h-none md:overflow-y-visible rounded-lg border border-border/50">
+        <table className="w-full min-w-[1100px] caption-bottom border-collapse text-sm">
+          <TableHeader className="sticky top-0 z-30 shadow-[0_1px_0_0_hsl(var(--border))]">
+            <TableRow>
+              <TableHead className="sticky left-0 z-40 min-w-[200px] border-r border-border/80 bg-[var(--table-header)] px-3 py-2 whitespace-nowrap text-[var(--table-header-text)] shadow-[2px_0_8px_-4px_rgba(0,0,0,0.15)] dark:shadow-[2px_0_8px_-4px_rgba(0,0,0,0.4)]">
+                Name
+              </TableHead>
+              <TableHead className="px-3 py-2 whitespace-nowrap">Phone</TableHead>
+              <TableHead className="px-3 py-2 whitespace-nowrap">Email</TableHead>
+              <TableHead className="px-3 py-2 whitespace-nowrap">Status</TableHead>
+              <TableHead className="px-3 py-2 whitespace-nowrap">Source</TableHead>
+              <TableHead className="px-3 py-2 whitespace-nowrap">Orders</TableHead>
+              <TableHead className="px-3 py-2 whitespace-nowrap">Last Visit</TableHead>
+              <TableHead className="w-[72px] px-3 py-2 text-right whitespace-nowrap">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {list.map((customer, rowIndex) => {
+              const statusClass = getStatusBadgeClass(customer);
+              const fullName =
+                customer.full_name ??
+                `${customer.first_name} ${customer.last_name ?? ""}`.trim();
+              return (
+                <TableRow
+                  key={customer.id}
+                  className="group cursor-pointer"
+                  onClick={() => router.push(`/customers/${customer.id}`)}
+                >
+                  <TableCell
+                    className={cn(
+                      "sticky left-0 z-10 min-w-[200px] border-r border-border/80 px-3 py-2 font-medium whitespace-nowrap shadow-[2px_0_8px_-4px_rgba(0,0,0,0.12)] dark:shadow-[2px_0_8px_-4px_rgba(0,0,0,0.35)]",
+                      rowIndex % 2 === 1 ? "bg-muted/30" : "bg-card",
+                      "group-hover:bg-accent"
+                    )}
+                  >
+                    {fullName || "—"}
+                  </TableCell>
+                  <TableCell className="px-3 py-2 text-sm whitespace-nowrap">
+                    {customer.phone_primary ? (
+                      <a
+                        href={`tel:${customer.phone_primary.replace(/\s/g, "")}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-primary hover:underline"
+                      >
+                        {customer.phone_primary}
+                      </a>
+                    ) : (
+                      "—"
+                    )}
+                  </TableCell>
+                  <TableCell className="px-3 py-2 text-sm whitespace-nowrap">
+                    {customer.email ? (
+                      <a
+                        href={`mailto:${customer.email}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-primary hover:underline"
+                      >
+                        {customer.email}
+                      </a>
+                    ) : (
+                      "—"
+                    )}
+                  </TableCell>
+                  <TableCell className="px-3 py-2 whitespace-nowrap">
+                    <Badge className={statusClass}>{getStatusLabel(customer)}</Badge>
+                  </TableCell>
+                  <TableCell className="px-3 py-2 text-sm whitespace-nowrap text-muted-foreground">
+                    {getSourceLabel(customer) || "—"}
+                  </TableCell>
+                  <TableCell className="px-3 py-2 whitespace-nowrap">
+                    {customer.total_orders != null ? (
+                      <Badge variant="secondary">{customer.total_orders}</Badge>
+                    ) : (
+                      "—"
+                    )}
+                  </TableCell>
+                  <TableCell className="px-3 py-2 text-sm whitespace-nowrap">
+                    {customer.last_visit_date
+                      ? new Date(customer.last_visit_date).toLocaleDateString()
+                      : "—"}
+                  </TableCell>
+                  <TableCell
+                    className="px-3 py-2 text-right whitespace-nowrap"
                     onClick={(e) => e.stopPropagation()}
-                    className="text-sm text-primary hover:underline flex items-center min-h-[36px]"
                   >
-                    {customer.phone_primary}
-                  </a>
-                )}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Desktop */}
-        <div className="hidden overflow-x-auto md:block">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Phone</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Source</TableHead>
-                <TableHead>Orders</TableHead>
-                <TableHead>Last Visit</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {list.map((customer) => {
-                const statusClass = getStatusBadgeClass(customer);
-                const fullName =
-                  customer.full_name ??
-                  `${customer.first_name} ${customer.last_name ?? ""}`.trim();
-                return (
-                  <TableRow
-                    key={customer.id}
-                    className="cursor-pointer"
-                    onClick={() => router.push(`/customers/${customer.id}`)}
-                  >
-                    <TableCell className="font-medium">{fullName || "—"}</TableCell>
-                    <TableCell className="text-sm">
-                      {customer.phone_primary ? (
-                        <a
-                          href={`tel:${customer.phone_primary.replace(/\s/g, "")}`}
-                          onClick={(e) => e.stopPropagation()}
-                          className="text-primary hover:underline"
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="size-8">
+                          <MoreHorizontal className="size-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={() => router.push(`/customers/${customer.id}`)}
                         >
-                          {customer.phone_primary}
-                        </a>
-                      ) : (
-                        "—"
-                      )}
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      {customer.email ? (
-                        <a
-                          href={`mailto:${customer.email}`}
-                          onClick={(e) => e.stopPropagation()}
-                          className="text-primary hover:underline"
-                        >
-                          {customer.email}
-                        </a>
-                      ) : (
-                        "—"
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={statusClass}>{getStatusLabel(customer)}</Badge>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {getSourceLabel(customer) || "—"}
-                    </TableCell>
-                    <TableCell>
-                      {customer.total_orders != null ? (
-                        <Badge variant="secondary">{customer.total_orders}</Badge>
-                      ) : (
-                        "—"
-                      )}
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      {customer.last_visit_date
-                        ? new Date(customer.last_visit_date).toLocaleDateString()
-                        : "—"}
-                    </TableCell>
-                    <TableCell
-                      className="text-right"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="size-8">
-                            <MoreHorizontal className="size-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
+                          View
+                        </DropdownMenuItem>
+                        {canEditCustomer && (
                           <DropdownMenuItem
-                            onClick={() => router.push(`/customers/${customer.id}`)}
+                            onClick={() => {
+                              setEditCustomer(customer);
+                              setEditOpen(true);
+                            }}
                           >
-                            View
+                            Edit
                           </DropdownMenuItem>
-                          {canEditCustomer && (
-                            <DropdownMenuItem
-                              onClick={() => {
-                                setEditCustomer(customer);
-                                setEditOpen(true);
-                              }}
-                            >
-                              Edit
-                            </DropdownMenuItem>
-                          )}
-                          {canDeleteCustomer && (
-                            <DropdownMenuItem
-                              variant="destructive"
-                              onClick={() => {
-                                setDeleteCustomer(customer);
-                                setDeleteOpen(true);
-                              }}
-                            >
-                              Delete
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
-      </>
+                        )}
+                        {canDeleteCustomer && (
+                          <DropdownMenuItem
+                            variant="destructive"
+                            onClick={() => {
+                              setDeleteCustomer(customer);
+                              setDeleteOpen(true);
+                            }}
+                          >
+                            Delete
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </table>
+      </div>
     );
   }
 
   return (
-    <div className="container mx-auto max-w-[1600px] space-y-6 overflow-x-hidden px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+    <div className="container mx-auto max-w-[1600px] min-w-0 space-y-6 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-semibold sm:text-2xl">Customers</h1>
@@ -580,250 +550,139 @@ export default function CustomersPage() {
               ) : soldCustomers.length === 0 ? (
                 <p className="text-muted-foreground">No sold cars found.</p>
               ) : (
-                <>
-                  <div className="space-y-3 pb-6 md:hidden">
-                    {convertedSoldCars.map((so) => {
-                      const car = so.cars;
-                      const customer = so.customers;
-                      const fullName = customer
-                        ? `${customer.first_name} ${customer.last_name ?? ""}`.trim()
-                        : "—";
-                      const isSubDealer = car?.status === "sent_to_sub_dealer";
-                      const vehicleTitle = car
-                        ? `${car.brand} ${car.model}${car.model_year ? ` (${car.model_year})` : ""}`
-                        : "—";
-                      const vinShort =
-                        car?.vin && car.vin.length > 12
-                          ? `…${car.vin.slice(-8)}`
-                          : (car?.vin ?? "—");
-                      const dateBoughtDisplay = so.date_bought ?? so.sale_date;
-
-                      return (
-                        <div
-                          key={so.id}
-                          className="rounded-xl border border-border/50 bg-card p-4 shadow-sm"
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0 flex-1">
-                              <p className="font-semibold">{vehicleTitle}</p>
-                              <p
-                                className="mt-0.5 font-mono text-xs text-muted-foreground"
-                                title={car?.vin}
-                              >
-                                {vinShort}
-                              </p>
-                              {car?.exterior_color && (
-                                <p className="mt-1 text-xs text-muted-foreground">
-                                  {car.exterior_color}
-                                </p>
+                <div className="scrollbar-thick w-full max-md:max-h-[min(75dvh,640px)] max-md:overflow-y-auto overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch] touch-pan-x md:max-h-none md:overflow-y-visible rounded-lg border border-border/50">
+                  <table className="w-full min-w-[1400px] caption-bottom border-collapse text-sm">
+                    <TableHeader className="sticky top-0 z-30 shadow-[0_1px_0_0_hsl(var(--border))]">
+                      <TableRow>
+                        <TableHead className="sticky left-0 z-40 min-w-[220px] border-r border-border/80 bg-[var(--table-header)] px-3 py-2 whitespace-nowrap text-[var(--table-header-text)] shadow-[2px_0_8px_-4px_rgba(0,0,0,0.15)] dark:shadow-[2px_0_8px_-4px_rgba(0,0,0,0.4)]">
+                          Vehicle
+                        </TableHead>
+                        <TableHead className="px-3 py-2 whitespace-nowrap">VIN</TableHead>
+                        <TableHead className="px-3 py-2 whitespace-nowrap">Color</TableHead>
+                        <TableHead className="px-3 py-2 whitespace-nowrap">Customer</TableHead>
+                        <TableHead className="px-3 py-2 whitespace-nowrap">Phone</TableHead>
+                        <TableHead className="px-3 py-2 whitespace-nowrap">Price</TableHead>
+                        <TableHead className="px-3 py-2 whitespace-nowrap">Date bought</TableHead>
+                        <TableHead className="px-3 py-2 whitespace-nowrap">Delivery Date</TableHead>
+                        <TableHead className="px-3 py-2 whitespace-nowrap">Order Status</TableHead>
+                        <TableHead className="min-w-[200px] px-3 py-2 text-right whitespace-nowrap">
+                          Actions
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {convertedSoldCars.map((so, rowIndex) => {
+                        const car = so.cars;
+                        const customer = so.customers;
+                        const fullName = customer
+                          ? `${customer.first_name} ${customer.last_name ?? ""}`.trim()
+                          : "—";
+                        const isSubDealer = car?.status === "sent_to_sub_dealer";
+                        const dateBoughtDisplay = so.date_bought ?? so.sale_date;
+                        return (
+                          <TableRow key={so.id} className="group">
+                            <TableCell
+                              className={cn(
+                                "sticky left-0 z-10 min-w-[220px] border-r border-border/80 px-3 py-2 font-medium whitespace-nowrap shadow-[2px_0_8px_-4px_rgba(0,0,0,0.12)] dark:shadow-[2px_0_8px_-4px_rgba(0,0,0,0.35)]",
+                                rowIndex % 2 === 1 ? "bg-muted/30" : "bg-card",
+                                "group-hover:bg-accent"
                               )}
-                            </div>
-                            <div className="flex shrink-0 flex-col items-end gap-1">
-                              <Badge variant="secondary">{so.status}</Badge>
-                              {isSubDealer && (
-                                <Badge variant="outline" className="text-xs">
-                                  Sub-dealer
-                                </Badge>
+                            >
+                              {car
+                                ? `${car.brand} ${car.model}${car.model_year ? ` (${car.model_year})` : ""}`
+                                : "—"}
+                            </TableCell>
+                            <TableCell className="px-3 py-2 font-mono text-xs whitespace-nowrap text-muted-foreground">
+                              {car?.vin ?? "—"}
+                            </TableCell>
+                            <TableCell className="px-3 py-2 text-sm whitespace-nowrap text-muted-foreground">
+                              {car?.exterior_color ?? "—"}
+                            </TableCell>
+                            <TableCell className="px-3 py-2 whitespace-nowrap">
+                              {customer ? (
+                                <button
+                                  type="button"
+                                  className="text-sm font-medium text-primary hover:underline"
+                                  onClick={() => router.push(`/customers/${customer.id}`)}
+                                >
+                                  {fullName}
+                                </button>
+                              ) : (
+                                <span className="text-sm text-muted-foreground">—</span>
                               )}
-                            </div>
-                          </div>
-
-                          <div className="mt-3 border-t border-border/50 pt-3 text-sm">
-                            {customer ? (
-                              <button
-                                type="button"
-                                className="text-left font-medium text-primary hover:underline"
-                                onClick={() => router.push(`/customers/${customer.id}`)}
-                              >
-                                {fullName}
-                              </button>
-                            ) : (
-                              <span className="text-muted-foreground">—</span>
-                            )}
-                            {customer?.phone_primary && (
-                              <a
-                                href={`tel:${customer.phone_primary.replace(/\s/g, "")}`}
-                                className="mt-1 block text-primary hover:underline"
-                              >
-                                {customer.phone_primary}
-                              </a>
-                            )}
-                          </div>
-
-                          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                            <span>
-                              Price:{" "}
+                            </TableCell>
+                            <TableCell className="px-3 py-2 text-sm whitespace-nowrap">
+                              {customer?.phone_primary ? (
+                                <a
+                                  href={`tel:${customer.phone_primary.replace(/\s/g, "")}`}
+                                  className="text-primary hover:underline"
+                                >
+                                  {customer.phone_primary}
+                                </a>
+                              ) : (
+                                "—"
+                              )}
+                            </TableCell>
+                            <TableCell className="px-3 py-2 text-sm whitespace-nowrap">
                               {so.selling_price != null
                                 ? `${Number(so.selling_price).toLocaleString()} ${so.currency ?? "USD"}`
                                 : "—"}
-                            </span>
-                            <span>
-                              Date bought:{" "}
+                            </TableCell>
+                            <TableCell className="px-3 py-2 text-sm whitespace-nowrap">
                               {dateBoughtDisplay
                                 ? new Date(dateBoughtDisplay).toLocaleDateString()
                                 : "—"}
-                            </span>
-                            <span>
-                              Delivery:{" "}
+                            </TableCell>
+                            <TableCell className="px-3 py-2 text-sm whitespace-nowrap">
                               {so.delivery_date
                                 ? new Date(so.delivery_date).toLocaleDateString()
                                 : "—"}
-                            </span>
-                          </div>
-
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            {customer && (
-                              <Button
-                                variant="secondary"
-                                size="sm"
-                                className="touch-manipulation"
-                                onClick={() => router.push(`/customers/${customer.id}`)}
-                              >
-                                Customer
-                              </Button>
-                            )}
-                            {car && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="touch-manipulation"
-                                onClick={() =>
-                                  router.push(
-                                    `/cars/${encodeURIComponent(car.vin ?? so.car_id)}`
-                                  )
-                                }
-                              >
-                                Car
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  <div className="hidden overflow-x-auto md:block">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Vehicle</TableHead>
-                          <TableHead>VIN</TableHead>
-                          <TableHead>Color</TableHead>
-                          <TableHead>Customer</TableHead>
-                          <TableHead>Phone</TableHead>
-                          <TableHead>Price</TableHead>
-                          <TableHead>Date bought</TableHead>
-                          <TableHead>Delivery Date</TableHead>
-                          <TableHead>Order Status</TableHead>
-                          <TableHead className="text-right">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {convertedSoldCars.map((so) => {
-                          const car = so.cars;
-                          const customer = so.customers;
-                          const fullName = customer
-                            ? `${customer.first_name} ${customer.last_name ?? ""}`.trim()
-                            : "—";
-                          const isSubDealer = car?.status === "sent_to_sub_dealer";
-                          const dateBoughtDisplay = so.date_bought ?? so.sale_date;
-                          return (
-                            <TableRow key={so.id}>
-                              <TableCell className="font-medium">
-                                {car ? `${car.brand} ${car.model}${car.model_year ? ` (${car.model_year})` : ""}` : "—"}
-                              </TableCell>
-                              <TableCell className="font-mono text-xs text-muted-foreground">
-                                {car?.vin ?? "—"}
-                              </TableCell>
-                              <TableCell className="text-sm text-muted-foreground">
-                                {car?.exterior_color ?? "—"}
-                              </TableCell>
-                              <TableCell>
-                                {customer ? (
-                                  <button
-                                    type="button"
-                                    className="text-primary hover:underline text-sm font-medium"
+                            </TableCell>
+                            <TableCell className="px-3 py-2 whitespace-nowrap">
+                              <div className="flex flex-wrap items-center gap-1">
+                                <Badge variant="secondary">{so.status}</Badge>
+                                {isSubDealer && (
+                                  <Badge
+                                    variant="outline"
+                                    className="bg-muted text-muted-foreground"
+                                  >
+                                    Sub-dealer
+                                  </Badge>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="min-w-[200px] px-3 py-2 text-right whitespace-nowrap">
+                              <div className="flex items-center justify-end gap-1">
+                                {customer && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
                                     onClick={() => router.push(`/customers/${customer.id}`)}
                                   >
-                                    {fullName}
-                                  </button>
-                                ) : (
-                                  <span className="text-muted-foreground text-sm">—</span>
+                                    Customer →
+                                  </Button>
                                 )}
-                              </TableCell>
-                              <TableCell className="text-sm">
-                                {customer?.phone_primary ? (
-                                  <a
-                                    href={`tel:${customer.phone_primary}`}
-                                    className="text-primary hover:underline"
+                                {car && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() =>
+                                      router.push(
+                                        `/cars/${encodeURIComponent(car.vin ?? so.car_id)}`
+                                      )
+                                    }
                                   >
-                                    {customer.phone_primary}
-                                  </a>
-                                ) : (
-                                  "—"
+                                    Car →
+                                  </Button>
                                 )}
-                              </TableCell>
-                              <TableCell className="text-sm">
-                                {so.selling_price != null
-                                  ? `${Number(so.selling_price).toLocaleString()} ${so.currency ?? "USD"}`
-                                  : "—"}
-                              </TableCell>
-                              <TableCell className="text-sm">
-                                {dateBoughtDisplay
-                                  ? new Date(dateBoughtDisplay).toLocaleDateString()
-                                  : "—"}
-                              </TableCell>
-                              <TableCell className="text-sm">
-                                {so.delivery_date
-                                  ? new Date(so.delivery_date).toLocaleDateString()
-                                  : "—"}
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex flex-wrap items-center gap-1">
-                                  <Badge variant="secondary">{so.status}</Badge>
-                                  {isSubDealer && (
-                                    <Badge
-                                      variant="outline"
-                                      className="bg-muted text-muted-foreground"
-                                    >
-                                      Sub-dealer
-                                    </Badge>
-                                  )}
-                                </div>
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <div className="flex items-center justify-end gap-1">
-                                  {customer && (
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => router.push(`/customers/${customer.id}`)}
-                                    >
-                                      Customer →
-                                    </Button>
-                                  )}
-                                  {car && (
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() =>
-                                        router.push(
-                                          `/cars/${encodeURIComponent(car.vin ?? so.car_id)}`
-                                        )
-                                      }
-                                    >
-                                      Car →
-                                    </Button>
-                                  )}
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </table>
+                </div>
               )}
             </CardContent>
           </Card>
