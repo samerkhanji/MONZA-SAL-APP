@@ -1,0 +1,33 @@
+---
+description: Never write to cars.client_name or cars.client_phone — use customers + sales_orders
+alwaysApply: true
+---
+
+# Legacy Car Fields (Read-Only)
+
+`cars.client_name` and `cars.client_phone` are **legacy fallback fields**. They must never be written to.
+
+## Source of Truth
+
+```
+cars → sales_orders → customers
+```
+
+## All New Sales Flows Must
+
+1. Create or update a **customer**
+2. Create a **sales_order** with `car_id` and `customer_id`
+3. Link the car via `sales_orders.car_id`
+4. Update car **status** only (no legacy fields)
+
+## Display Logic
+
+- **IF** `sales_order.customer` exists → show relational customer data
+- **ELSE** → show legacy `client_name` (and `client_phone` if present) as fallback
+
+## Never Write To
+
+- `cars.client_name`
+- `cars.client_phone`
+
+These remain only for backward compatibility and fallback display.

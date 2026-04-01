@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+web/node_modules/
+
+# Env (do not commit secrets)
+.env
+.env.local
+.env.*.local
+
+# Next.js
+web/.next/
+web/out/
+web/build
+
+# Supabase
+supabase/.temp/
+
+# Misc
+.DS_Store
+*.log
+*.tsbuildinfo
+web/.vercel
+
+# Optional: keep .env.example so others know what vars to set
+!.env.example
+.vercel

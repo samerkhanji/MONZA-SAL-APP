@@ -1,0 +1,29 @@
+---
+description: Supabase profiles join - use .map() with (r: any), never as Array<{...}> type assertions
+alwaysApply: true
+---
+
+# Supabase Profiles Join Pattern (DO NOT REVERT)
+
+When Supabase returns joined `profiles` (e.g. `profiles:submitted_by(full_name)`), PostgREST may return it as an array. **Never use `as Array<{...}>` type assertions.** Use the `.map()` pattern instead.
+
+## Required Pattern
+
+```typescript
+const reqList = (requestsWithProfiles.data ?? []).map((r: any) => ({
+  id: r.id,
+  subject: r.subject,
+  category: r.category,
+  submitted_by: r.submitted_by,
+  created_at: r.created_at,
+  profiles: Array.isArray(r.profiles) ? r.profiles[0] : r.profiles,
+}));
+```
+
+## Rules
+
+1. **DO NOT** use `as Array<{...}>` anywhere in assistant-dashboard
+2. **DO NOT** use verbose inline types like `(r: { id: string; subject: string; ... profiles?: unknown })`
+3. **DO** use `(r: any)` for the map callback parameter
+4. **DO** normalize profiles: `Array.isArray(r.profiles) ? r.profiles[0] : r.profiles`
+5. If modifying assistant-dashboard for any reason, **keep this .map() pattern intact**
