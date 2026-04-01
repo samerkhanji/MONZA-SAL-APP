@@ -36,7 +36,12 @@ export function ExportButton<T extends Record<string, unknown>>({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" disabled={disabled}>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={disabled}
+          data-tour-id="export-button"
+        >
           <Download className="mr-2 size-4" />
           Export
         </Button>

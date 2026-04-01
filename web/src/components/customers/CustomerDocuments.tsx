@@ -83,7 +83,7 @@ function formatFileSize(bytes: number): string {
 }
 
 export function CustomerDocuments({ customerId }: CustomerDocumentsProps) {
-  const { canEditInventory, canDelete, appRole } = useUser();
+  const { canEditInventory, appRole } = useUser();
   const canUpload = canPerform("customers", "edit", appRole ?? null);
   const canDeleteDocs = canPerform("customers", "delete", appRole ?? null);
   const supabase = createClient();
@@ -348,7 +348,7 @@ export function CustomerDocuments({ customerId }: CustomerDocumentsProps) {
                         <Download className="mr-1 size-3.5" />
                         Download
                       </Button>
-                      {canDelete && (
+                      {canDeleteDocs && (
                         <Button
                           variant="outline"
                           size="sm"

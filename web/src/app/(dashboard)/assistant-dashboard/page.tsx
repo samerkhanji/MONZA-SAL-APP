@@ -17,6 +17,7 @@ import {
   RefreshCw,
   FileCheck,
   BarChart3,
+  FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -77,6 +78,17 @@ interface RequestRow {
   created_at: string;
 }
 
+interface RepairProposalDashRow {
+  id: string;
+  job_id: string;
+  status: string;
+  updated_at: string;
+  garage_jobs?: {
+    title: string;
+    cars?: { vin: string } | null;
+  } | null;
+}
+
 export default function AssistantDashboardPage() {
   const router = useRouter();
   const { profile, isRequestAssistant, isOwner, loading: profileLoading } = useUser();
@@ -100,8 +112,10 @@ export default function AssistantDashboardPage() {
   const pendingRequestsRef = useRef<HTMLDivElement>(null);
   const carsReadyRef = useRef<HTMLDivElement>(null);
   const workshopRef = useRef<HTMLDivElement>(null);
+  const repairProposalsRef = useRef<HTMLDivElement>(null);
   const [activeTab, setActiveTab] = useState<string>("Review Requests");
   const [markingDelivered, setMarkingDelivered] = useState<string | null>(null);
+  const [repairProposals, setRepairProposals] = useState<RepairProposalDashRow[]>([]);
 
   const supabase = createClient();
 
@@ -141,6 +155,7 @@ export default function AssistantDashboardPage() {
       deleteRes,
       carsRes,
       requestsWithProfiles,
+      proposalsRes,
     ] = await Promise.all([
       supabase
         .from("garage_jobs")
@@ -163,6 +178,14 @@ export default function AssistantDashboardPage() {
         .select("id, subject, category, submitted_by, created_at, profiles:submitted_by(full_name)")
         .eq("status", "submitted")
         .order("created_at", { ascending: false }),
+      supabase
+        .from("repair_proposals")
+        .select(
+          "id, job_id, status, updated_at, garage_jobs:job_id(title, cars:car_id(vin))"
+        )
+        .neq("status", "draft")
+        .order("updated_at", { ascending: false })
+        .limit(30),
     ]);
 
     const jobs = (jobsRes.data ?? []) as JobWithCar[];
@@ -255,6 +278,40 @@ export default function AssistantDashboardPage() {
       }))
     );
 
+    const rawProps = (proposalsRes.data ?? []) as unknown[];
+    setRepairProposals(
+      rawProps.map((row: unknown) => {
+        const p = row as {
+          id: string;
+          job_id: string;
+          status: string;
+          updated_at: string;
+          garage_jobs?: unknown;
+        };
+        const gj = p.garage_jobs;
+        const jobRaw = Array.isArray(gj) ? gj[0] : gj;
+        const job =
+          jobRaw && typeof jobRaw === "object"
+            ? (() => {
+                const j = jobRaw as {
+                  title?: string;
+                  cars?: { vin: string } | { vin: string }[] | null;
+                };
+                const c = j.cars;
+                const car = Array.isArray(c) ? c[0] : c;
+                return { title: j.title ?? "", cars: car ?? null };
+              })()
+            : null;
+        return {
+          id: p.id,
+          job_id: p.job_id,
+          status: p.status,
+          updated_at: p.updated_at,
+          garage_jobs: job,
+        };
+      })
+    );
+
     setLastUpdated(new Date());
     setLoading(false);
   }, [canAccess]);
@@ -308,6 +365,14 @@ export default function AssistantDashboardPage() {
           { label: "Review Requests", icon: FileCheck, action: () => { setActiveTab("Review Requests"); scrollTo(pendingRequestsRef); } },
           { label: "Cars Ready", icon: Car, action: () => { setActiveTab("Cars Ready"); scrollTo(carsReadyRef); } },
           { label: "Workshop Overview", icon: BarChart3, action: () => { setActiveTab("Workshop Overview"); scrollTo(workshopRef); } },
+          {
+            label: "Repair proposals",
+            icon: FileText,
+            action: () => {
+              setActiveTab("Repair proposals");
+              scrollTo(repairProposalsRef);
+            },
+          },
           { label: "Request Center", icon: ClipboardList, href: "/requests" },
         ].map((tab) =>
           tab.href ? (
@@ -355,6 +420,64 @@ export default function AssistantDashboardPage() {
             }
           />
         ))}
+      </div>
+
+      {/* Repair proposals (Customer Service) */}
+      <div ref={repairProposalsRef}>
+        <Card>
+          <CardHeader>
+            <CardTitle>Repair proposals</CardTitle>
+            <CardDescription>
+              Quotes from the garage awaiting CS / customer steps (not drafts)
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <p className="text-muted-foreground text-sm">Loading…</p>
+            ) : repairProposals.length === 0 ? (
+              <p className="text-muted-foreground text-sm">No active repair proposals.</p>
+            ) : (
+              <ul className="space-y-2">
+                {repairProposals.map((p) => {
+                  const j = p.garage_jobs;
+                  const vin = j?.cars?.vin ? formatVinShort(j.cars.vin) : "—";
+                  const label = j?.title ?? "Job";
+                  const statusLabel =
+                    p.status === "sent_to_customer_service"
+                      ? "Sent to CS"
+                      : p.status === "sent_to_customer"
+                        ? "With customer"
+                        : p.status === "partially_approved"
+                          ? "Partially approved"
+                          : p.status === "fully_approved"
+                            ? "Approved"
+                            : p.status === "rejected"
+                              ? "Rejected"
+                              : p.status;
+                  return (
+                    <li
+                      key={p.id}
+                      className="flex flex-col gap-2 rounded-lg border border-border/60 p-3 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div>
+                        <p className="font-medium">{label}</p>
+                        <p className="text-muted-foreground text-sm">
+                          VIN {vin} · {statusLabel}
+                        </p>
+                        <p className="text-muted-foreground text-xs">
+                          Updated {new Date(p.updated_at).toLocaleString()}
+                        </p>
+                      </div>
+                      <Button size="sm" variant="outline" asChild>
+                        <Link href={`/garage/jobs/${p.job_id}`}>Open job</Link>
+                      </Button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       {/* Section 1: Pending Requests */}

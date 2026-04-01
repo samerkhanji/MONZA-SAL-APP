@@ -101,12 +101,35 @@ export const CRUD_PERMISSIONS = {
     view: ["owner", "assistant", "sales_ops"] as AppRole[],
     mark_paid: ["owner", "assistant", "sales_ops"] as AppRole[],
   },
+  requests: {
+    create: [
+      "owner",
+      "assistant",
+      "khalil_hybrid",
+      "it",
+      "garage_manager",
+      "garage_staff",
+      "sales_ops",
+    ] as AppRole[],
+    edit: ["owner", "assistant"] as AppRole[],
+    delete: ["owner"] as AppRole[],
+    view: [
+      "owner",
+      "assistant",
+      "khalil_hybrid",
+      "it",
+      "garage_manager",
+      "garage_staff",
+      "sales_ops",
+    ] as AppRole[],
+  },
 } as const;
 
 export type CrudEntity = keyof typeof CRUD_PERMISSIONS;
 export type CrudAction =
   | keyof (typeof CRUD_PERMISSIONS)["cars"]
-  | keyof (typeof CRUD_PERMISSIONS)["installments"];
+  | keyof (typeof CRUD_PERMISSIONS)["installments"]
+  | keyof (typeof CRUD_PERMISSIONS)["requests"];
 
 export function getAppRoleFromProfile(profile: UserProfile | null): AppRole | null {
   if (!profile) return null;

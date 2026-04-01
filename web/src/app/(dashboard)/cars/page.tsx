@@ -126,7 +126,8 @@ export default function CarsListPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const statusFromUrl = searchParams.get("status");
-  const { canEditInventory, canDelete, profile, isOwner, appRole } = useUser();
+  const { canEditInventory, canDelete, profile, isOwner, appRole, canOpenCarEditDialog } =
+    useUser();
   const [cars, setCars] = useState<CarDisplay[]>([]);
   const [pendingDeletes, setPendingDeletes] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
@@ -231,7 +232,7 @@ export default function CarsListPage() {
 
   const fetchCars = useCallback(async () => {
     setLoading(true);
-    const { data, error, aborted } = await getCarsDisplay();
+    const { data, error, aborted, usedFallback } = await getCarsDisplay();
 
     if (aborted) {
       setLoading(false);
@@ -254,6 +255,12 @@ export default function CarsListPage() {
       setCars([]);
     } else {
       setCars(data);
+      if (usedFallback) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          "[cars] Loaded inventory from public.cars (cars_display unavailable — e.g. schema cache). Apply migration / NOTIFY pgrst reload in Supabase when ready."
+        );
+      }
     }
     setLoading(false);
   }, []);
@@ -334,7 +341,7 @@ export default function CarsListPage() {
     });
 
   const canCreateCar = canPerform("cars", "create", appRole ?? null);
-  const canEditCar = canPerform("cars", "edit", appRole ?? null);
+  const canEditCar = canOpenCarEditDialog;
   const canDeleteCar = canPerform("cars", "delete", appRole ?? null);
 
   return (

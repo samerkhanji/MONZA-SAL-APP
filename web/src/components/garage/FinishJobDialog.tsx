@@ -96,12 +96,32 @@ export function FinishJobDialog({
       }
     }
 
+    const { data: openEntries } = await supabase
+      .from("job_time_entries")
+      .select("id, started_at")
+      .eq("job_id", job.id)
+      .is("ended_at", null);
+    const nowIso = new Date().toISOString();
+    for (const row of openEntries ?? []) {
+      const r = row as { id: string; started_at: string };
+      const mins = Math.max(
+        1,
+        Math.round((Date.now() - new Date(r.started_at).getTime()) / 60000)
+      );
+      await supabase
+        .from("job_time_entries")
+        .update({ ended_at: nowIso, duration_minutes: mins })
+        .eq("id", r.id);
+    }
+
     const { error } = await supabase
       .from("garage_jobs")
       .update({
         status: "done",
         completed_at: new Date().toISOString(),
         work_done: workDone,
+        garage_bay_id: null,
+        started_at: null,
       })
       .eq("id", job.id);
 

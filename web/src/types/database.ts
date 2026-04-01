@@ -345,6 +345,8 @@ export interface Part {
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
+  /** When the part was logged as physically received. */
+  received_at?: string | null;
 }
 
 export interface PartMovement {
@@ -369,9 +371,95 @@ export type JobStatus =
 
 export type JobPriority = "low" | "normal" | "urgent";
 
+export type GarageBayType =
+  | "normal"
+  | "pit"
+  | "car_wash"
+  | "oven"
+  | "paint"
+  | "ev"
+  | "body_work"
+  | "battery_lab"
+  | "polish";
+
+export interface GarageBay {
+  id: string;
+  bay_number: number;
+  name: string;
+  bay_type: GarageBayType;
+  capacity: number;
+  description: string | null;
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface JobTimeEntry {
+  id: string;
+  job_id: string;
+  user_id: string;
+  started_at: string;
+  ended_at: string | null;
+  duration_minutes: number | null;
+  created_at: string;
+}
+
+export type RepairProposalStatus =
+  | "draft"
+  | "sent_to_customer_service"
+  | "sent_to_customer"
+  | "partially_approved"
+  | "fully_approved"
+  | "rejected";
+
+export type ProposalItemDecision = "pending" | "approved" | "declined";
+
+export interface RepairProposal {
+  id: string;
+  job_id: string;
+  status: RepairProposalStatus;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RepairProposalItem {
+  id: string;
+  proposal_id: string;
+  item_type: "part" | "labor" | "service";
+  name: string;
+  part_number: string | null;
+  quantity: number;
+  unit_price: number;
+  line_total: number;
+  customer_decision: ProposalItemDecision;
+  sort_order: number;
+  created_at: string;
+}
+
+export interface GarageJobBayContext {
+  job_id: string;
+  paint_color: string | null;
+  paint_started_at: string | null;
+  paint_ended_at: string | null;
+  oven_temp_c: number | null;
+  oven_started_at: string | null;
+  oven_ended_at: string | null;
+  wash_type: "exterior" | "interior" | "full" | "detail" | null;
+  wash_started_at: string | null;
+  wash_ended_at: string | null;
+  polish_type: string | null;
+  polish_started_at: string | null;
+  polish_ended_at: string | null;
+  battery_health_pct: number | null;
+  battery_test_notes: string | null;
+  updated_at: string;
+}
+
 export interface GarageJob {
   id: string;
-  car_id: string;
+  car_id: string | null;
   title: string;
   description: string | null;
   priority: JobPriority;
@@ -392,6 +480,9 @@ export interface GarageJob {
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
+  garage_bay_id?: string | null;
+  is_battery_only?: boolean;
+  work_checklist?: Array<{ id: string; label: string; done: boolean }>;
 }
 
 export interface JobPart {
@@ -463,6 +554,8 @@ export interface PaymentPlan {
   months: number;
   start_date: string;
   due_day: number;
+  /** Late-payment interest rate (percentage or policy-specific; stored as numeric). */
+  interest_rate?: number;
   created_by: string | null;
   created_at: string;
   updated_at: string;

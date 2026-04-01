@@ -2,7 +2,29 @@
 
 export const AUTH_UNLOCKED_KEY = "monza_auth_unlocked";
 export const LAST_ACTIVITY_KEY = "monza_last_activity";
-export const IDLE_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
+
+/**
+ * Client-side idle sign-out (in addition to Supabase JWT expiry).
+ * 0 = disabled (default): session length follows Supabase / refresh token only.
+ * Set NEXT_PUBLIC_IDLE_LOGOUT_MINUTES to a positive number (e.g. 15) to re-enable.
+ */
+function parseIdleLogoutMs(): number {
+  const raw = process.env.NEXT_PUBLIC_IDLE_LOGOUT_MINUTES;
+  if (raw === undefined || raw === "") return 0;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  const ms = n * 60 * 1000;
+  const cap = 24 * 60 * 60 * 1000;
+  return Math.min(ms, cap);
+}
+
+export const IDLE_TIMEOUT_MS = parseIdleLogoutMs();
+
+/** Minutes for user-facing copy when idle logout is enabled (rounded). */
+export function idleLogoutMinutesForDisplay(): number | null {
+  if (IDLE_TIMEOUT_MS <= 0) return null;
+  return Math.round(IDLE_TIMEOUT_MS / 60000);
+}
 
 export function markAuthSessionUnlocked() {
   if (typeof window === "undefined") return;

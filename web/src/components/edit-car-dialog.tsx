@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
+import { useUser } from "@/lib/contexts/UserContext";
 import type { CarDisplay, PdiStatus, CustomsStatus, CarStatus, LocationType } from "@/types/database";
 import { PDI_LABELS, CUSTOMS_STATUS_LABELS, CAR_STATUS_LABELS, LOCATION_LABELS } from "@/types/database";
 import { Button } from "@/components/ui/button";
@@ -61,6 +62,7 @@ export function EditCarDialog({
   const [price, setPrice] = useState("");
   const [priceCurrency, setPriceCurrency] = useState("USD");
   const [warrantyPerDms, setWarrantyPerDms] = useState("");
+  const [warrantyBatteryDms, setWarrantyBatteryDms] = useState("");
   const [warrantyVehicleExpiry, setWarrantyVehicleExpiry] = useState("");
   const [warrantyBatteryExpiry, setWarrantyBatteryExpiry] = useState("");
   const [warrantyMonzaStartDate, setWarrantyMonzaStartDate] = useState("");
@@ -72,6 +74,12 @@ export function EditCarDialog({
   const [submitting, setSubmitting] = useState(false);
 
   const supabase = createClient();
+  const {
+    canEditInventory: fullInventory,
+    canEditMonzaWarrantyOnCar: monzaWarranty,
+    canEditDmsWarrantyOnCar: dmsWarranty,
+    canEditPdiStatusOnCar: pdiEditable,
+  } = useUser();
 
   useEffect(() => {
     if (car && open) {
@@ -102,6 +110,9 @@ export function EditCarDialog({
       setPrice(car.price != null ? String(car.price) : "");
       setPriceCurrency(car.price_currency ?? "USD");
       setWarrantyPerDms(car.warranty_per_dms ?? "");
+      setWarrantyBatteryDms(
+        (car as { warranty_battery_dms?: string | null }).warranty_battery_dms ?? ""
+      );
       const vehicleExpiry =
         (car as any).warranty_vehicle_expiry ??
         (car as any).warranty_expiry ??
@@ -130,72 +141,147 @@ export function EditCarDialog({
     e.preventDefault();
     if (!car) return;
 
+    const canSaveAnything =
+      fullInventory || monzaWarranty || dmsWarranty || pdiEditable;
+    if (!canSaveAnything) {
+      toast.error("You don't have permission to edit this vehicle.");
+      return;
+    }
+
     setSubmitting(true);
 
-    const updates: Record<string, unknown> = {
-      status,
-      plate_number: plateNumber.trim() || null,
-      exterior_color: exteriorColor.trim() || null,
-      interior_color: interiorColor.trim() || null,
-      date_arrived: dateArrived || null,
-      suffix: suffix.trim() || null,
-      engine_number: engineNumber.trim() || null,
-      dongle: dongle.trim() || null,
-      issue: issue.trim() || null,
-      notes: notes.trim() || null,
-      software_version: softwareVersion.trim() || null,
-      pdi_status: pdiStatus,
-      customs_status: customsStatus,
-      warranty_per_dms: warrantyPerDms || null,
-      warranty_vehicle_expiry: warrantyVehicleExpiry || null,
-      warranty_battery_expiry: warrantyBatteryExpiry || null,
-      warranty_expiry: warrantyVehicleExpiry || null,
-      warranty_monza_start_date: warrantyMonzaStartDate || null,
-      warranty_vehicle_km_limit:
-        warrantyVehicleKmLimit.trim() && !Number.isNaN(Number(warrantyVehicleKmLimit))
-          ? Number(warrantyVehicleKmLimit)
-          : null,
-      warranty_battery_km_limit:
-        warrantyBatteryKmLimit.trim() && !Number.isNaN(Number(warrantyBatteryKmLimit))
-          ? Number(warrantyBatteryKmLimit)
-          : null,
-      location_type: locationType,
-      location_slot: locationSlot.trim() || null,
+    const cAny = car as CarDisplay & {
+      warranty_vehicle_expiry?: string | null;
+      warranty_expiry?: string | null;
+      warranty_battery_expiry?: string | null;
+      warranty_vehicle_km_limit?: number | null;
+      warranty_battery_km_limit?: number | null;
+      warranty_battery_dms?: string | null;
     };
 
-    const priceNum = price ? parseFloat(price) : null;
-    if (priceNum !== null && !Number.isNaN(priceNum) && priceNum >= 0) {
-      updates.price = priceNum;
-      updates.price_currency = priceCurrency;
-    } else {
-      updates.price = null;
-    }
+    const monzaSnapshot = {
+      warranty_monza_start_date: car.warranty_monza_start_date ?? null,
+      warranty_vehicle_expiry: cAny.warranty_vehicle_expiry ?? null,
+      warranty_battery_expiry: cAny.warranty_battery_expiry ?? null,
+      warranty_expiry: cAny.warranty_expiry ?? null,
+      warranty_vehicle_km_limit: cAny.warranty_vehicle_km_limit ?? null,
+      warranty_battery_km_limit: cAny.warranty_battery_km_limit ?? null,
+    };
 
-    const batteryNum = batteryPercent ? parseInt(batteryPercent, 10) : null;
-    if (batteryNum !== null && !Number.isNaN(batteryNum) && batteryNum >= 0 && batteryNum <= 100) {
-      updates.battery_percent = batteryNum;
-    }
-    const evRangeNum = evRangeKm ? parseInt(evRangeKm, 10) : null;
-    if (evRangeNum !== null && !Number.isNaN(evRangeNum)) {
-      updates.ev_range_km = evRangeNum;
-    }
-    const currentKmNum = currentKm ? parseInt(currentKm, 10) : null;
-    if (currentKmNum !== null && !Number.isNaN(currentKmNum)) {
-      updates.current_km = currentKmNum;
-    }
+    const dmsSnapshot = {
+      warranty_per_dms: car.warranty_per_dms ?? null,
+      warranty_battery_dms: cAny.warranty_battery_dms ?? null,
+    };
 
-    if (isErev) {
-      updates.is_erev = true;
-      updates.motor = motor.trim() || null;
-      const evKmNum = evKm ? parseInt(evKm, 10) : null;
-      const motorKmNum = motorKm ? parseInt(motorKm, 10) : null;
-      if (evKmNum !== null && !Number.isNaN(evKmNum)) updates.ev_km = evKmNum;
-      if (motorKmNum !== null && !Number.isNaN(motorKmNum)) updates.motor_km = motorKmNum;
+    let updates: Record<string, unknown>;
+
+    if (fullInventory) {
+      updates = {
+        status,
+        plate_number: plateNumber.trim() || null,
+        exterior_color: exteriorColor.trim() || null,
+        interior_color: interiorColor.trim() || null,
+        date_arrived: dateArrived || null,
+        suffix: suffix.trim() || null,
+        engine_number: engineNumber.trim() || null,
+        dongle: dongle.trim() || null,
+        issue: issue.trim() || null,
+        notes: notes.trim() || null,
+        software_version: softwareVersion.trim() || null,
+        pdi_status: pdiEditable ? pdiStatus : car.pdi_status,
+        customs_status: customsStatus,
+        warranty_per_dms: dmsWarranty ? warrantyPerDms || null : dmsSnapshot.warranty_per_dms,
+        warranty_battery_dms: dmsWarranty
+          ? warrantyBatteryDms || null
+          : dmsSnapshot.warranty_battery_dms,
+        warranty_vehicle_expiry: monzaWarranty
+          ? warrantyVehicleExpiry || null
+          : monzaSnapshot.warranty_vehicle_expiry,
+        warranty_battery_expiry: monzaWarranty
+          ? warrantyBatteryExpiry || null
+          : monzaSnapshot.warranty_battery_expiry,
+        warranty_expiry: monzaWarranty
+          ? warrantyVehicleExpiry || null
+          : monzaSnapshot.warranty_expiry,
+        warranty_monza_start_date: monzaWarranty
+          ? warrantyMonzaStartDate || null
+          : monzaSnapshot.warranty_monza_start_date,
+        warranty_vehicle_km_limit: monzaWarranty
+          ? warrantyVehicleKmLimit.trim() && !Number.isNaN(Number(warrantyVehicleKmLimit))
+            ? Number(warrantyVehicleKmLimit)
+            : null
+          : monzaSnapshot.warranty_vehicle_km_limit,
+        warranty_battery_km_limit: monzaWarranty
+          ? warrantyBatteryKmLimit.trim() && !Number.isNaN(Number(warrantyBatteryKmLimit))
+            ? Number(warrantyBatteryKmLimit)
+            : null
+          : monzaSnapshot.warranty_battery_km_limit,
+        location_type: locationType,
+        location_slot: locationSlot.trim() || null,
+      };
+
+      const priceNum = price ? parseFloat(price) : null;
+      if (priceNum !== null && !Number.isNaN(priceNum) && priceNum >= 0) {
+        updates.price = priceNum;
+        updates.price_currency = priceCurrency;
+      } else {
+        updates.price = null;
+      }
+
+      const batteryNum = batteryPercent ? parseInt(batteryPercent, 10) : null;
+      if (batteryNum !== null && !Number.isNaN(batteryNum) && batteryNum >= 0 && batteryNum <= 100) {
+        updates.battery_percent = batteryNum;
+      }
+      const evRangeNum = evRangeKm ? parseInt(evRangeKm, 10) : null;
+      if (evRangeNum !== null && !Number.isNaN(evRangeNum)) {
+        updates.ev_range_km = evRangeNum;
+      }
+      const currentKmNum = currentKm ? parseInt(currentKm, 10) : null;
+      if (currentKmNum !== null && !Number.isNaN(currentKmNum)) {
+        updates.current_km = currentKmNum;
+      }
+
+      if (isErev) {
+        updates.is_erev = true;
+        updates.motor = motor.trim() || null;
+        const evKmNum = evKm ? parseInt(evKm, 10) : null;
+        const motorKmNum = motorKm ? parseInt(motorKm, 10) : null;
+        if (evKmNum !== null && !Number.isNaN(evKmNum)) updates.ev_km = evKmNum;
+        if (motorKmNum !== null && !Number.isNaN(motorKmNum)) updates.motor_km = motorKmNum;
+      } else {
+        updates.is_erev = false;
+        updates.motor = null;
+        updates.ev_km = null;
+        updates.motor_km = null;
+      }
     } else {
-      updates.is_erev = false;
-      updates.motor = null;
-      updates.ev_km = null;
-      updates.motor_km = null;
+      updates = {};
+      if (monzaWarranty) {
+        updates.warranty_monza_start_date = warrantyMonzaStartDate || null;
+        updates.warranty_vehicle_expiry = warrantyVehicleExpiry || null;
+        updates.warranty_battery_expiry = warrantyBatteryExpiry || null;
+        updates.warranty_expiry = warrantyVehicleExpiry || null;
+        updates.warranty_vehicle_km_limit =
+          warrantyVehicleKmLimit.trim() && !Number.isNaN(Number(warrantyVehicleKmLimit))
+            ? Number(warrantyVehicleKmLimit)
+            : null;
+        updates.warranty_battery_km_limit =
+          warrantyBatteryKmLimit.trim() && !Number.isNaN(Number(warrantyBatteryKmLimit))
+            ? Number(warrantyBatteryKmLimit)
+            : null;
+      }
+      if (dmsWarranty) {
+        updates.warranty_per_dms = warrantyPerDms || null;
+        updates.warranty_battery_dms = warrantyBatteryDms || null;
+      }
+      if (pdiEditable) {
+        updates.pdi_status = pdiStatus;
+      }
+      if (Object.keys(updates).length === 0) {
+        setSubmitting(false);
+        toast.error("No permitted fields to save.");
+        return;
+      }
     }
 
     const { error: updateError } = await supabase
@@ -218,7 +304,7 @@ export function EditCarDialog({
     await supabase.from("car_events").insert({
       car_id: car.id,
       event_type: "details_updated",
-      note: "Details updated",
+      note: fullInventory ? "Details updated" : "Warranty / PDI fields updated",
       created_by: user?.id ?? null,
     });
 
@@ -230,20 +316,28 @@ export function EditCarDialog({
 
   if (!car) return null;
 
+  const coreLocked = !fullInventory;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Edit car</DialogTitle>
           <DialogDescription>
-            Update vehicle details. Changes will be logged.
+            {fullInventory
+              ? "Update vehicle details. Changes will be logged."
+              : "You can edit only the fields your role allows (warranty / PDI)."}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="status">Status</Label>
-              <Select value={status} onValueChange={(v) => setStatus(v as CarStatus)}>
+              <Select
+                value={status}
+                onValueChange={(v) => setStatus(v as CarStatus)}
+                disabled={submitting || coreLocked}
+              >
                 <SelectTrigger id="status">
                   <SelectValue />
                 </SelectTrigger>
@@ -265,6 +359,7 @@ export function EditCarDialog({
                 value={plateNumber}
                 onChange={(e) => setPlateNumber(e.target.value)}
                 placeholder="Optional"
+                disabled={submitting || coreLocked}
               />
             </div>
           </div>
@@ -277,6 +372,7 @@ export function EditCarDialog({
                 type="date"
                 value={dateArrived}
                 onChange={(e) => setDateArrived(e.target.value)}
+                disabled={submitting || coreLocked}
               />
             </div>
             <div className="space-y-2">
@@ -286,6 +382,7 @@ export function EditCarDialog({
                 value={suffix}
                 onChange={(e) => setSuffix(e.target.value)}
                 placeholder="Optional"
+                disabled={submitting || coreLocked}
               />
             </div>
           </div>
@@ -298,6 +395,7 @@ export function EditCarDialog({
                 value={engineNumber}
                 onChange={(e) => setEngineNumber(e.target.value)}
                 placeholder="Optional"
+                disabled={submitting || coreLocked}
               />
             </div>
             <div className="space-y-2">
@@ -307,6 +405,7 @@ export function EditCarDialog({
                 value={dongle}
                 onChange={(e) => setDongle(e.target.value)}
                 placeholder="Optional"
+                disabled={submitting || coreLocked}
               />
             </div>
           </div>
@@ -317,6 +416,7 @@ export function EditCarDialog({
               <Select
                 value={locationType}
                 onValueChange={(v) => setLocationType(v as LocationType)}
+                disabled={submitting || coreLocked}
               >
                 <SelectTrigger id="locationType">
                   <SelectValue />
@@ -337,6 +437,7 @@ export function EditCarDialog({
                 value={locationSlot}
                 onChange={(e) => setLocationSlot(e.target.value)}
                 placeholder="Optional"
+                disabled={submitting || coreLocked}
               />
             </div>
           </div>
@@ -344,7 +445,11 @@ export function EditCarDialog({
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="pdi">PDI status</Label>
-              <Select value={pdiStatus} onValueChange={(v) => setPdiStatus(v as PdiStatus)}>
+              <Select
+                value={pdiStatus}
+                onValueChange={(v) => setPdiStatus(v as PdiStatus)}
+                disabled={submitting || !pdiEditable}
+              >
                 <SelectTrigger id="pdi">
                   <SelectValue />
                 </SelectTrigger>
@@ -364,6 +469,7 @@ export function EditCarDialog({
                 value={exteriorColor}
                 onChange={(e) => setExteriorColor(e.target.value)}
                 placeholder="Optional"
+                disabled={submitting || coreLocked}
               />
             </div>
           </div>
@@ -376,6 +482,7 @@ export function EditCarDialog({
                 value={interiorColor}
                 onChange={(e) => setInteriorColor(e.target.value)}
                 placeholder="Optional"
+                disabled={submitting || coreLocked}
               />
             </div>
             <div className="space-y-2">
@@ -385,6 +492,7 @@ export function EditCarDialog({
                 value={softwareVersion}
                 onChange={(e) => setSoftwareVersion(e.target.value)}
                 placeholder="Optional"
+                disabled={submitting || coreLocked}
               />
             </div>
           </div>
@@ -400,6 +508,7 @@ export function EditCarDialog({
                 value={batteryPercent}
                 onChange={(e) => setBatteryPercent(e.target.value)}
                 placeholder="0–100"
+                disabled={submitting || coreLocked}
               />
             </div>
             <div className="space-y-2">
@@ -411,6 +520,7 @@ export function EditCarDialog({
                 value={evRangeKm}
                 onChange={(e) => setEvRangeKm(e.target.value)}
                 placeholder="Optional"
+                disabled={submitting || coreLocked}
               />
             </div>
           </div>
@@ -425,6 +535,7 @@ export function EditCarDialog({
                 value={currentKm}
                 onChange={(e) => setCurrentKm(e.target.value)}
                 placeholder="Optional"
+                disabled={submitting || coreLocked}
               />
             </div>
           </div>
@@ -434,6 +545,7 @@ export function EditCarDialog({
               id="isErev"
               checked={isErev}
               onCheckedChange={(c) => setIsErev(c === true)}
+              disabled={submitting || coreLocked}
             />
             <Label htmlFor="isErev" className="cursor-pointer text-sm font-normal">
               Is EREV
@@ -449,6 +561,7 @@ export function EditCarDialog({
                   value={motor}
                   onChange={(e) => setMotor(e.target.value)}
                   placeholder="e.g. 1.5T"
+                  disabled={submitting || coreLocked}
                 />
               </div>
               <div className="space-y-2">
@@ -460,6 +573,7 @@ export function EditCarDialog({
                   value={evKm}
                   onChange={(e) => setEvKm(e.target.value)}
                   placeholder="Optional"
+                  disabled={submitting || coreLocked}
                 />
               </div>
               <div className="space-y-2 sm:col-span-2">
@@ -471,6 +585,7 @@ export function EditCarDialog({
                   value={motorKm}
                   onChange={(e) => setMotorKm(e.target.value)}
                   placeholder="Optional"
+                  disabled={submitting || coreLocked}
                 />
               </div>
             </div>
@@ -487,11 +602,16 @@ export function EditCarDialog({
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
                 placeholder="Optional"
+                disabled={submitting || coreLocked}
               />
             </div>
             <div className="space-y-2">
               <Label>Currency</Label>
-              <Select value={priceCurrency} onValueChange={setPriceCurrency}>
+              <Select
+                value={priceCurrency}
+                onValueChange={setPriceCurrency}
+                disabled={submitting || coreLocked}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -504,7 +624,11 @@ export function EditCarDialog({
             </div>
             <div className="space-y-2">
               <Label>Customs</Label>
-              <Select value={customsStatus} onValueChange={(v) => setCustomsStatus(v as CustomsStatus)}>
+              <Select
+                value={customsStatus}
+                onValueChange={(v) => setCustomsStatus(v as CustomsStatus)}
+                disabled={submitting || coreLocked}
+              >
                 <SelectTrigger id="editCustomsStatus">
                   <SelectValue />
                 </SelectTrigger>
@@ -519,42 +643,70 @@ export function EditCarDialog({
             </div>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="space-y-2">
-              <Label htmlFor="editWarrantyDms">Warranty DMS</Label>
-              <Input
-                id="editWarrantyDms"
-                type="date"
-                value={warrantyPerDms}
-                onChange={(e) => setWarrantyPerDms(e.target.value)}
-              />
+          <div className="grid gap-4 rounded-md border border-amber-500/25 bg-muted/15 p-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+            <div className="space-y-2 lg:col-span-2 xl:col-span-2">
+              <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+                DMS (Khalil / owners)
+              </p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="editWarrantyDms">Warranty vehicle DMS</Label>
+                  <Input
+                    id="editWarrantyDms"
+                    type="date"
+                    value={warrantyPerDms}
+                    onChange={(e) => setWarrantyPerDms(e.target.value)}
+                    disabled={submitting || !dmsWarranty}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="editWarrantyBatteryDms">Warranty battery DMS</Label>
+                  <Input
+                    id="editWarrantyBatteryDms"
+                    type="date"
+                    value={warrantyBatteryDms}
+                    onChange={(e) => setWarrantyBatteryDms(e.target.value)}
+                    disabled={submitting || !dmsWarranty}
+                  />
+                </div>
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="editWarrantyVehicle">Warranty on Vehicle (Expiry)</Label>
-              <Input
-                id="editWarrantyVehicle"
-                type="date"
-                value={warrantyVehicleExpiry}
-                onChange={(e) => setWarrantyVehicleExpiry(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="editWarrantyBattery">Warranty on Battery (Expiry)</Label>
-              <Input
-                id="editWarrantyBattery"
-                type="date"
-                value={warrantyBatteryExpiry}
-                onChange={(e) => setWarrantyBatteryExpiry(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="editWarrantyMonza">Warranty Monza Start Date</Label>
-              <Input
-                id="editWarrantyMonza"
-                type="date"
-                value={warrantyMonzaStartDate}
-                onChange={(e) => setWarrantyMonzaStartDate(e.target.value)}
-              />
+            <div className="space-y-2 lg:col-span-2 xl:col-span-3">
+              <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+                Monza (Lara / Samaya / owners)
+              </p>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="space-y-2">
+                  <Label htmlFor="editWarrantyVehicle">Warranty on Vehicle (Expiry)</Label>
+                  <Input
+                    id="editWarrantyVehicle"
+                    type="date"
+                    value={warrantyVehicleExpiry}
+                    onChange={(e) => setWarrantyVehicleExpiry(e.target.value)}
+                    disabled={submitting || !monzaWarranty}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="editWarrantyBattery">Warranty on Battery (Expiry)</Label>
+                  <Input
+                    id="editWarrantyBattery"
+                    type="date"
+                    value={warrantyBatteryExpiry}
+                    onChange={(e) => setWarrantyBatteryExpiry(e.target.value)}
+                    disabled={submitting || !monzaWarranty}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="editWarrantyMonza">Warranty Monza Start Date</Label>
+                  <Input
+                    id="editWarrantyMonza"
+                    type="date"
+                    value={warrantyMonzaStartDate}
+                    onChange={(e) => setWarrantyMonzaStartDate(e.target.value)}
+                    disabled={submitting || !monzaWarranty}
+                  />
+                </div>
+              </div>
             </div>
           </div>
 
@@ -566,6 +718,7 @@ export function EditCarDialog({
               onChange={(e) => setIssue(e.target.value)}
               placeholder="Optional"
               rows={3}
+              disabled={submitting || coreLocked}
             />
           </div>
 
@@ -577,6 +730,7 @@ export function EditCarDialog({
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Optional"
               rows={3}
+              disabled={submitting || coreLocked}
             />
           </div>
 

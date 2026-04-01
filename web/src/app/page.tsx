@@ -3,9 +3,16 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase";
-import { isConnectionError } from "@/lib/auth-utils";
+import { createClientForPasswordResetEmail } from "@/lib/supabase/password-reset-mail-client";
+import {
+  getPasswordResetRedirectUrl,
+  validatePasswordResetRedirectUrl,
+} from "@/lib/auth-app-url";
+import { formatAuthApiErrorMessage, isConnectionError } from "@/lib/auth-utils";
+import { getSupabaseUrl } from "@/lib/supabase/public-env";
 import {
   clearAuthSessionMarkers,
+  idleLogoutMinutesForDisplay,
   markAuthSessionUnlocked,
 } from "@/lib/auth-session";
 import { Button } from "@/components/ui/button";
@@ -77,20 +84,57 @@ function HomePageContent() {
     setForgotError(null);
     setForgotLoading(true);
 
-    const supabase = createClient();
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(
-      forgotEmail,
-      { redirectTo: `${window.location.origin}/reset-password` }
-    );
-
-    setForgotLoading(false);
-
-    if (resetError) {
-      setForgotError(resetError.message);
+    const redirectTo = getPasswordResetRedirectUrl();
+    const redirectInvalid = validatePasswordResetRedirectUrl(redirectTo);
+    if (redirectInvalid) {
+      console.error("[resetPasswordForEmail] Bad redirectTo:", redirectTo, redirectInvalid);
+      setForgotError(redirectInvalid);
+      setForgotLoading(false);
       return;
     }
 
-    setForgotSuccess(true);
+    if (process.env.NODE_ENV === "development") {
+      const apiUrl = getSupabaseUrl();
+      try {
+        if (apiUrl) console.debug("[resetPasswordForEmail] host:", new URL(apiUrl).host, "redirectTo:", redirectTo);
+      } catch {
+        /* ignore */
+      }
+    }
+
+    try {
+      const supabase = createClientForPasswordResetEmail();
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
+        redirectTo,
+      });
+
+      if (resetError) {
+        const errObj = resetError as object & { status?: number; code?: string; message?: string };
+        console.error("[resetPasswordForEmail] API error:", {
+          message: errObj.message,
+          status: errObj.status,
+          code: errObj.code,
+          redirectTo,
+        });
+        setForgotError(
+          isConnectionError(resetError)
+            ? "Connection failed. Please check your internet and try again."
+            : formatAuthApiErrorMessage(resetError, { redirectTo })
+        );
+        return;
+      }
+
+      setForgotSuccess(true);
+    } catch (unexpected) {
+      console.error("[resetPasswordForEmail] Unexpected:", unexpected);
+      setForgotError(
+        isConnectionError(unexpected)
+          ? "Connection failed. Please check your internet and try again."
+          : "Something went wrong while sending the reset email. Check the browser console for details."
+      );
+    } finally {
+      setForgotLoading(false);
+    }
   }
 
   function openForgotDialog() {
@@ -100,9 +144,12 @@ function HomePageContent() {
     setForgotSuccess(false);
   }
 
+  const idleMin = idleLogoutMinutesForDisplay();
   const reasonMessage =
     reason === "inactive"
-      ? "You were logged out after 15 minutes of inactivity."
+      ? idleMin != null
+        ? `You were signed out after ${idleMin} minutes of inactivity.`
+        : "You were signed out due to inactivity."
       : reason === "reauth"
         ? "Please sign in again to continue."
         : null;
@@ -181,9 +228,18 @@ function HomePageContent() {
             </DialogDescription>
           </DialogHeader>
           {forgotSuccess ? (
-            <p className="rounded-md bg-primary/10 p-3 text-sm text-foreground">
-              Check your email for the reset link.
-            </p>
+            <div className="space-y-2 rounded-md bg-primary/10 p-3 text-sm text-foreground">
+              <p>Check your inbox and spam for the reset link.</p>
+              <p className="text-muted-foreground">
+                Supabase only sends if this email is already registered. If nothing arrives, confirm
+                the address matches your login, wait out rate limits, and in the Supabase dashboard
+                check Authentication → URL Configuration (add{" "}
+                <code className="rounded bg-background/80 px-1 py-0.5 text-xs">
+                  http://localhost:3000/**
+                </code>{" "}
+                for local dev) and Project Settings → Auth for SMTP or email logs.
+              </p>
+            </div>
           ) : (
             <form onSubmit={handleForgotPassword} className="space-y-4">
               {forgotError && (

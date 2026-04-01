@@ -127,10 +127,10 @@ export function getOnboardingSteps(role: AppRole | null): OnboardingStep[] {
             "When a car is marked Completed in the garage, you coordinate the customer pickup and mark it as Delivered.",
         },
         {
-          target: '[data-tour-id="nav-dashboard"]',
+          target: '[data-tour-id="nav-assistant-dashboard"]',
           title: "Warranty Alerts",
           content:
-            "You will see warnings when warranties are approaching expiry: 🔴 within 7 days, 🟡 within 14 days, 🟢 within 30 days.",
+            "On the Assistant Dashboard you will see warnings when warranties are approaching expiry: 🔴 within 7 days, 🟡 within 14 days, 🟢 within 30 days.",
         },
         {
           target: '[data-tour-id="header-notifications"]',

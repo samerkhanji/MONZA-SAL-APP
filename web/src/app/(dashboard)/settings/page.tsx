@@ -37,6 +37,7 @@ import { AddEmployeeDialog } from "@/components/settings/AddEmployeeDialog";
 import { ChangePasswordDialog } from "@/components/settings/ChangePasswordDialog";
 import { cn } from "@/lib/utils";
 import { getProfileFullName } from "@/lib/supabase-profile";
+import { ProfileActivityDot } from "@/components/profile-activity-dot";
 
 const ALL_TABS = [
   { id: "profile", label: "Profile", icon: User, everyone: true },
@@ -70,6 +71,7 @@ interface ProfileRow {
   employment_status?: string | null;
   terminated_at?: string | null;
   created_at?: string;
+  last_active_at?: string | null;
 }
 
 function timeAgo(date: string): string {
@@ -148,6 +150,8 @@ export default function SettingsPage() {
   const [pushLoading, setPushLoading] = useState(false);
 
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
+  const [profileLanguage, setProfileLanguage] = useState("en");
+  const [savingLanguage, setSavingLanguage] = useState(false);
 
   const supabase = createClient();
 
@@ -181,6 +185,34 @@ export default function SettingsPage() {
       fetchProfiles();
     }
   }, [canSeeSettings, activeTab, fetchProfiles]);
+
+  useEffect(() => {
+    const lang = (profile?.preferred_language ?? "en").trim() || "en";
+    setProfileLanguage(lang);
+  }, [profile?.preferred_language]);
+
+  async function saveProfileLanguage(value: string) {
+    setProfileLanguage(value);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      toast.error("You must be signed in.");
+      return;
+    }
+    setSavingLanguage(true);
+    const { error } = await supabase
+      .from("profiles")
+      .update({ preferred_language: value || "en" })
+      .eq("id", user.id);
+    setSavingLanguage(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success("Language preference saved");
+    await refreshProfile();
+  }
 
   const fetchPrefs = useCallback(async () => {
     setPrefsLoading(true);
@@ -508,6 +540,29 @@ export default function SettingsPage() {
                   Change Password
                 </Button>
               </div>
+              <div className="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                <div className="min-w-0 flex-1 space-y-1">
+                  <p className="font-medium">Language</p>
+                  <p className="text-sm text-muted-foreground">
+                    Sets the HTML language for the app (full translations may follow). Saved on your profile.
+                  </p>
+                </div>
+                <div className="flex w-full flex-col gap-2 sm:w-48">
+                  <Select
+                    value={profileLanguage}
+                    onValueChange={(v) => void saveProfileLanguage(v)}
+                    disabled={savingLanguage}
+                  >
+                    <SelectTrigger id="profile-preferred-language">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="en">English</SelectItem>
+                      <SelectItem value="ar">العربية</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
               <div className="flex flex-col gap-3 rounded-lg border p-4">
                 <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                   <div className="min-w-0 flex-1">
@@ -645,7 +700,7 @@ export default function SettingsPage() {
                             "—"
                           )}
                         </p>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <span
                             className={cn(
                               "inline-block size-2 rounded-full",
@@ -653,6 +708,8 @@ export default function SettingsPage() {
                             )}
                             aria-label={p.is_active ? "Active" : "Inactive"}
                           />
+                          <ProfileActivityDot lastActiveAt={p.last_active_at} />
+                          <span className="text-xs text-muted-foreground">Presence</span>
                           <span className="text-xs text-muted-foreground">
                             {p.created_at ? new Date(p.created_at).toLocaleDateString() : "—"}
                           </span>
@@ -668,6 +725,7 @@ export default function SettingsPage() {
                           <th className="px-4 py-3 text-left font-medium">Name</th>
                           <th className="px-4 py-3 text-left font-medium">Role</th>
                           <th className="px-4 py-3 text-left font-medium">Status</th>
+                          <th className="px-4 py-3 text-left font-medium">Activity</th>
                           <th className="px-4 py-3 text-left font-medium">Email</th>
                           <th className="px-4 py-3 text-left font-medium">Phone</th>
                           <th className="px-4 py-3 text-left font-medium">Joined</th>
@@ -698,6 +756,12 @@ export default function SettingsPage() {
                                 <span className={cn("size-1.5 rounded-full", p.is_active ? "bg-green-500" : "bg-gray-400")} />
                                 {p.is_active ? "Active" : "Inactive"}
                               </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2">
+                                <ProfileActivityDot lastActiveAt={p.last_active_at} />
+                                <span className="text-xs text-muted-foreground">Last active</span>
+                              </div>
                             </td>
                             <td className="px-4 py-3 text-muted-foreground">
                               {p.email ? (

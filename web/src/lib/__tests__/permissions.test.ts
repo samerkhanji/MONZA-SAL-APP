@@ -156,5 +156,24 @@ describe("canPerform", () => {
       expect(canPerform("installments", "mark_paid", role)).toBe(canMarkPaid);
     });
   });
+
+  it("respects CRUD_PERMISSIONS for requests (delete owner-only)", () => {
+    const roles: AppRole[] = [
+      "owner",
+      "assistant",
+      "khalil_hybrid",
+      "it",
+      "garage_manager",
+      "garage_staff",
+      "sales_ops",
+    ];
+    roles.forEach((role) => {
+      const perms = CRUD_PERMISSIONS.requests;
+      expect(canPerform("requests", "delete", role)).toBe(perms.delete.includes(role));
+      expect(canPerform("requests", "create", role)).toBe(perms.create.includes(role));
+      expect(canPerform("requests", "edit", role)).toBe(perms.edit.includes(role));
+      expect(canPerform("requests", "view", role)).toBe(perms.view.includes(role));
+    });
+  });
 });
 

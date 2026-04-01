@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
 import type { CarDisplay, CarStatus } from "@/types/database";
 import { CAR_STATUS_LABELS } from "@/types/database";
+import { installmentDueDateIso } from "@/lib/installment-due-dates";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,6 +25,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { monzaWarrantySlotsEmpty, warrantyExpiryFromDeliveryYmd } from "@/lib/warranty-from-delivery";
 
 interface CustomerData {
   id: string;
@@ -53,6 +65,8 @@ interface StatusCustomerDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
+  /** When opening from a quick status control, pre-select this target status in the dialog. */
+  presetTargetStatus?: CarStatus | null;
 }
 
 export function StatusCustomerDialog({
@@ -60,6 +74,7 @@ export function StatusCustomerDialog({
   open,
   onOpenChange,
   onSuccess,
+  presetTargetStatus = null,
 }: StatusCustomerDialogProps) {
   const { canEditInventory } = useUser();
   const supabase = createClient();
@@ -89,6 +104,8 @@ export function StatusCustomerDialog({
   const [dateBought, setDateBought] = useState("");
   const [reservationDateStr, setReservationDateStr] = useState("");
   const [deliveryDateStr, setDeliveryDateStr] = useState("");
+  const [warrantyDeliveryConfirmOpen, setWarrantyDeliveryConfirmOpen] = useState(false);
+  const skipWarrantyDeliveryConfirmRef = useRef(false);
 
   const isSoldOrReserved = car && (car.status === "sold" || car.status === "reserved");
 
@@ -108,7 +125,7 @@ export function StatusCustomerDialog({
   useEffect(() => {
     if (!open || !car) return;
 
-    setNewStatus(car.status);
+    setNewStatus(presetTargetStatus ?? car.status);
     setPlateNumber(car.plate_number ?? "");
     setSubDealerName(car.sub_dealer_name ?? "");
 
@@ -205,8 +222,11 @@ export function StatusCustomerDialog({
       setEmail("");
       setSellingPrice("");
       setCurrency("USD");
+      setDeliveryDateStr(
+        car.delivery_date ? String(car.delivery_date).slice(0, 10) : ""
+      );
     }
-  }, [open, car, isSoldOrReserved]);
+  }, [open, car, isSoldOrReserved, presetTargetStatus]);
 
   useEffect(() => {
     const total = parseFloat(planTotalAmount || "0");
@@ -232,24 +252,36 @@ export function StatusCustomerDialog({
       return;
     }
 
-    setSubmitting(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      setSubmitting(false);
-      toast.error("Not authenticated");
-      return;
-    }
-
     for (const msg of [
       validateOptionalIsoDate(dateBought, "Date Bought"),
       validateOptionalIsoDate(reservationDateStr, "Reservation date"),
       validateOptionalIsoDate(deliveryDateStr, "Delivery date"),
     ]) {
       if (msg) {
-        setSubmitting(false);
         toast.error(msg);
         return;
       }
+    }
+
+    const dbDeliveryPreview = normalizeOptionalDateForDb(deliveryDateStr);
+    if (
+      !skipWarrantyDeliveryConfirmRef.current &&
+      newStatus === "delivered" &&
+      car.status !== "delivered" &&
+      dbDeliveryPreview &&
+      monzaWarrantySlotsEmpty(car)
+    ) {
+      setWarrantyDeliveryConfirmOpen(true);
+      return;
+    }
+    skipWarrantyDeliveryConfirmRef.current = false;
+
+    setSubmitting(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      setSubmitting(false);
+      toast.error("Not authenticated");
+      return;
     }
 
     if (needsCustomer) {
@@ -417,9 +449,9 @@ export function StatusCustomerDialog({
             toast.error("Monthly amount must be greater than 0.");
             return;
           }
-          if (dueDayNum < 1 || dueDayNum > 28) {
+          if (dueDayNum < 1 || dueDayNum > 31) {
             setSubmitting(false);
-            toast.error("Due day must be between 1 and 28.");
+            toast.error("Due day must be between 1 and 31.");
             return;
           }
 
@@ -435,6 +467,7 @@ export function StatusCustomerDialog({
               months: monthsNum,
               start_date: planStartDate,
               due_day: dueDayNum,
+              interest_rate: 0,
               created_by: user.id,
             })
             .select("id")
@@ -447,7 +480,6 @@ export function StatusCustomerDialog({
           }
 
           const installments: Record<string, unknown>[] = [];
-          const baseDate = new Date(planStartDate);
 
           if (downNum > 0) {
             installments.push({
@@ -461,11 +493,9 @@ export function StatusCustomerDialog({
             });
           }
 
+          const startYmd = planStartDate;
           for (let i = 0; i < monthsNum; i += 1) {
-            const d = new Date(baseDate);
-            d.setMonth(d.getMonth() + i);
-            d.setDate(dueDayNum);
-            const dueDateStr = d.toISOString().split("T")[0];
+            const dueDateStr = installmentDueDateIso(startYmd, i, dueDayNum);
             installments.push({
               plan_id: planData.id,
               installment_no: i + 1,
@@ -488,12 +518,41 @@ export function StatusCustomerDialog({
       }
     }
 
+    const dbDeliveryForSimple = normalizeOptionalDateForDb(deliveryDateStr);
+    let deliveryWrittenToCarRowOnly = false;
+    if (!needsCustomer && dbDeliveryForSimple) {
+      const { data: lo } = await supabase
+        .from("sales_orders")
+        .select("id")
+        .eq("car_id", car.id)
+        .not("status", "eq", "cancelled")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (lo?.id) {
+        const { error: delErr } = await supabase
+          .from("sales_orders")
+          .update({ delivery_date: dbDeliveryForSimple })
+          .eq("id", lo.id);
+        if (delErr) {
+          setSubmitting(false);
+          toast.error("Failed to update delivery date: " + delErr.message);
+          return;
+        }
+      } else {
+        deliveryWrittenToCarRowOnly = true;
+      }
+    }
+
     // Always update the car's status on the cars table
     const carStatusPayload: Record<string, unknown> = { status: newStatus };
     if (newStatus === "sent_to_sub_dealer") {
       carStatusPayload.sub_dealer_name = subDealerName.trim() || null;
     } else {
       carStatusPayload.sub_dealer_name = null;
+    }
+    if (deliveryWrittenToCarRowOnly) {
+      carStatusPayload.delivery_date = dbDeliveryForSimple;
     }
     const { error: carError } = await supabase
       .from("cars")
@@ -521,7 +580,57 @@ export function StatusCustomerDialog({
 
   if (!car) return null;
 
+  const previewDelivery = normalizeOptionalDateForDb(deliveryDateStr);
+  const previewV =
+    previewDelivery && warrantyExpiryFromDeliveryYmd(previewDelivery, 5);
+  const previewB =
+    previewDelivery && warrantyExpiryFromDeliveryYmd(previewDelivery, 8);
+
   return (
+    <>
+    <AlertDialog
+      open={warrantyDeliveryConfirmOpen}
+      onOpenChange={(o) => {
+        if (!o) skipWarrantyDeliveryConfirmRef.current = false;
+        setWarrantyDeliveryConfirmOpen(o);
+      }}
+    >
+      <AlertDialogContent className="border-border sm:max-w-md">
+        <AlertDialogHeader>
+          <AlertDialogTitle>Start warranty from delivery date?</AlertDialogTitle>
+          <AlertDialogDescription className="space-y-2 text-left">
+            <span className="block">
+              Monza warranty will start from{" "}
+              <strong>
+                {previewDelivery
+                  ? new Date(`${previewDelivery}T12:00:00`).toLocaleDateString()
+                  : "—"}
+              </strong>
+              . Vehicle coverage to{" "}
+              <strong>{previewV || "—"}</strong> (5 years) and battery to{" "}
+              <strong>{previewB || "—"}</strong> (8 years), only where fields are still empty.
+            </span>
+            <span className="text-muted-foreground block text-xs">
+              Existing warranty dates are never overwritten. You can change them later if you have permission.
+            </span>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Back</AlertDialogCancel>
+          <AlertDialogAction
+            className="bg-amber-500 text-amber-950 hover:bg-amber-400 dark:bg-amber-500 dark:text-amber-950"
+            onClick={() => {
+              skipWarrantyDeliveryConfirmRef.current = true;
+              setWarrantyDeliveryConfirmOpen(false);
+              void handleSaveCustomer();
+            }}
+          >
+            Save &amp; mark delivered
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
@@ -841,6 +950,21 @@ export function StatusCustomerDialog({
                       />
                     </div>
                   ) : null}
+                  {newStatus === "delivered" && (
+                    <div className="space-y-2">
+                      <Label htmlFor="status-simple-delivery">Delivery date</Label>
+                      <Input
+                        id="status-simple-delivery"
+                        type="date"
+                        value={deliveryDateStr}
+                        onChange={(e) => setDeliveryDateStr(e.target.value)}
+                        className="max-w-xs"
+                      />
+                      <p className="text-muted-foreground text-xs">
+                        Used to start Monza warranty when marking delivered (saved to sales order or car row).
+                      </p>
+                    </div>
+                  )}
                   {needsCustomer && (
                     <>
                       <div className="grid gap-4 sm:grid-cols-2">
@@ -1031,5 +1155,6 @@ export function StatusCustomerDialog({
         )}
       </DialogContent>
     </Dialog>
+    </>
   );
 }

@@ -6,9 +6,29 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
-import type { CarDisplay, CarEvent, CarStatus } from "@/types/database";
+import type {
+  CarDisplay,
+  CarEvent,
+  CarStatus,
+  CustomsStatus,
+  LocationType,
+} from "@/types/database";
+import {
+  CAR_STATUS_LABELS,
+  CUSTOMS_STATUS_LABELS,
+  LOCATION_LABELS,
+  PDI_LABELS,
+  type CarEventType,
+} from "@/types/database";
 import { fetchActiveTestDriveForCar } from "@/lib/data/test-drives";
-import { PDI_LABELS, type CarEventType } from "@/types/database";
+import { canPerform } from "@/lib/permissions";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -393,7 +413,14 @@ export default function CarProfilePage() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { canEditInventory, canDelete, profile, isOwner } = useUser();
+  const {
+    canEditInventory,
+    profile,
+    appRole,
+    canOpenCarEditDialog,
+    canEditPdiStatusOnCar,
+  } = useUser();
+  const canDeleteCar = canPerform("cars", "delete", appRole ?? null);
   const param = params.id as string;
   // Support lookup by VIN (17 alphanumeric) or by UUID
   const isVin = /^[A-HJ-NPR-Z0-9]{17}$/i.test(param);
@@ -425,6 +452,8 @@ export default function CarProfilePage() {
   const [saleDatesSaving, setSaleDatesSaving] = useState(false);
   const [saleDatesError, setSaleDatesError] = useState<string | null>(null);
   const [linkCustomerOpen, setLinkCustomerOpen] = useState(false);
+  const [statusDialogPreset, setStatusDialogPreset] = useState<CarStatus | null>(null);
+  const [quickFieldSaving, setQuickFieldSaving] = useState(false);
   const [checklistOpen, setChecklistOpen] = useState(false);
   const [pendingFieldFocusId, setPendingFieldFocusId] = useState<string | null>(null);
   const [activeTestDriveBanner, setActiveTestDriveBanner] = useState<{
@@ -658,6 +687,71 @@ export default function CarProfilePage() {
     toast.success("VIN copied");
   }
 
+  async function saveQuickCarField(
+    patch: Partial<{
+      status: CarStatus;
+      customs_status: CustomsStatus;
+      location_type: LocationType;
+    }>
+  ) {
+    if (!car || !canEditInventory) return;
+    const prev = car;
+    setQuickFieldSaving(true);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      const updates: Record<string, unknown> = {
+        ...patch,
+        updated_at: new Date().toISOString(),
+      };
+      if (patch.status != null) {
+        updates.status_changed_at = new Date().toISOString();
+      }
+      const { error } = await supabase.from("cars").update(updates).eq("id", car.id);
+      if (error) {
+        toast.error(error.message ?? "Update failed");
+        return;
+      }
+      if (patch.status != null && patch.status !== prev.status) {
+        await supabase.from("car_events").insert({
+          car_id: car.id,
+          event_type: "status_changed",
+          from_value: prev.status,
+          to_value: patch.status,
+          created_by: user?.id ?? null,
+        });
+      } else if (patch.customs_status != null || patch.location_type != null) {
+        const note =
+          patch.customs_status != null
+            ? `Customs status → ${patch.customs_status}`
+            : `Location type → ${patch.location_type}`;
+        await supabase.from("car_events").insert({
+          car_id: car.id,
+          event_type: "details_updated",
+          note,
+          created_by: user?.id ?? null,
+        });
+      }
+      toast.success("Saved");
+      await fetchCar();
+      await fetchEvents();
+      router.refresh();
+    } finally {
+      setQuickFieldSaving(false);
+    }
+  }
+
+  function onQuickStatusChange(value: string) {
+    const ns = value as CarStatus;
+    if (CUSTOMER_RELATED_STATUSES.includes(ns)) {
+      setStatusDialogPreset(ns);
+      setLinkCustomerOpen(true);
+      return;
+    }
+    void saveQuickCarField({ status: ns });
+  }
+
   async function fetchCar() {
     const query = supabase.from("cars_display").select("*");
     const { data, error } = isVin
@@ -882,7 +976,7 @@ export default function CarProfilePage() {
 
   async function handleDelete() {
     if (!car || !profile) return;
-    if (!(isOwner || profile.role === "owner")) {
+    if (!canDeleteCar) {
       toast.error("Only owners can delete vehicles.");
       return;
     }
@@ -979,7 +1073,16 @@ export default function CarProfilePage() {
   function handleChecklistItemClick(item: ChecklistItem) {
     if (item.isFilled) return;
     if (item.editTarget?.type === "edit") {
+      if (item.editTarget.fieldId === "pdi") {
+        setChecklistOpen(false);
+        setPdiOpen(true);
+        return;
+      }
       if (item.editTarget.fieldId) {
+        if (!canOpenCarEditDialog) {
+          toast.info("You don't have permission to edit this vehicle.");
+          return;
+        }
         setChecklistOpen(false);
         setPendingFieldFocusId(item.editTarget.fieldId);
         setEditOpen(true);
@@ -1097,7 +1200,7 @@ export default function CarProfilePage() {
             )}
           </div>
           <div className="flex flex-wrap justify-end gap-2">
-            {canEditInventory && (
+            {canOpenCarEditDialog && (
               <Button variant="outline" onClick={() => setEditOpen(true)}>
                 Edit
               </Button>
@@ -1105,7 +1208,7 @@ export default function CarProfilePage() {
             <Button variant="outline" onClick={() => setMoveOpen(true)}>
               Move location
             </Button>
-            {(isOwner || profile?.role === "owner") && (
+            {canDeleteCar && (
               <Button
                 variant="destructive"
                 onClick={() => setDeleteOpen(true)}
@@ -1175,7 +1278,11 @@ export default function CarProfilePage() {
       <StatusCustomerDialog
         car={car}
         open={linkCustomerOpen}
-        onOpenChange={setLinkCustomerOpen}
+        onOpenChange={(o) => {
+          setLinkCustomerOpen(o);
+          if (!o) setStatusDialogPreset(null);
+        }}
+        presetTargetStatus={statusDialogPreset}
         onSuccess={onLinkCustomerSuccess}
       />
 
@@ -1189,7 +1296,7 @@ export default function CarProfilePage() {
               This action is irreversible. Please confirm your password to continue.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          {(isOwner || profile?.role === "owner") ? (
+          {canDeleteCar ? (
             <div className="space-y-2">
               <Label htmlFor="delete-password-detail">Password</Label>
               <Input
@@ -1212,7 +1319,7 @@ export default function CarProfilePage() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <Button
               variant="destructive"
-              disabled={deleteLoading || !deletePassword || !(isOwner || profile?.role === "owner")}
+              disabled={deleteLoading || !deletePassword || !canDeleteCar}
               onClick={() => void handleDelete()}
             >
               {deleteLoading ? "Deleting..." : "Confirm Delete"}
@@ -1524,12 +1631,33 @@ export default function CarProfilePage() {
               </div>
               <div className="space-y-1">
                 <p className="text-muted-foreground text-sm">Status</p>
-                <Badge
-                  className={`${statusBadgeClass} cursor-pointer hover:ring-2 hover:ring-offset-1`}
-                  onClick={() => setLinkCustomerOpen(true)}
-                >
-                  {car.status_display ?? car.status}
-                </Badge>
+                {canEditInventory ? (
+                  <Select
+                    value={car.status}
+                    onValueChange={onQuickStatusChange}
+                    disabled={quickFieldSaving}
+                  >
+                    <SelectTrigger className="max-w-xs" id="car-quick-status">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(Object.keys(CAR_STATUS_LABELS) as CarStatus[]).map((s) => (
+                        <SelectItem key={s} value={s}>
+                          {CAR_STATUS_LABELS[s]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Badge className={statusBadgeClass}>
+                    {car.status_display ?? car.status}
+                  </Badge>
+                )}
+                {canEditInventory && (
+                  <p className="text-xs text-muted-foreground">
+                    Customer-related statuses open the status &amp; customer dialog.
+                  </p>
+                )}
               </div>
               <div className="space-y-1">
                 <p className="text-muted-foreground text-sm">Engine Number</p>
@@ -1853,11 +1981,41 @@ export default function CarProfilePage() {
             </CardHeader>
             <CardContent className="grid gap-6 sm:grid-cols-2">
               <div className="space-y-1">
-                <p className="text-muted-foreground text-sm">Location</p>
+                <p className="text-muted-foreground text-sm">Location type</p>
+                {canEditInventory ? (
+                  <Select
+                    value={car.location_type}
+                    onValueChange={(v) =>
+                      void saveQuickCarField({ location_type: v as LocationType })
+                    }
+                    disabled={quickFieldSaving}
+                  >
+                    <SelectTrigger className="max-w-xs" id="car-quick-location-type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(Object.keys(LOCATION_LABELS) as LocationType[]).map((lt) => (
+                        <SelectItem key={lt} value={lt}>
+                          {LOCATION_LABELS[lt]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <p>
+                    {car.location_full ??
+                      (car.location_type
+                        ? `${car.location_type}${car.location_slot ? ` · ${car.location_slot}` : ""}`
+                        : "—")}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-1">
+                <p className="text-muted-foreground text-sm">Location (display)</p>
                 <p>
                   {car.location_full ??
                     (car.location_type
-                      ? `${car.location_type}${car.location_slot ? ` · ${car.location_slot}` : ""}`
+                      ? `${LOCATION_LABELS[car.location_type] ?? car.location_type}${car.location_slot ? ` · ${car.location_slot}` : ""}`
                       : "—")}
                 </p>
               </div>
@@ -1937,16 +2095,54 @@ export default function CarProfilePage() {
                 <p>{car.software_version ?? "—"}</p>
               </div>
               <div
-                className="space-y-1 cursor-pointer"
+                className={canEditPdiStatusOnCar ? "space-y-1 cursor-pointer" : "space-y-1"}
                 onClick={(e) => {
                   e.stopPropagation();
                   setPdiOpen(true);
                 }}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setPdiOpen(true);
+                  }
+                }}
               >
                 <p className="text-muted-foreground text-sm">PDI Status</p>
-                <Badge className={`${pdiBadgeClass} hover:opacity-80`}>
+                <Badge
+                  className={`${pdiBadgeClass} ${canEditPdiStatusOnCar ? "hover:opacity-80" : ""}`}
+                >
                   {PDI_LABELS[car.pdi_status]}
                 </Badge>
+                {!canEditPdiStatusOnCar && (
+                  <p className="text-muted-foreground text-xs">Tap to view</p>
+                )}
+              </div>
+              <div className="space-y-1">
+                <p className="text-muted-foreground text-sm">Customs Status</p>
+                {canEditInventory ? (
+                  <Select
+                    value={car.customs_status}
+                    onValueChange={(v) =>
+                      void saveQuickCarField({ customs_status: v as CustomsStatus })
+                    }
+                    disabled={quickFieldSaving}
+                  >
+                    <SelectTrigger className="max-w-xs" id="car-quick-customs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(Object.keys(CUSTOMS_STATUS_LABELS) as CustomsStatus[]).map((cs) => (
+                        <SelectItem key={cs} value={cs}>
+                          {CUSTOMS_STATUS_LABELS[cs]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <p>{CUSTOMS_STATUS_LABELS[car.customs_status] ?? car.customs_status}</p>
+                )}
               </div>
               {(car as { is_erev?: boolean }).is_erev && (
                 <>

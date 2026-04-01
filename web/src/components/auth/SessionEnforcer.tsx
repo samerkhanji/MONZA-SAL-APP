@@ -62,7 +62,10 @@ export function SessionEnforcer({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      if (Date.now() - lastActivity > IDLE_TIMEOUT_MS) {
+      if (
+        IDLE_TIMEOUT_MS > 0 &&
+        Date.now() - lastActivity > IDLE_TIMEOUT_MS
+      ) {
         await forceLogout("inactive");
         return;
       }
@@ -92,7 +95,10 @@ export function SessionEnforcer({ children }: { children: React.ReactNode }) {
     };
 
     const checkIdleTimeout = () => {
-      if (Date.now() - lastActiveRef.current > IDLE_TIMEOUT_MS) {
+      if (
+        IDLE_TIMEOUT_MS > 0 &&
+        Date.now() - lastActiveRef.current > IDLE_TIMEOUT_MS
+      ) {
         void forceLogout("inactive");
       }
     };
@@ -104,6 +110,7 @@ export function SessionEnforcer({ children }: { children: React.ReactNode }) {
       }
 
       if (
+        IDLE_TIMEOUT_MS > 0 &&
         hiddenAtRef.current &&
         Date.now() - hiddenAtRef.current > IDLE_TIMEOUT_MS
       ) {
@@ -128,14 +135,17 @@ export function SessionEnforcer({ children }: { children: React.ReactNode }) {
       window.addEventListener(eventName, markActivity)
     );
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    const intervalId = window.setInterval(checkIdleTimeout, 30000);
+    const intervalId =
+      IDLE_TIMEOUT_MS > 0
+        ? window.setInterval(checkIdleTimeout, 30000)
+        : undefined;
 
     return () => {
       activityEvents.forEach((eventName) =>
         window.removeEventListener(eventName, markActivity)
       );
       document.removeEventListener("visibilitychange", handleVisibilityChange);
-      window.clearInterval(intervalId);
+      if (intervalId !== undefined) window.clearInterval(intervalId);
     };
   }, [ready]);
 

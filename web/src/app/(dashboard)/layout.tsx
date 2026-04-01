@@ -8,6 +8,7 @@ import { WarrantyNotificationChecker } from "@/components/WarrantyNotificationCh
 import { SessionEnforcer } from "@/components/auth/SessionEnforcer";
 import { FirstLoginGuard } from "@/components/auth/FirstLoginGuard";
 import { OnboardingTour } from "@/components/OnboardingTour";
+import { ProfileActivityHeartbeat } from "@/components/ProfileActivityHeartbeat";
 
 export default function DashboardLayout({
   children,
@@ -20,6 +21,7 @@ export default function DashboardLayout({
         <SessionEnforcer>
           <InstallProvider>
             <DashboardShell>
+              <ProfileActivityHeartbeat />
               <WarrantyNotificationChecker />
               <FirstLoginGuard>
                 <PageAccessGuard>

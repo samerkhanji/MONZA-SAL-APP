@@ -471,16 +471,18 @@ export function CustomAccessoryCollections() {
                                 />
                               </TableCell>
                               <TableCell className="pr-6 text-right align-top">
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  className="text-muted-foreground hover:text-destructive size-9 opacity-70 group-hover:opacity-100"
-                                  onClick={() => void deleteItem(row.id)}
-                                  aria-label="Remove row"
-                                >
-                                  <Trash2 className="size-4" />
-                                </Button>
+                                {isOwner ? (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="text-muted-foreground hover:text-destructive size-9 opacity-70 group-hover:opacity-100"
+                                    onClick={() => void deleteItem(row.id)}
+                                    aria-label="Remove row"
+                                  >
+                                    <Trash2 className="size-4" />
+                                  </Button>
+                                ) : null}
                               </TableCell>
                             </TableRow>
                           ))

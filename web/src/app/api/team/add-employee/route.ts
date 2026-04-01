@@ -78,6 +78,11 @@ export async function POST(request: NextRequest) {
     });
 
     if (authError) {
+      console.error("[add-employee] auth.admin.createUser failed:", {
+        message: authError.message,
+        code: (authError as { code?: string }).code,
+        status: (authError as { status?: number }).status,
+      });
       return NextResponse.json(
         { error: authError.message },
         { status: 400 }
@@ -113,6 +118,7 @@ export async function POST(request: NextRequest) {
       .upsert(profileData, { onConflict: "id" });
 
     if (profileError) {
+      console.error("[add-employee] profiles upsert failed:", profileError.message);
       return NextResponse.json(
         { error: profileError.message },
         { status: 400 }
@@ -122,7 +128,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       id: authUser.user.id,
       email,
-      message: "Employee created. They will receive a password reset email or you can share the temporary password.",
+      message:
+        "Employee created. No automatic email was sent—share the temporary password securely or trigger a password reset from the login page.",
       temp_password: tempPassword,
     });
   } catch (err) {

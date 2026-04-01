@@ -10,6 +10,12 @@ import {
 import { createClient } from "@/lib/supabase";
 import { handleSessionExpiredError, isConnectionError } from "@/lib/auth-utils";
 import type { AppRole } from "@/lib/permissions";
+import {
+  canEditDmsWarrantyOnCar,
+  canEditMonzaWarrantyOnCar,
+  canEditPdiStatusOnCar,
+  canOpenCarEditDialog,
+} from "@/lib/car-field-permissions";
 
 export type UserRole =
   | "owner"
@@ -35,6 +41,8 @@ export interface UserProfile {
   must_change_password?: boolean;
   onboarding_completed?: boolean;
   onboarding_completed_at?: string | null;
+  preferred_language?: string | null;
+  last_active_at?: string | null;
 }
 
 export interface UserContextType {
@@ -68,6 +76,14 @@ export interface UserContextType {
   canSeePartsInventory: boolean;
   canSeeGarageJobs: boolean;
   canSeeGarageHistory: boolean;
+  /** Phase 3.2 — Monza vehicle/battery warranty fields on cars */
+  canEditMonzaWarrantyOnCar: boolean;
+  /** Phase 3.2 — DMS warranty fields on cars */
+  canEditDmsWarrantyOnCar: boolean;
+  /** Phase 3.3 — pdi_status on cars */
+  canEditPdiStatusOnCar: boolean;
+  /** Open Edit car dialog (full or partial save) */
+  canOpenCarEditDialog: boolean;
 }
 
 const UserContext = createContext<UserContextType>({
@@ -101,6 +117,10 @@ const UserContext = createContext<UserContextType>({
   canSeePartsInventory: false,
   canSeeGarageJobs: false,
   canSeeGarageHistory: false,
+  canEditMonzaWarrantyOnCar: false,
+  canEditDmsWarrantyOnCar: false,
+  canEditPdiStatusOnCar: false,
+  canOpenCarEditDialog: false,
 });
 
 export function UserProvider({ children }: { children: React.ReactNode }) {
@@ -187,6 +207,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   }, [loadProfile]);
 
   useEffect(() => {
+    if (typeof document === "undefined") return;
+    const lang = (profile?.preferred_language ?? "en").trim() || "en";
+    document.documentElement.lang = lang;
+  }, [profile?.preferred_language]);
+
+  useEffect(() => {
     const supabase = createClient();
     const {
       data: { subscription },
@@ -194,7 +220,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       if (event === "SIGNED_OUT") {
         const path = typeof window !== "undefined" ? window.location.pathname : "";
         const isLoginPage = path === "/login" || path === "/";
-        if (!isLoginPage) {
+        const isAuthEmailFlow =
+          path === "/auth/callback" ||
+          path.startsWith("/auth/callback/") ||
+          path === "/auth/confirm" ||
+          path.startsWith("/auth/confirm/") ||
+          path === "/reset-password" ||
+          path.startsWith("/reset-password/");
+        if (!isLoginPage && !isAuthEmailFlow) {
           window.location.href = "/login";
         }
       }
@@ -277,6 +310,17 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     appRole === "garage_manager" ||
     appRole === "sales_ops";
 
+  const canEditMonzaWarrantyOnCarFlag = canEditMonzaWarrantyOnCar(
+    appRole,
+    profile?.full_name
+  );
+  const canEditDmsWarrantyOnCarFlag = canEditDmsWarrantyOnCar(appRole);
+  const canEditPdiStatusOnCarFlag = canEditPdiStatusOnCar(appRole);
+  const canOpenCarEditDialogFlag = canOpenCarEditDialog(
+    appRole,
+    profile?.full_name
+  );
+
   return (
     <UserContext.Provider
       value={{
@@ -310,6 +354,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         canSeePartsInventory,
         canSeeGarageJobs,
         canSeeGarageHistory,
+        canEditMonzaWarrantyOnCar: canEditMonzaWarrantyOnCarFlag,
+        canEditDmsWarrantyOnCar: canEditDmsWarrantyOnCarFlag,
+        canEditPdiStatusOnCar: canEditPdiStatusOnCarFlag,
+        canOpenCarEditDialog: canOpenCarEditDialogFlag,
       }}
     >
       {children}

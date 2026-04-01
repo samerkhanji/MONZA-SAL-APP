@@ -78,7 +78,8 @@ export function AddPartDialog({
     setSubmitting(true);
     const { data: authUser } = await supabase.auth.getUser();
 
-    const { error } = await supabase
+    const receivedAt = new Date().toISOString();
+    const { data: inserted, error } = await supabase
       .from("parts")
       .insert({
         part_name: partName.trim(),
@@ -94,6 +95,7 @@ export function AddPartDialog({
         order_date: orderDate || null,
         notes: notes.trim() || null,
         created_by: authUser.user?.id ?? null,
+        received_at: receivedAt,
       })
       .select("id")
       .single();
@@ -105,7 +107,20 @@ export function AddPartDialog({
       return;
     }
 
-    toast.success("Part added successfully");
+    const partId = (inserted as { id?: string } | null)?.id;
+    if (partId && qty > 0) {
+      await supabase.from("part_movements").insert({
+        part_id: partId,
+        movement_type: "stock_in",
+        quantity: qty,
+        car_id: null,
+        job_description: null,
+        note: "Received — Add Part",
+        created_by: authUser.user?.id ?? null,
+      });
+    }
+
+    toast.success("Part logged as received");
     onOpenChange(false);
     onSuccess();
   }

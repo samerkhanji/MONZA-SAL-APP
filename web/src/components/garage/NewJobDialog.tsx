@@ -16,6 +16,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Trash2, ScanLine, Camera } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ScannerDialog } from "@/components/scanner/ScannerDialog";
 
 interface CarOption {
@@ -70,6 +71,7 @@ export function NewJobDialog({
   const [scanVinOpen, setScanVinOpen] = useState(false);
   const [partNumberSearch, setPartNumberSearch] = useState("");
   const [scanPartOpen, setScanPartOpen] = useState(false);
+  const [batteryOnlyJob, setBatteryOnlyJob] = useState(false);
 
   const supabase = createClient();
 
@@ -97,6 +99,7 @@ export function NewJobDialog({
       setPartQuantity("1");
       setPartNote("");
       setPartNumberSearch("");
+      setBatteryOnlyJob(false);
     }
   }, [open]);
 
@@ -171,7 +174,7 @@ export function NewJobDialog({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!selectedCar) {
+    if (!batteryOnlyJob && !selectedCar) {
       toast.error("Please select a car");
       return;
     }
@@ -191,7 +194,8 @@ export function NewJobDialog({
     const { data: jobData, error: jobError } = await supabase
       .from("garage_jobs")
       .insert({
-        car_id: selectedCar.id,
+        car_id: batteryOnlyJob ? null : selectedCar!.id,
+        is_battery_only: batteryOnlyJob,
         title: title.trim(),
         description: description.trim() || null,
         priority,
@@ -211,27 +215,29 @@ export function NewJobDialog({
       return;
     }
 
-    const { data: carData } = await supabase
-      .from("cars")
-      .select("status")
-      .eq("id", selectedCar.id)
-      .single();
+    if (!batteryOnlyJob && selectedCar) {
+      const { data: carData } = await supabase
+        .from("cars")
+        .select("status")
+        .eq("id", selectedCar.id)
+        .single();
 
-    const currentStatus = (carData as { status?: string } | null)?.status ?? "in_stock";
+      const currentStatus = (carData as { status?: string } | null)?.status ?? "in_stock";
 
-    await supabase
-      .from("cars")
-      .update({ status: "service" })
-      .eq("id", selectedCar.id);
+      await supabase
+        .from("cars")
+        .update({ status: "service" })
+        .eq("id", selectedCar.id);
 
-    await supabase.from("car_events").insert({
-      car_id: selectedCar.id,
-      event_type: "status_changed",
-      from_value: currentStatus,
-      to_value: "service",
-      note: `Garage job created: ${title.trim()}`,
-      created_by: user.id,
-    });
+      await supabase.from("car_events").insert({
+        car_id: selectedCar.id,
+        event_type: "status_changed",
+        from_value: currentStatus,
+        to_value: "service",
+        note: `Garage job created: ${title.trim()}`,
+        created_by: user.id,
+      });
+    }
 
     const jobId = (jobData as { id: string }).id;
     for (const p of partsToAdd) {
@@ -253,7 +259,9 @@ export function NewJobDialog({
         m.createNotification({
           userId: markId,
           title: "New garage job",
-          message: `New garage job created: ${title.trim()} for VIN ${selectedCar.vin ?? "—"}`,
+          message: batteryOnlyJob
+            ? `New battery-lab job: ${title.trim()}`
+            : `New garage job created: ${title.trim()} for VIN ${selectedCar?.vin ?? "—"}`,
           link: `/garage/jobs/${jobId}`,
         })
       );
@@ -271,8 +279,34 @@ export function NewJobDialog({
           <DialogTitle className="text-xl">New Garage Job</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-5">
-          <div>
-            <Label htmlFor="job-car-search" className="text-base">Select Car *</Label>
+          <div className="flex items-start gap-3 rounded-lg border border-yellow-600/40 bg-yellow-950/20 p-3">
+            <Checkbox
+              id="job-battery-only"
+              checked={batteryOnlyJob}
+              onCheckedChange={(c) => {
+                const on = c === true;
+                setBatteryOnlyJob(on);
+                if (on) {
+                  setSelectedCar(null);
+                  setCarSearch("");
+                  setCars([]);
+                }
+              }}
+            />
+            <div>
+              <Label htmlFor="job-battery-only" className="cursor-pointer text-base">
+                Battery lab job (no vehicle)
+              </Label>
+              <p className="text-muted-foreground mt-1 text-xs">
+                Use for battery-unit work only. No car is linked and no car status is changed.
+              </p>
+            </div>
+          </div>
+
+          <div className={batteryOnlyJob ? "pointer-events-none opacity-50" : ""}>
+            <Label htmlFor="job-car-search" className="text-base">
+              Select Car{batteryOnlyJob ? "" : " *"}
+            </Label>
             <div className="mt-2 flex gap-2">
               <Input
                 id="job-car-search"

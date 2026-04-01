@@ -1,25 +1,57 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
-import { getOnboardingSteps } from "@/lib/onboarding";
+import { getOnboardingSteps, type OnboardingStep } from "@/lib/onboarding";
+
+function filterStepsToExistingTargets(steps: OnboardingStep[]): OnboardingStep[] {
+  if (typeof document === "undefined") return steps;
+  return steps.filter((s) => {
+    try {
+      return !!document.querySelector(s.target);
+    } catch {
+      return false;
+    }
+  });
+}
 
 export function OnboardingTour() {
   const { profile, appRole } = useUser();
   const [index, setIndex] = useState(0);
   const [open, setOpen] = useState(false);
   const highlightRef = useRef<HTMLElement | null>(null);
-
-  const steps = getOnboardingSteps(appRole ?? null);
+  const rawSteps = useMemo(() => getOnboardingSteps(appRole ?? null), [appRole]);
+  const [steps, setSteps] = useState<OnboardingStep[]>([]);
 
   useEffect(() => {
     if (!profile) return;
     if (profile.must_change_password) return;
     if (profile.onboarding_completed) return;
-    if (steps.length === 0) return;
+    if (rawSteps.length === 0) return;
     setOpen(true);
-  }, [profile, steps.length]);
+  }, [profile, rawSteps.length]);
+
+  useEffect(() => {
+    if (!open || rawSteps.length === 0) return;
+    let cancelled = false;
+    const resolve = () => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (cancelled) return;
+          const filtered = filterStepsToExistingTargets(rawSteps);
+          setSteps(filtered);
+          setIndex(0);
+        });
+      });
+    };
+    resolve();
+    window.addEventListener("resize", resolve);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("resize", resolve);
+    };
+  }, [open, rawSteps]);
 
   useEffect(() => {
     if (!open || steps.length === 0) return;
@@ -71,16 +103,12 @@ export function OnboardingTour() {
       <div className="pointer-events-auto fixed inset-x-0 bottom-0 flex justify-center px-4 pb-6">
         <div className="max-w-xl w-full rounded-lg bg-background/95 p-4 shadow-lg border border-border">
           <div className="flex items-center justify-between gap-2">
-            <h2 className="text-sm font-semibold">
-              {step.title}
-            </h2>
+            <h2 className="text-sm font-semibold">{step.title}</h2>
             <p className="text-xs text-muted-foreground">
               Step {index + 1} of {total}
             </p>
           </div>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {step.content}
-          </p>
+          <p className="mt-2 text-sm text-muted-foreground">{step.content}</p>
           <div className="mt-4 flex items-center justify-between gap-2">
             <button
               type="button"
@@ -118,4 +146,3 @@ export function OnboardingTour() {
     </div>
   );
 }
-

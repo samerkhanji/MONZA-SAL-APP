@@ -31,6 +31,7 @@ import { ExportButton } from "@/components/ExportButton";
 import type { ExportColumn } from "@/lib/exportToExcel";
 import { NewJobDialog } from "@/components/garage/NewJobDialog";
 import { FinishJobDialog } from "@/components/garage/FinishJobDialog";
+import { GarageBaySection } from "@/components/garage/GarageBaySection";
 
 const ScannerDialog = dynamic(
   () => import("@/components/scanner/ScannerDialog").then((m) => ({ default: m.ScannerDialog })),
@@ -281,9 +282,35 @@ export default function GarageJobsPage() {
     }
     if (newStatus === "done") {
       updates.completed_at = new Date().toISOString();
+      updates.garage_bay_id = null;
+      updates.started_at = null;
+    }
+    if (newStatus === "cancelled") {
+      updates.garage_bay_id = null;
+      updates.started_at = null;
     }
     if (newStatus === "delivered") {
       updates.delivered_at = new Date().toISOString();
+    }
+
+    if (newStatus === "done" || newStatus === "cancelled") {
+      const { data: openEntries } = await supabase
+        .from("job_time_entries")
+        .select("id, started_at")
+        .eq("job_id", job.id)
+        .is("ended_at", null);
+      const nowIso = new Date().toISOString();
+      for (const row of openEntries ?? []) {
+        const r = row as { id: string; started_at: string };
+        const mins = Math.max(
+          1,
+          Math.round((Date.now() - new Date(r.started_at).getTime()) / 60000)
+        );
+        await supabase
+          .from("job_time_entries")
+          .update({ ended_at: nowIso, duration_minutes: mins })
+          .eq("id", r.id);
+      }
     }
 
     const { error } = await supabase
@@ -294,6 +321,23 @@ export default function GarageJobsPage() {
     if (error) {
       toast.error(error.message);
       return;
+    }
+
+    if (newStatus === "done" && job.cars?.id) {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      await supabase.from("cars").update({ status: "in_stock" }).eq("id", job.cars.id);
+      if (user) {
+        await supabase.from("car_events").insert({
+          car_id: job.cars.id,
+          event_type: "status_changed",
+          from_value: "service",
+          to_value: "in_stock",
+          note: `Job marked done from list: ${job.title}`,
+          created_by: user.id,
+        });
+      }
     }
 
     if (newStatus === "delivered") {
@@ -360,7 +404,8 @@ export default function GarageJobsPage() {
   const jobExportData = (list: JobWithCar[]) =>
     list.map((j) => {
       const car = Array.isArray(j.cars) ? j.cars[0] : j.cars;
-      const priorityLabel = j.priority === "low" ? "🟢 Low" : j.priority === "urgent" ? "🔴 Urgent" : "🟡 Medium";
+      const priorityLabel =
+        j.priority === "low" ? "Low" : j.priority === "urgent" ? "Urgent" : "Medium";
       return {
         ...j,
         car_vin: car?.vin ?? "",
@@ -392,6 +437,11 @@ export default function GarageJobsPage() {
             }}
             disabled={loading}
           />
+          {canManageGarage && (
+            <Button size="lg" variant="outline" className="h-12 px-6 text-base" asChild>
+              <Link href="/garage/time-reports">Time reports</Link>
+            </Button>
+          )}
           {canCreateJob && (
             <>
               <Button
@@ -418,6 +468,8 @@ export default function GarageJobsPage() {
           )}
         </div>
       </div>
+
+      <GarageBaySection onRefreshJobs={fetchJobs} />
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <div className="rounded-lg border bg-card p-4">

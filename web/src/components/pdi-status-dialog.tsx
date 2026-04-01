@@ -42,7 +42,7 @@ export function PdiStatusDialog({
   onOpenChange,
   onSuccess,
 }: PdiStatusDialogProps) {
-  const { canEditInventory } = useUser();
+  const { canEditPdiStatusOnCar } = useUser();
   const supabase = createClient();
   const [status, setStatus] = useState<PdiStatus>("pending");
   const [submitting, setSubmitting] = useState(false);
@@ -53,7 +53,7 @@ export function PdiStatusDialog({
   }, [open, car]);
 
   async function handleSave() {
-    if (!car || !canEditInventory) return;
+    if (!car || !canEditPdiStatusOnCar) return;
 
     setSubmitting(true);
     const { error } = await supabase
@@ -81,12 +81,21 @@ export function PdiStatusDialog({
           <DialogDescription>
             {car.brand} {car.model} — VIN:{" "}
             <span className="font-mono">{car.vin_short ?? car.vin?.slice(-8)}</span>
+            {!canEditPdiStatusOnCar && (
+              <span className="mt-2 block text-amber-600/90 dark:text-amber-400">
+                View only — owners, assistants, and garage managers can change PDI.
+              </span>
+            )}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-8">
           <div className="space-y-2">
             <Label>Status</Label>
-            <Select value={status} onValueChange={(v) => setStatus(v as PdiStatus)}>
+            <Select
+              value={status}
+              onValueChange={(v) => setStatus(v as PdiStatus)}
+              disabled={!canEditPdiStatusOnCar}
+            >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -104,7 +113,7 @@ export function PdiStatusDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          {canEditInventory && (
+          {canEditPdiStatusOnCar && (
             <Button onClick={handleSave} disabled={submitting}>
               {submitting ? "Saving..." : "Save"}
             </Button>

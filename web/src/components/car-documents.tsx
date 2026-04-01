@@ -11,6 +11,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
+import { canPerform } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -150,7 +151,8 @@ function getDocTypeIcon(doc: CarDocumentRow): string {
 }
 
 export function CarDocuments({ carId, carVin }: CarDocumentsProps) {
-  const { canUploadDocuments, canDelete } = useUser();
+  const { canUploadDocuments, appRole } = useUser();
+  const canDeleteCarDocs = canPerform("cars", "delete", appRole ?? null);
   const supabase = createClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [documents, setDocuments] = useState<CarDocumentRow[]>([]);
@@ -233,7 +235,7 @@ export function CarDocuments({ carId, carVin }: CarDocumentsProps) {
   }
 
   async function handleDelete(doc: CarDocumentRow) {
-    if (!canDelete) return;
+    if (!canDeleteCarDocs) return;
     if (!confirm(`Delete "${doc.file_name}"?`)) return;
 
     const path = getDocPath(doc);
@@ -460,7 +462,7 @@ export function CarDocuments({ carId, carVin }: CarDocumentsProps) {
                         <Download className="mr-1 size-3.5" />
                         Download
                       </Button>
-                      {canDelete && (
+                      {canDeleteCarDocs && (
                         <Button
                           variant="outline"
                           size="sm"

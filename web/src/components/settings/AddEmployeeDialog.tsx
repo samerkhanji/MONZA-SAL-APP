@@ -113,7 +113,15 @@ export function AddEmployeeDialog({
       }
 
       setTempPassword(data.temp_password ?? null);
-      toast.success("Employee added successfully");
+      const successDescription =
+        typeof data.message === "string" && data.message.trim()
+          ? data.message.trim()
+          : null;
+      if (successDescription) {
+        toast.success("Employee added", { description: successDescription });
+      } else {
+        toast.success("Employee added successfully");
+      }
 
       if (data.temp_password) {
         setTimeout(() => {

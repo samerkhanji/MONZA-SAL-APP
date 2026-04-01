@@ -44,6 +44,7 @@ import { Badge } from "@/components/ui/badge";
 import { ExportButton } from "@/components/ExportButton";
 import type { ExportColumn } from "@/lib/exportToExcel";
 import { createNotificationsForUsers, createNotification } from "@/lib/notifications";
+import { installmentDueDateIso } from "@/lib/installment-due-dates";
 import {
   Plus,
   DollarSign,
@@ -118,6 +119,7 @@ export default function InstallmentsPage() {
   const [newPlanMonthly, setNewPlanMonthly] = useState("");
   const [newPlanStartDate, setNewPlanStartDate] = useState("");
   const [newPlanDueDay, setNewPlanDueDay] = useState("");
+  const [newPlanInterestRate, setNewPlanInterestRate] = useState("");
   const [savingNewPlan, setSavingNewPlan] = useState(false);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [cars, setCars] = useState<Car[]>([]);
@@ -614,7 +616,7 @@ export default function InstallmentsPage() {
       !(monthsNum > 0) ||
       !(monthlyNum > 0) ||
       dueDayNum < 1 ||
-      dueDayNum > 28
+      dueDayNum > 31
     ) {
       return { summary: null as string | null, rows: [] as { no: number; date: string; amount: number }[] };
     }
@@ -628,14 +630,12 @@ export default function InstallmentsPage() {
     )} | Monthly: ${currencyFormatter.format(monthlyNum)} x ${monthsNum} months`;
 
     const rows: { no: number; date: string; amount: number }[] = [];
-    const baseDate = new Date(newPlanStartDate);
+    const startYmd = newPlanStartDate;
     for (let i = 0; i < monthsNum; i += 1) {
-      const d = new Date(baseDate);
-      d.setMonth(d.getMonth() + i);
-      d.setDate(dueDayNum);
+      const ymd = installmentDueDateIso(startYmd, i, dueDayNum);
       rows.push({
         no: i + 1,
-        date: format(d, "dd/MM/yyyy"),
+        date: format(new Date(`${ymd}T12:00:00`), "dd/MM/yyyy"),
         amount: monthlyNum,
       });
     }
@@ -2449,13 +2449,24 @@ export default function InstallmentsPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Due Day (1–28) *</Label>
+                    <Label>Due Day (1–31) *</Label>
                     <Input
                       value={newPlanDueDay}
                       onChange={(e) => setNewPlanDueDay(e.target.value)}
                       type="number"
                       min={1}
-                      max={28}
+                      max={31}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Late interest rate (% optional)</Label>
+                    <Input
+                      value={newPlanInterestRate}
+                      onChange={(e) => setNewPlanInterestRate(e.target.value)}
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      placeholder="0"
                     />
                   </div>
                 </div>
@@ -2545,8 +2556,8 @@ export default function InstallmentsPage() {
                         toast.error("Start date is required.");
                         return;
                       }
-                      if (dueDayNum < 1 || dueDayNum > 28) {
-                        toast.error("Due day must be between 1 and 28.");
+                      if (dueDayNum < 1 || dueDayNum > 31) {
+                        toast.error("Due day must be between 1 and 31.");
                         return;
                       }
 
@@ -2554,6 +2565,11 @@ export default function InstallmentsPage() {
 
                       const { data: authData } = await supabase.auth.getUser();
                       const creatorId = authData?.user?.id || profile?.id || null;
+                      const interestPct = newPlanInterestRate.trim()
+                        ? Number(newPlanInterestRate)
+                        : 0;
+                      const interestRate =
+                        Number.isFinite(interestPct) && interestPct >= 0 ? interestPct : 0;
 
                       const { data: planData, error: planError } = await supabase
                         .from("payment_plans")
@@ -2567,6 +2583,7 @@ export default function InstallmentsPage() {
                           months: monthsNum,
                           start_date: newPlanStartDate,
                           due_day: dueDayNum,
+                          interest_rate: interestRate,
                           created_by: creatorId,
                         })
                         .select("id")
@@ -2582,7 +2599,7 @@ export default function InstallmentsPage() {
                       }
 
                       const installmentsPayload: Record<string, unknown>[] = [];
-                      const baseDate = new Date(newPlanStartDate);
+                      const planStartYmd = newPlanStartDate;
 
                       if (downNum > 0) {
                         installmentsPayload.push({
@@ -2598,10 +2615,7 @@ export default function InstallmentsPage() {
                       }
 
                       for (let i = 0; i < monthsNum; i += 1) {
-                        const d = new Date(baseDate);
-                        d.setMonth(d.getMonth() + i);
-                        d.setDate(dueDayNum);
-                        const dueDateStr = d.toISOString().split("T")[0];
+                        const dueDateStr = installmentDueDateIso(planStartYmd, i, dueDayNum);
                         installmentsPayload.push({
                           plan_id: planData.id,
                           installment_no: i + 1,

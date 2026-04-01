@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
 import { canPerform } from "@/lib/permissions";
-import type { GarageJob, JobPart } from "@/types/database";
+import type { GarageBay, GarageBayType, GarageJob, JobPart } from "@/types/database";
 import {
   JOB_STATUS_COLORS,
   JOB_STATUS_LABELS,
@@ -29,10 +29,20 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Plus, Play, Square, Check, Trash2, ScanLine } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { ArrowLeft, Plus, Check, Trash2, ScanLine } from "lucide-react";
 import { JobDocuments } from "@/components/garage/JobDocuments";
 import { FinishJobDialog } from "@/components/garage/FinishJobDialog";
 import { ScannerDialog } from "@/components/scanner/ScannerDialog";
+import { JobTimeEntryControls } from "@/components/garage/JobTimeEntryControls";
+import { JobBayTypeControls } from "@/components/garage/JobBayTypeControls";
+import { RepairProposalPanel } from "@/components/garage/RepairProposalPanel";
 
 interface JobWithCar extends GarageJob {
   cars?: {
@@ -43,6 +53,11 @@ interface JobWithCar extends GarageJob {
     model_year: number | null;
     exterior_color: string | null;
     status: string;
+  } | null;
+  garage_bays?: {
+    id: string;
+    name: string;
+    bay_type: string;
   } | null;
 }
 
@@ -59,7 +74,7 @@ export default function JobDetailPage() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
-  const { canManageGarage, canDelete, appRole, profile } = useUser();
+  const { canManageGarage, canDelete, appRole, profile, isOwner } = useUser();
   const [job, setJob] = useState<JobWithCar | null>(null);
   const [parts, setParts] = useState<JobPartWithPart[]>([]);
   const [loading, setLoading] = useState(true);
@@ -73,8 +88,7 @@ export default function JobDetailPage() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [finishOpen, setFinishOpen] = useState(false);
   const [scanPartOpen, setScanPartOpen] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const [elapsed, setElapsed] = useState(0);
+  const [bays, setBays] = useState<GarageBay[]>([]);
 
   const supabase = createClient();
 
@@ -99,7 +113,9 @@ export default function JobDetailPage() {
   async function fetchJob() {
     const { data, error } = await supabase
       .from("garage_jobs")
-      .select("*, cars:car_id(id, vin, brand, model, model_year, exterior_color, status)")
+      .select(
+        "*, cars:car_id(id, vin, brand, model, model_year, exterior_color, status), garage_bays:garage_bay_id(id, name, bay_type)"
+      )
       .eq("id", id)
       .is("deleted_at", null)
       .single();
@@ -109,7 +125,19 @@ export default function JobDetailPage() {
       router.push("/garage");
       return;
     }
-    setJob(data as JobWithCar);
+    const row = data as JobWithCar;
+    const bayJoin = row.garage_bays;
+    row.garage_bays = Array.isArray(bayJoin) ? bayJoin[0] ?? null : bayJoin ?? null;
+    setJob(row);
+  }
+
+  async function fetchBays() {
+    const { data } = await supabase
+      .from("garage_bays")
+      .select("*")
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true });
+    setBays((data as GarageBay[]) ?? []);
   }
 
   async function fetchParts() {
@@ -125,23 +153,12 @@ export default function JobDetailPage() {
     if (!id) return;
     setLoading(true);
     fetchJob().finally(() => setLoading(false));
+    void fetchBays();
   }, [id]);
 
   useEffect(() => {
     if (job?.id) fetchParts();
   }, [job?.id]);
-
-  useEffect(() => {
-    if (!job?.started_at || job.status !== "in_progress") return;
-    const start = new Date(job.started_at).getTime();
-    const update = () =>
-      setElapsed(Math.floor((Date.now() - start) / 1000 / 60));
-    update();
-    timerRef.current = setInterval(update, 60000);
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [job?.started_at, job?.status]);
 
   useEffect(() => {
     if (!addPartOpen || !partSearch.trim() || partSearch.length < 2) {
@@ -161,45 +178,6 @@ export default function JobDetailPage() {
         )
       );
   }, [addPartOpen, partSearch]);
-
-  async function handleStartTimer() {
-    if (!job) return;
-    const { error } = await supabase
-      .from("garage_jobs")
-      .update({
-        status: "in_progress",
-        started_at: new Date().toISOString(),
-      })
-      .eq("id", job.id);
-    if (error) {
-      toast.error(error.message);
-      return;
-    }
-    toast.success("Timer started");
-    fetchJob();
-  }
-
-  async function handleStopTimer() {
-    if (!job) return;
-    const start = job.started_at ? new Date(job.started_at).getTime() : Date.now();
-    const mins = Math.floor((Date.now() - start) / 60000);
-    const addHours = mins / 60;
-    const current = job.actual_hours ?? 0;
-    const { error } = await supabase
-      .from("garage_jobs")
-      .update({
-        actual_hours: current + addHours,
-        started_at: null,
-      })
-      .eq("id", job.id);
-    if (error) {
-      toast.error(error.message);
-      return;
-    }
-    toast.success(`Added ${(addHours).toFixed(1)}h`);
-    fetchJob();
-    setElapsed(0);
-  }
 
   async function handleAddPart() {
     if (!selectedPartId || !job) return;
@@ -303,10 +281,6 @@ export default function JobDetailPage() {
     return sum + cost * qty;
   }, 0);
 
-  const runningMins = job?.started_at && job?.status === "in_progress"
-    ? Math.floor((Date.now() - new Date(job.started_at).getTime()) / 60000)
-    : 0;
-
   if (loading || !job) {
     return (
       <div className="container py-12">
@@ -321,6 +295,8 @@ export default function JobDetailPage() {
   const isAssignedToMe =
     job.assigned_to && profile?.id && job.assigned_to === profile.id;
   const canGarageStaffEditLimited = isGarageStaff && !!isAssignedToMe;
+  const isGarageManagerRole = appRole === "garage_manager";
+  const isAssistantRole = appRole === "assistant";
 
   const car = job.cars;
   const isOverdue =
@@ -345,6 +321,11 @@ export default function JobDetailPage() {
         </Badge>
       </div>
 
+      {job.is_battery_only && (
+        <p className="text-sm text-yellow-600 dark:text-yellow-400">
+          Battery unit only — no vehicle on this job.
+        </p>
+      )}
       {car && (
         <p>
           <Link
@@ -359,18 +340,6 @@ export default function JobDetailPage() {
       <div className="flex flex-wrap gap-2">
         {(canEditJob || canGarageStaffEditLimited) && (
           <>
-            {job.status === "pending" && (
-              <Button size="lg" onClick={handleStartTimer}>
-                <Play className="mr-2 size-4" />
-                Start Timer
-              </Button>
-            )}
-            {job.status === "in_progress" && (
-              <Button size="lg" variant="outline" onClick={handleStopTimer}>
-                <Square className="mr-2 size-4" />
-                Stop Timer
-              </Button>
-            )}
             {job.status !== "done" && job.status !== "cancelled" && (
               <Button size="lg" onClick={() => setFinishOpen(true)}>
                 <Check className="mr-2 size-4" />
@@ -390,6 +359,124 @@ export default function JobDetailPage() {
           </Button>
         )}
       </div>
+
+      <JobTimeEntryControls
+        jobId={job.id}
+        jobStatus={job.status}
+        actualHours={job.actual_hours ?? null}
+        canControl={canEditJob || canGarageStaffEditLimited}
+        carVinShort={
+          car?.vin
+            ? car.vin.length >= 8
+              ? `…${car.vin.slice(-8)}`
+              : car.vin
+            : job.is_battery_only
+              ? "battery unit"
+              : ""
+        }
+        onChanged={() => void fetchJob()}
+      />
+
+      {canManageGarage && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Workshop bay</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <Label>Assign bay</Label>
+            <Select
+              value={job.garage_bay_id ?? "__none__"}
+              onValueChange={async (v) => {
+                const bayId = v === "__none__" ? null : v;
+                const { error } = await supabase
+                  .from("garage_jobs")
+                  .update({
+                    garage_bay_id: bayId,
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq("id", job.id);
+                if (error) toast.error(error.message);
+                else {
+                  toast.success(bayId ? "Bay updated" : "Bay cleared");
+                  void fetchJob();
+                }
+              }}
+            >
+              <SelectTrigger className="max-w-md">
+                <SelectValue placeholder="No bay" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">No bay</SelectItem>
+                {bays
+                  .filter((b) =>
+                    job.is_battery_only ? b.bay_type === "battery_lab" : b.bay_type !== "battery_lab"
+                  )
+                  .map((b) => (
+                    <SelectItem key={b.id} value={b.id}>
+                      {b.name} ({b.bay_type})
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+            {job.garage_bays && (
+              <p className="text-muted-foreground text-sm">
+                Current: {job.garage_bays.name} · {job.garage_bays.bay_type}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      <JobBayTypeControls
+        jobId={job.id}
+        bayType={(job.garage_bays?.bay_type as GarageBayType | undefined) ?? null}
+        canEdit={canEditJob || canGarageStaffEditLimited}
+      />
+
+      <RepairProposalPanel
+        jobId={job.id}
+        isGarageManager={isGarageManagerRole}
+        isAssistant={isAssistantRole}
+        isOwner={!!isOwner}
+        onJobUpdated={() => void fetchJob()}
+      />
+
+      {Array.isArray(job.work_checklist) && job.work_checklist.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Work checklist (approved items)</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {job.work_checklist.map((item) => (
+              <label
+                key={item.id}
+                className="flex cursor-pointer items-center gap-2 rounded border border-border p-2 text-sm"
+              >
+                <input
+                  type="checkbox"
+                  checked={item.done}
+                  disabled={!(canEditJob || canGarageStaffEditLimited)}
+                  onChange={async (e) => {
+                    const next = (job.work_checklist ?? []).map((x) =>
+                      x.id === item.id ? { ...x, done: e.target.checked } : x
+                    );
+                    setJob({ ...job, work_checklist: next });
+                    const { error } = await supabase
+                      .from("garage_jobs")
+                      .update({ work_checklist: next })
+                      .eq("id", job.id);
+                    if (error) {
+                      toast.error(error.message);
+                      void fetchJob();
+                    }
+                  }}
+                />
+                <span>{item.label}</span>
+              </label>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Section 1: Job Info */}
       <Card>
@@ -423,8 +510,8 @@ export default function JobDetailPage() {
           </div>
           {job.status === "in_progress" && job.started_at && (
             <p className="text-muted-foreground text-sm">
-              Started: {new Date(job.started_at).toLocaleString()} · Running:{" "}
-              {Math.floor(runningMins / 60)}h {runningMins % 60}m
+              Job clock started: {new Date(job.started_at).toLocaleString()} (use work time above for
+              sessions)
             </p>
           )}
         </CardContent>
