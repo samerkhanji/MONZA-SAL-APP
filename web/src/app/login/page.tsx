@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase";
-import { submitPasswordResetRequest } from "@/lib/request-password-reset";
+import { getPasswordResetRedirectUrl } from "@/lib/auth-app-url";
 import { isConnectionError } from "@/lib/auth-utils";
 import {
   clearAuthSessionMarkers,
@@ -115,9 +115,13 @@ function LoginForm() {
     setForgotError(null);
     setForgotLoading(true);
 
-    const { error } = await submitPasswordResetRequest(forgotEmail);
-    if (error) {
-      setForgotError(error);
+    const supabase = createClient();
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+      forgotEmail.trim(),
+      { redirectTo: getPasswordResetRedirectUrl() }
+    );
+    if (resetError) {
+      setForgotError(resetError.message);
     } else {
       setForgotSuccess(true);
     }

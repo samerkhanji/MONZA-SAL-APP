@@ -3,12 +3,8 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase";
-import {
-  getPasswordResetRedirectUrl,
-  logPasswordResetClientDebug,
-  validatePasswordResetRedirectUrl,
-} from "@/lib/auth-app-url";
-import { formatAuthApiErrorMessage, isConnectionError } from "@/lib/auth-utils";
+import { getPasswordResetRedirectUrl } from "@/lib/auth-app-url";
+import { isConnectionError } from "@/lib/auth-utils";
 import {
   clearAuthSessionMarkers,
   idleLogoutMinutesForDisplay,
@@ -83,47 +79,17 @@ function HomePageContent() {
     setForgotError(null);
     setForgotLoading(true);
 
-    const redirectTo = getPasswordResetRedirectUrl();
-    const redirectInvalid = validatePasswordResetRedirectUrl(redirectTo);
-    if (redirectInvalid) {
-      console.error("[PasswordReset] Bad redirectTo:", redirectTo, redirectInvalid);
-      setForgotError(redirectInvalid);
-      setForgotLoading(false);
-      return;
-    }
-    logPasswordResetClientDebug(redirectTo);
-
-    try {
-      const res = await fetch("/api/auth/reset-password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: forgotEmail.trim() }),
-      });
-      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
-
-      if (res.status === 503) {
-        setForgotError(
-          data.error ?? "Password reset is temporarily unavailable. Try again later."
-        );
-        return;
-      }
-      if (res.status === 502 || !res.ok) {
-        setForgotError(
-          data.error ?? "Something went wrong while sending the reset email. Please try again."
-        );
-        return;
-      }
+    const supabase = createClient();
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+      forgotEmail.trim(),
+      { redirectTo: getPasswordResetRedirectUrl() }
+    );
+    if (resetError) {
+      setForgotError(resetError.message);
+    } else {
       setForgotSuccess(true);
-    } catch (unexpected) {
-      console.error("[PasswordReset] fetch failed:", unexpected);
-      setForgotError(
-        isConnectionError(unexpected)
-          ? "Connection failed. Please check your internet and try again."
-          : formatAuthApiErrorMessage(unexpected as Error, { redirectTo })
-      );
-    } finally {
-      setForgotLoading(false);
     }
+    setForgotLoading(false);
   }
 
   function openForgotDialog() {
