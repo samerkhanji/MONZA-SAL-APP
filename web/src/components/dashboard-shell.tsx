@@ -87,6 +87,12 @@ const BASE_NAV_ITEMS: Array<{
     children: [
       { href: "/garage", label: "Jobs", icon: Wrench, tourId: "nav-garage" },
       {
+        href: "/garage/tasks",
+        label: "Task board",
+        icon: ClipboardList,
+        tourId: "nav-garage-tasks",
+      },
+      {
         href: "/garage/inventory",
         label: "Parts Inventory",
         icon: Package,
@@ -97,6 +103,12 @@ const BASE_NAV_ITEMS: Array<{
         label: "Garage History",
         icon: History,
         tourId: "nav-garage-history",
+      },
+      {
+        href: "/garage/settings",
+        label: "Workflow setup",
+        icon: Settings,
+        tourId: "nav-garage-settings",
       },
     ],
   },
@@ -118,6 +130,8 @@ function getPageTitle(pathname: string): string {
   if (pathname.startsWith("/requests/pending")) return "Pending Requests";
   if (pathname.startsWith("/requests")) return "Request Center";
   if (pathname.startsWith("/garage/jobs/")) return "Job Details";
+  if (pathname.startsWith("/garage/tasks")) return "Garage Task Board";
+  if (pathname.startsWith("/garage/settings")) return "Garage Workflow";
   if (pathname.startsWith("/garage/inventory")) return "Parts Inventory";
   if (pathname.startsWith("/garage/history")) return "Garage History";
   if (pathname.startsWith("/garage")) return "Garage";
@@ -216,6 +230,12 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               return ["owner", "assistant", "garage_manager", "sales_ops"].includes(
                 appRole
               );
+            if (child.href === "/garage/tasks")
+              return ["owner", "assistant", "garage_manager", "garage_staff"].includes(
+                appRole
+              );
+            if (child.href === "/garage/settings")
+              return appRole === "owner" || appRole === "garage_manager";
             return false;
           });
           return !!visibleChildren && visibleChildren.length > 0;
@@ -280,6 +300,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                   {item.children!.filter((child) => {
                     if (child.href === "/garage/inventory") return canSeePartsInventory;
                     if (child.href === "/garage/history") return canSeeGarageJobs;
+                    if (child.href === "/garage/tasks") return canSeeGarageJobs;
+                    if (child.href === "/garage/settings")
+                      return appRole === "owner" || appRole === "garage_manager";
                     if (child.href === "/garage") return canSeeGarageJobs;
                     if (child.href === "/requests/pending") return canSeeSettings;
                     return true;

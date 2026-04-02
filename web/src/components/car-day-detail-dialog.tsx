@@ -9,6 +9,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
+import { canPerform } from "@/lib/permissions";
 import type { CarEvent } from "@/types/database";
 import {
   Dialog,
@@ -87,7 +88,8 @@ export function DayDetailDialog({
   formatEventDisplay,
   onRefresh,
 }: DayDetailDialogProps) {
-  const { canUploadDocuments, canDelete } = useUser();
+  const { canUploadDocuments, appRole } = useUser();
+  const canDeleteCarDocs = canPerform("cars", "delete", appRole ?? null);
   const supabase = createClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [documents, setDocuments] = useState<DayDoc[]>([]);
@@ -171,7 +173,7 @@ export function DayDetailDialog({
   }
 
   async function handleDelete(doc: DayDoc) {
-    if (!canDelete) return;
+    if (!canDeleteCarDocs) return;
     if (!confirm(`Delete "${doc.file_name}"?`)) return;
     const path = getDocPath(doc);
     await supabase.storage.from("car-documents").remove([path]);
@@ -372,7 +374,7 @@ export function DayDetailDialog({
                       >
                         <Download className="size-4" />
                       </Button>
-                      {canDelete && (
+                      {canDeleteCarDocs && (
                         <Button
                           variant="ghost"
                           size="icon"

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
+import { canPerform } from "@/lib/permissions";
 import type { AccessoryCustomItem, AccessoryCustomTable } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -51,7 +52,10 @@ function profileName(t: AccessoryCustomTable): string | null {
 
 export function CustomAccessoryCollections() {
   const supabase = createClient();
-  const { profile, isOwner, loading: userLoading } = useUser();
+  const { profile, appRole, loading: userLoading } = useUser();
+  const canCreateCollection = canPerform("accessory_collections", "create", appRole ?? null);
+  const canEditCollection = canPerform("accessory_collections", "edit", appRole ?? null);
+  const canDeleteCollection = canPerform("accessory_collections", "delete", appRole ?? null);
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -123,6 +127,10 @@ export function CustomAccessoryCollections() {
   }, [userLoading, profile, refresh]);
 
   async function handleCreateTable() {
+    if (!canCreateCollection) {
+      toast.error("You do not have permission to create collections.");
+      return;
+    }
     const name = newTableName.trim();
     if (!name || !profile?.id) {
       toast.error("Enter a collection name.");
@@ -145,6 +153,10 @@ export function CustomAccessoryCollections() {
   }
 
   async function handleRename() {
+    if (!canEditCollection) {
+      toast.error("You do not have permission to rename collections.");
+      return;
+    }
     const t = renameTarget;
     const name = renameValue.trim();
     if (!t || !name) return;
@@ -164,6 +176,10 @@ export function CustomAccessoryCollections() {
   }
 
   async function handleDeleteTable(tableId: string) {
+    if (!canDeleteCollection) {
+      toast.error("You do not have permission to delete collections.");
+      return;
+    }
     const { error } = await supabase.from("accessory_custom_tables").delete().eq("id", tableId);
     if (error) {
       toast.error(error.message);
@@ -178,6 +194,10 @@ export function CustomAccessoryCollections() {
     id: string,
     patch: Partial<Pick<AccessoryCustomItem, "label" | "quantity" | "note" | "linked_plate">>
   ) {
+    if (!canEditCollection) {
+      toast.error("You do not have permission to edit lines.");
+      return;
+    }
     const { error } = await supabase
       .from("accessory_custom_items")
       .update({
@@ -193,6 +213,10 @@ export function CustomAccessoryCollections() {
   }
 
   async function addItem(tableId: string) {
+    if (!canEditCollection) {
+      toast.error("You do not have permission to add lines.");
+      return;
+    }
     const { data, error } = await supabase
       .from("accessory_custom_items")
       .insert({
@@ -214,6 +238,10 @@ export function CustomAccessoryCollections() {
   }
 
   async function deleteItem(id: string) {
+    if (!canEditCollection) {
+      toast.error("You do not have permission to remove lines.");
+      return;
+    }
     const { error } = await supabase.from("accessory_custom_items").delete().eq("id", id);
     if (error) {
       toast.error(error.message);
@@ -256,14 +284,16 @@ export function CustomAccessoryCollections() {
         <div>
           <h2 className="text-lg font-semibold tracking-tight">Custom collections</h2>
           <p className="text-muted-foreground max-w-2xl text-sm">
-            Create new accessory lists for your team. Everyone with access can add and edit lines. Collection
-            names can only be changed or removed by an <strong>owner</strong> (enforced in the database).
+            Create accessory lists for your team. Who can create, edit lines, rename, or delete a whole
+            collection follows role permissions (owner-only delete of collections).
           </p>
         </div>
-        <Button type="button" className="gap-2 shrink-0" onClick={() => setCreateOpen(true)}>
-          <Table2 className="size-4" />
-          New collection
-        </Button>
+        {canCreateCollection ? (
+          <Button type="button" className="gap-2 shrink-0" onClick={() => setCreateOpen(true)}>
+            <Table2 className="size-4" />
+            New collection
+          </Button>
+        ) : null}
       </div>
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
@@ -301,7 +331,7 @@ export function CustomAccessoryCollections() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Rename collection</DialogTitle>
-            <DialogDescription>Owner only — updates the list title for all staff.</DialogDescription>
+            <DialogDescription>Updates the list title for all staff (requires edit permission).</DialogDescription>
           </DialogHeader>
           <Input value={renameValue} onChange={(e) => setRenameValue(e.target.value)} />
           <DialogFooter>
@@ -360,11 +390,13 @@ export function CustomAccessoryCollections() {
                     </CardDescription>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <Button type="button" variant="secondary" size="sm" className="gap-1.5" onClick={() => void addItem(t.id)}>
-                      <Plus className="size-4" />
-                      Add line
-                    </Button>
-                    {isOwner && (
+                    {canEditCollection ? (
+                      <Button type="button" variant="secondary" size="sm" className="gap-1.5" onClick={() => void addItem(t.id)}>
+                        <Plus className="size-4" />
+                        Add line
+                      </Button>
+                    ) : null}
+                    {(canEditCollection || canDeleteCollection) && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button type="button" variant="outline" size="icon" aria-label="Collection actions">
@@ -372,22 +404,26 @@ export function CustomAccessoryCollections() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={() => {
-                              setRenameTarget(t);
-                              setRenameValue(t.name);
-                            }}
-                          >
-                            <Pencil className="mr-2 size-4" />
-                            Rename
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-destructive focus:text-destructive"
-                            onClick={() => setPendingDelete({ id: t.id, name: t.name })}
-                          >
-                            <Trash2 className="mr-2 size-4" />
-                            Delete collection
-                          </DropdownMenuItem>
+                          {canEditCollection ? (
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setRenameTarget(t);
+                                setRenameValue(t.name);
+                              }}
+                            >
+                              <Pencil className="mr-2 size-4" />
+                              Rename
+                            </DropdownMenuItem>
+                          ) : null}
+                          {canDeleteCollection ? (
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onClick={() => setPendingDelete({ id: t.id, name: t.name })}
+                            >
+                              <Trash2 className="mr-2 size-4" />
+                              Delete collection
+                            </DropdownMenuItem>
+                          ) : null}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     )}
@@ -471,7 +507,7 @@ export function CustomAccessoryCollections() {
                                 />
                               </TableCell>
                               <TableCell className="pr-6 text-right align-top">
-                                {isOwner ? (
+                                {canEditCollection ? (
                                   <Button
                                     type="button"
                                     variant="ghost"

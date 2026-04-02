@@ -20,6 +20,7 @@ function getPageKeyFromPathname(pathname: string):
   | "garage_history"
   | "documents"
   | "settings"
+  | "garage_settings"
   | null {
   if (pathname.startsWith("/assistant-dashboard")) return "assistant_dashboard";
   if (pathname === "/dashboard") return "dashboard";
@@ -32,7 +33,13 @@ function getPageKeyFromPathname(pathname: string):
   if (pathname.startsWith("/requests")) return "requests";
   if (pathname.startsWith("/garage/inventory")) return "parts";
   if (pathname.startsWith("/garage/history")) return "garage_history";
-  if (pathname === "/garage" || pathname.startsWith("/garage/jobs")) return "garage";
+  if (
+    pathname === "/garage" ||
+    pathname.startsWith("/garage/jobs") ||
+    pathname.startsWith("/garage/tasks")
+  )
+    return "garage";
+  if (pathname.startsWith("/garage/settings")) return "garage_settings";
   if (pathname.startsWith("/settings")) return "settings";
   return null;
 }

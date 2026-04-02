@@ -11,6 +11,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
+import { canPerform } from "@/lib/permissions";
 import { JOB_DOCUMENT_TYPES } from "@/lib/constants/jobs";
 import { Button } from "@/components/ui/button";
 import {
@@ -103,7 +104,7 @@ function ThumbnailPreview({
 }
 
 export function JobDocuments({ jobId, onDocumentsChange }: JobDocumentsProps) {
-  const { canManageGarage, canDelete, appRole } = useUser();
+  const { canManageGarage, appRole } = useUser();
   const supabase = createClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [documents, setDocuments] = useState<JobDocumentRow[]>([]);
@@ -116,7 +117,7 @@ export function JobDocuments({ jobId, onDocumentsChange }: JobDocumentsProps) {
   const [typeFilter, setTypeFilter] = useState<string>("all");
 
   const canUpload = canManageGarage || appRole === "garage_staff";
-  const canDeleteDocs = canManageGarage && canDelete;
+  const canDeleteDocs = canPerform("garage_jobs", "delete", appRole ?? null);
 
   async function fetchDocuments() {
     setLoading(true);

@@ -22,7 +22,8 @@ export const PAGE_PERMISSIONS: Record<
   | "garage"
   | "garage_history"
   | "documents"
-  | "settings",
+  | "settings"
+  | "garage_settings",
   AppRole[]
 > = {
   dashboard: ["owner"],
@@ -60,6 +61,7 @@ export const PAGE_PERMISSIONS: Record<
     "sales_ops",
   ],
   settings: ["owner"],
+  garage_settings: ["owner", "garage_manager"],
 };
 
 export const CRUD_PERMISSIONS = {
@@ -123,13 +125,21 @@ export const CRUD_PERMISSIONS = {
       "sales_ops",
     ] as AppRole[],
   },
+  accessory_collections: {
+    create: ["owner", "assistant", "khalil_hybrid", "it", "sales_ops"] as AppRole[],
+    edit: ["owner", "assistant", "khalil_hybrid", "it", "sales_ops"] as AppRole[],
+    delete: ["owner"] as AppRole[],
+    view: ["owner", "assistant", "khalil_hybrid", "it", "sales_ops"] as AppRole[],
+  },
 } as const;
 
 export type CrudEntity = keyof typeof CRUD_PERMISSIONS;
 export type CrudAction =
-  | keyof (typeof CRUD_PERMISSIONS)["cars"]
-  | keyof (typeof CRUD_PERMISSIONS)["installments"]
-  | keyof (typeof CRUD_PERMISSIONS)["requests"];
+  | "create"
+  | "edit"
+  | "delete"
+  | "view"
+  | "mark_paid";
 
 export function getAppRoleFromProfile(profile: UserProfile | null): AppRole | null {
   if (!profile) return null;
