@@ -113,7 +113,7 @@ This will read EVERY file in this area. Proceed? [y/n]
   <check if="target_type == api_group">
     <action>Identify all route/controller files in API group</action>
     <action>Read all route handlers completely</action>
-    <action>Read associated middleware, controllers, services</action>
+    <action>Read associated middleware or edge/proxy handlers, controllers, services</action>
     <action>Read data models and schemas used</action>
     <action>Extract complete request/response schemas</action>
     <action>Document authentication and authorization requirements</action>

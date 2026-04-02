@@ -7,15 +7,22 @@
  *   https://*.vercel.app/** (or your team pattern) in Supabase Redirect URLs.
  * - Local: leave unset; uses http://localhost:3000 — allow http://localhost:3000/** in Supabase.
  *
- * Password reset cross-device: `@supabase/ssr` createBrowserClient forces PKCE, which made reset emails use
- * ?code=; use `createClientForPasswordResetEmail` from `./supabase/password-reset-mail-client` for
- * resetPasswordForEmail only. Also use the token link example below in Supabase → Email Templates → Reset
- * password. Magic-link / sign-in OTP templates can use /auth/confirm
+ * Password reset cross-device: the app triggers recovery via **`POST /api/auth/request-password-reset`**
+ * (GoTrue `/recover` with no `code_challenge`). `@supabase/ssr` `createBrowserClient` still uses PKCE for
+ * other auth calls — do not call `resetPasswordForEmail` from that client. Legacy:
+ * `createClientForPasswordResetEmail` in `./supabase/password-reset-mail-client`. Use the token link example
+ * below in Supabase → Email Templates → Reset password. Magic-link / sign-in OTP templates can use /auth/confirm
  * (app/auth/confirm/page.tsx), e.g. {{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email
  *
  * In the browser, if NEXT_PUBLIC_SITE_URL points at a different host than the page the user is on
  * (e.g. production URL in env but they opened a Vercel preview), we use window.location.origin for
  * redirectTo so Supabase allow-listed URLs match.
+ *
+ * **Emails still show `?code=` (PKCE)** if the Supabase “Reset password” template uses `{{ .ConfirmationURL }}`.
+ * Use the token link with `{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=recovery` (see
+ * `SUPABASE_RESET_PASSWORD_EMAIL_BODY_EXAMPLE`). If you need a programmatic link without sending
+ * Supabase’s built-in mail, Auth Admin `generateLink({ type: "recovery", email, options: { redirectTo } })`
+ * returns `properties.action_link` — pair with a [Send Email Hook](https://supabase.com/docs/guides/auth/auth-hooks/send-email-hook) or your own provider.
  */
 function normalizeSiteOrigin(raw: string): string {
   return raw.trim().replace(/\/$/, "");
@@ -69,6 +76,71 @@ export function getAuthSiteUrl(): string {
 export function getPasswordResetRedirectUrl(): string {
   const base = getAuthSiteUrl().replace(/\/$/, "");
   return `${base}/reset-password`;
+}
+
+/**
+ * Server / API routes: same destination as `getPasswordResetRedirectUrl()` but without `window`.
+ * Order: `NEXT_PUBLIC_SITE_URL` → `requestOrigin` (usually the browser `Origin` header) → prod default / localhost.
+ */
+export function getPasswordResetRedirectUrlFromServer(requestOrigin?: string | null): string {
+  const fromEnv = normalizeSiteOrigin(process.env.NEXT_PUBLIC_SITE_URL ?? "");
+  if (fromEnv) {
+    return `${fromEnv.replace(/\/$/, "")}/reset-password`;
+  }
+  const o = requestOrigin?.trim();
+  if (o) {
+    try {
+      const u = new URL(o);
+      if (u.protocol === "http:" || u.protocol === "https:") {
+        return `${u.origin}/reset-password`;
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  if (process.env.NODE_ENV === "production") {
+    return "https://monzacrm.vercel.app/reset-password";
+  }
+  return "http://localhost:3000/reset-password";
+}
+
+/**
+ * Temporary: set `NEXT_PUBLIC_DEBUG_PASSWORD_RESET=1` in `.env.local` (or use dev) to log `redirectTo` / origin details in the browser console. Remove when finished debugging.
+ */
+export function logPasswordResetClientDebug(
+  redirectTo: string,
+  extra?: Record<string, unknown>
+): void {
+  if (
+    process.env.NODE_ENV !== "development" &&
+    process.env.NEXT_PUBLIC_DEBUG_PASSWORD_RESET !== "1"
+  ) {
+    return;
+  }
+  let parsed: Record<string, unknown> = {};
+  try {
+    const u = new URL(redirectTo);
+    parsed = {
+      href: u.href,
+      origin: u.origin,
+      host: u.host,
+      pathname: u.pathname,
+      protocol: u.protocol,
+    };
+  } catch (e) {
+    parsed = { parseError: String(e) };
+  }
+  console.info("[PasswordResetDebug client]", {
+    redirectTo,
+    isAbsoluteHttpsProduction:
+      redirectTo === "https://monzacrm.vercel.app/reset-password",
+    authSiteUrl: getAuthSiteUrl(),
+    nextPublicSiteUrl: process.env.NEXT_PUBLIC_SITE_URL?.trim() || "(unset)",
+    windowOrigin: typeof window !== "undefined" ? window.location.origin : null,
+    flow: "POST /api/auth/request-password-reset (GoTrue /recover, no code_challenge)",
+    ...parsed,
+    ...extra,
+  });
 }
 
 /**

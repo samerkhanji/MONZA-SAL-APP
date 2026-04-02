@@ -100,7 +100,7 @@ Look for rules that AI agents might miss:
 
 - React hooks usage patterns
 - API route conventions
-- Middleware usage patterns
+- Edge / proxy vs middleware usage (e.g. Next.js 16+ `src/proxy.ts` instead of root `middleware.ts`)
 - State management patterns
 
 **Testing Rules:**

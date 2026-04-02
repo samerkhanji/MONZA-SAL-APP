@@ -20,7 +20,7 @@
 | **Medium** | M2 | Error UX | Forgot-password on `/` used raw `resetError.message`; **`formatAuthApiErrorMessage`** (rate limits, codes) was not applied consistently with `/login`. |
 | **Medium** | M3 | `getAuthSiteUrl()` | Hardcoded fallback `https://monzacrm.vercel.app` if `NEXT_PUBLIC_SITE_URL` unset in production build — wrong if production domain changes. |
 | **Low** | L1 | Monitoring | No **Sentry** (or similar) in `web/src` for client auth failures. |
-| **Low** | L2 | Middleware | `getUser()` errors only `console.warn` in **development**; production failures are silent on the server edge. |
+| **Low** | L2 | Edge session (`proxy` + lib) | `getUser()` errors only `console.warn` in **development**; production failures are silent on the server edge (`web/src/proxy.ts` → `web/src/lib/supabase/middleware.ts`). |
 
 ### What this app does **not** own
 
@@ -70,7 +70,7 @@
 - [ ] `http://localhost:3000/**` for local dev
 - [ ] After deploy, trigger reset from **preview**, copy link from email, confirm it matches allow list
 
-### 2.3 Cookie & session middleware
+### 2.3 Cookie & session (Next.js proxy + Supabase helper)
 
 | File | Role |
 |------|------|
@@ -128,7 +128,7 @@
 
 - Add **Sentry** (or similar) for client + edge.
 - **Invite / welcome email:** `inviteUserByEmail`, magic link, or transactional API (Resend/SendGrid) from a Route Handler.
-- Production **middleware** logging for `getUser` failures (careful with volume).
+- Production **edge/proxy** logging for `getUser` failures (careful with volume).
 
 ---
 
@@ -169,7 +169,7 @@
 |------|-----------|
 | `web/src/lib/auth-app-url.ts` | `getAuthSiteUrl`, `getPasswordResetRedirectUrl` |
 | `web/src/lib/supabase/middleware.ts` | Session refresh, public routes, `/`→`/auth/callback` forward |
-| `web/src/proxy.ts` | Invokes middleware |
+| `web/src/proxy.ts` | Next.js 16 entry; calls `updateSession` from `lib/supabase/middleware.ts` |
 | `web/src/app/page.tsx`, `web/src/app/login/page.tsx` | Sign-in, forgot password |
 | `web/src/app/auth/callback/page.tsx` | PKCE exchange |
 | `web/src/app/auth/confirm/page.tsx` | `token_hash` OTP |

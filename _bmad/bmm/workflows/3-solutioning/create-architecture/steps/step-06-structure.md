@@ -162,7 +162,7 @@ project-name/
 │   │   ├── auth.ts
 │   │   └── utils.ts
 │   ├── types/
-│   └── middleware.ts
+│   └── proxy.ts
 ├── prisma/
 │   ├── schema.prisma
 │   └── migrations/
@@ -227,7 +227,7 @@ Create explicit mapping from project requirements to specific files/directories:
 
 - Components: src/components/auth/
 - Services: src/services/auth/
-- Middleware: src/middleware/auth.ts
+- Edge / middleware: Next.js 16+ often `src/proxy.ts` (plus helpers under `src/lib/...`); Nest/Express-style stacks use `src/middleware/auth.ts`
 - Guards: src/guards/auth.guard.ts
 - Tests: tests/auth/"
 

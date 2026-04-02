@@ -9,8 +9,8 @@
 
 | Variable | Required | Used By |
 |----------|----------|---------|
-| `NEXT_PUBLIC_SUPABASE_URL` | ✅ Yes | client.ts, middleware.ts |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅ Yes | client.ts, middleware.ts |
+| `NEXT_PUBLIC_SUPABASE_URL` | ✅ Yes | client.ts, `lib/supabase/middleware.ts` (via `proxy.ts`) |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅ Yes | client.ts, `lib/supabase/middleware.ts` (via `proxy.ts`) |
 | `SUPABASE_SERVICE_ROLE_KEY` | ❌ No | Not used (only in .env.example) |
 
 **Action:** Ensure `web/.env.local` has valid `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` from Supabase Dashboard → Project Settings → API.
@@ -108,10 +108,10 @@ Used by CustomerDocuments. Expected: metadata for uploaded files (id, customer_i
 **Issue:** `createServerClient` is never imported. The app uses `createClient` from client.ts everywhere.  
 **Note:** Keep if you plan to use Server Components with Supabase; otherwise remove.
 
-### 8.3 Middleware: silent fail when env missing
+### 8.3 Edge session (proxy + lib): silent fail when env missing
 
-**File:** `web/src/lib/supabase/middleware.ts`  
-**Issue:** If `NEXT_PUBLIC_SUPABASE_URL` or `NEXT_PUBLIC_SUPABASE_ANON_KEY` is missing, middleware returns `NextResponse.next()` without auth check. Users could access protected routes.  
+**Files:** `web/src/proxy.ts` → `web/src/lib/supabase/middleware.ts` (`updateSession`)  
+**Issue:** If `NEXT_PUBLIC_SUPABASE_URL` or `NEXT_PUBLIC_SUPABASE_ANON_KEY` is missing, `updateSession` returns `NextResponse.next()` without auth check. Users could access protected routes.  
 **Recommendation:** In development, log a warning. In production, ensure env vars are set.
 
 ---
@@ -119,7 +119,7 @@ Used by CustomerDocuments. Expected: metadata for uploaded files (id, customer_i
 ## 9. Connection Flow Summary
 
 1. **Client:** `createClient()` from `@/lib/supabase` → `createBrowserClient` (SSR) with cookies.
-2. **Middleware:** `createServerClient` with request cookies for session refresh and auth redirect.
+2. **Edge:** `proxy.ts` invokes `updateSession` in `lib/supabase/middleware.ts` — `createServerClient` with request cookies for session refresh and auth redirect.
 3. **Auth:** `supabase.auth.getUser()`, `signInWithPassword`, `signOut`, `updateUser`, `resetPasswordForEmail`, `onAuthStateChange`.
 4. **Data:** All queries use the browser client. No server-side Supabase client in use.
 

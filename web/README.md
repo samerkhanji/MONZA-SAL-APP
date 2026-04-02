@@ -39,7 +39,7 @@ If the console shows `WebSocket ... /_next/webpack-hmr ... ERR_INVALID_HTTP_RESP
 3. **Clear cache** — stop dev server, delete `web/.next`, run `npm run dev` again.
 4. **LAN / phone** — set `NEXT_DEV_ALLOWED_ORIGINS=http://YOUR_LAN_IP:3000` in `.env.local` if you need a non-localhost origin (see `next.config.ts`).
 
-This repo’s middleware intentionally skips all `/_next/*` routes so dev HMR is not intercepted by auth.
+This repo’s Next.js **proxy** (`src/proxy.ts`) intentionally skips all `/_next/*` routes so dev HMR is not intercepted by auth. Session refresh and redirects live in `src/lib/supabase/middleware.ts` (`updateSession`), which `proxy.ts` calls.
 
 ### 3. Tests
 

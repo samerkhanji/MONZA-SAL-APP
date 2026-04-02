@@ -33,14 +33,16 @@
 
 ---
 
-## 4. PWA & Middleware
+## 4. PWA & auth proxy (`src/proxy.ts`)
+
+Matcher excludes static/PWA paths so the auth edge layer does not intercept them.
 
 | Item | Status |
 |------|--------|
-| manifest.json | ✅ Excluded from middleware |
-| sw.js | ✅ Excluded from middleware |
-| /icons/* | ✅ Excluded from middleware |
-| /images/* | ✅ Excluded from middleware |
+| manifest.json | ✅ Excluded from proxy matcher |
+| sw.js | ✅ Excluded from proxy matcher |
+| /icons/* | ✅ Excluded from proxy matcher |
+| /images/* | ✅ Excluded from proxy matcher |
 | Service worker | ✅ Registered in layout |
 | Install banner | ✅ Dashboard, dismissible |
 | Install dropdown | ✅ User menu |
@@ -69,7 +71,7 @@ Several `useEffect` hooks omit `fetchCars`, `fetchCustomer`, etc. from the depen
 
 ## 6. Security Notes
 
-1. **Auth:** Middleware redirects unauthenticated users to `/` (login). Public routes: `/`, `/login`, `/reset-password`.
+1. **Auth:** `web/src/proxy.ts` runs session refresh via `updateSession` in `web/src/lib/supabase/middleware.ts`; unauthenticated users are redirected to `/` (login). Public routes: `/`, `/login`, `/reset-password`.
 2. **PWA assets:** `/manifest.json`, `/sw.js`, `/icons/*`, `/images/*` are public.
 3. **Storage:** `car-documents` bucket policies require authenticated users.
 4. **Parts:** INSERT/UPDATE limited to owner, sales, garage_manager; DELETE to owner only.
@@ -88,4 +90,4 @@ Several `useEffect` hooks omit `fetchCars`, `fetchCustomer`, etc. from the depen
 1. **Lint:** Gradually fix `setState` in effects and dependency arrays.
 2. **Storage:** Add a `job-documents` bucket if job document uploads are used.
 3. **Tests:** Add E2E tests for critical flows (login, add car, add customer).
-4. **Next.js:** Review middleware deprecation warning (middleware → proxy).
+4. **Next.js:** Root `middleware.ts` removed; use `src/proxy.ts` only (Next.js 16+). Supabase logic stays in `src/lib/supabase/middleware.ts`.

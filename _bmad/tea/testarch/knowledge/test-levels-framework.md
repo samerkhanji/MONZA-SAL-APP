@@ -41,7 +41,7 @@ unit_test:
 - Database operations and transactions
 - API endpoint contracts
 - Service-to-service communication
-- Middleware and interceptor behavior
+- Middleware, edge/proxy handlers, and interceptor behavior
 
 **Characteristics:**
 
@@ -100,7 +100,7 @@ e2e_test:
 
 - Testing persistence layer
 - Validating service contracts
-- Testing middleware/interceptors
+- Testing middleware, edge/proxy handlers, and interceptors
 - Component boundaries critical
 
 ### Favor E2E Tests When:

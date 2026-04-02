@@ -56,7 +56,7 @@ Choose the best level per scenario based on `{detected_stack}`:
 **If {detected_stack} is `backend` or `fullstack`:**
 
 - **Unit** for pure functions, business logic, and edge cases
-- **Integration** for service interactions, database queries, and middleware
+- **Integration** for service interactions, database queries, and request pipeline code (HTTP middleware, Next.js `proxy`/edge handlers, etc.)
 - **API/Contract** for endpoint validation, request/response schemas, and Pact contracts
 - **No E2E** for pure backend projects (no browser-based testing needed)
 

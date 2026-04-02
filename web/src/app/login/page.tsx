@@ -3,13 +3,8 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase";
-import { createClientForPasswordResetEmail } from "@/lib/supabase/password-reset-mail-client";
-import {
-  getPasswordResetRedirectUrl,
-  validatePasswordResetRedirectUrl,
-} from "@/lib/auth-app-url";
-import { formatAuthApiErrorMessage, isConnectionError } from "@/lib/auth-utils";
-import { getSupabaseUrl } from "@/lib/supabase/public-env";
+import { submitPasswordResetRequest } from "@/lib/request-password-reset";
+import { isConnectionError } from "@/lib/auth-utils";
 import {
   clearAuthSessionMarkers,
   idleLogoutMinutesForDisplay,
@@ -120,57 +115,13 @@ function LoginForm() {
     setForgotError(null);
     setForgotLoading(true);
 
-    const redirectTo = getPasswordResetRedirectUrl();
-    const redirectInvalid = validatePasswordResetRedirectUrl(redirectTo);
-    if (redirectInvalid) {
-      console.error("[resetPasswordForEmail] Bad redirectTo:", redirectTo, redirectInvalid);
-      setForgotError(redirectInvalid);
-      setForgotLoading(false);
-      return;
-    }
-
-    if (process.env.NODE_ENV === "development") {
-      const apiUrl = getSupabaseUrl();
-      try {
-        if (apiUrl) console.debug("[resetPasswordForEmail] host:", new URL(apiUrl).host, "redirectTo:", redirectTo);
-      } catch {
-        /* ignore */
-      }
-    }
-
-    try {
-      const supabase = createClientForPasswordResetEmail();
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
-        redirectTo,
-      });
-
-      if (resetError) {
-        const errObj = resetError as object & { status?: number; code?: string; message?: string };
-        console.error("[resetPasswordForEmail] API error:", {
-          message: errObj.message,
-          status: errObj.status,
-          code: errObj.code,
-          redirectTo,
-        });
-        setForgotError(
-          isConnectionError(resetError)
-            ? "Connection failed. Please check your internet and try again."
-            : formatAuthApiErrorMessage(resetError, { redirectTo })
-        );
-        return;
-      }
-
+    const { error } = await submitPasswordResetRequest(forgotEmail);
+    if (error) {
+      setForgotError(error);
+    } else {
       setForgotSuccess(true);
-    } catch (unexpected) {
-      console.error("[resetPasswordForEmail] Unexpected:", unexpected);
-      setForgotError(
-        isConnectionError(unexpected)
-          ? "Connection failed. Please check your internet and try again."
-          : "Something went wrong while sending the reset email. Check the browser console for details."
-      );
-    } finally {
-      setForgotLoading(false);
     }
+    setForgotLoading(false);
   }
 
   function openForgotDialog() {

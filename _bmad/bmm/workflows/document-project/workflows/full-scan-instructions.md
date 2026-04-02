@@ -264,7 +264,7 @@ Are there any other important documents or key areas I should focus on while ana
 <action>Determine architecture pattern based on detected tech stack:
 
 - Use project_type_id as primary indicator (e.g., "web" → layered/component-based, "backend" → service/API-centric)
-- Consider framework patterns (e.g., React → component hierarchy, Express → middleware pipeline)
+- Consider framework patterns (e.g., React → component hierarchy, Express → middleware pipeline, Next.js 16+ → `src/proxy.ts` for edge request handling instead of root `middleware.ts`)
 - Note architectural style in technology table
 - Store as {{architecture_pattern}} for each part
   </action>
