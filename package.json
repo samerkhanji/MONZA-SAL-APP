@@ -3,6 +3,7 @@
   "private": true,
   "description": "Root package so CSS bundlers can resolve shared deps when the editor workspace is the repo folder (not web/).",
   "scripts": {
+    "bulk-reset-passwords": "node --env-file=web/.env.local scripts/bulk-reset-passwords.mjs",
     "dev": "npm run dev --prefix web",
     "build": "npm run build --prefix web",
     "start": "npm run start --prefix web",

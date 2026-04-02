@@ -7,9 +7,9 @@
  *   https://*.vercel.app/** (or your team pattern) in Supabase Redirect URLs.
  * - Local: leave unset; uses http://localhost:3000 — allow http://localhost:3000/** in Supabase.
  *
- * Password reset cross-device: the app triggers recovery via **`POST /api/auth/request-password-reset`**
- * (GoTrue `/recover` with no `code_challenge`). `@supabase/ssr` `createBrowserClient` still uses PKCE for
- * other auth calls — do not call `resetPasswordForEmail` from that client. Legacy:
+ * Password reset: the app sends mail via **`POST /api/auth/reset-password`** (`admin.generateLink` + Resend).
+ * From the client use `fetch('/api/auth/reset-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) })` or `submitPasswordResetRequest` from `@/lib/request-password-reset`.
+ * Do not trigger GoTrue recover from the PKCE browser client. Legacy helper:
  * `createClientForPasswordResetEmail` in `./supabase/password-reset-mail-client`. Use the token link example
  * below in Supabase → Email Templates → Reset password. Magic-link / sign-in OTP templates can use /auth/confirm
  * (app/auth/confirm/page.tsx), e.g. {{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email
@@ -68,8 +68,8 @@ export function getAuthSiteUrl(): string {
 }
 
 /**
- * Full URL passed as `redirectTo` to `resetPasswordForEmail`. Supabase stores it as `RedirectTo` in the
- * reset email template. The reset page (`/reset-password`) handles:
+ * Full URL used as `redirectTo` for `admin.generateLink` recovery; matches template variable `RedirectTo` in
+ * Supabase email templates. The reset page (`/reset-password`) handles:
  * - `?token_hash=...&type=recovery` → verifyOtp (works on any device; use this in the email template)
  * - `?code=...` → exchangeCodeForSession / PKCE (same device only if using default ConfirmationURL)
  */
@@ -137,7 +137,7 @@ export function logPasswordResetClientDebug(
     authSiteUrl: getAuthSiteUrl(),
     nextPublicSiteUrl: process.env.NEXT_PUBLIC_SITE_URL?.trim() || "(unset)",
     windowOrigin: typeof window !== "undefined" ? window.location.origin : null,
-    flow: "POST /api/auth/request-password-reset (GoTrue /recover, no code_challenge)",
+    flow: "POST /api/auth/reset-password (generateLink + Resend)",
     ...parsed,
     ...extra,
   });
@@ -167,7 +167,7 @@ export function isPkceVerifierOrCrossDeviceError(err: { message?: string } | nul
 }
 
 /**
- * Supabase rejects resetPasswordForEmail if redirectTo is not a valid absolute URL or is disallowed.
+ * Validates the same `redirectTo` shape Supabase expects for recovery `redirect_to` / template `RedirectTo`.
  * Returns an English error message, or null if the URL looks valid.
  */
 export function validatePasswordResetRedirectUrl(redirectTo: string): string | null {

@@ -17,14 +17,12 @@ vi.mock("@/lib/contexts/ThemeContext", () => ({
 // Mock Supabase client
 const mockSignInWithPassword = vi.fn();
 const mockSignOut = vi.fn();
-const mockResetPasswordForEmail = vi.fn();
 
 vi.mock("@/lib/supabase", () => ({
   createClient: () => ({
     auth: {
       signInWithPassword: mockSignInWithPassword,
       signOut: mockSignOut,
-      resetPasswordForEmail: mockResetPasswordForEmail,
     },
   }),
 }));
@@ -45,7 +43,6 @@ describe.skip("LoginPage", () => {
     });
     mockSignInWithPassword.mockReset();
     mockSignOut.mockReset();
-    mockResetPasswordForEmail.mockReset();
     push.mockReset();
   });
 

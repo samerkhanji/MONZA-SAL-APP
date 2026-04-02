@@ -58,7 +58,7 @@
 | **Password reset `redirectTo`** | `getPasswordResetRedirectUrl()` → `` `${getAuthSiteUrl()}/reset-password` `` |
 | **`NEXT_PUBLIC_SITE_URL`** | Trimmed; trailing `/` stripped. Browser: `fromEnv \|\| window.location.origin`. SSR production: `fromEnv \|\| "https://monzacrm.vercel.app"`. |
 | **Preview** | If env unset in browser, origin is the preview host — must match Supabase **Redirect URLs** (e.g. `https://*.vercel.app/**`). |
-| **Call sites** | `resetPasswordForEmail` in `web/src/app/page.tsx`, `web/src/app/login/page.tsx` |
+| **Call sites** | `fetch('/api/auth/reset-password', …)` from `web/src/app/page.tsx`; `submitPasswordResetRequest` → same API from `web/src/app/login/page.tsx` |
 
 **Redirect URL checklist (for Supabase dashboard):**
 
@@ -157,7 +157,7 @@
 2. If custom SMTP: provider dashboard (delivery, bounce, suppression).  
 3. **DNS** SPF/DKIM/DMARC for sending domain.  
 4. Vercel **function logs** for `/api/team/add-employee` only (not for client PKCE).  
-5. Browser **Network** for `resetPasswordForEmail` response.  
+5. Browser **Network** for `POST /api/auth/reset-password` response.  
 6. **Spam / Promotions / All Mail.**  
 7. Copy **full link** from email → compare to **Redirect URLs** and to `getPasswordResetRedirectUrl()` output for that environment.
 

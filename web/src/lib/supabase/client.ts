@@ -1,7 +1,7 @@
 import { createBrowserClient } from "@supabase/ssr";
 import { getSupabasePublicKey, getSupabaseUrl } from "./public-env";
 
-/** For forgot-password email use `submitPasswordResetRequest` from `@/lib/request-password-reset` (server calls GoTrue `/recover` without PKCE). This client uses PKCE and must not be used for `resetPasswordForEmail`. */
+/** Forgot-password: `fetch('/api/auth/reset-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) })` or `submitPasswordResetRequest` from `@/lib/request-password-reset` — not the Supabase client’s recovery method (PKCE). */
 
 export function createClient() {
   const url = getSupabaseUrl();

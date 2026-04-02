@@ -11,16 +11,12 @@ const noopStorage = {
 };
 
 /**
- * Use **only** for `auth.resetPasswordForEmail`.
+ * Legacy: non-PKCE client if you ever call the Supabase JS client’s password-recovery method from the browser.
+ * **Prefer** `POST /api/auth/reset-password` with `fetch` (or `submitPasswordResetRequest`) so recovery mail
+ * uses `admin.generateLink` + Resend and avoids `?code=` PKCE links.
  *
- * `@supabase/ssr` `createBrowserClient` always sets `auth.flowType` to `"pkce"` after merging
- * options, which overrides `implicit`. With PKCE, `resetPasswordForEmail` sends `code_challenge`
- * to GoTrue `/recover`, and the server emails a **`?code=`** recovery link tied to that verifier.
- * Your custom template with `{{ .RedirectTo }}?token_hash=...` is then ignored/superseded for the
- * actual link behavior users see.
- *
- * This client uses `flowType: "implicit"` so `/recover` is called **without** a code challenge,
- * allowing token-based recovery emails to match your dashboard template.
+ * `@supabase/ssr` `createBrowserClient` uses PKCE; that client’s recovery call sends `code_challenge` and
+ * tends to produce **`?code=`** links. This helper uses `flowType: "implicit"` for GoTrue `/recover` without PKCE.
  */
 export function createClientForPasswordResetEmail(): SupabaseClient {
   const url = getSupabaseUrl();

@@ -15,6 +15,9 @@ web/build
 # Supabase
 supabase/.temp/
 
+# Local bulk-reset script output (may contain PII)
+scripts/bulk-reset-passwords-report.csv
+
 # Misc
 .DS_Store
 *.log

@@ -92,12 +92,16 @@ export async function updateSession(request: NextRequest) {
   // Password recovery (PKCE): allow full URL including ?code= without forcing login first
   const isResetPasswordPage =
     pathname === "/reset-password" || pathname.startsWith("/reset-password/");
+  // Bearer ADMIN_API_SECRET protects the API; page is reachable without app login (ops tool).
+  const isAdminForceResetPage =
+    pathname === "/admin/force-reset" || pathname.startsWith("/admin/force-reset/");
   const isPublicPage =
     isLoginPage ||
     isRootPage ||
     isAuthCallbackPage ||
     isAuthConfirmPage ||
-    isResetPasswordPage;
+    isResetPasswordPage ||
+    isAdminForceResetPage;
 
   if (!user && !isPublicPage) {
     const url = request.nextUrl.clone();

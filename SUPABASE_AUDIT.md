@@ -120,7 +120,7 @@ Used by CustomerDocuments. Expected: metadata for uploaded files (id, customer_i
 
 1. **Client:** `createClient()` from `@/lib/supabase` → `createBrowserClient` (SSR) with cookies.
 2. **Edge:** `proxy.ts` invokes `updateSession` in `lib/supabase/middleware.ts` — `createServerClient` with request cookies for session refresh and auth redirect.
-3. **Auth:** `supabase.auth.getUser()`, `signInWithPassword`, `signOut`, `updateUser`, `resetPasswordForEmail`, `onAuthStateChange`.
+3. **Auth:** `supabase.auth.getUser()`, `signInWithPassword`, `signOut`, `updateUser`, `onAuthStateChange`. Forgot-password uses `POST /api/auth/reset-password`, not client-side GoTrue recovery.
 4. **Data:** All queries use the browser client. No server-side Supabase client in use.
 
 ---
