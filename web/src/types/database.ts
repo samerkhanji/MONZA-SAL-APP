@@ -85,6 +85,12 @@ export interface Car {
   customs_status: CustomsStatus;
   customs_amount_paid: number | null;
   customs_amount_currency: string | null;
+  /** Migration 042 */
+  trim?: string | null;
+  specs?: string | null;
+  bl_issue_date?: string | null;
+  registration_date?: string | null;
+  customs_notes?: string | null;
   deleted_at: string | null;
   notes: string | null;
   created_at: string;
@@ -578,4 +584,51 @@ export interface InstallmentPayment {
   marked_paid_by: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/** Migration 043 — garage workflow */
+export type GarageTaskStatus =
+  | "pending"
+  | "in_progress"
+  | "blocked"
+  | "done"
+  | "cancelled";
+
+export interface GarageTaskTemplate {
+  id: string;
+  name: string;
+  is_system: boolean;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface GarageTaskTemplateItem {
+  id: string;
+  template_id: string;
+  description: string;
+  sort_order: number;
+  default_resource_type: string | null;
+}
+
+export interface GarageTask {
+  id: string;
+  car_id: string;
+  description: string;
+  status: GarageTaskStatus;
+  assigned_to: string | null;
+  resource_type: string | null;
+  template_item_id: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  sort_order: number;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GarageCapacityRow {
+  resource_name: string;
+  capacity: number;
+  updated_at: string;
+  updated_by: string | null;
 }

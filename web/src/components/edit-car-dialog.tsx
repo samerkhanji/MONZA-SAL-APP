@@ -69,6 +69,11 @@ export function EditCarDialog({
   const [warrantyVehicleKmLimit, setWarrantyVehicleKmLimit] = useState("");
   const [warrantyBatteryKmLimit, setWarrantyBatteryKmLimit] = useState("");
   const [customsStatus, setCustomsStatus] = useState<CustomsStatus>("pending");
+  const [trim, setTrim] = useState("");
+  const [specs, setSpecs] = useState("");
+  const [blIssueDate, setBlIssueDate] = useState("");
+  const [registrationDate, setRegistrationDate] = useState("");
+  const [customsNotes, setCustomsNotes] = useState("");
   const [locationType, setLocationType] = useState<LocationType>("storage");
   const [locationSlot, setLocationSlot] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -79,6 +84,7 @@ export function EditCarDialog({
     canEditMonzaWarrantyOnCar: monzaWarranty,
     canEditDmsWarrantyOnCar: dmsWarranty,
     canEditPdiStatusOnCar: pdiEditable,
+    appRole,
   } = useUser();
 
   useEffect(() => {
@@ -132,6 +138,18 @@ export function EditCarDialog({
           : ""
       );
       setCustomsStatus(car.customs_status ?? "pending");
+      const cExtra = car as CarDisplay & {
+        trim?: string | null;
+        specs?: string | null;
+        bl_issue_date?: string | null;
+        registration_date?: string | null;
+        customs_notes?: string | null;
+      };
+      setTrim(cExtra.trim ?? "");
+      setSpecs(cExtra.specs ?? "");
+      setBlIssueDate(cExtra.bl_issue_date ?? "");
+      setRegistrationDate(cExtra.registration_date ?? "");
+      setCustomsNotes(cExtra.customs_notes ?? "");
       setLocationType(car.location_type ?? "storage");
       setLocationSlot(car.location_slot ?? "");
     }
@@ -147,6 +165,8 @@ export function EditCarDialog({
       toast.error("You don't have permission to edit this vehicle.");
       return;
     }
+
+    const previousStatus = car.status;
 
     setSubmitting(true);
 
@@ -190,6 +210,11 @@ export function EditCarDialog({
         software_version: softwareVersion.trim() || null,
         pdi_status: pdiEditable ? pdiStatus : car.pdi_status,
         customs_status: customsStatus,
+        trim: trim.trim() || null,
+        specs: specs.trim() || null,
+        bl_issue_date: blIssueDate || null,
+        registration_date: registrationDate || null,
+        customs_notes: customsNotes.trim() || null,
         warranty_per_dms: dmsWarranty ? warrantyPerDms || null : dmsSnapshot.warranty_per_dms,
         warranty_battery_dms: dmsWarranty
           ? warrantyBatteryDms || null
@@ -307,6 +332,20 @@ export function EditCarDialog({
       note: fullInventory ? "Details updated" : "Warranty / PDI fields updated",
       created_by: user?.id ?? null,
     });
+
+    if (
+      fullInventory &&
+      status === "service" &&
+      previousStatus !== "service" &&
+      (appRole === "owner" || appRole === "garage_manager")
+    ) {
+      void fetch("/api/garage/bootstrap-car", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ car_id: car.id }),
+      }).catch(() => {});
+    }
 
     setSubmitting(false);
     toast.success("Car updated successfully");
@@ -641,6 +680,65 @@ export function EditCarDialog({
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="carTrim">Trim / variant</Label>
+              <Input
+                id="carTrim"
+                value={trim}
+                onChange={(e) => setTrim(e.target.value)}
+                placeholder="Optional"
+                disabled={submitting || coreLocked}
+              />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="carSpecs">Specs</Label>
+              <Textarea
+                id="carSpecs"
+                value={specs}
+                onChange={(e) => setSpecs(e.target.value)}
+                placeholder="Optional technical specs"
+                rows={2}
+                disabled={submitting || coreLocked}
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="blIssue">B/L issue date</Label>
+              <Input
+                id="blIssue"
+                type="date"
+                value={blIssueDate}
+                onChange={(e) => setBlIssueDate(e.target.value)}
+                disabled={submitting || coreLocked}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="regDate">Registration date</Label>
+              <Input
+                id="regDate"
+                type="date"
+                value={registrationDate}
+                onChange={(e) => setRegistrationDate(e.target.value)}
+                disabled={submitting || coreLocked}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="customsNotes">Customs notes</Label>
+            <Textarea
+              id="customsNotes"
+              value={customsNotes}
+              onChange={(e) => setCustomsNotes(e.target.value)}
+              placeholder="Customs-related notes (separate from general notes)"
+              rows={2}
+              disabled={submitting || coreLocked}
+            />
           </div>
 
           <div className="grid gap-4 rounded-md border border-amber-500/25 bg-muted/15 p-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">

@@ -1002,19 +1002,21 @@ export default function CarProfilePage() {
       return;
     }
 
-    const { error } = await supabase
-      .from("cars")
-      .update({ deleted_at: new Date().toISOString() })
-      .eq("id", car.id);
+    const res = await fetch(`/api/cars/${car.id}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    const body = await res.json().catch(() => ({}));
 
     setDeleteLoading(false);
 
-    if (error) {
-      const isRls =
-        error.code === "42501" ||
-        error.message.toLowerCase().includes("permission");
+    if (!res.ok) {
+      const msg =
+        typeof body?.error === "string" ? body.error : `Delete failed (${res.status})`;
       toast.error(
-        isRls ? "You don't have permission to do this." : error.message
+        res.status === 403
+          ? "You don't have permission to do this."
+          : msg
       );
       return;
     }

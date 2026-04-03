@@ -159,22 +159,13 @@ export function CustomerDocuments({ customerId }: CustomerDocumentsProps) {
     if (!canDeleteDocs) return;
     if (!confirm(`Delete "${doc.file_name}"?`)) return;
 
-    const { error: storageError } = await supabase.storage
-      .from("customer-documents")
-      .remove([doc.file_path]);
-
-    if (storageError) {
-      toast.error(`Failed to delete file: ${storageError.message}`);
-      return;
-    }
-
-    const { error: metaError } = await supabase
-      .from("customer_documents")
-      .delete()
-      .eq("id", doc.id);
-
-    if (metaError) {
-      toast.error(`File deleted but metadata remains: ${metaError.message}`);
+    const res = await fetch(`/api/documents/customer/${doc.id}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast.error(typeof j?.error === "string" ? j.error : "Delete failed");
       return;
     }
 

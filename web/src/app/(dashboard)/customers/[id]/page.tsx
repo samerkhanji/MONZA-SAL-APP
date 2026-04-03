@@ -70,6 +70,7 @@ export default function CustomerDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { canEditInventory, canDelete, appRole } = useUser();
+  const canDeleteCustomer = canPerform("customers", "delete", appRole ?? null);
   const id = params.id as string;
   const [customer, setCustomer] = useState<CustomerDisplay | null>(null);
   const [vehicles, setVehicles] = useState<EnrichedSaleOrder[]>([]);
@@ -267,13 +268,19 @@ export default function CustomerDetailPage() {
 
   async function handleDelete() {
     if (!customer) return;
-    const { error } = await supabase
-      .from("customers")
-      .update({ deleted_at: new Date().toISOString() })
-      .eq("id", customer.id);
-
-    if (error) {
-      toast.error(`Failed to delete: ${error.message}`);
+    if (!canDeleteCustomer) {
+      toast.error("You don't have permission to delete customers.");
+      return;
+    }
+    const res = await fetch(`/api/customers/${customer.id}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast.error(
+        typeof body?.error === "string" ? body.error : `Failed to delete (${res.status})`
+      );
       return;
     }
 
@@ -319,7 +326,6 @@ export default function CustomerDetailPage() {
     "—";
 
   const canEditCustomer = canPerform("customers", "edit", appRole ?? null);
-  const canDeleteCustomer = canPerform("customers", "delete", appRole ?? null);
 
   return (
     <div className="container mx-auto space-y-6 px-4 py-6 sm:px-6 sm:py-8">

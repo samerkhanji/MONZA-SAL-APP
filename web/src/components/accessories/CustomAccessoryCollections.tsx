@@ -180,9 +180,13 @@ export function CustomAccessoryCollections() {
       toast.error("You do not have permission to delete collections.");
       return;
     }
-    const { error } = await supabase.from("accessory_custom_tables").delete().eq("id", tableId);
-    if (error) {
-      toast.error(error.message);
+    const res = await fetch(`/api/accessory-collections/tables/${tableId}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast.error(typeof j?.error === "string" ? j.error : "Delete failed");
       return;
     }
     toast.success("Collection removed");
@@ -242,9 +246,13 @@ export function CustomAccessoryCollections() {
       toast.error("You do not have permission to remove lines.");
       return;
     }
-    const { error } = await supabase.from("accessory_custom_items").delete().eq("id", id);
-    if (error) {
-      toast.error(error.message);
+    const res = await fetch(`/api/accessory-collections/items/${id}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast.error(typeof j?.error === "string" ? j.error : "Delete failed");
       return;
     }
     toast.success("Line removed");

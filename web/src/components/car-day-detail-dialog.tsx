@@ -175,9 +175,15 @@ export function DayDetailDialog({
   async function handleDelete(doc: DayDoc) {
     if (!canDeleteCarDocs) return;
     if (!confirm(`Delete "${doc.file_name}"?`)) return;
-    const path = getDocPath(doc);
-    await supabase.storage.from("car-documents").remove([path]);
-    await supabase.from("car_documents").delete().eq("id", doc.id);
+    const res = await fetch(`/api/documents/car/${doc.id}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast.error(typeof j?.error === "string" ? j.error : "Delete failed");
+      return;
+    }
     toast.success("Document deleted");
     fetchDocuments();
     onRefresh?.();

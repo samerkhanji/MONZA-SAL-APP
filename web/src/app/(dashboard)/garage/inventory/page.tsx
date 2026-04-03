@@ -76,7 +76,7 @@ function matchesSearch(p: Part, q: string): boolean {
 
 export default function GarageInventoryPage() {
   const searchParams = useSearchParams();
-  const { canManageParts, canDelete, profile, appRole } = useUser();
+  const { canManageParts, profile, appRole } = useUser();
   const [parts, setParts] = useState<Part[]>([]);
   const [pendingDeletes, setPendingDeletes] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
@@ -172,17 +172,19 @@ export default function GarageInventoryPage() {
     setStatusFilter("low_or_out");
   };
 
+  const canDeletePart = canPerform("parts", "delete", appRole ?? null);
+
   async function handleDelete() {
     if (!deletePart || !profile) return;
 
-    if (canDelete) {
-      const { error } = await supabase
-        .from("parts")
-        .update({ deleted_at: new Date().toISOString() })
-        .eq("id", deletePart.id);
-
-      if (error) {
-        toast.error(error.message);
+    if (canDeletePart) {
+      const res = await fetch(`/api/parts/${deletePart.id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(typeof j?.error === "string" ? j.error : "Delete failed");
         return;
       }
       toast.success("Part removed");
@@ -231,7 +233,6 @@ export default function GarageInventoryPage() {
 
   const canCreatePart = canPerform("parts", "create", appRole ?? null);
   const canEditPart = canPerform("parts", "edit", appRole ?? null);
-  const canDeletePart = canPerform("parts", "delete", appRole ?? null);
 
   return (
     <div className="container mx-auto max-w-[1800px] space-y-6 overflow-x-hidden px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
@@ -674,10 +675,10 @@ export default function GarageInventoryPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {canDelete ? "Delete part?" : "Request part deletion?"}
+              {canDeletePart ? "Delete part?" : "Request part deletion?"}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {canDelete
+              {canDeletePart
                 ? `This will soft-delete "${deletePart?.part_name}". You can restore it later if needed.`
                 : "This deletion requires owner approval. A request will be sent for review."}
             </AlertDialogDescription>
@@ -685,7 +686,7 @@ export default function GarageInventoryPage() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <Button variant="destructive" onClick={handleDelete}>
-              {canDelete ? "Delete" : "Send Request"}
+              {canDeletePart ? "Delete" : "Send Request"}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

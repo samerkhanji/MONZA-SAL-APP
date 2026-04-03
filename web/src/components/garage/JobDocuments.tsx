@@ -185,22 +185,13 @@ export function JobDocuments({ jobId, onDocumentsChange }: JobDocumentsProps) {
     if (!canDeleteDocs) return;
     if (!confirm(`Delete "${doc.file_name}"?`)) return;
 
-    const { error: storageError } = await supabase.storage
-      .from("job-documents")
-      .remove([doc.file_path]);
-
-    if (storageError) {
-      toast.error(`Failed to delete file: ${storageError.message}`);
-      return;
-    }
-
-    const { error: metaError } = await supabase
-      .from("job_documents")
-      .delete()
-      .eq("id", doc.id);
-
-    if (metaError) {
-      toast.error(`File deleted but metadata remains: ${metaError.message}`);
+    const res = await fetch(`/api/documents/job/${doc.id}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast.error(typeof j?.error === "string" ? j.error : "Delete failed");
       return;
     }
 

@@ -89,9 +89,9 @@ function warrantyVehicleExpiry(car: CarDisplay): string {
   return fmtSheetDate(v ?? null);
 }
 
-/** Pixel widths — single source of truth via <colgroup> (header + body). 20 columns. */
+/** Pixel widths — single source of truth via <colgroup> (header + body). 21 columns. */
 const CARS_TABLE_COL_PX = [
-  220, 120, 150, 90, 140, 140, 130, 220, 140, 140, 130, 190, 140, 190, 140, 120, 140,
+  220, 120, 150, 110, 90, 140, 140, 130, 220, 140, 140, 130, 190, 140, 190, 140, 120, 140,
   140, 140, 100,
 ] as const;
 
@@ -112,11 +112,13 @@ function matchesSearch(
   const model = (car.model ?? "").toLowerCase();
   const issue = (car.issue ?? "").toLowerCase();
   const notes = (car.notes ?? "").toLowerCase();
+  const trimVal = ((car as CarDisplay & { trim?: string | null }).trim ?? "").toLowerCase();
   return (
     vin.includes(q) ||
     plate.includes(q) ||
     brand.includes(q) ||
     model.includes(q) ||
+    trimVal.includes(q) ||
     issue.includes(q) ||
     notes.includes(q)
   );
@@ -207,19 +209,21 @@ export default function CarsListPage() {
       return;
     }
 
-    const { error } = await supabase
-      .from("cars")
-      .update({ deleted_at: new Date().toISOString() })
-      .eq("id", deleteCar.id);
+    const res = await fetch(`/api/cars/${deleteCar.id}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    const body = await res.json().catch(() => ({}));
 
     setDeleteLoading(false);
 
-    if (error) {
-      const isRls =
-        error.code === "42501" ||
-        error.message.toLowerCase().includes("permission");
+    if (!res.ok) {
+      const msg =
+        typeof body?.error === "string" ? body.error : `Delete failed (${res.status})`;
       toast.error(
-        isRls ? "You don't have permission to do this." : error.message
+        res.status === 403
+          ? "You don't have permission to do this."
+          : msg
       );
       return;
     }
@@ -295,6 +299,7 @@ export default function CarsListPage() {
     { key: "vin", header: "VIN", width: 22 },
     { key: "brand", header: "Brand" },
     { key: "model", header: "Model" },
+    { key: "trim", header: "Trim" },
     { key: "model_year", header: "Year" },
     { key: "exterior_color", header: "Exterior" },
     { key: "interior_color", header: "Interior" },
@@ -483,6 +488,9 @@ export default function CarsListPage() {
                       Model
                     </th>
                     <th scope="col" className={CARS_TH}>
+                      Trim
+                    </th>
+                    <th scope="col" className={CARS_TH}>
                       Year
                     </th>
                     <th scope="col" className={CARS_TH}>
@@ -558,6 +566,8 @@ export default function CarsListPage() {
                     const statusCellText = pendingDeletes[car.id]
                       ? `${statusLabel} · Pending`
                       : statusLabel;
+                    const trimDisplay =
+                      (car as CarDisplay & { trim?: string | null }).trim ?? "—";
 
                     return (
                       <tr
@@ -574,6 +584,9 @@ export default function CarsListPage() {
                         </td>
                         <td title={car.model ?? undefined} className={CARS_TD}>
                           {car.model}
+                        </td>
+                        <td title={trimDisplay !== "—" ? trimDisplay : undefined} className={CARS_TD}>
+                          {trimDisplay}
                         </td>
                         <td className={`${CARS_TD} tabular-nums`}>
                           {car.model_year ?? "—"}

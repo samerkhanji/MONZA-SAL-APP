@@ -261,12 +261,17 @@ export default function JobDetailPage() {
 
   async function handleDelete() {
     if (!job) return;
-    const { error } = await supabase
-      .from("garage_jobs")
-      .update({ deleted_at: new Date().toISOString() })
-      .eq("id", job.id);
-    if (error) {
-      toast.error(error.message);
+    if (!canPerform("garage_jobs", "delete", appRole ?? null)) {
+      toast.error("You don't have permission to delete this job.");
+      return;
+    }
+    const res = await fetch(`/api/garage/jobs/${job.id}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast.error(typeof j?.error === "string" ? j.error : "Delete failed");
       return;
     }
     toast.success("Job removed");
