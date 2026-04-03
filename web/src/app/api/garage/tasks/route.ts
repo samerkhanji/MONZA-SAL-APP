@@ -80,13 +80,17 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const body = (await req.json().catch(() => null)) as {
+    const bodyRaw = await req.json().catch(() => null);
+    if (bodyRaw === null || typeof bodyRaw !== "object") {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
+    const body = bodyRaw as {
       carId?: string;
       templateId?: string;
       tasks?: TaskInput[];
-    } | null;
+    };
 
-    const carId = body?.carId?.trim();
+    const carId = body.carId?.trim();
     if (!carId || !isUuid(carId)) {
       return NextResponse.json({ error: "carId is required (uuid)" }, { status: 400 });
     }

@@ -384,7 +384,7 @@ export function JobDocuments({ jobId, onDocumentsChange }: JobDocumentsProps) {
                       <Download className="mr-1 size-4" />
                       Download
                     </Button>
-                    {canManageGarage && canDelete && (
+                    {canDeleteDocs && (
                       <Button
                         variant="outline"
                         size="lg"
