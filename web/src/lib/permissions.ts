@@ -23,10 +23,12 @@ export const PAGE_PERMISSIONS: Record<
   | "garage_history"
   | "documents"
   | "settings"
-  | "garage_settings",
+  | "garage_settings"
+  | "dashboard_overview",
   AppRole[]
 > = {
   dashboard: ["owner"],
+  dashboard_overview: ["owner"],
   assistant_dashboard: ["owner", "assistant"],
   requests: [
     "owner",
@@ -61,7 +63,7 @@ export const PAGE_PERMISSIONS: Record<
     "sales_ops",
   ],
   settings: ["owner"],
-  garage_settings: ["owner", "garage_manager"],
+  garage_settings: ["owner", "garage_manager", "khalil_hybrid"],
 };
 
 export const CRUD_PERMISSIONS = {

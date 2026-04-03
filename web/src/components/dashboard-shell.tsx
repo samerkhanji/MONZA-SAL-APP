@@ -22,6 +22,7 @@ import {
   WifiOff,
   Bell,
   BarChart3,
+  PieChart,
   FileCheck,
   CreditCard,
   Activity,
@@ -63,6 +64,13 @@ const BASE_NAV_ITEMS: Array<{
     tourId: "nav-assistant-dashboard",
   },
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, tourId: "nav-dashboard" },
+  {
+    href: "/dashboard/overview",
+    label: "Owner overview",
+    icon: PieChart,
+    ownerOnly: true,
+    tourId: "nav-dashboard-overview",
+  },
   {
     href: "/requests",
     label: "Request Center",
@@ -117,6 +125,7 @@ const BASE_NAV_ITEMS: Array<{
 
 function getPageTitle(pathname: string): string {
   if (pathname.startsWith("/assistant-dashboard")) return "Assistant Dashboard";
+  if (pathname.startsWith("/dashboard/overview")) return "Owner overview";
   if (pathname === "/dashboard") return "Dashboard";
   if (pathname.startsWith("/cars/add")) return "Add Car";
   if (pathname.startsWith("/cars/") && pathname !== "/cars") return "Car Details";
@@ -174,6 +183,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     () =>
       BASE_NAV_ITEMS.filter((item) => {
         if (!appRole) return false;
+        if (item.ownerOnly) {
+          return appRole === "owner";
+        }
         if (item.assistantDashboard) {
           return appRole === "assistant" || appRole === "owner";
         }
@@ -235,7 +247,11 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                 appRole
               );
             if (child.href === "/garage/settings")
-              return appRole === "owner" || appRole === "garage_manager";
+              return (
+                appRole === "owner" ||
+                appRole === "garage_manager" ||
+                appRole === "khalil_hybrid"
+              );
             return false;
           });
           return !!visibleChildren && visibleChildren.length > 0;
@@ -302,7 +318,11 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                     if (child.href === "/garage/history") return canSeeGarageJobs;
                     if (child.href === "/garage/tasks") return canSeeGarageJobs;
                     if (child.href === "/garage/settings")
-                      return appRole === "owner" || appRole === "garage_manager";
+                      return (
+                        appRole === "owner" ||
+                        appRole === "garage_manager" ||
+                        appRole === "khalil_hybrid"
+                      );
                     if (child.href === "/garage") return canSeeGarageJobs;
                     if (child.href === "/requests/pending") return canSeeSettings;
                     return true;

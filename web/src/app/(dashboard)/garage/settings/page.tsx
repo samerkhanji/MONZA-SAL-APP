@@ -8,7 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { GARAGE_RESOURCE_LABELS } from "@/lib/constants/garage-workflow";
+import {
+  GARAGE_RESOURCE_LABELS,
+  isGarageGmIncrementOnlyResource,
+} from "@/lib/constants/garage-workflow";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import {
   Dialog,
@@ -28,7 +31,10 @@ type CapRow = {
 
 export default function GarageWorkflowSettingsPage() {
   const { appRole } = useUser();
-  const canManage = appRole === "owner" || appRole === "garage_manager";
+  const canUsePage =
+    appRole === "owner" || appRole === "garage_manager" || appRole === "khalil_hybrid";
+  const canManageTemplates = appRole === "owner" || appRole === "garage_manager";
+  const isGm = appRole === "garage_manager";
   const supabase = createClient();
 
   const [caps, setCaps] = useState<CapRow[]>([]);
@@ -125,6 +131,24 @@ export default function GarageWorkflowSettingsPage() {
     await loadCapacities();
   }
 
+  async function incrementCapacity(resourceName: string, current: number) {
+    setSaving(resourceName);
+    const res = await fetch("/api/garage/capacities", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ resource_name: resourceName, capacity: current + 1 }),
+    });
+    const j = await res.json().catch(() => ({}));
+    setSaving(null);
+    if (!res.ok) {
+      toast.error(typeof j?.error === "string" ? j.error : "Save failed");
+      return;
+    }
+    toast.success("Capacity +1");
+    await loadCapacities();
+  }
+
   async function createTemplate() {
     const name = newTplName.trim();
     if (!name) return;
@@ -183,10 +207,10 @@ export default function GarageWorkflowSettingsPage() {
     await loadTemplates();
   }
 
-  if (!canManage) {
+  if (!canUsePage) {
     return (
       <div className="container mx-auto px-4 py-12 text-center text-muted-foreground">
-        Only owners and garage managers can edit workflow settings.
+        Only owners, Khalil, and garage managers can open garage workflow settings.
       </div>
     );
   }
@@ -213,40 +237,80 @@ export default function GarageWorkflowSettingsPage() {
           <CardDescription>Usage = tasks in pending or in_progress with this resource_type</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {caps.map((c) => (
-            <div key={c.resource_name} className="flex flex-col gap-2 sm:flex-row sm:items-end">
-              <div className="min-w-0 flex-1 space-y-1">
-                <Label>{GARAGE_RESOURCE_LABELS[c.resource_name] ?? c.resource_name}</Label>
-                <p className="text-muted-foreground text-xs">
-                  In use: {c.usage_count} / {c.capacity}
-                </p>
+          {caps.map((c) => {
+            const gmCarWashLocked = isGm && c.resource_name === "car_wash";
+            const gmIncrementOnly = isGm && isGarageGmIncrementOnlyResource(c.resource_name);
+
+            return (
+              <div key={c.resource_name} className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                <div className="min-w-0 flex-1 space-y-1">
+                  <Label>{GARAGE_RESOURCE_LABELS[c.resource_name] ?? c.resource_name}</Label>
+                  <p className="text-muted-foreground text-xs">
+                    In use: {c.usage_count} / {c.capacity}
+                  </p>
+                  {gmCarWashLocked ? (
+                    <p className="text-muted-foreground text-xs">
+                      Capacity changes for car wash are limited to owners and Khalil.
+                    </p>
+                  ) : null}
+                  {gmIncrementOnly ? (
+                    <p className="text-muted-foreground text-xs">
+                      As garage manager you can only add +1 per save.
+                    </p>
+                  ) : null}
+                </div>
+                <div className="flex items-center gap-2">
+                  {gmCarWashLocked ? null : gmIncrementOnly ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={saving === c.resource_name}
+                      onClick={() => void incrementCapacity(c.resource_name, c.capacity)}
+                    >
+                      {saving === c.resource_name ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        "+1 capacity"
+                      )}
+                    </Button>
+                  ) : (
+                    <>
+                      <Input
+                        type="number"
+                        min={0}
+                        className="w-28"
+                        key={`${c.resource_name}-${c.capacity}`}
+                        defaultValue={c.capacity}
+                        id={`cap-${c.resource_name}`}
+                        disabled={saving === c.resource_name}
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        disabled={saving === c.resource_name}
+                        onClick={() => {
+                          const el = document.getElementById(
+                            `cap-${c.resource_name}`
+                          ) as HTMLInputElement | null;
+                          if (el) void saveCapacity(c.resource_name, el.value);
+                        }}
+                      >
+                        {saving === c.resource_name ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                          "Save"
+                        )}
+                      </Button>
+                    </>
+                  )}
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Input
-                  type="number"
-                  min={0}
-                  className="w-28"
-                  defaultValue={c.capacity}
-                  id={`cap-${c.resource_name}`}
-                  disabled={saving === c.resource_name}
-                />
-                <Button
-                  type="button"
-                  size="sm"
-                  disabled={saving === c.resource_name}
-                  onClick={() => {
-                    const el = document.getElementById(`cap-${c.resource_name}`) as HTMLInputElement | null;
-                    if (el) void saveCapacity(c.resource_name, el.value);
-                  }}
-                >
-                  {saving === c.resource_name ? <Loader2 className="size-4 animate-spin" /> : "Save"}
-                </Button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </CardContent>
       </Card>
 
+      {canManageTemplates ? (
       <Card>
         <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
           <div>
@@ -326,6 +390,11 @@ export default function GarageWorkflowSettingsPage() {
           ))}
         </CardContent>
       </Card>
+      ) : (
+        <p className="text-muted-foreground text-sm">
+          Task templates are managed by owners and garage managers.
+        </p>
+      )}
     </div>
   );
 }

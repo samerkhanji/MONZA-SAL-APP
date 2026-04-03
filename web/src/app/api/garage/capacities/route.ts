@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getSessionUserAndRole, isGarageMgmtRole } from "@/lib/server/session-app-role";
+import { canEditGarageCapacities, getSessionUserAndRole } from "@/lib/server/session-app-role";
+import { isGarageGmIncrementOnlyResource } from "@/lib/constants/garage-workflow";
 
 const ACTIVE_STATUSES = ["pending", "in_progress"] as const;
 
@@ -48,14 +49,14 @@ export async function GET() {
   }
 }
 
-/** PATCH: { resource_name, capacity } — owner / garage_manager only */
+/** PATCH: { resource_name, capacity } — owner / khalil_hybrid (any non‑negative); garage_manager +1 on listed resources only (not car_wash). */
 export async function PATCH(req: Request) {
   try {
     const session = await getSessionUserAndRole();
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    if (!isGarageMgmtRole(session.appRole)) {
+    if (!canEditGarageCapacities(session.appRole)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -68,6 +69,38 @@ export async function PATCH(req: Request) {
     const capacity = body?.capacity;
     if (!resourceName || typeof capacity !== "number" || capacity < 0 || !Number.isFinite(capacity)) {
       return NextResponse.json({ error: "resource_name and non-negative capacity required" }, { status: 400 });
+    }
+
+    const role = session.appRole;
+    if (role === "garage_manager") {
+      if (resourceName === "car_wash") {
+        return NextResponse.json(
+          { error: "Garage managers cannot change car wash capacity; ask an owner or Khalil." },
+          { status: 403 }
+        );
+      }
+      if (!isGarageGmIncrementOnlyResource(resourceName)) {
+        return NextResponse.json({ error: "Garage managers cannot update this resource" }, { status: 403 });
+      }
+      const { data: current, error: curErr } = await session.supabase
+        .from("garage_capacities")
+        .select("capacity")
+        .eq("resource_name", resourceName)
+        .maybeSingle();
+      if (curErr) {
+        return NextResponse.json({ error: curErr.message }, { status: 500 });
+      }
+      if (!current) {
+        return NextResponse.json({ error: "Unknown resource_name" }, { status: 404 });
+      }
+      const prev = (current as { capacity: number }).capacity;
+      const next = Math.floor(capacity);
+      if (next !== prev + 1) {
+        return NextResponse.json(
+          { error: "Garage managers may only add +1 to this capacity (current " + prev + ")." },
+          { status: 400 }
+        );
+      }
     }
 
     const { data, error } = await session.supabase

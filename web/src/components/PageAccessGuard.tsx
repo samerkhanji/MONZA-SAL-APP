@@ -21,8 +21,10 @@ function getPageKeyFromPathname(pathname: string):
   | "documents"
   | "settings"
   | "garage_settings"
+  | "dashboard_overview"
   | null {
   if (pathname.startsWith("/assistant-dashboard")) return "assistant_dashboard";
+  if (pathname.startsWith("/dashboard/overview")) return "dashboard_overview";
   if (pathname === "/dashboard") return "dashboard";
   if (pathname.startsWith("/cars")) return "cars";
   if (pathname.startsWith("/accessories")) return "accessories";
