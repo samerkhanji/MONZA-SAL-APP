@@ -206,10 +206,12 @@ export default function DashboardPage() {
     ] = await Promise.all([
       supabase
         .from("cars_display")
-        .select("*", { count: "exact", head: true }),
+        .select("*", { count: "exact", head: true })
+        .is("deleted_at", null),
       supabase
         .from("cars_display")
         .select("*", { count: "exact", head: true })
+        .is("deleted_at", null)
         .eq("location_type", "garage"),
       supabase
         .from("customers")
@@ -231,7 +233,7 @@ export default function DashboardPage() {
         .from("garage_jobs")
         .select("status")
         .is("deleted_at", null),
-      supabase.from("cars_display").select("status"),
+      supabase.from("cars_display").select("status").is("deleted_at", null),
       supabase
         .from("parts")
         .select("id, part_name, oe_number, quantity, status")

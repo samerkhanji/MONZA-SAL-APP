@@ -1,7 +1,7 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useEffect, useState, useMemo, useCallback } from "react";
-import { addDays, isWithinInterval, parseISO, startOfDay } from "date-fns";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -50,6 +50,7 @@ import type { ExportColumn } from "@/lib/exportToExcel";
 import { canPerform } from "@/lib/permissions";
 import { getCarsDisplay } from "@/lib/data/cars";
 import { createClient } from "@/lib/supabase";
+import { cn } from "@/lib/utils";
 
 const ScannerDialog = dynamic(
   () => import("@/components/scanner/ScannerDialog").then((m) => ({ default: m.ScannerDialog })),
@@ -91,15 +92,7 @@ function warrantyVehicleExpiry(car: CarDisplay): string {
   return fmtSheetDate(v ?? null);
 }
 
-const COL_EMPTY = "__empty__";
-const FILTER_ALL = "all";
-
-function dateKeyDb(v: string | null | undefined): string {
-  if (!v) return COL_EMPTY;
-  return String(v).slice(0, 10);
-}
-
-function locationTextForFilter(car: CarDisplay): string {
+function locationDisplayText(car: CarDisplay): string {
   return (
     car.location_full ??
     (car.location_type
@@ -108,111 +101,222 @@ function locationTextForFilter(car: CarDisplay): string {
   );
 }
 
-function vehicleWarrantyDateKey(car: CarDisplay): string {
+function warrantySummaryDisplay(car: CarDisplay): string {
   const v = car.warranty_vehicle_expiry ?? car.warranty_expiry ?? car.warranty_monza_start_date;
-  return dateKeyDb(v ?? null);
+  if (v) return fmtSheetDate(v);
+  if (car.warranty_battery_expiry) return fmtSheetDate(car.warranty_battery_expiry);
+  return "—";
 }
 
-function customsFilterValue(car: CarDisplay): string {
-  if (car.customs_status === "cleared") return "Complete";
-  if (car.customs_status === "in_progress") return "Incomplete";
-  return CUSTOMS_STATUS_LABELS[car.customs_status] ?? "Pending";
+const SORT_INF = Number.MAX_SAFE_INTEGER;
+
+function dateSortTs(v: string | null | undefined): number {
+  if (!v) return SORT_INF;
+  const t = Date.parse(String(v).slice(0, 10));
+  return Number.isNaN(t) ? SORT_INF : t;
 }
 
-function warrantyInNextDays(
-  iso: string | null | undefined,
-  start: Date,
-  end: Date
-): boolean {
-  if (!iso) return false;
-  const d = parseISO(String(iso).slice(0, 10));
-  if (Number.isNaN(d.getTime())) return false;
-  return isWithinInterval(d, { start, end });
+function strSort(v: string | null | undefined): string {
+  return (v ?? "").trim().toLowerCase();
 }
 
-type ColFilterOpts = { value: string; label: string };
+const STATUS_SORT_RANK: Record<string, number> = {
+  inventory: 0,
+  available: 1,
+  reserved: 2,
+  sold: 3,
+};
 
-function freqOpts(
-  list: CarDisplay[],
-  pick: (c: CarDisplay) => string | null | undefined,
-  sort: "freq" | "alpha" = "freq"
-): ColFilterOpts[] {
-  const m = new Map<string, number>();
-  for (const c of list) {
-    const raw = pick(c);
-    const k =
-      raw == null || String(raw).trim() === "" ? COL_EMPTY : String(raw).trim();
-    m.set(k, (m.get(k) ?? 0) + 1);
+function customsSortKey(car: CarDisplay): string {
+  if (car.customs_status === "cleared") return "complete";
+  if (car.customs_status === "in_progress") return "incomplete";
+  return (CUSTOMS_STATUS_LABELS[car.customs_status] ?? "pending").toLowerCase();
+}
+
+type InventorySortKey =
+  | "vin"
+  | "brand"
+  | "model"
+  | "model_year"
+  | "exterior"
+  | "interior"
+  | "status"
+  | "client"
+  | "client_phone"
+  | "delivery_date"
+  | "location"
+  | "warranty_per_dms"
+  | "wvm"
+  | "warranty_battery_dms"
+  | "warranty_battery_expiry"
+  | "warranties"
+  | "battery_percent"
+  | "pdi"
+  | "customs"
+  | "software_update"
+  | "date_arrived";
+
+function compareInventoryRows(
+  a: CarDisplay,
+  b: CarDisplay,
+  key: InventorySortKey,
+  asc: boolean
+): number {
+  const dir = asc ? 1 : -1;
+  const n = (x: number, y: number) => (x < y ? -1 : x > y ? 1 : 0) * dir;
+  const s = (x: string, y: string) => x.localeCompare(y, undefined, { sensitivity: "base" }) * dir;
+
+  switch (key) {
+    case "vin":
+      return s(strSort(a.vin), strSort(b.vin));
+    case "brand":
+      return s(strSort(a.brand), strSort(b.brand));
+    case "model":
+      return s(strSort(a.model), strSort(b.model));
+    case "model_year":
+      return n(a.model_year ?? SORT_INF, b.model_year ?? SORT_INF);
+    case "exterior":
+      return s(strSort(a.exterior_color), strSort(b.exterior_color));
+    case "interior":
+      return s(strSort(a.interior_color), strSort(b.interior_color));
+    case "status": {
+      const ra = STATUS_SORT_RANK[a.status] ?? 99;
+      const rb = STATUS_SORT_RANK[b.status] ?? 99;
+      const c = n(ra, rb);
+      return c !== 0 ? c : s(strSort(a.status), strSort(b.status));
+    }
+    case "client":
+      return s(strSort(a.client_name), strSort(b.client_name));
+    case "client_phone":
+      return s(
+        strSort((a as { client_phone?: string }).client_phone),
+        strSort((b as { client_phone?: string }).client_phone)
+      );
+    case "delivery_date":
+      return n(dateSortTs(a.delivery_date), dateSortTs(b.delivery_date));
+    case "location": {
+      const la = strSort(locationDisplayText(a) === "—" ? "" : locationDisplayText(a));
+      const lb = strSort(locationDisplayText(b) === "—" ? "" : locationDisplayText(b));
+      return s(la, lb);
+    }
+    case "warranty_per_dms":
+      return n(dateSortTs(a.warranty_per_dms), dateSortTs(b.warranty_per_dms));
+    case "wvm": {
+      const va = a.warranty_vehicle_expiry ?? a.warranty_expiry ?? a.warranty_monza_start_date;
+      const vb = b.warranty_vehicle_expiry ?? b.warranty_expiry ?? b.warranty_monza_start_date;
+      return n(dateSortTs(va), dateSortTs(vb));
+    }
+    case "warranty_battery_dms":
+      return n(dateSortTs(a.warranty_battery_dms), dateSortTs(b.warranty_battery_dms));
+    case "warranty_battery_expiry":
+      return n(dateSortTs(a.warranty_battery_expiry), dateSortTs(b.warranty_battery_expiry));
+    case "warranties": {
+      const datesA = [
+        dateSortTs(a.warranty_vehicle_expiry ?? a.warranty_expiry ?? a.warranty_monza_start_date),
+        dateSortTs(a.warranty_battery_expiry),
+        dateSortTs(a.warranty_per_dms),
+      ].filter((t) => t !== SORT_INF);
+      const datesB = [
+        dateSortTs(b.warranty_vehicle_expiry ?? b.warranty_expiry ?? b.warranty_monza_start_date),
+        dateSortTs(b.warranty_battery_expiry),
+        dateSortTs(b.warranty_per_dms),
+      ].filter((t) => t !== SORT_INF);
+      const minA = datesA.length ? Math.min(...datesA) : SORT_INF;
+      const minB = datesB.length ? Math.min(...datesB) : SORT_INF;
+      if (minA !== minB) return n(minA, minB);
+      const nameA = [a.warranty_vehicle_expiry, a.warranty_battery_expiry, a.warranty_per_dms]
+        .filter(Boolean)
+        .join("|")
+        .toLowerCase();
+      const nameB = [b.warranty_vehicle_expiry, b.warranty_battery_expiry, b.warranty_per_dms]
+        .filter(Boolean)
+        .join("|")
+        .toLowerCase();
+      return s(nameA, nameB);
+    }
+    case "battery_percent":
+      return n(a.battery_percent ?? SORT_INF, b.battery_percent ?? SORT_INF);
+    case "pdi": {
+      const da = a.pdi_status === "done" ? 1 : 0;
+      const db = b.pdi_status === "done" ? 1 : 0;
+      const c = n(da, db);
+      return c !== 0 ? c : s(strSort(a.pdi_status), strSort(b.pdi_status));
+    }
+    case "customs":
+      return s(customsSortKey(a), customsSortKey(b));
+    case "software_update": {
+      const sa = (a.software_update ?? "").trim();
+      const sb = (b.software_update ?? "").trim();
+      const isoA = /^\d{4}-\d{2}-\d{2}/.test(sa) ? dateSortTs(sa) : null;
+      const isoB = /^\d{4}-\d{2}-\d{2}/.test(sb) ? dateSortTs(sb) : null;
+      if (isoA !== null && isoB !== null) return n(isoA, isoB);
+      if (isoA !== null && isoB === null) return asc ? -1 : 1;
+      if (isoA === null && isoB !== null) return asc ? 1 : -1;
+      const ha = sa ? 1 : 0;
+      const hb = sb ? 1 : 0;
+      const c = n(ha, hb);
+      return c !== 0 ? c : s(strSort(a.software_update), strSort(b.software_update));
+    }
+    case "date_arrived":
+      return n(dateSortTs(a.date_arrived), dateSortTs(b.date_arrived));
+    default:
+      return 0;
   }
-  const entries = [...m.entries()];
-  if (sort === "freq") entries.sort((a, b) => b[1] - a[1]);
-  else entries.sort((a, b) => a[0].localeCompare(b[0]));
-  return entries.map(([value, n]) => ({
-    value,
-    label: value === COL_EMPTY ? `(Empty) · ${n}` : `${value} · ${n}`,
-  }));
 }
 
-function yearOpts(list: CarDisplay[]): ColFilterOpts[] {
-  const m = new Map<string, number>();
-  for (const c of list) {
-    const k = c.model_year == null ? COL_EMPTY : String(c.model_year);
-    m.set(k, (m.get(k) ?? 0) + 1);
-  }
-  return [...m.entries()]
-    .sort((a, b) => {
-      if (a[0] === COL_EMPTY) return 1;
-      if (b[0] === COL_EMPTY) return -1;
-      return Number(b[0]) - Number(a[0]);
-    })
-    .map(([value, n]) => ({
-      value,
-      label: value === COL_EMPTY ? `(Empty) · ${n}` : `${value} · ${n}`,
-    }));
+function InventorySortTh({
+  k,
+  sortKey,
+  sortDir,
+  onToggle,
+  children,
+  className = "",
+  title: thTitle,
+}: {
+  k: InventorySortKey;
+  sortKey: InventorySortKey | null;
+  sortDir: "asc" | "desc";
+  onToggle: (key: InventorySortKey) => void;
+  children: ReactNode;
+  className?: string;
+  title?: string;
+}) {
+  const active = sortKey === k;
+  return (
+    <th
+      scope="col"
+      title={thTitle}
+      className={cn(`${CARS_TH} p-0`.trim(), className)}
+    >
+      <button
+        type="button"
+        className={cn(
+          "flex w-full min-w-0 items-center gap-0.5 px-2 py-2 text-left hover:bg-muted/40",
+          active && "bg-muted/25"
+        )}
+        onClick={() => onToggle(k)}
+      >
+        <span className="min-w-0 flex-1 truncate">{children}</span>
+        {active ? (
+          <span className="shrink-0 tabular-nums" aria-hidden>
+            {sortDir === "asc" ? "\u2191" : "\u2193"}
+          </span>
+        ) : null}
+      </button>
+    </th>
+  );
 }
 
-function dateOpts(
-  list: CarDisplay[],
-  pick: (c: CarDisplay) => string | null | undefined
-): ColFilterOpts[] {
-  const m = new Map<string, number>();
-  for (const c of list) {
-    const v = pick(c);
-    const k = v ? String(v).slice(0, 10) : COL_EMPTY;
-    m.set(k, (m.get(k) ?? 0) + 1);
-  }
-  return [...m.entries()]
-    .sort((a, b) => {
-      if (a[0] === COL_EMPTY) return 1;
-      if (b[0] === COL_EMPTY) return -1;
-      return b[0].localeCompare(a[0]);
-    })
-    .map(([value, n]) => ({
-      value,
-      label: value === COL_EMPTY ? `(Empty) · ${n}` : `${value} · ${n}`,
-    }));
-}
-
-/** Pixel widths — single source of truth via <colgroup> (header + body). 21 columns. */
+/** Pixel widths — <colgroup> for 23 columns (incl. Warranties, Software update). */
 const CARS_TABLE_COL_PX = [
-  220, 120, 150, 110, 90, 140, 140, 130, 220, 140, 140, 130, 190, 140, 190, 140, 120, 140,
-  140, 140, 100,
+  220, 118, 148, 108, 72, 132, 132, 118, 200, 132, 128, 124, 168, 124, 168, 124, 108, 96, 124, 124,
+  120, 120, 96,
 ] as const;
 
 const CARS_TH =
   "sticky top-0 z-10 box-border min-w-0 max-w-full border-b-2 border-r border-border bg-[var(--table-header)] px-2 py-2 text-left align-middle text-[11px] font-semibold text-[var(--table-header-text)] whitespace-nowrap overflow-hidden text-ellipsis";
 const CARS_TD =
-  "box-border min-w-0 max-w-full border-b border-r border-border bg-card px-2 py-2 text-left align-middle text-xs whitespace-nowrap overflow-hidden text-ellipsis";
-
-const CAR_COL_BANDS = [
-  "bg-sky-500/[0.06] dark:bg-sky-500/10",
-  "bg-emerald-500/[0.06] dark:bg-emerald-500/10",
-  "bg-amber-500/[0.06] dark:bg-amber-500/10",
-  "bg-violet-500/[0.06] dark:bg-violet-500/10",
-] as const;
-function carColBand(i: number, base: string) {
-  return `${base} ${CAR_COL_BANDS[i % CAR_COL_BANDS.length]}`;
-}
+  "box-border min-w-0 max-w-full border-b border-r border-border bg-transparent px-2 py-2 text-left align-middle text-xs whitespace-nowrap overflow-hidden text-ellipsis";
 
 function matchesSearch(
   car: CarDisplay,
@@ -264,31 +368,8 @@ export default function CarsListPage() {
     }
   }, [locationFromUrl]);
   const [brandFilter, setBrandFilter] = useState<string>("all");
-  const [colVin, setColVin] = useState("");
-  const [colClientPhone, setColClientPhone] = useState("");
-  const [colFilters, setColFilters] = useState({
-    brand: FILTER_ALL,
-    model: FILTER_ALL,
-    model_year: FILTER_ALL,
-    exterior: FILTER_ALL,
-    interior: FILTER_ALL,
-    status: FILTER_ALL,
-    client: FILTER_ALL,
-    delivery_date: FILTER_ALL,
-    location: FILTER_ALL,
-    warranty_per_dms: FILTER_ALL,
-    wvm: FILTER_ALL,
-    warranty_battery_dms: FILTER_ALL,
-    wbm: FILTER_ALL,
-    battery: FILTER_ALL,
-    pdi: FILTER_ALL,
-    customs: FILTER_ALL,
-    date_arrived: FILTER_ALL,
-    software_update: FILTER_ALL,
-    extra_pdi: FILTER_ALL,
-    extra_software: FILTER_ALL,
-    extra_warranty: FILTER_ALL,
-  });
+  const [sortKey, setSortKey] = useState<InventorySortKey | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [customsDialogCar, setCustomsDialogCar] = useState<CarDisplay | null>(null);
   const [customsDialogOpen, setCustomsDialogOpen] = useState(false);
   const [pdiDialogCar, setPdiDialogCar] = useState<CarDisplay | null>(null);
@@ -369,7 +450,7 @@ export default function CarsListPage() {
       return;
     }
 
-    toast.success("Car removed successfully");
+    toast.success("Vehicle marked as scrapped and removed from inventory");
     setDeletePassword("");
     setDeleteCar(null);
     fetchCars();
@@ -425,154 +506,31 @@ export default function CarsListPage() {
     });
   }, [cars]);
 
-  const colOpts = useMemo(
-    () => ({
-      brand: freqOpts(cars, (c) => c.brand),
-      model: freqOpts(cars, (c) => c.model),
-      model_year: yearOpts(cars),
-      exterior: freqOpts(cars, (c) => c.exterior_color),
-      interior: freqOpts(cars, (c) => c.interior_color),
-      status: freqOpts(cars, (c) => c.status),
-      client: freqOpts(cars, (c) => c.client_name),
-      delivery_date: dateOpts(cars, (c) => c.delivery_date),
-      location: freqOpts(cars, (c) => {
-        const t = locationTextForFilter(c);
-        return t === "—" ? null : t;
-      }),
-      warranty_per_dms: dateOpts(cars, (c) => c.warranty_per_dms),
-      wvm: dateOpts(cars, (c) => c.warranty_vehicle_expiry ?? c.warranty_expiry ?? c.warranty_monza_start_date),
-      warranty_battery_dms: dateOpts(cars, (c) => c.warranty_battery_dms),
-      wbm: dateOpts(cars, (c) => c.warranty_battery_expiry),
-      battery: freqOpts(cars, (c) =>
-        c.battery_percent != null ? String(c.battery_percent) : null
-      ),
-      pdi: freqOpts(cars, (c) => c.pdi_status),
-      customs: freqOpts(cars, customsFilterValue),
-      date_arrived: dateOpts(cars, (c) => c.date_arrived),
-      software_update: freqOpts(cars, (c) => c.software_update, "alpha"),
-    }),
-    [cars]
-  );
-
   const filteredCars = useMemo(() => {
-    const wStart = startOfDay(new Date());
-    const wEnd = startOfDay(addDays(new Date(), 90));
     return cars.filter((car) => {
       if (!matchesSearch(car, search)) return false;
       if (statusFilter !== "all" && car.status !== statusFilter) return false;
       if (locationFilter !== "all" && car.location_type !== locationFilter)
         return false;
       if (brandFilter !== "all" && car.brand !== brandFilter) return false;
-
-      const vinQ = colVin.trim().toLowerCase();
-      if (vinQ && !(car.vin ?? "").toLowerCase().includes(vinQ)) return false;
-      const phQ = colClientPhone.trim().toLowerCase();
-      const clientPh = ((car as { client_phone?: string }).client_phone ?? "")
-        .trim()
-        .toLowerCase();
-      if (phQ && !clientPh.includes(phQ)) return false;
-
-      if (colFilters.brand !== FILTER_ALL) {
-        const v = car.brand?.trim() ? car.brand.trim() : COL_EMPTY;
-        if (v !== colFilters.brand) return false;
-      }
-      if (colFilters.model !== FILTER_ALL) {
-        const v = car.model?.trim() ? car.model.trim() : COL_EMPTY;
-        if (v !== colFilters.model) return false;
-      }
-      if (colFilters.model_year !== FILTER_ALL) {
-        const v = car.model_year == null ? COL_EMPTY : String(car.model_year);
-        if (v !== colFilters.model_year) return false;
-      }
-      if (colFilters.exterior !== FILTER_ALL) {
-        const v = car.exterior_color?.trim() ? car.exterior_color.trim() : COL_EMPTY;
-        if (v !== colFilters.exterior) return false;
-      }
-      if (colFilters.interior !== FILTER_ALL) {
-        const v = car.interior_color?.trim() ? car.interior_color.trim() : COL_EMPTY;
-        if (v !== colFilters.interior) return false;
-      }
-      if (colFilters.status !== FILTER_ALL && car.status !== colFilters.status) return false;
-      if (colFilters.client !== FILTER_ALL) {
-        const v = car.client_name?.trim() ? car.client_name.trim() : COL_EMPTY;
-        if (v !== colFilters.client) return false;
-      }
-      if (colFilters.delivery_date !== FILTER_ALL) {
-        if (dateKeyDb(car.delivery_date) !== colFilters.delivery_date) return false;
-      }
-      if (colFilters.location !== FILTER_ALL) {
-        const loc = locationTextForFilter(car);
-        const v = loc === "—" ? COL_EMPTY : loc;
-        if (v !== colFilters.location) return false;
-      }
-      if (colFilters.warranty_per_dms !== FILTER_ALL) {
-        if (dateKeyDb(car.warranty_per_dms) !== colFilters.warranty_per_dms) return false;
-      }
-      if (colFilters.wvm !== FILTER_ALL) {
-        if (vehicleWarrantyDateKey(car) !== colFilters.wvm) return false;
-      }
-      if (colFilters.warranty_battery_dms !== FILTER_ALL) {
-        if (dateKeyDb(car.warranty_battery_dms) !== colFilters.warranty_battery_dms)
-          return false;
-      }
-      if (colFilters.wbm !== FILTER_ALL) {
-        if (dateKeyDb(car.warranty_battery_expiry) !== colFilters.wbm) return false;
-      }
-      if (colFilters.battery !== FILTER_ALL) {
-        const v =
-          car.battery_percent != null ? String(car.battery_percent) : COL_EMPTY;
-        if (v !== colFilters.battery) return false;
-      }
-      if (colFilters.pdi !== FILTER_ALL && car.pdi_status !== colFilters.pdi) return false;
-      if (colFilters.customs !== FILTER_ALL) {
-        if (customsFilterValue(car) !== colFilters.customs) return false;
-      }
-      if (colFilters.date_arrived !== FILTER_ALL) {
-        if (dateKeyDb(car.date_arrived) !== colFilters.date_arrived) return false;
-      }
-      if (colFilters.software_update !== FILTER_ALL) {
-        const raw = car.software_update?.trim();
-        const v = raw ? raw : COL_EMPTY;
-        if (v !== colFilters.software_update) return false;
-      }
-
-      if (colFilters.extra_pdi === "done" && car.pdi_status !== "done") return false;
-      if (colFilters.extra_pdi === "not_done" && car.pdi_status === "done") return false;
-
-      if (colFilters.extra_software === "has" && !(car.software_update ?? "").trim())
-        return false;
-      if (colFilters.extra_software === "empty" && (car.software_update ?? "").trim())
-        return false;
-
-      if (colFilters.extra_warranty === "expiring90") {
-        const hit =
-          warrantyInNextDays(car.warranty_vehicle_expiry, wStart, wEnd) ||
-          warrantyInNextDays(car.warranty_battery_expiry, wStart, wEnd) ||
-          warrantyInNextDays(car.warranty_expiry, wStart, wEnd) ||
-          warrantyInNextDays(car.warranty_monza_start_date, wStart, wEnd);
-        if (!hit) return false;
-      }
-      if (colFilters.extra_warranty === "no_vehicle_with_arrival") {
-        if (!car.date_arrived) return false;
-        if (vehicleWarrantyDateKey(car) !== COL_EMPTY) return false;
-      }
-      if (colFilters.extra_warranty === "no_battery_with_arrival") {
-        if (!car.date_arrived) return false;
-        if (dateKeyDb(car.warranty_battery_expiry) !== COL_EMPTY) return false;
-      }
-
       return true;
     });
-  }, [
-    cars,
-    search,
-    statusFilter,
-    locationFilter,
-    brandFilter,
-    colVin,
-    colClientPhone,
-    colFilters,
-  ]);
+  }, [cars, search, statusFilter, locationFilter, brandFilter]);
+
+  const sortedCars = useMemo(() => {
+    if (!sortKey) return filteredCars;
+    const asc = sortDir === "asc";
+    return [...filteredCars].sort((a, b) => compareInventoryRows(a, b, sortKey, asc));
+  }, [filteredCars, sortKey, sortDir]);
+
+  const toggleSort = useCallback((k: InventorySortKey) => {
+    if (sortKey === k) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(k);
+      setSortDir("asc");
+    }
+  }, [sortKey]);
 
   const carExportColumns: ExportColumn[] = [
     { key: "vin", header: "VIN", width: 22 },
@@ -591,9 +549,11 @@ export default function CarsListPage() {
     { key: "warranty_vm_display", header: "W.V.M", type: "date" },
     { key: "warranty_battery_dms", header: "Warranty Battery DMS", type: "date" },
     { key: "warranty_battery_expiry", header: "W.B.M", type: "date" },
+    { key: "warranties_summary", header: "Warranties" },
     { key: "battery_percent_display", header: "Battery %" },
     { key: "pdi_display", header: "PDI" },
     { key: "customs_display", header: "Customs" },
+    { key: "software_update", header: "Software Update" },
     { key: "date_arrived", header: "Date Arrived", type: "date" },
   ];
 
@@ -621,6 +581,8 @@ export default function CarsListPage() {
             : c.customs_status === "in_progress"
               ? "Incomplete"
               : CUSTOMS_STATUS_LABELS[c.customs_status] ?? "Pending",
+        warranties_summary: warrantySummaryDisplay(c),
+        software_update: (c.software_update ?? "").trim() || "",
       };
     });
 
@@ -637,13 +599,13 @@ export default function CarsListPage() {
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
           <ExportButton
-            data={carExportData(filteredCars)}
+            data={carExportData(sortedCars)}
             allData={carExportData(cars)}
             columns={carExportColumns}
             filename="Car_Inventory"
             options={{
               pageName: "Car Inventory",
-              summary: `Total Cars: ${filteredCars.length}`,
+              summary: `Total Cars: ${sortedCars.length}`,
             }}
             disabled={loading}
           />
@@ -730,196 +692,10 @@ export default function CarsListPage() {
       </Card>
 
       <Card>
-        <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <CardTitle>Column filters</CardTitle>
-            <CardDescription>
-              Per-column values (categories by frequency, dates newest first, year descending). VIN and
-              client phone use text match.
-            </CardDescription>
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="shrink-0"
-            onClick={() => {
-              setColVin("");
-              setColClientPhone("");
-              setColFilters({
-                brand: FILTER_ALL,
-                model: FILTER_ALL,
-                model_year: FILTER_ALL,
-                exterior: FILTER_ALL,
-                interior: FILTER_ALL,
-                status: FILTER_ALL,
-                client: FILTER_ALL,
-                delivery_date: FILTER_ALL,
-                location: FILTER_ALL,
-                warranty_per_dms: FILTER_ALL,
-                wvm: FILTER_ALL,
-                warranty_battery_dms: FILTER_ALL,
-                wbm: FILTER_ALL,
-                battery: FILTER_ALL,
-                pdi: FILTER_ALL,
-                customs: FILTER_ALL,
-                date_arrived: FILTER_ALL,
-                software_update: FILTER_ALL,
-                extra_pdi: FILTER_ALL,
-                extra_software: FILTER_ALL,
-                extra_warranty: FILTER_ALL,
-              });
-            }}
-          >
-            Clear column filters
-          </Button>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            <div className="flex flex-col gap-1">
-              <Label htmlFor="col-filter-vin" className="text-xs text-muted-foreground">
-                VIN contains
-              </Label>
-              <Input
-                id="col-filter-vin"
-                value={colVin}
-                onChange={(e) => setColVin(e.target.value)}
-                placeholder="Substring…"
-                className="h-9 text-xs"
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <Label htmlFor="col-filter-phone" className="text-xs text-muted-foreground">
-                Client phone contains
-              </Label>
-              <Input
-                id="col-filter-phone"
-                value={colClientPhone}
-                onChange={(e) => setColClientPhone(e.target.value)}
-                placeholder="Digits…"
-                className="h-9 text-xs"
-              />
-            </div>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {(
-              [
-                ["col-brand", "Brand", "brand", colOpts.brand],
-                ["col-model", "Model", "model", colOpts.model],
-                ["col-year", "Year", "model_year", colOpts.model_year],
-                ["col-ext", "Exterior", "exterior", colOpts.exterior],
-                ["col-int", "Interior", "interior", colOpts.interior],
-                ["col-st", "Status", "status", colOpts.status],
-                ["col-client", "Client", "client", colOpts.client],
-                ["col-del", "Delivery date", "delivery_date", colOpts.delivery_date],
-                ["col-loc", "Location", "location", colOpts.location],
-                ["col-wdms", "Warranty Vehicle DMS", "warranty_per_dms", colOpts.warranty_per_dms],
-                ["col-wvm", "W.V.M", "wvm", colOpts.wvm],
-                ["col-wbdms", "Warranty Battery DMS", "warranty_battery_dms", colOpts.warranty_battery_dms],
-                ["col-wbm", "W.B.M", "wbm", colOpts.wbm],
-                ["col-bat", "Battery %", "battery", colOpts.battery],
-                ["col-pdi", "PDI", "pdi", colOpts.pdi],
-                ["col-cust", "Customs", "customs", colOpts.customs],
-                ["col-arr", "Date arrived", "date_arrived", colOpts.date_arrived],
-                ["col-sw", "Software update", "software_update", colOpts.software_update],
-              ] as const
-            ).map(([id, label, key, options]) => (
-              <div key={id} className="flex min-w-0 flex-col gap-1">
-                <Label htmlFor={id} className="text-xs text-muted-foreground">
-                  {label}
-                </Label>
-                <Select
-                  value={colFilters[key as keyof typeof colFilters] as string}
-                  onValueChange={(v) =>
-                    setColFilters((prev) => ({ ...prev, [key]: v }))
-                  }
-                >
-                  <SelectTrigger id={id} className="h-9 text-xs">
-                    <SelectValue placeholder="All" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={FILTER_ALL}>All</SelectItem>
-                    {options.map((o) => (
-                      <SelectItem key={o.value} value={o.value}>
-                        {key === "pdi" && o.value !== COL_EMPTY
-                          ? `${PDI_LABELS[o.value as keyof typeof PDI_LABELS] ?? o.value} · ${o.label.split(" · ")[1] ?? ""}`
-                          : o.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            ))}
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <div className="flex flex-col gap-1">
-              <Label htmlFor="col-extra-pdi" className="text-xs text-muted-foreground">
-                PDI done (extra)
-              </Label>
-              <Select
-                value={colFilters.extra_pdi}
-                onValueChange={(v) => setColFilters((p) => ({ ...p, extra_pdi: v }))}
-              >
-                <SelectTrigger id="col-extra-pdi" className="h-9 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={FILTER_ALL}>All</SelectItem>
-                  <SelectItem value="done">PDI done</SelectItem>
-                  <SelectItem value="not_done">PDI not done</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex flex-col gap-1">
-              <Label htmlFor="col-extra-sw" className="text-xs text-muted-foreground">
-                Software update (extra)
-              </Label>
-              <Select
-                value={colFilters.extra_software}
-                onValueChange={(v) => setColFilters((p) => ({ ...p, extra_software: v }))}
-              >
-                <SelectTrigger id="col-extra-sw" className="h-9 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={FILTER_ALL}>All</SelectItem>
-                  <SelectItem value="has">Has value</SelectItem>
-                  <SelectItem value="empty">Empty</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex flex-col gap-1">
-              <Label htmlFor="col-extra-war" className="text-xs text-muted-foreground">
-                Warranties vs arrival
-              </Label>
-              <Select
-                value={colFilters.extra_warranty}
-                onValueChange={(v) => setColFilters((p) => ({ ...p, extra_warranty: v }))}
-              >
-                <SelectTrigger id="col-extra-war" className="h-9 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={FILTER_ALL}>All</SelectItem>
-                  <SelectItem value="expiring90">Expires within 90 days (vehicle or battery)</SelectItem>
-                  <SelectItem value="no_vehicle_with_arrival">
-                    Date arrived set · no vehicle warranty date
-                  </SelectItem>
-                  <SelectItem value="no_battery_with_arrival">
-                    Date arrived set · no battery warranty date
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
         <CardHeader>
           <CardTitle>Cars</CardTitle>
           <CardDescription>
-            {loading ? "Loading..." : `${filteredCars.length} car(s)`}
+            {loading ? "Loading..." : `${sortedCars.length} car(s)`}
           </CardDescription>
         </CardHeader>
         <CardContent className="min-w-0 overflow-hidden">
@@ -929,7 +705,7 @@ export default function CarsListPage() {
                 <Skeleton key={i} className="h-12 w-full" />
               ))}
             </div>
-          ) : filteredCars.length === 0 ? (
+          ) : sortedCars.length === 0 ? (
             <p className="text-muted-foreground">No cars found.</p>
           ) : (
             <div className="scrollbar-thick w-full min-w-0 max-h-[min(72vh,calc(100dvh-14rem))] overflow-x-auto overflow-y-auto rounded-md border border-border bg-card [-webkit-overflow-scrolling:touch]">
@@ -941,73 +717,208 @@ export default function CarsListPage() {
                 </colgroup>
                 <thead>
                   <tr>
-                    <th scope="col" className={carColBand(0, `${CARS_TH} font-mono`)}>
+                    <InventorySortTh
+                      k="vin"
+
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onToggle={toggleSort}
+                      className="font-mono"
+                    >
                       VIN
-                    </th>
-                    <th scope="col" className={carColBand(1, CARS_TH)}>
+                    </InventorySortTh>
+                    <InventorySortTh
+                      k="brand"
+
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onToggle={toggleSort}
+                    >
                       Brand
-                    </th>
-                    <th scope="col" className={carColBand(2, CARS_TH)}>
+                    </InventorySortTh>
+                    <InventorySortTh
+                      k="model"
+
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onToggle={toggleSort}
+                    >
                       Model
-                    </th>
-                    <th scope="col" className={carColBand(3, CARS_TH)}>
+                    </InventorySortTh>
+                    <th scope="col" className={CARS_TH}>
                       Trim
                     </th>
-                    <th scope="col" className={carColBand(4, CARS_TH)}>
+                    <InventorySortTh
+                      k="model_year"
+
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onToggle={toggleSort}
+                    >
                       Year
-                    </th>
-                    <th scope="col" className={carColBand(5, CARS_TH)}>
+                    </InventorySortTh>
+                    <InventorySortTh
+                      k="exterior"
+
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onToggle={toggleSort}
+                    >
                       Exterior
-                    </th>
-                    <th scope="col" className={carColBand(6, CARS_TH)}>
+                    </InventorySortTh>
+                    <InventorySortTh
+                      k="interior"
+
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onToggle={toggleSort}
+                    >
                       Interior
-                    </th>
-                    <th scope="col" className={carColBand(7, CARS_TH)}>
+                    </InventorySortTh>
+                    <InventorySortTh
+                      k="status"
+
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onToggle={toggleSort}
+                    >
                       Status
-                    </th>
-                    <th scope="col" className={carColBand(8, CARS_TH)}>
+                    </InventorySortTh>
+                    <InventorySortTh
+                      k="client"
+
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onToggle={toggleSort}
+                    >
                       Client
-                    </th>
-                    <th scope="col" className={carColBand(9, CARS_TH)}>
+                    </InventorySortTh>
+                    <InventorySortTh
+                      k="client_phone"
+
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onToggle={toggleSort}
+                    >
                       Client Phone
-                    </th>
-                    <th scope="col" className={carColBand(10, CARS_TH)}>
+                    </InventorySortTh>
+                    <InventorySortTh
+                      k="delivery_date"
+
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onToggle={toggleSort}
+                    >
                       Delivery Date
-                    </th>
-                    <th scope="col" className={carColBand(11, CARS_TH)}>
+                    </InventorySortTh>
+                    <InventorySortTh
+                      k="location"
+
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onToggle={toggleSort}
+                    >
                       Location
-                    </th>
-                    <th scope="col" className={carColBand(12, CARS_TH)}>
+                    </InventorySortTh>
+                    <InventorySortTh
+                      k="warranty_per_dms"
+
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onToggle={toggleSort}
+                    >
                       Warranty Vehicle DMS
-                    </th>
-                    <th scope="col" title="Warranty V.M" className={carColBand(13, CARS_TH)}>
+                    </InventorySortTh>
+                    <InventorySortTh
+                      k="wvm"
+
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onToggle={toggleSort}
+                      title="Warranty V.M"
+                    >
                       W.V.M
-                    </th>
-                    <th scope="col" className={carColBand(14, CARS_TH)}>
+                    </InventorySortTh>
+                    <InventorySortTh
+                      k="warranty_battery_dms"
+
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onToggle={toggleSort}
+                    >
                       Warranty Battery DMS
-                    </th>
-                    <th scope="col" title="Warranty B.M" className={carColBand(15, CARS_TH)}>
+                    </InventorySortTh>
+                    <InventorySortTh
+                      k="warranty_battery_expiry"
+
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onToggle={toggleSort}
+                      title="Warranty B.M"
+                    >
                       W.B.M
-                    </th>
-                    <th scope="col" className={carColBand(16, CARS_TH)}>
+                    </InventorySortTh>
+                    <InventorySortTh
+                      k="warranties"
+
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onToggle={toggleSort}
+                    >
+                      Warranties
+                    </InventorySortTh>
+                    <InventorySortTh
+                      k="battery_percent"
+
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onToggle={toggleSort}
+                    >
                       Battery %
-                    </th>
-                    <th scope="col" className={carColBand(17, CARS_TH)}>
+                    </InventorySortTh>
+                    <InventorySortTh
+                      k="pdi"
+
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onToggle={toggleSort}
+                    >
                       PDI
-                    </th>
-                    <th scope="col" className={carColBand(18, CARS_TH)}>
+                    </InventorySortTh>
+                    <InventorySortTh
+                      k="customs"
+
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onToggle={toggleSort}
+                    >
                       Customs
-                    </th>
-                    <th scope="col" className={carColBand(19, CARS_TH)}>
+                    </InventorySortTh>
+                    <InventorySortTh
+                      k="software_update"
+
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onToggle={toggleSort}
+                    >
+                      Software update
+                    </InventorySortTh>
+                    <InventorySortTh
+                      k="date_arrived"
+
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onToggle={toggleSort}
+                    >
                       Date Arrived
-                    </th>
-                    <th scope="col" className={carColBand(20, `${CARS_TH} text-right`)}>
+                    </InventorySortTh>
+                    <th scope="col" className={`${CARS_TH} text-right`}>
                       Actions
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredCars.map((car) => {
+                  {sortedCars.map((car) => {
                     const customsLabel =
                       car.customs_status === "cleared"
                         ? "Complete"
@@ -1016,11 +927,8 @@ export default function CarsListPage() {
                           : CUSTOMS_STATUS_LABELS[car.customs_status] ?? "Pending";
                     const batteryPercent = car.battery_percent;
                     const clientPhone = (car as { client_phone?: string }).client_phone;
-                    const locationText =
-                      car.location_full ??
-                      (car.location_type
-                        ? `${LOCATION_LABELS[car.location_type as keyof typeof LOCATION_LABELS] ?? car.location_type}${car.location_slot ? ` ${car.location_slot}` : ""}`
-                        : "—");
+                    const locationText = locationDisplayText(car);
+                    const softwareText = (car.software_update ?? "").trim();
                     const clientDisplay = pendingDeletes[car.id]
                       ? `(!) ${car.client_name ?? "—"}`
                       : (car.client_name ?? "—");
@@ -1034,64 +942,70 @@ export default function CarsListPage() {
                     return (
                       <tr
                         key={car.id}
-                        className="cursor-pointer hover:bg-muted/30"
+                        className="cursor-pointer odd:bg-gray-50 even:bg-white"
                         title={pendingDeletes[car.id] ? "Pending delete request" : undefined}
                         onClick={() => router.push(`/cars/${encodeURIComponent(car.vin ?? car.id)}`)}
                       >
-                        <td title={car.vin ?? ""} className={carColBand(0, `${CARS_TD} font-mono`)}>
+                        <td title={car.vin ?? ""} className={`${CARS_TD} font-mono`}>
                           {car.vin ?? "—"}
                         </td>
-                        <td title={car.brand ?? undefined} className={carColBand(1, CARS_TD)}>
+                        <td title={car.brand ?? undefined} className={CARS_TD}>
                           {car.brand ?? "—"}
                         </td>
-                        <td title={car.model ?? undefined} className={carColBand(2, CARS_TD)}>
+                        <td title={car.model ?? undefined} className={CARS_TD}>
                           {car.model}
                         </td>
-                        <td title={trimDisplay !== "—" ? trimDisplay : undefined} className={carColBand(3, CARS_TD)}>
+                        <td title={trimDisplay !== "—" ? trimDisplay : undefined} className={CARS_TD}>
                           {trimDisplay}
                         </td>
-                        <td className={carColBand(4, `${CARS_TD} tabular-nums`)}>
+                        <td className={`${CARS_TD} tabular-nums`}>
                           {car.model_year ?? "—"}
                         </td>
-                        <td title={car.exterior_color ?? undefined} className={carColBand(5, CARS_TD)}>
+                        <td title={car.exterior_color ?? undefined} className={CARS_TD}>
                           {car.exterior_color ?? "—"}
                         </td>
-                        <td title={car.interior_color ?? undefined} className={carColBand(6, CARS_TD)}>
+                        <td title={car.interior_color ?? undefined} className={CARS_TD}>
                           {car.interior_color ?? "—"}
                         </td>
-                        <td title={statusCellText} className={carColBand(7, CARS_TD)}>
+                        <td title={statusCellText} className={CARS_TD}>
                           {statusCellText}
                         </td>
-                        <td title={car.client_name ?? undefined} className={carColBand(8, CARS_TD)}>
+                        <td title={car.client_name ?? undefined} className={CARS_TD}>
                           {clientDisplay}
                         </td>
-                        <td title={clientPhone ?? undefined} className={carColBand(9, CARS_TD)}>
+                        <td title={clientPhone ?? undefined} className={CARS_TD}>
                           {clientPhone ?? "—"}
                         </td>
-                        <td className={carColBand(10, `${CARS_TD} tabular-nums`)}>
+                        <td className={`${CARS_TD} tabular-nums`}>
                           {fmtSheetDate(car.delivery_date)}
                         </td>
-                        <td title={locationText !== "—" ? locationText : undefined} className={carColBand(11, CARS_TD)}>
+                        <td title={locationText !== "—" ? locationText : undefined} className={CARS_TD}>
                           {locationText}
                         </td>
-                        <td className={carColBand(12, `${CARS_TD} tabular-nums`)}>
+                        <td className={`${CARS_TD} tabular-nums`}>
                           {fmtSheetDate(car.warranty_per_dms)}
                         </td>
-                        <td className={carColBand(13, `${CARS_TD} tabular-nums`)}>
+                        <td className={`${CARS_TD} tabular-nums`}>
                           {warrantyVehicleExpiry(car)}
                         </td>
-                        <td className={carColBand(14, `${CARS_TD} tabular-nums`)}>
+                        <td className={`${CARS_TD} tabular-nums`}>
                           {fmtSheetDate(car.warranty_battery_dms)}
                         </td>
-                        <td className={carColBand(15, `${CARS_TD} tabular-nums`)}>
+                        <td className={`${CARS_TD} tabular-nums`}>
                           {fmtSheetDate(car.warranty_battery_expiry)}
                         </td>
-                        <td className={carColBand(16, `${CARS_TD} tabular-nums`)}>
+                        <td
+                          title={warrantySummaryDisplay(car)}
+                          className={`${CARS_TD} tabular-nums`}
+                        >
+                          {warrantySummaryDisplay(car)}
+                        </td>
+                        <td className={`${CARS_TD} tabular-nums`}>
                           {batteryPercent != null ? `${batteryPercent}%` : "—"}
                         </td>
                         <td
                           title={PDI_LABELS[car.pdi_status]}
-                          className={carColBand(17, `${CARS_TD} cursor-pointer text-primary hover:underline`)}
+                          className={`${CARS_TD} cursor-pointer text-primary hover:underline`}
                           onClick={(e) => {
                             e.stopPropagation();
                             setPdiDialogCar(car);
@@ -1102,7 +1016,7 @@ export default function CarsListPage() {
                         </td>
                         <td
                           title={customsLabel}
-                          className={carColBand(18, `${CARS_TD} cursor-pointer text-primary hover:underline`)}
+                          className={`${CARS_TD} cursor-pointer text-primary hover:underline`}
                           onClick={(e) => {
                             e.stopPropagation();
                             setCustomsDialogCar(car);
@@ -1111,11 +1025,14 @@ export default function CarsListPage() {
                         >
                           {customsLabel}
                         </td>
-                        <td className={carColBand(19, `${CARS_TD} tabular-nums`)}>
+                        <td title={softwareText || undefined} className={CARS_TD}>
+                          {softwareText || "—"}
+                        </td>
+                        <td className={`${CARS_TD} tabular-nums`}>
                           {fmtSheetDate(car.date_arrived)}
                         </td>
                         <td
-                          className={carColBand(20, `${CARS_TD} overflow-hidden text-right`)}
+                          className={`${CARS_TD} overflow-hidden text-right`}
                           onClick={(e) => e.stopPropagation()}
                         >
                           <span className="inline-flex max-w-full flex-nowrap items-center justify-end gap-0.5 overflow-hidden">
@@ -1159,7 +1076,7 @@ export default function CarsListPage() {
                                 )}
                                 {canDeleteCar && (
                                   <DropdownMenuItem variant="destructive" onClick={() => setDeleteCar(car)}>
-                                    Delete
+                                    Scrap vehicle
                                   </DropdownMenuItem>
                                 )}
                               </DropdownMenuContent>
@@ -1236,10 +1153,11 @@ export default function CarsListPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Confirm deletion — enter your password to permanently delete this vehicle
+              Mark vehicle as scrapped — enter your password
             </AlertDialogTitle>
             <AlertDialogDescription>
-              This action is irreversible. Please confirm your password to continue.
+              This removes the car from active inventory (scrapped). It does not apply to returns or
+              resales; those use status and customer unlink. Confirm your password to continue.
             </AlertDialogDescription>
           </AlertDialogHeader>
           {(isOwner || profile?.role === "owner") ? (
@@ -1270,7 +1188,7 @@ export default function CarsListPage() {
                 void handleDeleteCar();
               }}
             >
-              {deleteLoading ? "Deleting..." : "Confirm Delete"}
+              {deleteLoading ? "Saving..." : "Confirm scrap"}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

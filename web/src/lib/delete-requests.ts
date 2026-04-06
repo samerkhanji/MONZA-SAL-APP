@@ -125,20 +125,45 @@ export async function approveDeleteRequest(
 
   if (updateError) return false;
 
-  const table = (req as { item_type: string }).item_type === "car" ? "cars" : "parts";
-  const { error: deleteError } = await supabase
-    .from(table)
-    .update({ deleted_at: new Date().toISOString() })
-    .eq("id", (req as { item_id: string }).item_id);
+  const itemType = (req as { item_type: string }).item_type;
+  const itemId = (req as { item_id: string }).item_id;
 
-  if (deleteError) return false;
-
-  await createNotification({
-    userId: (req as { requested_by: string }).requested_by,
-    title: "Deletion approved",
-    message: "Your deletion request has been approved.",
-    link: (req as { item_type: string }).item_type === "car" ? "/cars" : "/garage/inventory",
-  });
+  if (itemType === "car") {
+    const now = new Date().toISOString();
+    await supabase
+      .from("sales_orders")
+      .update({ status: "cancelled" })
+      .eq("car_id", itemId)
+      .neq("status", "cancelled");
+    const { error: carErr } = await supabase
+      .from("cars")
+      .update({
+        customer_id: null,
+        status: "available",
+        deleted_at: null,
+        updated_at: now,
+      })
+      .eq("id", itemId);
+    if (carErr) return false;
+    await createNotification({
+      userId: (req as { requested_by: string }).requested_by,
+      title: "Vehicle returned to stock",
+      message: "The car was unlinked from the customer and set to Available (not scrapped).",
+      link: "/cars",
+    });
+  } else {
+    const { error: deleteError } = await supabase
+      .from("parts")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", itemId);
+    if (deleteError) return false;
+    await createNotification({
+      userId: (req as { requested_by: string }).requested_by,
+      title: "Deletion approved",
+      message: "Your deletion request has been approved.",
+      link: "/garage/inventory",
+    });
+  }
 
   return true;
 }

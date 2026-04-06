@@ -14,6 +14,7 @@ import type {
   LocationType,
 } from "@/types/database";
 import {
+  CAR_STATUS_EDITABLE,
   CAR_STATUS_LABELS,
   CUSTOMS_STATUS_LABELS,
   LOCATION_LABELS,
@@ -1006,7 +1007,7 @@ export default function CarProfilePage() {
       return;
     }
 
-    toast.success("Car removed successfully");
+    toast.success("Vehicle marked as scrapped and removed from inventory");
     setDeletePassword("");
     setDeleteOpen(false);
     router.push("/cars");
@@ -1200,7 +1201,7 @@ export default function CarProfilePage() {
                 variant="destructive"
                 onClick={() => setDeleteOpen(true)}
               >
-                Delete
+                Scrap vehicle
               </Button>
             )}
           </div>
@@ -1277,10 +1278,11 @@ export default function CarProfilePage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Confirm deletion — enter your password to permanently delete this vehicle
+              Mark vehicle as scrapped — enter your password
             </AlertDialogTitle>
             <AlertDialogDescription>
-              This action is irreversible. Please confirm your password to continue.
+              This removes the car from active inventory (scrapped). Returns and resales should use
+              status and customer changes, not this action. Confirm your password to continue.
             </AlertDialogDescription>
           </AlertDialogHeader>
           {canDeleteCar ? (
@@ -1309,7 +1311,7 @@ export default function CarProfilePage() {
               disabled={deleteLoading || !deletePassword || !canDeleteCar}
               onClick={() => void handleDelete()}
             >
-              {deleteLoading ? "Deleting..." : "Confirm Delete"}
+              {deleteLoading ? "Saving..." : "Confirm scrap"}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1628,7 +1630,7 @@ export default function CarProfilePage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {(Object.keys(CAR_STATUS_LABELS) as CarStatus[]).map((s) => (
+                      {CAR_STATUS_EDITABLE.map((s) => (
                         <SelectItem key={s} value={s}>
                           {CAR_STATUS_LABELS[s]}
                         </SelectItem>
