@@ -267,14 +267,6 @@ function computeChecklist(car: CarDisplay): ChecklistResult {
         editTarget: { type: "uneditable" },
       },
     );
-  } else if (car.status === "sent_to_sub_dealer") {
-    subDealerItems.push({
-      key: "sub_dealer_name",
-      label: "Sub-dealer Name",
-      section: "subdealer",
-      isFilled: !!car.sub_dealer_name?.trim(),
-      editTarget: { type: "statusDialog" },
-    });
   }
 
   const items = [...baseItems, ...inspectionItems, ...customerItems, ...subDealerItems];
@@ -291,14 +283,7 @@ function getEventActor(ev: CarEvent): string {
 }
 
 /** Statuses that show the customer / sale dates section on the vehicle page */
-const CUSTOMER_RELATED_STATUSES: CarStatus[] = [
-  "sold",
-  "reserved",
-  "sent_to_sub_dealer",
-  "delivered",
-  "registered",
-  "under_registration",
-];
+const CUSTOMER_RELATED_STATUSES: CarStatus[] = ["sold", "reserved"];
 
 /** Empty string → null for Postgres DATE */
 function normalizeDateForDb(value: string): string | null {
@@ -916,7 +901,7 @@ export default function CarProfilePage() {
     car &&
     salesOrder?.customer &&
     salesOrder?.status === "confirmed" &&
-    (car.status === "registered" || car.status === "under_registration");
+    (car.status === "inventory" || car.status === "available");
 
   async function handleUpdateToSold() {
     if (!car || !canEditInventory) return;

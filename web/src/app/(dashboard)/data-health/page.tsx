@@ -440,7 +440,7 @@ export default function DataHealthPage() {
     const soCarIds = new Set(salesOrders.map((s) => s.car_id).filter(Boolean));
     return cars.filter(
       (c) =>
-        ["sold", "reserved", "delivered"].includes(c.status) &&
+        ["sold", "reserved"].includes(c.status) &&
         !soCarIds.has(c.id)
     );
   }, [cars, salesOrders]);
@@ -467,11 +467,9 @@ export default function DataHealthPage() {
       );
     });
   }, [cars]);
-  // Sales Ops: warranty missing only for sold/reserved/delivered cars
+  // Sales Ops: warranty missing only for sold/reserved cars
   const carsWarrantyMissingSoldReservedDelivered = useMemo(() => {
-    return carsWarrantyMissing.filter((c) =>
-      ["sold", "reserved", "delivered"].includes(c.status)
-    );
+    return carsWarrantyMissing.filter((c) => ["sold", "reserved"].includes(c.status));
   }, [carsWarrantyMissing]);
 
   // 6. Reservation / delivery missing
@@ -486,9 +484,7 @@ export default function DataHealthPage() {
     );
   }, [cars]);
   const deliveredNoDate = useMemo(() => {
-    return cars.filter(
-      (c) => c.status === "delivered" && empty(c.delivery_date)
-    );
+    return cars.filter((c) => c.status === "sold" && empty(c.delivery_date));
   }, [cars]);
 
   // 7. Installment data missing
@@ -544,15 +540,17 @@ export default function DataHealthPage() {
   const jobsMissingDiagnosis = useMemo(() => garageJobs.filter((j) => empty(j.diagnosis)), [garageJobs]);
   const carsInServiceNoIssue = useMemo(() => {
     const serviceCarIds = new Set(garageJobs.map((j) => j.car_id));
-    return cars.filter((c) => c.status === "service" && serviceCarIds.has(c.id) && empty((c as CarRow).issue));
+    return cars.filter(
+      (c) => c.location_type === "garage" && serviceCarIds.has(c.id) && empty((c as CarRow).issue)
+    );
   }, [cars, garageJobs]);
 
   // 10. Cars missing technical (garage_manager)
-  // engine_number, date_arrived = always issue; issue = only for cars in service/garage
+  // engine_number, date_arrived = always issue; issue = only for cars physically in garage
   const carsMissingTechnical = useMemo(() => {
     return cars.filter((c) => {
       if (empty(c.engine_number) || empty(c.date_arrived)) return true;
-      if (c.status === "service" && empty((c as CarRow).issue)) return true;
+      if (c.location_type === "garage" && empty((c as CarRow).issue)) return true;
       return false;
     });
   }, [cars]);
@@ -1056,7 +1054,7 @@ export default function DataHealthPage() {
                   <p className="text-2xl font-bold">{soMissingData.length}</p>
                 </div>
                 <div className="rounded-lg border bg-background p-4">
-                  <p className="text-sm font-medium text-muted-foreground">Warranty missing (sold/reserved/delivered)</p>
+                  <p className="text-sm font-medium text-muted-foreground">Warranty missing (sold/reserved)</p>
                   <p className="text-2xl font-bold">{carsWarrantyMissingSoldReservedDelivered.length}</p>
                 </div>
               </>
@@ -1315,7 +1313,7 @@ export default function DataHealthPage() {
           <div style={{ order: sortedSections.indexOf("broken_relationships") }}>
           <SectionCard
             title={`${sortedSections.indexOf("broken_relationships") + 1}. Broken Relationships`}
-            description="Cars sold/reserved/delivered with no sales_orders; sales_orders without cars or customers"
+            description="Cars sold or reserved with no sales_orders; sales_orders without cars or customers"
             count={
               soldCarsNoOrder.filter((c) => rowMatchesSearch("broken_relationships", c, searchQuery) && filterRowBySeverity("broken_relationships", c)).length +
               soNoCar.filter((so) => rowMatchesSearch("broken_relationships", so, searchQuery) && filterRowBySeverity("broken_relationships", so)).length +
@@ -1333,7 +1331,7 @@ export default function DataHealthPage() {
               <div className="space-y-4">
                 {filteredSold.length > 0 && (
                   <div>
-                    <p className="mb-2 text-sm font-medium">Cars marked sold/reserved/delivered with no sales_order</p>
+                    <p className="mb-2 text-sm font-medium">Cars marked sold or reserved with no sales_order</p>
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -1411,7 +1409,7 @@ export default function DataHealthPage() {
             title={`${sortedSections.indexOf("warranty_data_missing") + 1}. Warranty Data Missing`}
             description={
               appRole === "sales_ops"
-                ? "Sold, reserved, or delivered cars where all warranty fields are missing"
+                ? "Sold or reserved cars where all warranty fields are missing"
                 : "Cars where all warranty fields (warranty_per_dms, warranty_vehicle_expiry, warranty_battery_expiry) are NULL"
             }
             count={(appRole === "sales_ops" ? carsWarrantyMissingSoldReservedDelivered : carsWarrantyMissing).filter(
@@ -1454,7 +1452,7 @@ export default function DataHealthPage() {
           <div style={{ order: sortedSections.indexOf("reservation_delivery_missing") }}>
           <SectionCard
             title={`${sortedSections.indexOf("reservation_delivery_missing") + 1}. Reservation / Delivery Missing`}
-            description="Reserved cars without reservation_date or reserved_by; delivered cars without delivery_date"
+            description="Reserved cars without reservation_date or reserved_by; sold cars without delivery_date"
             count={
               reservedNoDate.filter((c) => rowMatchesSearch("reservation_delivery_missing", c, searchQuery) && filterRowBySeverity("reservation_delivery_missing", c)).length +
               reservedNoBy.filter((c) => rowMatchesSearch("reservation_delivery_missing", c, searchQuery) && filterRowBySeverity("reservation_delivery_missing", c)).length +
@@ -1911,7 +1909,7 @@ export default function DataHealthPage() {
                     const missing: string[] = [];
                     if (empty(c.engine_number)) missing.push("engine_number");
                     if (empty(c.date_arrived)) missing.push("date_arrived");
-                    if (c.status === "service" && empty((c as CarRow).issue)) missing.push("issue");
+                    if (c.location_type === "garage" && empty((c as CarRow).issue)) missing.push("issue");
                     return (
                       <TableRow key={c.id} className={getRowSeverityClass("cars_missing_technical", c)}>
                         <TableCell className="font-mono text-sm">{c.vin ?? "—"}</TableCell>

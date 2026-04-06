@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
 import type { CarDisplay, CarStatus } from "@/types/database";
-import { CAR_STATUS_LABELS } from "@/types/database";
+import { formatCarStatusLabel } from "@/types/database";
 import { installmentDueDateIso } from "@/lib/installment-due-dates";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -90,8 +90,7 @@ export function StatusCustomerDialog({
   const [phone2, setPhone2] = useState("");
   const [email, setEmail] = useState("");
   const [plateNumber, setPlateNumber] = useState("");
-  const [subDealerName, setSubDealerName] = useState("");
-  const [newStatus, setNewStatus] = useState<CarStatus>("in_stock");
+  const [newStatus, setNewStatus] = useState<CarStatus>("available");
   const [sellingPrice, setSellingPrice] = useState("");
   const [currency, setCurrency] = useState("USD");
   const [paymentType, setPaymentType] = useState<"full" | "installments">("full");
@@ -127,7 +126,6 @@ export function StatusCustomerDialog({
 
     setNewStatus(presetTargetStatus ?? car.status);
     setPlateNumber(car.plate_number ?? "");
-    setSubDealerName(car.sub_dealer_name ?? "");
 
     // Reset payment plan fields on open
     setPaymentType("full");
@@ -243,7 +241,7 @@ export function StatusCustomerDialog({
   }, [planTotalAmount, planDownPayment, planMonths]);
 
   const needsCustomer = newStatus === "reserved" || newStatus === "sold";
-  const showPlateField = ["sold", "delivered", "registered"].includes(newStatus);
+  const showPlateField = newStatus === "sold";
 
   async function handleSaveCustomer() {
     if (!car || !canEditInventory) return;
@@ -266,8 +264,8 @@ export function StatusCustomerDialog({
     const dbDeliveryPreview = normalizeOptionalDateForDb(deliveryDateStr);
     if (
       !skipWarrantyDeliveryConfirmRef.current &&
-      newStatus === "delivered" &&
-      car.status !== "delivered" &&
+      newStatus === "sold" &&
+      car.status !== "sold" &&
       dbDeliveryPreview &&
       monzaWarrantySlotsEmpty(car)
     ) {
@@ -545,12 +543,10 @@ export function StatusCustomerDialog({
     }
 
     // Always update the car's status on the cars table
-    const carStatusPayload: Record<string, unknown> = { status: newStatus };
-    if (newStatus === "sent_to_sub_dealer") {
-      carStatusPayload.sub_dealer_name = subDealerName.trim() || null;
-    } else {
-      carStatusPayload.sub_dealer_name = null;
-    }
+    const carStatusPayload: Record<string, unknown> = {
+      status: newStatus,
+      sub_dealer_name: null,
+    };
     if (deliveryWrittenToCarRowOnly) {
       carStatusPayload.delivery_date = dbDeliveryForSimple;
     }
@@ -625,7 +621,7 @@ export function StatusCustomerDialog({
               void handleSaveCustomer();
             }}
           >
-            Save &amp; mark delivered
+            Save &amp; apply warranty dates
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
@@ -653,7 +649,7 @@ export function StatusCustomerDialog({
             {isSoldOrReserved && customer ? (
               <>
                 <p className="text-sm font-medium text-muted-foreground">
-                  Status: {CAR_STATUS_LABELS[car.status]}
+                  Status: {formatCarStatusLabel(car.status)}
                 </p>
                 {canEditInventory ? (
                   <div className="space-y-4">
@@ -916,31 +912,13 @@ export function StatusCustomerDialog({
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="inventory">Inventory</SelectItem>
-                        <SelectItem value="in_stock">Available</SelectItem>
-                        <SelectItem value="showroom">Showroom</SelectItem>
+                        <SelectItem value="available">Available</SelectItem>
                         <SelectItem value="reserved">Reserved</SelectItem>
                         <SelectItem value="sold">Sold</SelectItem>
-                        <SelectItem value="delivered">Delivered</SelectItem>
-                        <SelectItem value="service">Service</SelectItem>
-                        <SelectItem value="sent_to_sub_dealer">Sent to Dealership</SelectItem>
-                        <SelectItem value="demo">Display</SelectItem>
-                        <SelectItem value="registered">Registered</SelectItem>
-                        <SelectItem value="under_registration">Under Registration</SelectItem>
-                        <SelectItem value="sent_to_customs">Sent to Customs</SelectItem>
-                        <SelectItem value="company_car">Company Car</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
-                  {newStatus === "sent_to_sub_dealer" ? (
-                    <div className="space-y-2">
-                      <Label>Sub dealer</Label>
-                      <Input
-                        value={subDealerName}
-                        onChange={(e) => setSubDealerName(e.target.value)}
-                        placeholder="Which sub dealer?"
-                      />
-                    </div>
-                  ) : showPlateField ? (
+                  {showPlateField ? (
                     <div className="space-y-2">
                       <Label>Number plate</Label>
                       <Input
@@ -950,7 +928,7 @@ export function StatusCustomerDialog({
                       />
                     </div>
                   ) : null}
-                  {newStatus === "delivered" && (
+                  {newStatus === "sold" && (
                     <div className="space-y-2">
                       <Label htmlFor="status-simple-delivery">Delivery date</Label>
                       <Input
@@ -961,7 +939,7 @@ export function StatusCustomerDialog({
                         className="max-w-xs"
                       />
                       <p className="text-muted-foreground text-xs">
-                        Used to start Monza warranty when marking delivered (saved to sales order or car row).
+                        Used to start Monza warranty when marking sold (saved to sales order or car row).
                       </p>
                     </div>
                   )}

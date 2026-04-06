@@ -222,7 +222,7 @@ export function NewJobDialog({
         .eq("id", selectedCar.id)
         .single();
 
-      const currentStatus = (carData as { status?: string } | null)?.status ?? "in_stock";
+      const currentStatus = (carData as { status?: string } | null)?.status ?? "available";
 
       await supabase
         .from("cars")

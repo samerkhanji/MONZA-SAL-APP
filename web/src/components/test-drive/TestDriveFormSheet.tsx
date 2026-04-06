@@ -305,7 +305,7 @@ export function TestDriveFormSheet({
     }
 
     const restore: CarStatus =
-      (carStatusBefore as CarStatus) || (existing.car_status_before_test_drive as CarStatus) || "showroom";
+      (carStatusBefore as CarStatus) || (existing.car_status_before_test_drive as CarStatus) || "available";
     const { error: cErr } = await supabase
       .from("cars")
       .update({ status: restore, updated_at: now })
@@ -333,7 +333,7 @@ export function TestDriveFormSheet({
       return;
     }
     const restore: CarStatus =
-      (carStatusBefore as CarStatus) || (existing.car_status_before_test_drive as CarStatus) || "showroom";
+      (carStatusBefore as CarStatus) || (existing.car_status_before_test_drive as CarStatus) || "available";
     const { error: cErr } = await supabase
       .from("cars")
       .update({ status: restore, updated_at: now })

@@ -1,20 +1,18 @@
-// Enums matching Supabase
-export type CarStatus =
-  | "inbound"
-  | "inventory"
-  | "in_stock"
-  | "showroom"
-  | "reserved"
-  | "sold"
-  | "delivered"
-  | "service"
-  | "sent_to_sub_dealer"
-  | "demo"
-  | "registered"
-  | "under_registration"
-  | "sent_to_customs"
-  | "company_car"
-  | "test_drive";
+// Car lifecycle (DB + app): four values after migration 047–048.
+export type CarStatus = "inventory" | "available" | "reserved" | "sold";
+
+/** UI label; unknown strings (legacy rows) fall back to formatted text. */
+export const CAR_STATUS_LABELS: Record<string, string> = {
+  inventory: "Inventory",
+  available: "Available",
+  reserved: "Reserved",
+  sold: "Sold",
+};
+
+export function formatCarStatusLabel(status: string | null | undefined): string {
+  if (status == null || status === "") return "—";
+  return CAR_STATUS_LABELS[status] ?? status.replace(/_/g, " ");
+}
 
 export type LocationType = "showroom1" | "showroom2" | "garage" | "storage" | "inventory";
 
@@ -135,24 +133,6 @@ export interface CarEvent {
   created_at: string;
   profiles?: { full_name: string | null } | null;
 }
-
-export const CAR_STATUS_LABELS: Record<CarStatus, string> = {
-  inbound: "Inbound",
-  inventory: "Inventory",
-  in_stock: "Available",
-  showroom: "Showroom",
-  reserved: "Reserved",
-  sold: "Sold",
-  delivered: "Delivered",
-  service: "Service",
-  sent_to_sub_dealer: "Sent to Dealership",
-  demo: "Display",
-  registered: "Registered",
-  under_registration: "Under Registration",
-  sent_to_customs: "Sent to Customs",
-  company_car: "Company Car",
-  test_drive: "Test drive",
-};
 
 export type TestDriveStatus =
   | "pending"
@@ -528,6 +508,8 @@ export interface Request {
   subject: string;
   description: string | null;
   category: string | null;
+  /** Optional VIN (migration 049); 17-char vehicle reference. */
+  vin?: string | null;
   status: RequestStatus;
   priority: RequestPriority;
   assistant_notes: string | null;

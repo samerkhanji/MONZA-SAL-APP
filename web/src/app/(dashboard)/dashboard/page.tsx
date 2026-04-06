@@ -82,17 +82,7 @@ interface RequestSummaryRow {
   send_to_user_id: string | null;
 }
 
-const CAR_STATUS_ORDER: CarStatus[] = [
-  "inventory",
-  "in_stock",
-  "showroom",
-  "reserved",
-  "sold",
-  "delivered",
-  "service",
-  "sent_to_sub_dealer",
-  "demo",
-];
+const CAR_STATUS_ORDER: CarStatus[] = ["inventory", "available", "reserved", "sold"];
 
 const JOB_STATUS_ORDER = ["pending", "in_progress", "waiting_parts", "done", "cancelled"] as const;
 
@@ -105,16 +95,10 @@ const JOB_STATUS_DOT_COLORS: Record<string, string> = {
 };
 
 const STATUS_DOT_COLORS: Record<string, string> = {
-  inbound: "bg-gray-400",
-  inventory: "bg-gray-400",
-  in_stock: "bg-blue-500",
-  showroom: "bg-green-500",
-  reserved: "bg-amber-500",
-  sold: "bg-purple-500",
-  delivered: "bg-emerald-500",
-  service: "bg-red-500",
-  sent_to_sub_dealer: "bg-orange-500",
-  demo: "bg-cyan-500",
+  inventory: "bg-slate-500",
+  available: "bg-emerald-500",
+  reserved: "bg-sky-500",
+  sold: "bg-violet-500",
 };
 
 function formatActivityMessage(ev: CarEventRow): string {
@@ -226,7 +210,7 @@ export default function DashboardPage() {
       supabase
         .from("cars_display")
         .select("*", { count: "exact", head: true })
-        .eq("status", "service"),
+        .eq("location_type", "garage"),
       supabase
         .from("customers")
         .select("*", { count: "exact", head: true })
@@ -442,7 +426,7 @@ export default function DashboardPage() {
       label: "In Garage",
       value: inGarageCount,
       icon: Wrench,
-      href: "/cars?status=service",
+      href: "/cars?location=garage",
       color: "text-amber-600 dark:text-amber-400",
       bgColor: "bg-amber-100 dark:bg-amber-900/30",
     },

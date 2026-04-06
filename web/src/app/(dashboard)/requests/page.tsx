@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo, useCallback } from "react";
+import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
@@ -41,7 +42,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Check, X, MessageSquare, ChevronRight } from "lucide-react";
+import { Plus, Check, X, MessageSquare, ChevronRight, ScanLine } from "lucide-react";
+
+const ScannerDialog = dynamic(
+  () => import("@/components/scanner/ScannerDialog").then((m) => ({ default: m.ScannerDialog })),
+  { ssr: false }
+);
 import { ExportButton } from "@/components/ExportButton";
 import type { ExportColumn } from "@/lib/exportToExcel";
 
@@ -106,6 +112,8 @@ export default function RequestCenterPage() {
   const [newDescription, setNewDescription] = useState("");
   const [newCategory, setNewCategory] = useState<string>("none");
   const [newPriority, setNewPriority] = useState<string>("normal");
+  const [newVin, setNewVin] = useState("");
+  const [scanVinOpen, setScanVinOpen] = useState(false);
   const [newSendToUserId, setNewSendToUserId] = useState<string>("");
   const [newSubmitting, setNewSubmitting] = useState(false);
 
@@ -186,8 +194,18 @@ export default function RequestCenterPage() {
   useEffect(() => {
     if (!newOpen) {
       setNewSendToUserId("");
+      setNewVin("");
     }
   }, [newOpen]);
+
+  useEffect(() => {
+    function onScanVin(e: Event) {
+      const d = (e as CustomEvent<string>).detail?.trim().toUpperCase() ?? "";
+      if (d) setNewVin(d.slice(0, 17));
+    }
+    window.addEventListener("requests-scan-vin", onScanVin as EventListener);
+    return () => window.removeEventListener("requests-scan-vin", onScanVin as EventListener);
+  }, []);
 
   const detailIdFromUrl = searchParams.get("detail");
   useEffect(() => {
@@ -263,6 +281,7 @@ export default function RequestCenterPage() {
           r.subject.toLowerCase().includes(q) ||
           (r.description ?? "").toLowerCase().includes(q) ||
           r.category?.toLowerCase().includes(q) ||
+          (r.vin ?? "").toLowerCase().includes(q) ||
           (r as RequestWithProfiles).submitter?.full_name?.toLowerCase().includes(q)
       );
     }
@@ -306,6 +325,7 @@ export default function RequestCenterPage() {
 
   const requestExportColumns: ExportColumn[] = [
     { key: "subject", header: "Subject" },
+    { key: "vin", header: "VIN", width: 20 },
     { key: "description", header: "Description" },
     { key: "category", header: "Category" },
     { key: "status_display", header: "Status" },
@@ -358,12 +378,14 @@ export default function RequestCenterPage() {
       assignedTo = null;
     }
 
+    const vinNorm = newVin.trim().toUpperCase().slice(0, 17);
     const { error } = await supabase
       .from("requests")
       .insert({
         subject: newSubject.trim(),
         description: newDescription.trim() || null,
         category: newCategory === "none" || !newCategory ? null : newCategory,
+        vin: vinNorm || null,
         status,
         priority: newPriority,
         submitted_by: user.id,
@@ -420,6 +442,7 @@ export default function RequestCenterPage() {
     setNewDescription("");
     setNewCategory("none");
     setNewPriority("normal");
+    setNewVin("");
     setNewSendToUserId("");
     setNewOpen(false);
     fetchRequests();
@@ -744,6 +767,7 @@ export default function RequestCenterPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Subject</TableHead>
+                <TableHead className="font-mono text-xs">VIN</TableHead>
                 <TableHead>Submitted By</TableHead>
                 <TableHead>Sent To</TableHead>
                 <TableHead>Date</TableHead>
@@ -761,6 +785,9 @@ export default function RequestCenterPage() {
                   onClick={() => openDetail(r)}
                 >
                   <TableCell className="font-medium">{r.subject}</TableCell>
+                  <TableCell className="font-mono text-xs text-muted-foreground">
+                    {r.vin ?? "—"}
+                  </TableCell>
                   <TableCell>{submitterName(r)}</TableCell>
                   <TableCell>{getSendToLabel(r)}</TableCell>
                   <TableCell>
@@ -797,6 +824,30 @@ export default function RequestCenterPage() {
             }}
             className="space-y-4"
           >
+            <div>
+              <Label>VIN (optional)</Label>
+              <div className="mt-2 flex gap-2">
+                <Input
+                  id="request-vin"
+                  name="request-vin"
+                  value={newVin}
+                  onChange={(e) => setNewVin(e.target.value.toUpperCase().slice(0, 17))}
+                  placeholder="17-character VIN"
+                  className="font-mono flex-1"
+                  maxLength={17}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="shrink-0"
+                  title="Scan VIN"
+                  onClick={() => setScanVinOpen(true)}
+                >
+                  <ScanLine className="size-4" />
+                </Button>
+              </div>
+            </div>
             <div>
               <Label>Subject / Title *</Label>
               <Input
@@ -902,6 +953,18 @@ export default function RequestCenterPage() {
         </DialogContent>
       </Dialog>
 
+      <ScannerDialog
+        open={scanVinOpen}
+        onClose={() => setScanVinOpen(false)}
+        onScan={(v) => {
+          setNewVin(v.trim().toUpperCase().slice(0, 17));
+          setScanVinOpen(false);
+        }}
+        title="Scan VIN"
+        placeholder="17-character VIN..."
+        scanType="vin"
+      />
+
       <Dialog
         open={!!detailOpen}
         onOpenChange={(o) => !o && setDetailOpen(null)}
@@ -918,6 +981,12 @@ export default function RequestCenterPage() {
                   {detailOpen.description || "—"}
                 </p>
               </div>
+              {detailOpen.vin ? (
+                <div>
+                  <Label>VIN</Label>
+                  <p className="mt-1 font-mono text-sm">{detailOpen.vin}</p>
+                </div>
+              ) : null}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <Label>Status</Label>

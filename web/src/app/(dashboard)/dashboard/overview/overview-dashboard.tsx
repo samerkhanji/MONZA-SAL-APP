@@ -47,6 +47,13 @@ const CHART_COLORS = [
 ];
 
 export type OwnerOverviewData = {
+  summary: {
+    totalCars: number;
+    totalCustomers: number;
+    activeSalesOrders: number;
+    pendingRequests: number;
+    warrantiesExpiringSoon: number;
+  };
   carStatusChart: { name: string; count: number }[];
   activeGarageTasks: number;
   requestPriorityChart: { name: string; count: number }[];
@@ -89,7 +96,8 @@ export function OverviewDashboard({ data }: { data: OwnerOverviewData }) {
         <div>
           <h1 className="text-xl font-semibold sm:text-2xl">Owner overview</h1>
           <p className="text-muted-foreground text-sm">
-            Aggregated snapshot from inventory, garage tasks, requests, installments, and parts.
+            Central snapshot: inventory, customers, sales pipeline, warranties, garage, requests,
+            installments, and parts.
           </p>
         </div>
         <Button
@@ -120,6 +128,60 @@ export function OverviewDashboard({ data }: { data: OwnerOverviewData }) {
           </CardContent>
         </Card>
       ) : null}
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Vehicles</CardDescription>
+            <CardTitle className="text-2xl tabular-nums">{data.summary.totalCars}</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <Button variant="link" className="h-auto px-0 text-xs" asChild>
+              <Link href="/cars">Inventory</Link>
+            </Button>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Customers</CardDescription>
+            <CardTitle className="text-2xl tabular-nums">{data.summary.totalCustomers}</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <Button variant="link" className="h-auto px-0 text-xs" asChild>
+              <Link href="/customers">Directory</Link>
+            </Button>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Sales orders</CardDescription>
+            <CardTitle className="text-2xl tabular-nums">{data.summary.activeSalesOrders}</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <p className="text-muted-foreground text-xs">Non-cancelled orders</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Open requests</CardDescription>
+            <CardTitle className="text-2xl tabular-nums">{data.summary.pendingRequests}</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <Button variant="link" className="h-auto px-0 text-xs" asChild>
+              <Link href="/requests/pending">Pending queue</Link>
+            </Button>
+          </CardContent>
+        </Card>
+        <Card className="sm:col-span-2 lg:col-span-1">
+          <CardHeader className="pb-2">
+            <CardDescription>Warranties (90 days)</CardDescription>
+            <CardTitle className="text-2xl tabular-nums">{data.summary.warrantiesExpiringSoon}</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <p className="text-muted-foreground text-xs">Vehicle or battery end date in window</p>
+          </CardContent>
+        </Card>
+      </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card className="lg:col-span-2">

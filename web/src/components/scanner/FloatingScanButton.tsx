@@ -36,6 +36,12 @@ export function FloatingScanButton() {
         return;
       }
 
+      if (pathname.startsWith("/requests")) {
+        window.dispatchEvent(new CustomEvent("requests-scan-vin", { detail: trimmed }));
+        toast.success(`VIN added to request form: ${trimmed}`);
+        return;
+      }
+
       if (pathname.startsWith("/test-drive")) {
         window.dispatchEvent(new CustomEvent("test-drive-scan-vin", { detail: trimmed }));
         toast.success(`VIN ready: ${trimmed}`);

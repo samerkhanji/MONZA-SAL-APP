@@ -30,7 +30,7 @@ export async function POST(req: Request) {
 
     const { data: car, error: carErr } = await session.supabase
       .from("cars")
-      .select("id, status")
+      .select("id, location_type")
       .eq("id", carId)
       .maybeSingle();
 
@@ -38,8 +38,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Car not found" }, { status: 404 });
     }
 
-    if ((car as { status: string }).status !== "service") {
-      return NextResponse.json({ skipped: true, reason: "not_service", tasks: [] });
+    if ((car as { location_type: string }).location_type !== "garage") {
+      return NextResponse.json({ skipped: true, reason: "not_in_garage", tasks: [] });
     }
 
     const { data: existing, error: exErr } = await session.supabase

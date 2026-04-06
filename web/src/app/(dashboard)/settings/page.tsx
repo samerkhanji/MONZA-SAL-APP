@@ -35,9 +35,20 @@ import {
 import { EditTeamMemberDialog } from "@/components/settings/EditTeamMemberDialog";
 import { AddEmployeeDialog } from "@/components/settings/AddEmployeeDialog";
 import { ChangePasswordDialog } from "@/components/settings/ChangePasswordDialog";
+import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 import { getProfileFullName } from "@/lib/supabase-profile";
 import { ProfileActivityDot } from "@/components/profile-activity-dot";
+import { DatabaseComputeSection } from "@/components/settings/DatabaseComputeSection";
+
+function formatLastOnline(iso: string | null | undefined): string {
+  if (!iso) return "Never";
+  try {
+    return formatDistanceToNow(new Date(iso), { addSuffix: true });
+  } catch {
+    return "—";
+  }
+}
 
 const ALL_TABS = [
   { id: "profile", label: "Profile", icon: User, everyone: true },
@@ -88,7 +99,14 @@ function timeAgo(date: string): string {
 export default function SettingsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { canSeeSettings, canSeeProfileSettings, canSeeMyRequests, profile, refreshProfile } = useUser();
+  const {
+    canSeeSettings,
+    canSeeProfileSettings,
+    canSeeMyRequests,
+    profile,
+    refreshProfile,
+    isOwner,
+  } = useUser();
   const tabFromUrl = searchParams.get("tab") as TabId | null;
   const defaultTab: TabId = canSeeSettings ? "team" : "profile";
   const [activeTab, setActiveTab] = useState<TabId>(tabFromUrl && ALL_TABS.some((t) => t.id === tabFromUrl) ? tabFromUrl : defaultTab);
@@ -700,18 +718,17 @@ export default function SettingsPage() {
                             "—"
                           )}
                         </p>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span
-                            className={cn(
-                              "inline-block size-2 rounded-full",
-                              p.is_active ? "bg-green-500" : "bg-gray-400"
-                            )}
-                            aria-label={p.is_active ? "Active" : "Inactive"}
-                          />
-                          <ProfileActivityDot lastActiveAt={p.last_active_at} />
-                          <span className="text-xs text-muted-foreground">Presence</span>
-                          <span className="text-xs text-muted-foreground">
-                            {p.created_at ? new Date(p.created_at).toLocaleDateString() : "—"}
+                        <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+                          <span>
+                            <span className="font-medium text-foreground">Account: </span>
+                            {p.is_active ? "Enabled" : "Deactivated"}
+                          </span>
+                          <span className="flex flex-wrap items-center gap-1.5">
+                            <ProfileActivityDot lastActiveAt={p.last_active_at} />
+                            <span className="text-foreground">Last online: {formatLastOnline(p.last_active_at)}</span>
+                          </span>
+                          <span>
+                            Joined: {p.created_at ? new Date(p.created_at).toLocaleDateString() : "—"}
                           </span>
                         </div>
                       </button>
@@ -724,8 +741,8 @@ export default function SettingsPage() {
                         <tr className="border-b bg-muted/50">
                           <th className="px-4 py-3 text-left font-medium">Name</th>
                           <th className="px-4 py-3 text-left font-medium">Role</th>
-                          <th className="px-4 py-3 text-left font-medium">Status</th>
-                          <th className="px-4 py-3 text-left font-medium">Activity</th>
+                          <th className="px-4 py-3 text-left font-medium">Account</th>
+                          <th className="px-4 py-3 text-left font-medium">Last online</th>
                           <th className="px-4 py-3 text-left font-medium">Email</th>
                           <th className="px-4 py-3 text-left font-medium">Phone</th>
                           <th className="px-4 py-3 text-left font-medium">Joined</th>
@@ -750,17 +767,20 @@ export default function SettingsPage() {
                               <span
                                 className={cn(
                                   "inline-flex items-center gap-1.5 rounded px-2 py-0.5 text-xs font-medium",
-                                  p.is_active ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
+                                  p.is_active
+                                    ? "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200"
+                                    : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
                                 )}
                               >
-                                <span className={cn("size-1.5 rounded-full", p.is_active ? "bg-green-500" : "bg-gray-400")} />
-                                {p.is_active ? "Active" : "Inactive"}
+                                {p.is_active ? "Enabled" : "Deactivated"}
                               </span>
                             </td>
                             <td className="px-4 py-3">
                               <div className="flex items-center gap-2">
                                 <ProfileActivityDot lastActiveAt={p.last_active_at} />
-                                <span className="text-xs text-muted-foreground">Last active</span>
+                                <span className="text-xs text-muted-foreground">
+                                  {formatLastOnline(p.last_active_at)}
+                                </span>
                               </div>
                             </td>
                             <td className="px-4 py-3 text-muted-foreground">
@@ -900,55 +920,58 @@ export default function SettingsPage() {
         )}
 
         {activeTab === "prefs" && (
-          <Card>
-            <CardHeader>
-              <CardTitle>System Preferences</CardTitle>
-              <CardDescription>Default settings for the system</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {prefsLoading ? (
-                <p className="text-muted-foreground">Loading...</p>
-              ) : (
-                <form onSubmit={handleSavePrefs} className="space-y-4">
-                  <div>
-                    <Label>Default Currency</Label>
-                    <Select
-                      value={defaultCurrency}
-                      onValueChange={setDefaultCurrency}
-                    >
-                      <SelectTrigger className="mt-2 w-[180px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="USD">USD</SelectItem>
-                        <SelectItem value="AED">AED</SelectItem>
-                        <SelectItem value="LBP">LBP</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Default Language</Label>
-                    <Select
-                      value={defaultLanguage}
-                      onValueChange={setDefaultLanguage}
-                    >
-                      <SelectTrigger className="mt-2 w-[180px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="en">English</SelectItem>
-                        <SelectItem value="ar">Arabic</SelectItem>
-                        <SelectItem value="fr">French</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Button type="submit" disabled={prefsSaving}>
-                    {prefsSaving ? "Saving..." : "Save Changes"}
-                  </Button>
-                </form>
-              )}
-            </CardContent>
-          </Card>
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>System Preferences</CardTitle>
+                <CardDescription>Default settings for the system</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {prefsLoading ? (
+                  <p className="text-muted-foreground">Loading...</p>
+                ) : (
+                  <form onSubmit={handleSavePrefs} className="space-y-4">
+                    <div>
+                      <Label>Default Currency</Label>
+                      <Select
+                        value={defaultCurrency}
+                        onValueChange={setDefaultCurrency}
+                      >
+                        <SelectTrigger className="mt-2 w-[180px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="USD">USD</SelectItem>
+                          <SelectItem value="AED">AED</SelectItem>
+                          <SelectItem value="LBP">LBP</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Default Language</Label>
+                      <Select
+                        value={defaultLanguage}
+                        onValueChange={setDefaultLanguage}
+                      >
+                        <SelectTrigger className="mt-2 w-[180px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="en">English</SelectItem>
+                          <SelectItem value="ar">Arabic</SelectItem>
+                          <SelectItem value="fr">French</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button type="submit" disabled={prefsSaving}>
+                      {prefsSaving ? "Saving..." : "Save Changes"}
+                    </Button>
+                  </form>
+                )}
+              </CardContent>
+            </Card>
+            {isOwner && <DatabaseComputeSection />}
+          </div>
         )}
 
         {activeTab === "notifications" && (

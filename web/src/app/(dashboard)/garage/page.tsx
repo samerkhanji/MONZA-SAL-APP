@@ -327,13 +327,13 @@ export default function GarageJobsPage() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      await supabase.from("cars").update({ status: "in_stock" }).eq("id", job.cars.id);
+      await supabase.from("cars").update({ status: "available" }).eq("id", job.cars.id);
       if (user) {
         await supabase.from("car_events").insert({
           car_id: job.cars.id,
           event_type: "status_changed",
           from_value: "service",
-          to_value: "in_stock",
+          to_value: "available",
           note: `Job marked done from list: ${job.title}`,
           created_by: user.id,
         });

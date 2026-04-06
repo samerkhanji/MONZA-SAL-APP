@@ -166,8 +166,6 @@ export function EditCarDialog({
       return;
     }
 
-    const previousStatus = car.status;
-
     setSubmitting(true);
 
     const cAny = car as CarDisplay & {
@@ -335,8 +333,8 @@ export function EditCarDialog({
 
     if (
       fullInventory &&
-      status === "service" &&
-      previousStatus !== "service" &&
+      locationType === "garage" &&
+      car.location_type !== "garage" &&
       (appRole === "owner" || appRole === "garage_manager")
     ) {
       void fetch("/api/garage/bootstrap-car", {
@@ -381,13 +379,11 @@ export function EditCarDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(CAR_STATUS_LABELS)
-                    .filter(([value]) => value !== "inbound")
-                    .map(([value, label]) => (
-                      <SelectItem key={value} value={value}>
-                        {label}
-                      </SelectItem>
-                    ))}
+                  {Object.entries(CAR_STATUS_LABELS).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>
+                      {label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

@@ -118,9 +118,9 @@ export default function AddCarPage() {
   const [reservedUntil, setReservedUntil] = useState("");
   const [saleNotes, setSaleNotes] = useState("");
 
-  const CUSTOMER_REQUIRED_STATUSES: CarStatus[] = ["sold", "reserved", "registered", "under_registration", "sent_to_sub_dealer", "delivered"];
+  const CUSTOMER_REQUIRED_STATUSES: CarStatus[] = ["sold", "reserved"];
   const showCustomerSection = CUSTOMER_REQUIRED_STATUSES.includes(status) || soldMarker;
-  const requireDeliveryDate = status === "sold" || status === "delivered" || soldMarker;
+  const requireDeliveryDate = status === "sold" || soldMarker;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

@@ -134,13 +134,13 @@ export function FinishJobDialog({
     if (job.cars) {
       await supabase
         .from("cars")
-        .update({ status: "in_stock" })
+        .update({ status: "available" })
         .eq("id", job.cars.id);
       await supabase.from("car_events").insert({
         car_id: job.cars.id,
         event_type: "status_changed",
         from_value: "service",
-        to_value: "in_stock",
+        to_value: "available",
         note: `Job completed: ${job.title}`,
         created_by: user.id,
       });

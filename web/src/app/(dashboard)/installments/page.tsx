@@ -531,14 +531,9 @@ export default function InstallmentsPage() {
         | null;
       if (!car?.id) return;
       if (
-        ![
-          "sold",
-          "inventory",
-          "in_stock",
-          "showroom",
-          "registered",
-          "under_registration",
-        ].includes((car.status ?? "") as string)
+        !["sold", "inventory", "available", "reserved"].includes(
+          (car.status ?? "") as string
+        )
       )
         return;
       const option: {
@@ -577,14 +572,7 @@ export default function InstallmentsPage() {
       .select(
         "id, vin, brand, model, model_year, exterior_color, interior_color, status, client_name"
       )
-      .in("status", [
-        "available",
-        "inventory",
-        "in_stock",
-        "showroom",
-        "registered",
-        "under_registration",
-      ])
+      .in("status", ["inventory", "available", "reserved", "sold"])
       .order("model_year", { ascending: false })
       .limit(20);
 

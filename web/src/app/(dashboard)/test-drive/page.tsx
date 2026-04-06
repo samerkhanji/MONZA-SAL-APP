@@ -188,7 +188,7 @@ export default function TestDrivePage() {
             vin: td.vin,
             brand: "",
             model: "",
-            status: "showroom",
+            status: "available",
             current_km: null,
             battery_percent: null,
           }

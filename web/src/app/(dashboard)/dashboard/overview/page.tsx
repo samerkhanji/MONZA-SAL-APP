@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { addDays, format } from "date-fns";
+import { addDays, format, isWithinInterval, parseISO, startOfDay } from "date-fns";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionUserAndRole } from "@/lib/server/session-app-role";
 import { CAR_STATUS_LABELS, type CarStatus } from "@/types/database";
@@ -35,10 +35,16 @@ async function fetchOverviewData(supabase: DashboardSupabase): Promise<OwnerOver
     carsRes,
     tasksRes,
     requestsRes,
+    requestsPendingCountRes,
     installmentsRes,
     partsRes,
+    customersCountRes,
+    salesOrdersCountRes,
   ] = await Promise.all([
-    supabase.from("cars_display").select("status").is("deleted_at", null),
+    supabase
+      .from("cars_display")
+      .select("status, warranty_vehicle_expiry, warranty_battery_expiry")
+      .is("deleted_at", null),
     supabase
       .from("garage_tasks")
       .select("id", { count: "exact", head: true })
@@ -46,6 +52,10 @@ async function fetchOverviewData(supabase: DashboardSupabase): Promise<OwnerOver
     supabase
       .from("requests")
       .select("priority")
+      .in("status", [...PENDING_REQUEST_STATUSES]),
+    supabase
+      .from("requests")
+      .select("id", { count: "exact", head: true })
       .in("status", [...PENDING_REQUEST_STATUSES]),
     supabase
       .from("installment_payments")
@@ -72,19 +82,52 @@ async function fetchOverviewData(supabase: DashboardSupabase): Promise<OwnerOver
       .lt("quantity", 5)
       .order("quantity", { ascending: true })
       .limit(40),
+    supabase.from("customers").select("id", { count: "exact", head: true }),
+    supabase
+      .from("sales_orders")
+      .select("id", { count: "exact", head: true })
+      .neq("status", "cancelled"),
   ]);
 
   if (carsRes.error) errors.push(`Cars: ${carsRes.error.message}`);
   if (tasksRes.error) errors.push(`Garage tasks: ${tasksRes.error.message}`);
   if (requestsRes.error) errors.push(`Requests: ${requestsRes.error.message}`);
+  if (requestsPendingCountRes.error) {
+    errors.push(`Requests count: ${requestsPendingCountRes.error.message}`);
+  }
   if (installmentsRes.error) errors.push(`Installments: ${installmentsRes.error.message}`);
   if (partsRes.error) errors.push(`Parts: ${partsRes.error.message}`);
+  if (customersCountRes.error) errors.push(`Customers: ${customersCountRes.error.message}`);
+  if (salesOrdersCountRes.error) errors.push(`Sales orders: ${salesOrdersCountRes.error.message}`);
+
+  const warrantyWindow = {
+    start: startOfDay(new Date()),
+    end: startOfDay(addDays(new Date(), 90)),
+  };
+
+  function expiryInWindow(iso: string | null | undefined): boolean {
+    if (!iso || typeof iso !== "string") return false;
+    const d = parseISO(iso.slice(0, 10));
+    if (Number.isNaN(d.getTime())) return false;
+    return isWithinInterval(d, warrantyWindow);
+  }
 
   const statusCounts: Record<string, number> = {};
+  let warrantiesExpiringSoon = 0;
   for (const row of carsRes.data ?? []) {
-    const s = (row as { status: string }).status;
+    const r = row as {
+      status: string;
+      warranty_vehicle_expiry?: string | null;
+      warranty_battery_expiry?: string | null;
+    };
+    const s = r.status;
     statusCounts[s] = (statusCounts[s] ?? 0) + 1;
+    if (expiryInWindow(r.warranty_vehicle_expiry) || expiryInWindow(r.warranty_battery_expiry)) {
+      warrantiesExpiringSoon += 1;
+    }
   }
+
+  const totalCars = carsRes.data?.length ?? 0;
 
   const carStatusChart = (Object.keys(CAR_STATUS_LABELS) as CarStatus[])
     .map((status) => ({
@@ -157,6 +200,13 @@ async function fetchOverviewData(supabase: DashboardSupabase): Promise<OwnerOver
     }[]) ?? [];
 
   return {
+    summary: {
+      totalCars,
+      totalCustomers: customersCountRes.count ?? 0,
+      activeSalesOrders: salesOrdersCountRes.count ?? 0,
+      pendingRequests: requestsPendingCountRes.count ?? 0,
+      warrantiesExpiringSoon,
+    },
     carStatusChart,
     activeGarageTasks: tasksRes.count ?? 0,
     requestPriorityChart,

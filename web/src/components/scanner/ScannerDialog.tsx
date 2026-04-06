@@ -93,8 +93,12 @@ export function ScannerDialog({
           return;
         }
 
+        const cameraConfig = cameraId
+          ? { deviceId: { exact: cameraId } }
+          : { facingMode: "environment" as const };
+
         await html5QrCode.start(
-          { facingMode: "environment" },
+          cameraConfig,
           { fps: 10, qrbox: { width: 250, height: 150 } },
           (decodedText) => {
             if (!mounted) return;
