@@ -19,6 +19,8 @@ const nextConfig: NextConfig = {
     "http://127.0.0.1:3000",
     ...extraAllowedDevOrigins(),
   ],
+  // Must match turbopack.root or Next warns (and tracing can mis-resolve in monorepos).
+  outputFileTracingRoot: webRoot,
   turbopack: {
     root: webRoot,
   },

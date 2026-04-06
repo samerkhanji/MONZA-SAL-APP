@@ -16,9 +16,12 @@ jobs:
         with:
           fetch-depth: 0
 
+      # checkout often does not create refs/remotes/origin/phone; without it,
+      # `git push --force-with-lease` has no lease baseline and behaves like a normal push → non-FF reject.
       - name: Sync main to phone
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch origin
           git checkout -B phone origin/main
-          git push origin phone
+          git push --force-with-lease origin phone
