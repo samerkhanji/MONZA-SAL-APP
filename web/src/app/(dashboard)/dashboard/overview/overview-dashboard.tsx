@@ -1,15 +1,17 @@
 "use client";
 
-import { useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { format } from "date-fns";
+import { format, subMonths } from "date-fns";
 import {
   Bar,
   BarChart,
   CartesianGrid,
   Cell,
   Legend,
+  Line,
+  LineChart,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -26,6 +28,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
+import { CAR_STATUS_LABELS } from "@/types/database";
 import { refreshOwnerOverview } from "./actions";
 
 const CHART_COLORS = [
@@ -45,6 +49,41 @@ const CHART_COLORS = [
   "hsl(160 60% 40%)",
   "hsl(250 50% 55%)",
 ];
+
+/** Sold → primary, Inventory → cyan, Available → green; other statuses get a distinct fallback. */
+function carStatusFill(statusLabel: string): string {
+  const n = statusLabel.trim().toLowerCase();
+  if (n === "sold") return "hsl(var(--primary))";
+  if (n === "inventory") return "hsl(199 89% 48%)";
+  if (n === "available") return "hsl(142 71% 45%)";
+  if (n === "reserved") return "hsl(47 96% 53%)";
+  return CHART_COLORS[4];
+}
+
+/**
+ * Illustrative last-6-month curve; latest month equals totalVehicles from the same load as KPIs.
+ * Replace with real time-series when available.
+ */
+function buildCarsOverTimeFromFleetTotal(totalVehicles: number): { month: string; total: number }[] {
+  const now = new Date();
+  return [5, 4, 3, 2, 1, 0].map((back) => {
+    const d = subMonths(now, back);
+    const t = (5 - back) / 5;
+    const total = Math.max(0, Math.round(totalVehicles * (0.72 + 0.28 * t)));
+    return { month: format(d, "MMM yyyy"), total };
+  });
+}
+
+const CAR_STATUS_CHART_TYPES = ["bar", "pie", "donut", "horizontal", "line"] as const;
+type CarStatusChartType = (typeof CAR_STATUS_CHART_TYPES)[number];
+
+const CHART_TYPE_LABELS: Record<CarStatusChartType, string> = {
+  bar: "Bar",
+  pie: "Pie",
+  donut: "Donut",
+  horizontal: "Horizontal",
+  line: "Line",
+};
 
 export type OwnerOverviewData = {
   summary: {
@@ -79,9 +118,206 @@ const currency = new Intl.NumberFormat(undefined, {
   maximumFractionDigits: 0,
 });
 
+const tooltipContentStyle = {
+  borderRadius: 8,
+  border: "1px solid hsl(var(--border))",
+  background: "hsl(var(--card))",
+} as const;
+
+function CarsByStatusChartCard({
+  rows,
+  totalVehicles,
+  soldCarsCount,
+}: {
+  rows: { name: string; count: number }[];
+  /** Same as Vehicles KPI — from one server fetch, not a second query. */
+  totalVehicles: number;
+  /** Derived from `rows` (Sold label); kept explicit for chart copy / future series. */
+  soldCarsCount: number;
+}) {
+  const [chartType, setChartType] = useState<CarStatusChartType>("bar");
+
+  const carsByStatusData = useMemo(() => rows.filter((d) => d.count > 0), [rows]);
+
+  const pieData = carsByStatusData;
+
+  const carsOverTime = useMemo(
+    () => buildCarsOverTimeFromFleetTotal(totalVehicles),
+    [totalVehicles]
+  );
+
+  const chartKey = `${chartType}-${rows.map((r) => `${r.name}:${r.count}`).join("|")}-${totalVehicles}`;
+
+  return (
+    <Card className="lg:col-span-2">
+      <CardHeader className="space-y-2">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0 flex-1 space-y-1.5">
+            <CardTitle className="text-lg">Cars by status</CardTitle>
+            <CardDescription>
+              Same scope as the inventory list: all rows from{" "}
+              <code className="text-xs">cars_display</code>.
+              {chartType === "line" ? (
+                <span className="mt-1 block text-xs">
+                  Line shows an illustrative 6‑month curve ending at the current fleet total (
+                  {totalVehicles} vehicles, {soldCarsCount} sold). Replace with real history when
+                  available.
+                </span>
+              ) : null}
+            </CardDescription>
+          </div>
+          <div
+            className="flex shrink-0 flex-wrap gap-0.5 rounded-lg border border-border bg-muted/40 p-0.5"
+            role="tablist"
+            aria-label="Chart type"
+          >
+            {CAR_STATUS_CHART_TYPES.map((t) => (
+              <Button
+                key={t}
+                type="button"
+                size="sm"
+                variant={chartType === t ? "secondary" : "ghost"}
+                className={cn(
+                  "h-8 rounded-md px-2.5 text-xs font-medium",
+                  chartType === t && "shadow-sm"
+                )}
+                onClick={() => setChartType(t)}
+              >
+                {CHART_TYPE_LABELS[t]}
+              </Button>
+            ))}
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {totalVehicles === 0 ? (
+          <p className="text-muted-foreground text-sm">No cars to show.</p>
+        ) : chartType === "line" ? (
+          <div className="h-[320px] w-full min-w-0">
+            <ResponsiveContainer width="100%" height={320}>
+              <LineChart key={chartKey} data={carsOverTime} margin={{ left: 8, right: 16, top: 8, bottom: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                <XAxis dataKey="month" tick={{ fontSize: 11 }} className="text-muted-foreground" />
+                <YAxis allowDecimals={false} className="text-xs" />
+                <Tooltip contentStyle={tooltipContentStyle} />
+                <Line
+                  type="monotone"
+                  dataKey="total"
+                  name="Total vehicles"
+                  stroke="hsl(var(--primary))"
+                  strokeWidth={2}
+                  dot={{ fill: "hsl(var(--primary))", r: 4 }}
+                  activeDot={{ r: 6 }}
+                  animationDuration={400}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        ) : carsByStatusData.length === 0 ? (
+          <div className="text-muted-foreground flex min-h-[320px] items-center justify-center px-4 text-center text-sm">
+            No vehicles in the four standard statuses to chart (fleet total {totalVehicles} may use legacy
+            status values).
+          </div>
+        ) : (
+          <div className="h-[320px] w-full min-w-0">
+            <ResponsiveContainer width="100%" height={320}>
+              {chartType === "bar" ? (
+                <BarChart
+                  key={chartKey}
+                  data={carsByStatusData}
+                  margin={{ left: 8, right: 16, top: 8, bottom: 8 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                  <XAxis dataKey="name" tick={{ fontSize: 11 }} className="text-muted-foreground" />
+                  <YAxis allowDecimals={false} className="text-xs" />
+                  <Tooltip contentStyle={tooltipContentStyle} />
+                  <Bar dataKey="count" name="Cars" radius={[4, 4, 0, 0]} animationDuration={400}>
+                    {carsByStatusData.map((entry, i) => (
+                      <Cell key={`${entry.name}-${i}`} fill={carStatusFill(entry.name)} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              ) : chartType === "horizontal" ? (
+                <BarChart
+                  key={chartKey}
+                  data={carsByStatusData}
+                  layout="vertical"
+                  margin={{ left: 8, right: 16, top: 8, bottom: 8 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                  <XAxis type="number" allowDecimals={false} className="text-xs" />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    width={120}
+                    tick={{ fontSize: 11 }}
+                    className="text-muted-foreground"
+                  />
+                  <Tooltip contentStyle={tooltipContentStyle} />
+                  <Bar dataKey="count" name="Cars" radius={[0, 4, 4, 0]} animationDuration={400}>
+                    {carsByStatusData.map((entry, i) => (
+                      <Cell key={`${entry.name}-${i}`} fill={carStatusFill(entry.name)} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              ) : chartType === "pie" ? (
+                <PieChart key={chartKey}>
+                  <Pie
+                    data={pieData}
+                    dataKey="count"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={110}
+                    label={({ name, value }) => `${name}: ${value}`}
+                    animationDuration={400}
+                  >
+                    {pieData.map((entry, i) => (
+                      <Cell key={`${entry.name}-${i}`} fill={carStatusFill(entry.name)} />
+                    ))}
+                  </Pie>
+                  <Tooltip contentStyle={tooltipContentStyle} />
+                  <Legend />
+                </PieChart>
+              ) : chartType === "donut" ? (
+                <PieChart key={chartKey}>
+                  <Pie
+                    data={pieData}
+                    dataKey="count"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={58}
+                    outerRadius={110}
+                    label={({ name, value }) => `${name}: ${value}`}
+                    animationDuration={400}
+                  >
+                    {pieData.map((entry, i) => (
+                      <Cell key={`${entry.name}-${i}`} fill={carStatusFill(entry.name)} />
+                    ))}
+                  </Pie>
+                  <Tooltip contentStyle={tooltipContentStyle} />
+                  <Legend />
+                </PieChart>
+              ) : null}
+            </ResponsiveContainer>
+          </div>
+        )}
+        <Button variant="link" className="mt-2 h-auto px-0" asChild>
+          <Link href="/cars">Open inventory</Link>
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
 export function OverviewDashboard({ data }: { data: OwnerOverviewData }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+
+  const totalVehicles = data.summary.totalCars;
+  const soldCarsCount =
+    data.carStatusChart.find((r) => r.name === CAR_STATUS_LABELS.sold)?.count ?? 0;
 
   function handleRefresh() {
     startTransition(async () => {
@@ -133,7 +369,7 @@ export function OverviewDashboard({ data }: { data: OwnerOverviewData }) {
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>Vehicles</CardDescription>
-            <CardTitle className="text-2xl tabular-nums">{data.summary.totalCars}</CardTitle>
+            <CardTitle className="text-2xl tabular-nums">{totalVehicles}</CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
             <Button variant="link" className="h-auto px-0 text-xs" asChild>
@@ -163,12 +399,15 @@ export function OverviewDashboard({ data }: { data: OwnerOverviewData }) {
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>Open requests</CardDescription>
+            <CardDescription>Pending queue</CardDescription>
             <CardTitle className="text-2xl tabular-nums">{data.summary.pendingRequests}</CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
+            <p className="text-muted-foreground text-xs">
+              Deletions, Houssam/Kareem requests, document &amp; page access
+            </p>
             <Button variant="link" className="h-auto px-0 text-xs" asChild>
-              <Link href="/requests/pending">Pending queue</Link>
+              <Link href="/requests/pending">Open queue</Link>
             </Button>
           </CardContent>
         </Card>
@@ -184,55 +423,11 @@ export function OverviewDashboard({ data }: { data: OwnerOverviewData }) {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="text-lg">Cars by status</CardTitle>
-            <CardDescription>
-              Active inventory rows from{" "}
-              <code className="text-xs">cars_display</code> (excluding deleted).
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {data.carStatusChart.length === 0 ? (
-              <p className="text-muted-foreground text-sm">No cars to show.</p>
-            ) : (
-              <div className="h-[320px] w-full min-w-0">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={data.carStatusChart}
-                    layout="vertical"
-                    margin={{ left: 8, right: 16, top: 8, bottom: 8 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                    <XAxis type="number" allowDecimals={false} className="text-xs" />
-                    <YAxis
-                      type="category"
-                      dataKey="name"
-                      width={120}
-                      tick={{ fontSize: 11 }}
-                      className="text-muted-foreground"
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        borderRadius: 8,
-                        border: "1px solid hsl(var(--border))",
-                        background: "hsl(var(--card))",
-                      }}
-                    />
-                    <Bar dataKey="count" name="Cars" radius={[0, 4, 4, 0]}>
-                      {data.carStatusChart.map((_, i) => (
-                        <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-            <Button variant="link" className="mt-2 h-auto px-0" asChild>
-              <Link href="/cars">Open inventory</Link>
-            </Button>
-          </CardContent>
-        </Card>
+        <CarsByStatusChartCard
+          rows={data.carStatusChart}
+          totalVehicles={totalVehicles}
+          soldCarsCount={soldCarsCount}
+        />
 
         <Card>
           <CardHeader>
@@ -278,13 +473,7 @@ export function OverviewDashboard({ data }: { data: OwnerOverviewData }) {
                           <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
                         ))}
                     </Pie>
-                    <Tooltip
-                      contentStyle={{
-                        borderRadius: 8,
-                        border: "1px solid hsl(var(--border))",
-                        background: "hsl(var(--card))",
-                      }}
-                    />
+                    <Tooltip contentStyle={tooltipContentStyle} />
                     <Legend />
                   </PieChart>
                 </ResponsiveContainer>

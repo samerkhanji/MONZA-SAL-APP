@@ -86,17 +86,7 @@ const SOLD_TABLE_COL_PX = [220, 200, 130, 240, 160, 140, 120, 120, 170, 110] as 
 const CRM_TH =
   "sticky top-0 z-10 box-border min-w-0 max-w-full border-b-2 border-r border-border bg-[var(--table-header)] px-2 py-2 text-left align-middle text-[11px] font-semibold text-[var(--table-header-text)] whitespace-nowrap overflow-hidden text-ellipsis";
 const CRM_TD =
-  "box-border min-w-0 max-w-full border-b border-r border-border bg-card px-2 py-2 text-left align-middle text-xs whitespace-nowrap overflow-hidden text-ellipsis";
-
-const CRM_COL_BANDS = [
-  "bg-sky-500/[0.06] dark:bg-sky-500/10",
-  "bg-emerald-500/[0.06] dark:bg-emerald-500/10",
-  "bg-amber-500/[0.06] dark:bg-amber-500/10",
-  "bg-violet-500/[0.06] dark:bg-violet-500/10",
-] as const;
-function custColBand(i: number, base: string) {
-  return `${base} ${CRM_COL_BANDS[i % CRM_COL_BANDS.length]}`;
-}
+  "box-border min-w-0 max-w-full border-b border-r border-border bg-transparent px-2 py-2 text-left align-middle text-xs whitespace-nowrap overflow-hidden text-ellipsis";
 
 export default function CustomersPage() {
   const router = useRouter();
@@ -280,28 +270,28 @@ export default function CustomersPage() {
           </colgroup>
           <thead>
             <tr>
-              <th scope="col" className={custColBand(0, CRM_TH)}>
+              <th scope="col" className={CRM_TH}>
                 Name
               </th>
-              <th scope="col" className={custColBand(1, CRM_TH)}>
+              <th scope="col" className={CRM_TH}>
                 Phone
               </th>
-              <th scope="col" className={custColBand(2, CRM_TH)}>
+              <th scope="col" className={CRM_TH}>
                 Email
               </th>
-              <th scope="col" className={custColBand(3, CRM_TH)}>
+              <th scope="col" className={CRM_TH}>
                 Status
               </th>
-              <th scope="col" className={custColBand(0, CRM_TH)}>
+              <th scope="col" className={CRM_TH}>
                 Source
               </th>
-              <th scope="col" className={custColBand(1, CRM_TH)}>
+              <th scope="col" className={CRM_TH}>
                 Orders
               </th>
-              <th scope="col" className={custColBand(2, CRM_TH)}>
+              <th scope="col" className={CRM_TH}>
                 Last Visit
               </th>
-              <th scope="col" className={custColBand(3, `${CRM_TH} text-right`)}>
+              <th scope="col" className={`${CRM_TH} text-right`}>
                 Actions
               </th>
             </tr>
@@ -315,13 +305,13 @@ export default function CustomersPage() {
               return (
                 <tr
                   key={customer.id}
-                  className="cursor-pointer hover:bg-muted/30"
+                  className="cursor-pointer odd:bg-gray-50 even:bg-white"
                   onClick={() => router.push(`/customers/${customer.id}`)}
                 >
-                  <td title={fullName || undefined} className={custColBand(0, `${CRM_TD} font-medium`)}>
+                  <td title={fullName || undefined} className={`${CRM_TD} font-medium`}>
                     {fullName || "—"}
                   </td>
-                  <td className={custColBand(1, CRM_TD)}>
+                  <td className={CRM_TD}>
                     {customer.phone_primary ? (
                       <a
                         href={`tel:${customer.phone_primary.replace(/\s/g, "")}`}
@@ -334,7 +324,7 @@ export default function CustomersPage() {
                       "—"
                     )}
                   </td>
-                  <td title={customer.email ?? undefined} className={custColBand(2, CRM_TD)}>
+                  <td title={customer.email ?? undefined} className={CRM_TD}>
                     {customer.email ? (
                       <a
                         href={`mailto:${customer.email}`}
@@ -347,25 +337,25 @@ export default function CustomersPage() {
                       "—"
                     )}
                   </td>
-                  <td title={statusLabel} className={custColBand(3, CRM_TD)}>
+                  <td title={statusLabel} className={CRM_TD}>
                     {statusLabel}
                   </td>
                   <td
                     title={getSourceLabel(customer) || undefined}
-                    className={custColBand(0, `${CRM_TD} text-muted-foreground`)}
+                    className={`${CRM_TD} text-muted-foreground`}
                   >
                     {getSourceLabel(customer) || "—"}
                   </td>
-                  <td className={custColBand(1, `${CRM_TD} tabular-nums`)}>
+                  <td className={`${CRM_TD} tabular-nums`}>
                     {customer.total_orders != null ? String(customer.total_orders) : "—"}
                   </td>
-                  <td className={custColBand(2, `${CRM_TD} tabular-nums`)}>
+                  <td className={`${CRM_TD} tabular-nums`}>
                     {customer.last_visit_date
                       ? new Date(customer.last_visit_date).toLocaleDateString()
                       : "—"}
                   </td>
                   <td
-                    className={custColBand(3, `${CRM_TD} overflow-hidden text-right`)}
+                    className={`${CRM_TD} overflow-hidden text-right`}
                     onClick={(e) => e.stopPropagation()}
                   >
                     <DropdownMenu>
@@ -564,34 +554,34 @@ export default function CustomersPage() {
                     </colgroup>
                     <thead>
                       <tr>
-                        <th scope="col" className={custColBand(0, CRM_TH)}>
+                        <th scope="col" className={CRM_TH}>
                           Vehicle
                         </th>
-                        <th scope="col" className={custColBand(1, `${CRM_TH} font-mono`)}>
+                        <th scope="col" className={`${CRM_TH} font-mono`}>
                           VIN
                         </th>
-                        <th scope="col" className={custColBand(2, CRM_TH)}>
+                        <th scope="col" className={CRM_TH}>
                           Color
                         </th>
-                        <th scope="col" className={custColBand(3, CRM_TH)}>
+                        <th scope="col" className={CRM_TH}>
                           Customer
                         </th>
-                        <th scope="col" className={custColBand(0, CRM_TH)}>
+                        <th scope="col" className={CRM_TH}>
                           Phone
                         </th>
-                        <th scope="col" className={custColBand(1, CRM_TH)}>
+                        <th scope="col" className={CRM_TH}>
                           Price
                         </th>
-                        <th scope="col" className={custColBand(2, CRM_TH)}>
+                        <th scope="col" className={CRM_TH}>
                           Date bought
                         </th>
-                        <th scope="col" className={custColBand(3, CRM_TH)}>
+                        <th scope="col" className={CRM_TH}>
                           Delivery Date
                         </th>
-                        <th scope="col" className={custColBand(0, CRM_TH)}>
+                        <th scope="col" className={CRM_TH}>
                           Order Status
                         </th>
-                        <th scope="col" className={custColBand(1, `${CRM_TH} text-right`)}>
+                        <th scope="col" className={`${CRM_TH} text-right`}>
                           Actions
                         </th>
                       </tr>
@@ -609,23 +599,23 @@ export default function CustomersPage() {
                           : "—";
                         const orderStatusText = so.status ?? "—";
                         return (
-                          <tr key={so.id} className="hover:bg-muted/30">
-                            <td title={vehicleTitle} className={custColBand(0, `${CRM_TD} font-medium`)}>
+                          <tr key={so.id} className="odd:bg-gray-50 even:bg-white">
+                            <td title={vehicleTitle} className={`${CRM_TD} font-medium`}>
                               {vehicleTitle}
                             </td>
                             <td
                               title={car?.vin ?? ""}
-                              className={custColBand(1, `${CRM_TD} font-mono text-[10px] text-muted-foreground`)}
+                              className={`${CRM_TD} font-mono text-[10px] text-muted-foreground`}
                             >
                               {car?.vin ?? "—"}
                             </td>
                             <td
                               title={car?.exterior_color ?? undefined}
-                              className={custColBand(2, `${CRM_TD} text-muted-foreground`)}
+                              className={`${CRM_TD} text-muted-foreground`}
                             >
                               {car?.exterior_color ?? "—"}
                             </td>
-                            <td className={custColBand(3, CRM_TD)}>
+                            <td className={CRM_TD}>
                               {customer ? (
                                 <button
                                   type="button"
@@ -638,7 +628,7 @@ export default function CustomersPage() {
                                 <span className="text-muted-foreground">—</span>
                               )}
                             </td>
-                            <td className={custColBand(0, CRM_TD)}>
+                            <td className={CRM_TD}>
                               {customer?.phone_primary ? (
                                 <a
                                   href={`tel:${customer.phone_primary}`}
@@ -650,25 +640,25 @@ export default function CustomersPage() {
                                 "—"
                               )}
                             </td>
-                            <td className={custColBand(1, `${CRM_TD} tabular-nums`)}>
+                            <td className={`${CRM_TD} tabular-nums`}>
                               {so.selling_price != null
                                 ? `${Number(so.selling_price).toLocaleString()} ${so.currency ?? "USD"}`
                                 : "—"}
                             </td>
-                            <td className={custColBand(2, `${CRM_TD} tabular-nums`)}>
+                            <td className={`${CRM_TD} tabular-nums`}>
                               {dateBoughtDisplay
                                 ? new Date(dateBoughtDisplay).toLocaleDateString()
                                 : "—"}
                             </td>
-                            <td className={custColBand(3, `${CRM_TD} tabular-nums`)}>
+                            <td className={`${CRM_TD} tabular-nums`}>
                               {so.delivery_date
                                 ? new Date(so.delivery_date).toLocaleDateString()
                                 : "—"}
                             </td>
-                            <td title={orderStatusText} className={custColBand(0, CRM_TD)}>
+                            <td title={orderStatusText} className={CRM_TD}>
                               {orderStatusText}
                             </td>
-                            <td className={custColBand(1, `${CRM_TD} overflow-hidden text-right`)}>
+                            <td className={`${CRM_TD} overflow-hidden text-right`}>
                               <span className="inline-flex max-w-full flex-nowrap items-center justify-end gap-0.5 overflow-hidden">
                                 {customer && (
                                   <Button

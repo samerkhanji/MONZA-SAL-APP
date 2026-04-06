@@ -5,7 +5,13 @@ import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
 import type { CarDisplay, PdiStatus, CustomsStatus, CarStatus, LocationType } from "@/types/database";
-import { PDI_LABELS, CUSTOMS_STATUS_LABELS, CAR_STATUS_LABELS, LOCATION_LABELS } from "@/types/database";
+import {
+  CAR_STATUS_EDITABLE,
+  CAR_STATUS_LABELS,
+  PDI_LABELS,
+  CUSTOMS_STATUS_LABELS,
+  LOCATION_LABELS,
+} from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -379,9 +385,9 @@ export function EditCarDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(CAR_STATUS_LABELS).map(([value, label]) => (
+                  {CAR_STATUS_EDITABLE.map((value) => (
                     <SelectItem key={value} value={value}>
-                      {label}
+                      {CAR_STATUS_LABELS[value]}
                     </SelectItem>
                   ))}
                 </SelectContent>

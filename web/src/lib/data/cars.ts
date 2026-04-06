@@ -58,6 +58,7 @@ export async function getCarsDisplay(): Promise<CarsDisplayResult> {
   const primary = await supabase
     .from("cars_display")
     .select("*")
+    .is("deleted_at", null)
     .order("created_at", { ascending: false });
 
   if (primary.error && abortedFrom(primary.error)) {
@@ -87,6 +88,7 @@ export async function getCarsDisplay(): Promise<CarsDisplayResult> {
   const fallback = await supabase
     .from("cars")
     .select("*")
+    .is("deleted_at", null)
     .order("created_at", { ascending: false });
 
   if (fallback.error) {

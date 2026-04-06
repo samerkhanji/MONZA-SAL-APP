@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { requireCrud } from "@/lib/server/require-crud";
 import { isUuid } from "@/lib/validation/uuid";
 
-/** Soft-delete car (sets deleted_at). Server checks cars.delete permission. */
+/**
+ * Permanently remove a vehicle from active inventory (physically scrapped).
+ * Sets status = scrapped and deleted_at together (DB CHECK requires both).
+ * Return/resell must not use this route — use unlink customer + available instead.
+ */
 export async function DELETE(
   _req: Request,
   ctx: { params: Promise<{ id: string }> }
@@ -16,9 +20,14 @@ export async function DELETE(
       return NextResponse.json({ error: "Invalid car id" }, { status: 400 });
     }
 
+    const now = new Date().toISOString();
     const { error } = await gate.supabase
       .from("cars")
-      .update({ deleted_at: new Date().toISOString() })
+      .update({
+        status: "scrapped",
+        deleted_at: now,
+        updated_at: now,
+      })
       .eq("id", id);
 
     if (error) {

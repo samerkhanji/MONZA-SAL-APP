@@ -1,5 +1,5 @@
-// Car lifecycle (DB + app): four values after migration 047–048.
-export type CarStatus = "inventory" | "available" | "reserved" | "sold";
+// Car lifecycle: four operational values + scrapped (migration 051; DB-only soft-remove).
+export type CarStatus = "inventory" | "available" | "reserved" | "sold" | "scrapped";
 
 /** UI label; unknown strings (legacy rows) fall back to formatted text. */
 export const CAR_STATUS_LABELS: Record<string, string> = {
@@ -7,7 +7,11 @@ export const CAR_STATUS_LABELS: Record<string, string> = {
   available: "Available",
   reserved: "Reserved",
   sold: "Sold",
+  scrapped: "Scrapped",
 };
+
+/** Statuses users can assign in normal workflows (not scrapped — use archive/scrap flow). */
+export const CAR_STATUS_EDITABLE: CarStatus[] = ["inventory", "available", "reserved", "sold"];
 
 export function formatCarStatusLabel(status: string | null | undefined): string {
   if (status == null || status === "") return "—";
