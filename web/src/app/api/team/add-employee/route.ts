@@ -33,6 +33,16 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Roles that can be assigned via this endpoint; owner accounts require manual Supabase promotion.
+  const ASSIGNABLE_ROLES = new Set([
+    "assistant",
+    "sales_ops",
+    "garage_manager",
+    "garage_staff",
+    "khalil_hybrid",
+    "it",
+  ]);
+
   try {
     const body = await request.json();
     const {
@@ -41,7 +51,7 @@ export async function POST(request: NextRequest) {
       phone,
       job_title,
       department,
-      user_role,
+      user_role: rawRole,
       capabilities,
       is_active = true,
       employment_status = "active",
@@ -53,6 +63,9 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Clamp to allowed roles; silently default to assistant if unknown/owner supplied.
+    const user_role: string = ASSIGNABLE_ROLES.has(rawRole) ? rawRole : "assistant";
 
     const tempPassword = crypto.randomUUID() + "A1!";
 
@@ -129,8 +142,7 @@ export async function POST(request: NextRequest) {
       id: authUser.user.id,
       email,
       message:
-        "Employee created. No automatic email was sent—share the temporary password securely or trigger a password reset from the login page.",
-      temp_password: tempPassword,
+        "Employee created. Ask them to use 'Forgot password' on the login page to set their own password.",
     });
   } catch (err) {
     console.error("Add employee error:", err);

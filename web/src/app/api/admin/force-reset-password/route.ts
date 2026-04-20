@@ -109,6 +109,14 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Audit log — service role bypasses RLS so this always lands.
+  await admin.from("system_events").insert({
+    event_type: "admin.force_reset_password",
+    severity: "warning",
+    message: `Password force-reset for ${email}`,
+    metadata: { target_user_id: userId, target_email: email },
+  });
+
   return NextResponse.json({
     success: true,
     userId: updated.user?.id ?? userId,

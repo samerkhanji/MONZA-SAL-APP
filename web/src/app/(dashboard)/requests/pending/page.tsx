@@ -30,6 +30,8 @@ export default function PendingRequestsPage() {
   const [pendingItems, setPendingItems] = useState<PendingItem[]>([]);
   const [pendingItemsLoading, setPendingItemsLoading] = useState(false);
   const [deleteActioning, setDeleteActioning] = useState<string | null>(null);
+  const [docActioning, setDocActioning] = useState<string | null>(null);
+  const [pageActioning, setPageActioning] = useState<string | null>(null);
   const supabase = createClient();
 
   const fetchPendingItems = useCallback(async () => {
@@ -186,6 +188,40 @@ export default function PendingRequestsPage() {
     }
   }
 
+  async function handleDocAccess(reqId: string, action: "approve" | "deny") {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    setDocActioning(reqId);
+    const { approveDocumentAccessRequest, denyDocumentAccessRequest } = await import("@/lib/document-access");
+    const ok = action === "approve"
+      ? await approveDocumentAccessRequest(reqId, user.id)
+      : await denyDocumentAccessRequest(reqId, user.id);
+    setDocActioning(null);
+    if (ok) {
+      toast.success(action === "approve" ? "Document access approved" : "Document access denied");
+      fetchPendingItems();
+    } else {
+      toast.error("Action failed");
+    }
+  }
+
+  async function handlePageAccess(reqId: string, action: "approve" | "deny") {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    setPageActioning(reqId);
+    const { approvePageAccessRequest, denyPageAccessRequest } = await import("@/lib/page-access");
+    const ok = action === "approve"
+      ? await approvePageAccessRequest(reqId, user.id)
+      : await denyPageAccessRequest(reqId, user.id);
+    setPageActioning(null);
+    if (ok) {
+      toast.success(action === "approve" ? "Page access approved" : "Page access denied");
+      fetchPendingItems();
+    } else {
+      toast.error("Action failed");
+    }
+  }
+
   if (!profileLoading && !canSeeSettings) return null;
 
   return (
@@ -263,6 +299,44 @@ export default function PendingRequestsPage() {
                                 variant="outline"
                                 onClick={() => handleDenyDelete(deleteId)}
                                 disabled={deleteActioning === deleteId}
+                              >
+                                Deny
+                              </Button>
+                            </div>
+                          ) : r.type === "document_access" ? (
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                size="sm"
+                                variant="default"
+                                onClick={() => handleDocAccess(r.id.replace("doc-", ""), "approve")}
+                                disabled={docActioning === r.id.replace("doc-", "")}
+                              >
+                                Approve
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleDocAccess(r.id.replace("doc-", ""), "deny")}
+                                disabled={docActioning === r.id.replace("doc-", "")}
+                              >
+                                Deny
+                              </Button>
+                            </div>
+                          ) : r.type === "page_access" ? (
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                size="sm"
+                                variant="default"
+                                onClick={() => handlePageAccess(r.id.replace("page-", ""), "approve")}
+                                disabled={pageActioning === r.id.replace("page-", "")}
+                              >
+                                Approve
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handlePageAccess(r.id.replace("page-", ""), "deny")}
+                                disabled={pageActioning === r.id.replace("page-", "")}
                               >
                                 Deny
                               </Button>
