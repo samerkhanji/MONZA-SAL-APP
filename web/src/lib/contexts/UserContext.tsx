@@ -33,7 +33,6 @@ export interface UserProfile {
   id: string;
   full_name: string;
   phone: string | null;
-  role: UserRole;
   user_role?: AppRole | null;
   capabilities: UserCapability[];
   is_active: boolean;
@@ -235,19 +234,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const role = profile?.role;
   const capabilities = profile?.capabilities ?? [];
-  const appRole: AppRole | null =
-    profile?.user_role ??
-    (role === "sales"
-      ? "sales_ops"
-      : role === "garage_manager"
-        ? "garage_manager"
-        : role === "assistant"
-          ? "assistant"
-          : role === "owner"
-            ? "owner"
-            : null);
+  const appRole: AppRole | null = profile?.user_role ?? null;
 
   const isRequestAssistant = appRole === "assistant";
   const canEditInventory = appRole === "owner" || appRole === "sales_ops";

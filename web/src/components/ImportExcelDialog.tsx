@@ -262,7 +262,7 @@ export function ImportExcelDialog({
             const resDate = safeDate(arr[resDateIdx]);
             if (!client && !phone) continue;
 
-            const { data: carRow } = await supabase.from("cars").select("id").eq("vin", vin).maybeSingle();
+            const { data: carRow } = await supabase.from("cars").select("id, price, price_currency").eq("vin", vin).maybeSingle();
             if (!carRow?.id) continue;
 
             let customerId: string | null = null;
@@ -300,6 +300,9 @@ export function ImportExcelDialog({
               customer_id: customerId,
               status: "confirmed",
               created_by: user.id,
+              // Copy price from the car we just imported so sales reports aren't empty.
+              selling_price: carRow.price ?? null,
+              currency: carRow.price_currency ?? "USD",
             };
             if (delivery) salePayload.delivery_date = delivery;
             if (reserved) salePayload.reserved_by = reserved;

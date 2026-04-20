@@ -145,21 +145,7 @@ export type CrudAction =
 
 export function getAppRoleFromProfile(profile: UserProfile | null): AppRole | null {
   if (!profile) return null;
-  if (profile.user_role) return profile.user_role;
-
-  // Fallback mapping from legacy role field
-  switch (profile.role) {
-    case "owner":
-      return "owner";
-    case "garage_manager":
-      return "garage_manager";
-    case "sales":
-      return "sales_ops";
-    case "assistant":
-      return "assistant";
-    default:
-      return null;
-  }
+  return profile.user_role ?? null;
 }
 
 export function canAccessPage(page: keyof typeof PAGE_PERMISSIONS, role: AppRole | null): boolean {

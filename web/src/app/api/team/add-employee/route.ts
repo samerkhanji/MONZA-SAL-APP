@@ -116,7 +116,6 @@ export async function POST(request: NextRequest) {
         phone: phone || null,
         job_title: job_title || null,
         department: department || null,
-        role: "assistant",
         user_role,
         is_active: is_active_bool,
         employment_status,
@@ -135,21 +134,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const roleMap: Record<string, string> = {
-      owner: "owner",
-      assistant: "assistant",
-      sales_ops: "sales",
-      garage_manager: "garage_manager",
-      garage_staff: "garage_manager",
-      khalil_hybrid: "assistant",
-      it: "assistant",
-    };
     const profileData = {
       id: authUser.user.id,
       full_name,
       email,
       phone: phone || null,
-      role: roleMap[user_role] ?? "assistant",
       job_title: job_title || null,
       department: department || null,
       user_role,

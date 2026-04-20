@@ -1242,7 +1242,7 @@ export default function CarsListPage() {
               This action is irreversible. Please confirm your password to continue.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          {(isOwner || profile?.role === "owner") ? (
+          {(isOwner || profile?.user_role === "owner") ? (
             <div className="space-y-2">
               <Label htmlFor="delete-password">Password</Label>
               <Input
@@ -1265,7 +1265,7 @@ export default function CarsListPage() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <Button
               variant="destructive"
-              disabled={deleteLoading || !deletePassword || !(isOwner || profile?.role === "owner")}
+              disabled={deleteLoading || !deletePassword || !(isOwner || profile?.user_role === "owner")}
               onClick={() => {
                 void handleDeleteCar();
               }}
