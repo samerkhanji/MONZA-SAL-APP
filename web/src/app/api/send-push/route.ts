@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import webpush from "web-push";
-import { getSupabasePublicKey } from "@/lib/supabase/public-env";
+import { createClient as createServerClient } from "@/lib/supabase/server";
 
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
+
+// Roles that may fan out push notifications to arbitrary users.
+// Everyone else can only push to themselves (e.g. a test).
+const BROADCAST_ROLES = new Set(["owner", "assistant", "khalil_hybrid", "it", "garage_manager"]);
 
 function configureWebPush(): { ok: true } | { ok: false; error: string } {
   if (!VAPID_PUBLIC_KEY?.trim() || !VAPID_PRIVATE_KEY?.trim()) {
@@ -29,27 +33,59 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: vapid.error }, { status: 500 });
   }
 
+  // Require authenticated session.
+  const serverClient = await createServerClient();
+  const {
+    data: { user },
+  } = await serverClient.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { data: callerProfile } = await serverClient
+    .from("profiles")
+    .select("user_role")
+    .eq("id", user.id)
+    .single();
+
+  const callerRole = (callerProfile?.user_role as string | undefined) ?? null;
+
   try {
     const body = await request.json();
-    const { user_id, title, message, link, tag } = body;
+    const { user_id, title, message, link, tag } = body as {
+      user_id?: string;
+      title?: string;
+      message?: string;
+      link?: string;
+      tag?: string;
+    };
 
-    if (!user_id || !title || !message) {
+    if (!user_id || typeof user_id !== "string" || !title || !message) {
       return NextResponse.json(
         { error: "Missing user_id, title, or message" },
         { status: 400 }
       );
     }
 
+    // Enforce target authorization: self-push always allowed; fan-out gated by role.
+    if (user_id !== user.id) {
+      if (!callerRole || !BROADCAST_ROLES.has(callerRole)) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+    }
+
+    // Only proceed with service role (we already authorized the caller).
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-    const serviceOrPublic =
-      process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ?? getSupabasePublicKey();
-    if (!supabaseUrl || !serviceOrPublic) {
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+    if (!supabaseUrl || !serviceKey) {
       return NextResponse.json(
-        { error: "Supabase URL or keys not configured" },
+        { error: "Supabase service credentials not configured" },
         { status: 500 }
       );
     }
-    const supabase = createClient(supabaseUrl, serviceOrPublic);
+    const supabase = createClient(supabaseUrl, serviceKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
 
     const { data: subs } = await supabase
       .from("push_subscriptions")
@@ -60,11 +96,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ sent: 0 });
     }
 
+    // Cap fields we forward to the browser.
+    const safeTitle = String(title).slice(0, 200);
+    const safeMessage = String(message).slice(0, 1000);
+    const safeLink = typeof link === "string" && link.startsWith("/") ? link : "/";
+
     const payload = JSON.stringify({
-      title,
-      message,
-      link: link ?? "/",
-      tag: tag ?? `notif-${Date.now()}`,
+      title: safeTitle,
+      message: safeMessage,
+      link: safeLink,
+      tag: typeof tag === "string" ? tag.slice(0, 80) : `notif-${Date.now()}`,
     });
 
     const results = await Promise.allSettled(

@@ -11,6 +11,26 @@ function isUuid(s: string): boolean {
   );
 }
 
+const ALLOWED_TASK_STATUSES = new Set([
+  "pending",
+  "in_progress",
+  "blocked",
+  "done",
+  "cancelled",
+]);
+
+const ALLOWED_RESOURCE_TYPES = new Set([
+  "bays",
+  "pit",
+  "car_wash",
+  "oven",
+  "car_painting",
+  "ev_bays",
+  "body_work",
+  "battery_lab",
+  "polish",
+]);
+
 export async function PATCH(
   req: Request,
   ctx: { params: Promise<{ id: string }> }
@@ -33,10 +53,24 @@ export async function PATCH(
     } | null;
 
     const patch: Record<string, unknown> = {};
-    if (body?.status != null) patch.status = body.status;
-    if (body && "assigned_to" in body) patch.assigned_to = body.assigned_to;
+    if (body?.status != null) {
+      if (typeof body.status !== "string" || !ALLOWED_TASK_STATUSES.has(body.status)) {
+        return NextResponse.json({ error: "Invalid status value" }, { status: 400 });
+      }
+      patch.status = body.status;
+    }
+    if (body && "assigned_to" in body) {
+      if (body.assigned_to !== null && (typeof body.assigned_to !== "string" || !isUuid(body.assigned_to))) {
+        return NextResponse.json({ error: "Invalid assigned_to" }, { status: 400 });
+      }
+      patch.assigned_to = body.assigned_to;
+    }
     if (body?.resource_type !== undefined) {
-      patch.resource_type = body.resource_type?.trim() || null;
+      const rt = body.resource_type?.trim() || null;
+      if (rt !== null && !ALLOWED_RESOURCE_TYPES.has(rt)) {
+        return NextResponse.json({ error: "Invalid resource_type" }, { status: 400 });
+      }
+      patch.resource_type = rt;
     }
 
     const bodyKeys = Object.keys(patch).filter((k) => patch[k] !== undefined);
@@ -66,6 +100,16 @@ export async function PATCH(
       }
       if ("assigned_to" in patch) {
         return NextResponse.json({ error: "Cannot reassign task" }, { status: 403 });
+      }
+      // Staff can only progress tasks — not cancel or reopen.
+      if (
+        patch.status &&
+        !["in_progress", "blocked", "done"].includes(patch.status as string)
+      ) {
+        return NextResponse.json(
+          { error: "Staff can only set status to in_progress, blocked, or done" },
+          { status: 403 }
+        );
       }
     }
 

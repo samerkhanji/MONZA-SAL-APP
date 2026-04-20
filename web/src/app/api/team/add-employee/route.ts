@@ -43,6 +43,28 @@ export async function POST(request: NextRequest) {
     "it",
   ]);
 
+  // Whitelist of known capability strings the UI may toggle.
+  const ALLOWED_CAPABILITIES = new Set([
+    "garage",
+    "inventory",
+    "sales",
+    "customers",
+    "documents",
+    "requests",
+    "test_drive",
+    "accessories",
+    "data_health",
+    "installments",
+  ]);
+
+  const ALLOWED_EMPLOYMENT_STATUSES = new Set([
+    "active",
+    "inactive",
+    "suspended",
+    "terminated",
+    "on_leave",
+  ]);
+
   try {
     const body = await request.json();
     const {
@@ -52,9 +74,9 @@ export async function POST(request: NextRequest) {
       job_title,
       department,
       user_role: rawRole,
-      capabilities,
+      capabilities: rawCapabilities,
       is_active = true,
-      employment_status = "active",
+      employment_status: rawEmploymentStatus,
     } = body;
 
     if (!email || !full_name) {
@@ -66,6 +88,18 @@ export async function POST(request: NextRequest) {
 
     // Clamp to allowed roles; silently default to assistant if unknown/owner supplied.
     const user_role: string = ASSIGNABLE_ROLES.has(rawRole) ? rawRole : "assistant";
+
+    // Sanitize capabilities: strip anything not in the allowlist.
+    const capabilities: string[] = Array.isArray(rawCapabilities)
+      ? rawCapabilities
+          .filter((c): c is string => typeof c === "string" && ALLOWED_CAPABILITIES.has(c))
+      : [];
+
+    const employment_status = ALLOWED_EMPLOYMENT_STATUSES.has(rawEmploymentStatus)
+      ? rawEmploymentStatus
+      : "active";
+
+    const is_active_bool = typeof is_active === "boolean" ? is_active : true;
 
     const tempPassword = crypto.randomUUID() + "A1!";
 
@@ -82,11 +116,10 @@ export async function POST(request: NextRequest) {
         phone: phone || null,
         job_title: job_title || null,
         department: department || null,
-        role: user_role ? "assistant" : "assistant",
-        user_role: user_role || "assistant",
-        capabilities: Array.isArray(capabilities) ? capabilities : [],
-        is_active,
-        employment_status: employment_status || "active",
+        role: "assistant",
+        user_role,
+        is_active: is_active_bool,
+        employment_status,
       },
     });
 
@@ -116,13 +149,13 @@ export async function POST(request: NextRequest) {
       full_name,
       email,
       phone: phone || null,
-      role: roleMap[user_role || "assistant"] ?? "assistant",
+      role: roleMap[user_role] ?? "assistant",
       job_title: job_title || null,
       department: department || null,
-      user_role: user_role || "assistant",
-      capabilities: Array.isArray(capabilities) ? capabilities : [],
-      is_active,
-      employment_status: employment_status || "active",
+      user_role,
+      capabilities,
+      is_active: is_active_bool,
+      employment_status,
       created_by: user.id,
     };
 

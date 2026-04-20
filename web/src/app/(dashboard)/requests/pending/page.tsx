@@ -158,67 +158,62 @@ export default function PendingRequestsPage() {
     }
   }, [canSeeSettings, fetchPendingItems]);
 
+  async function callApproval(
+    type: "delete" | "document-access" | "page-access",
+    reqId: string,
+    action: "approve" | "deny"
+  ): Promise<boolean> {
+    const res = await fetch(`/api/approvals/${type}/${reqId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ action }),
+    });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      toast.error(typeof j?.error === "string" ? j.error : "Action failed");
+      return false;
+    }
+    return true;
+  }
+
   async function handleApproveDelete(reqId: string) {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
     setDeleteActioning(reqId);
-    const { approveDeleteRequest } = await import("@/lib/delete-requests");
-    const ok = await approveDeleteRequest(reqId, user.id);
+    const ok = await callApproval("delete", reqId, "approve");
     setDeleteActioning(null);
     if (ok) {
       toast.success("Deletion approved");
       fetchPendingItems();
-    } else {
-      toast.error("Failed to approve");
     }
   }
 
   async function handleDenyDelete(reqId: string) {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
     setDeleteActioning(reqId);
-    const { denyDeleteRequest } = await import("@/lib/delete-requests");
-    const ok = await denyDeleteRequest(reqId, user.id);
+    const ok = await callApproval("delete", reqId, "deny");
     setDeleteActioning(null);
     if (ok) {
       toast.success("Deletion denied");
       fetchPendingItems();
-    } else {
-      toast.error("Failed to deny");
     }
   }
 
   async function handleDocAccess(reqId: string, action: "approve" | "deny") {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
     setDocActioning(reqId);
-    const { approveDocumentAccessRequest, denyDocumentAccessRequest } = await import("@/lib/document-access");
-    const ok = action === "approve"
-      ? await approveDocumentAccessRequest(reqId, user.id)
-      : await denyDocumentAccessRequest(reqId, user.id);
+    const ok = await callApproval("document-access", reqId, action);
     setDocActioning(null);
     if (ok) {
       toast.success(action === "approve" ? "Document access approved" : "Document access denied");
       fetchPendingItems();
-    } else {
-      toast.error("Action failed");
     }
   }
 
   async function handlePageAccess(reqId: string, action: "approve" | "deny") {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
     setPageActioning(reqId);
-    const { approvePageAccessRequest, denyPageAccessRequest } = await import("@/lib/page-access");
-    const ok = action === "approve"
-      ? await approvePageAccessRequest(reqId, user.id)
-      : await denyPageAccessRequest(reqId, user.id);
+    const ok = await callApproval("page-access", reqId, action);
     setPageActioning(null);
     if (ok) {
       toast.success(action === "approve" ? "Page access approved" : "Page access denied");
       fetchPendingItems();
-    } else {
-      toast.error("Action failed");
     }
   }
 

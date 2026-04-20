@@ -129,17 +129,32 @@ export async function POST(req: Request) {
         });
       }
     } else if (body.tasks?.length) {
+      const ALLOWED_RESOURCE_TYPES = new Set([
+        "bays",
+        "pit",
+        "car_wash",
+        "oven",
+        "car_painting",
+        "ev_bays",
+        "body_work",
+        "battery_lab",
+        "polish",
+      ]);
       for (let i = 0; i < body.tasks.length; i += 1) {
         const t = body.tasks[i];
         const desc = (t.description ?? "").trim();
         if (!desc) {
           return NextResponse.json({ error: "Each task needs a description" }, { status: 400 });
         }
+        const rt = t.resourceType?.trim() || null;
+        if (rt !== null && !ALLOWED_RESOURCE_TYPES.has(rt)) {
+          return NextResponse.json({ error: "Invalid resourceType" }, { status: 400 });
+        }
         rows.push({
           car_id: carId,
-          description: desc,
-          resource_type: t.resourceType?.trim() || null,
-          sort_order: t.sortOrder ?? i,
+          description: desc.slice(0, 500),
+          resource_type: rt,
+          sort_order: typeof t.sortOrder === "number" ? t.sortOrder : i,
           created_by: session.userId,
         });
       }
