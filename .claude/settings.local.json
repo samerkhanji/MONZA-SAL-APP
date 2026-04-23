@@ -12,7 +12,14 @@
       "mcp__5ce8f499-a2d0-4ae0-a3db-cf641ea8c77d__list_projects",
       "mcp__5ce8f499-a2d0-4ae0-a3db-cf641ea8c77d__get_advisors",
       "mcp__5ce8f499-a2d0-4ae0-a3db-cf641ea8c77d__execute_sql",
-      "mcp__5ce8f499-a2d0-4ae0-a3db-cf641ea8c77d__apply_migration"
+      "mcp__5ce8f499-a2d0-4ae0-a3db-cf641ea8c77d__apply_migration",
+      "Bash(supabase --version)",
+      "Bash(supabase link *)",
+      "Bash(supabase migration *)",
+      "Bash(mkdir -p _archive)",
+      "Read(//c/c/Users/User/Desktop/MONZA-CRM-main/.claude/worktrees/vigorous-mendel-50233d/supabase/**)",
+      "Bash(supabase db *)",
+      "Bash(docker info *)"
     ]
   }
 }
