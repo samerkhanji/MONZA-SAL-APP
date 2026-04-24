@@ -114,7 +114,8 @@ export default function SalesOrdersPage() {
       toast.error(error.message);
       setOrders([]);
     } else {
-      setOrders((data as SalesOrderFull[]) ?? []);
+      // Supabase types FK embeds as arrays by default; cast via unknown.
+      setOrders((data as unknown as SalesOrderFull[]) ?? []);
     }
     setLoading(false);
   }
