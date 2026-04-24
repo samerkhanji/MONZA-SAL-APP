@@ -42,14 +42,11 @@ export async function POST(
 
   const { data: profile } = await serverClient
     .from("profiles")
-    .select("user_role, role")
+    .select("user_role")
     .eq("id", user.id)
     .single();
 
-  const effectiveRole =
-    (profile?.user_role as string | undefined) ??
-    (profile?.role as string | undefined) ??
-    null;
+  const effectiveRole = (profile?.user_role as string | undefined) ?? null;
 
   if (effectiveRole !== "owner") {
     return NextResponse.json({ error: "Only owners can approve requests" }, { status: 403 });
