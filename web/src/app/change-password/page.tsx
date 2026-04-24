@@ -47,8 +47,9 @@ export default function ChangePasswordPage() {
         .eq("id", user.id)
         .maybeSingle();
       if (!profile || profile.must_change_password === false) {
-        // Already changed password; send to default home
-        router.replace("/requests");
+        // Already changed password — bail out of this page.
+        // Hard navigation guarantees UserContext re-fetches clean state.
+        window.location.href = "/requests";
         return;
       }
       setLoading(false);
@@ -58,6 +59,7 @@ export default function ChangePasswordPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+
     const pwError = validatePassword(newPassword);
     if (pwError) {
       setError(pwError);
@@ -69,43 +71,54 @@ export default function ChangePasswordPage() {
     }
 
     setSubmitting(true);
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-    if (userError || !user) {
+
+    try {
+      // 1) Confirm session before mutating.
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+      if (userError || !user) {
+        throw new Error("You must be signed in to change your password.");
+      }
+
+      // 2) Update auth password. Supabase rotates the JWT internally.
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+      if (updateError) throw updateError;
+
+      // 3) Force session refresh so subsequent queries use the rotated token.
+      await supabase.auth.refreshSession();
+
+      // 4) Clear the flag *and verify the row actually updated*.
+      //    Without .select() we wouldn't notice an RLS silent-reject.
+      const { data: updatedRows, error: profileError } = await supabase
+        .from("profiles")
+        .update({
+          must_change_password: false,
+          onboarding_completed: false,
+          onboarding_completed_at: null,
+        })
+        .eq("id", user.id)
+        .select("id, must_change_password");
+
+      if (profileError) throw profileError;
+
+      if (!updatedRows || updatedRows.length === 0 || updatedRows[0].must_change_password !== false) {
+        throw new Error(
+          "Password was saved but we couldn't clear the reset flag. Please sign out and sign in again — if this keeps happening, contact an owner."
+        );
+      }
+
+      // 5) Hard navigation (not router.replace) so the entire React tree remounts
+      //    and no stale UserContext cache can loop us back here.
+      window.location.replace("/requests");
+      return; // stop execution so we don't re-enable the button
+    } catch (err) {
       setSubmitting(false);
-      setError("You must be signed in to change your password.");
-      return;
+      setError(err instanceof Error ? err.message : "Failed to set password.");
     }
-
-    const { error: updateError } = await supabase.auth.updateUser({
-      password: newPassword,
-    });
-    if (updateError) {
-      setSubmitting(false);
-      setError(updateError.message);
-      return;
-    }
-
-    const { error: profileError } = await supabase
-      .from("profiles")
-      .update({
-        must_change_password: false,
-        onboarding_completed: false,
-        onboarding_completed_at: null,
-      })
-      .eq("id", user.id);
-
-    if (profileError) {
-      setSubmitting(false);
-      setError(profileError.message);
-      return;
-    }
-
-    setSubmitting(false);
-    // Redirect to default home; onboarding tour will start automatically based on profile flags.
-    router.replace("/requests");
   }
 
   if (loading) {
@@ -168,4 +181,3 @@ export default function ChangePasswordPage() {
     </div>
   );
 }
-

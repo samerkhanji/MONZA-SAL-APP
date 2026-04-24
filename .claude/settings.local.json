@@ -29,7 +29,13 @@
       "mcp__4de16d43-081a-462b-9b29-67938c0847fa__list_deployments",
       "Bash(gh repo *)",
       "Bash(grep -E \"^\\\\.vercel\" .gitignore)",
-      "Bash(ls -la .vercel/)"
+      "Bash(ls -la .vercel/)",
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "mcp__4de16d43-081a-462b-9b29-67938c0847fa__get_runtime_logs",
+      "Bash(python3 -)",
+      "Bash(python3 .audit-drift.py)",
+      "Read(//c/c/Users/User/Desktop/MONZA-CRM-main/.claude/worktrees/vigorous-mendel-50233d/**)",
+      "Bash(grep -E \"\\\\.\\(py|txt|json|sql\\)$\")"
     ]
   }
 }

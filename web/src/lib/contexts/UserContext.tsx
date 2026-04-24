@@ -229,10 +229,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         if (!isLoginPage && !isAuthEmailFlow) {
           window.location.href = "/login";
         }
+      } else if (event === "USER_UPDATED" || event === "TOKEN_REFRESHED") {
+        // Password / email / metadata change → pull fresh profile
+        // so FirstLoginGuard etc. don't act on a stale must_change_password flag.
+        void loadProfile();
       }
     });
     return () => subscription.unsubscribe();
-  }, []);
+  }, [loadProfile]);
 
   const capabilities = profile?.capabilities ?? [];
   const appRole: AppRole | null = profile?.user_role ?? null;
