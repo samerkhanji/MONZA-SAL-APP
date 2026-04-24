@@ -50,7 +50,7 @@ describe("canAccessPage", () => {
         const allRoles: AppRole[] = [
           "owner",
           "assistant",
-          "khalil_hybrid",
+          "hybrid",
           "it",
           "garage_manager",
           "garage_staff",
@@ -79,7 +79,7 @@ describe("canPerform", () => {
     const roles: AppRole[] = [
       "owner",
       "assistant",
-      "khalil_hybrid",
+      "hybrid",
       "it",
       "garage_manager",
       "garage_staff",
@@ -105,7 +105,7 @@ describe("canPerform", () => {
     const roles: AppRole[] = [
       "owner",
       "assistant",
-      "khalil_hybrid",
+      "hybrid",
       "it",
       "garage_manager",
       "garage_staff",
@@ -133,7 +133,7 @@ describe("canPerform", () => {
     const roles: AppRole[] = [
       "owner",
       "assistant",
-      "khalil_hybrid",
+      "hybrid",
       "it",
       "garage_manager",
       "garage_staff",
@@ -161,7 +161,7 @@ describe("canPerform", () => {
     const roles: AppRole[] = [
       "owner",
       "assistant",
-      "khalil_hybrid",
+      "hybrid",
       "it",
       "garage_manager",
       "garage_staff",

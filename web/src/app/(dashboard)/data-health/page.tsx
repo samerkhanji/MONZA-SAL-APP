@@ -352,7 +352,7 @@ export default function DataHealthPage() {
       }
 
       let reqQuery = supabase.from("requests").select("id, subject, category, status, description, assigned_to");
-      if (appRole === "khalil_hybrid" && profile?.id) {
+      if (appRole === "hybrid" && profile?.id) {
         reqQuery = reqQuery.eq("assigned_to", profile.id);
       }
 
@@ -1121,7 +1121,7 @@ export default function DataHealthPage() {
                 )}
               </>
             )}
-            {appRole === "khalil_hybrid" && (
+            {appRole === "hybrid" && (
               <>
                 <div className="rounded-lg border bg-background p-4">
                   <p className="text-sm font-medium text-muted-foreground">Parts missing data</p>

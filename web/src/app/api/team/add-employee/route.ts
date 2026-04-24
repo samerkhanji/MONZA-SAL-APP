@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
     "sales_ops",
     "garage_manager",
     "garage_staff",
-    "khalil_hybrid",
+    "hybrid",
     "it",
   ]);
 

@@ -21,9 +21,9 @@ describe("car-field-permissions", () => {
     expect(canEditMonzaWarrantyOnCar("sales_ops", null)).toBe(false);
   });
 
-  it("DMS warranty: owner or khalil_hybrid", () => {
+  it("DMS warranty: owner or hybrid", () => {
     expect(canEditDmsWarrantyOnCar("owner")).toBe(true);
-    expect(canEditDmsWarrantyOnCar("khalil_hybrid")).toBe(true);
+    expect(canEditDmsWarrantyOnCar("hybrid")).toBe(true);
     expect(canEditDmsWarrantyOnCar("assistant")).toBe(false);
   });
 
@@ -37,7 +37,7 @@ describe("car-field-permissions", () => {
   it("canOpenCarEditDialog includes sales_ops and monza/khalil paths", () => {
     expect(canOpenCarEditDialog("sales_ops", null)).toBe(true);
     expect(canOpenCarEditDialog("assistant", "Samaya")).toBe(true);
-    expect(canOpenCarEditDialog("khalil_hybrid", null)).toBe(true);
+    expect(canOpenCarEditDialog("hybrid", null)).toBe(true);
     expect(canOpenCarEditDialog("it", null)).toBe(false);
   });
 });

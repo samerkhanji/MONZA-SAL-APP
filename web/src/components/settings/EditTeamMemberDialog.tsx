@@ -43,7 +43,7 @@ const CAPABILITY_LABELS: Record<UserCapability, string> = {
 const ROLE_COLORS: Record<string, string> = {
   owner: "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300",
   assistant: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
-  khalil_hybrid:
+  hybrid:
     "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
   it: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900 dark:text-cyan-300",
   garage_manager:

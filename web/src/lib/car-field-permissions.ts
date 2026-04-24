@@ -24,7 +24,7 @@ export function canEditMonzaWarrantyOnCar(
 }
 
 export function canEditDmsWarrantyOnCar(appRole: AppRole | null): boolean {
-  return appRole === "owner" || appRole === "khalil_hybrid";
+  return appRole === "owner" || appRole === "hybrid";
 }
 
 /** Phase 3.3 — owners, all assistants, garage managers (matches DB trigger). */

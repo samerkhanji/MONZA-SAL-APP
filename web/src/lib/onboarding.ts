@@ -228,7 +228,7 @@ export function getOnboardingSteps(role: AppRole | null): OnboardingStep[] {
             "Submit requests when you need something from management or other teams.",
         },
       ];
-    case "khalil_hybrid":
+    case "hybrid":
       return [
         {
           target: '[data-tour-id="nav-requests"]',

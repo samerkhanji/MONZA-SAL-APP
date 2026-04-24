@@ -3,7 +3,7 @@ import type { UserProfile } from "@/lib/contexts/UserContext";
 export type AppRole =
   | "owner"
   | "assistant"
-  | "khalil_hybrid"
+  | "hybrid"
   | "it"
   | "garage_manager"
   | "garage_staff"
@@ -33,20 +33,20 @@ export const PAGE_PERMISSIONS: Record<
   requests: [
     "owner",
     "assistant",
-    "khalil_hybrid",
+    "hybrid",
     "it",
     "garage_manager",
     "garage_staff",
     "sales_ops",
   ],
-  cars: ["owner", "assistant", "khalil_hybrid", "it", "sales_ops"],
-  accessories: ["owner", "assistant", "khalil_hybrid", "it", "sales_ops"],
-  test_drive: ["owner", "assistant", "khalil_hybrid", "it", "sales_ops"],
+  cars: ["owner", "assistant", "hybrid", "it", "sales_ops"],
+  accessories: ["owner", "assistant", "hybrid", "it", "sales_ops"],
+  test_drive: ["owner", "assistant", "hybrid", "it", "sales_ops"],
   installments: ["owner", "assistant", "sales_ops"],
   parts: [
     "owner",
     "assistant",
-    "khalil_hybrid",
+    "hybrid",
     "it",
     "garage_manager",
     "garage_staff",
@@ -57,13 +57,13 @@ export const PAGE_PERMISSIONS: Record<
   documents: [
     "owner",
     "assistant",
-    "khalil_hybrid",
+    "hybrid",
     "it",
     "garage_manager",
     "sales_ops",
   ],
   settings: ["owner"],
-  garage_settings: ["owner", "garage_manager", "khalil_hybrid"],
+  garage_settings: ["owner", "garage_manager", "hybrid"],
 };
 
 export const CRUD_PERMISSIONS = {
@@ -71,16 +71,16 @@ export const CRUD_PERMISSIONS = {
     create: ["owner", "sales_ops"] as AppRole[],
     edit: ["owner", "sales_ops"] as AppRole[],
     delete: ["owner"] as AppRole[],
-    view: ["owner", "assistant", "khalil_hybrid", "it", "sales_ops"] as AppRole[],
+    view: ["owner", "assistant", "hybrid", "it", "sales_ops"] as AppRole[],
   },
   parts: {
     create: ["owner", "garage_manager"] as AppRole[],
-    edit: ["owner", "khalil_hybrid", "garage_manager"] as AppRole[],
+    edit: ["owner", "hybrid", "garage_manager"] as AppRole[],
     delete: ["owner"] as AppRole[],
     view: [
       "owner",
       "assistant",
-      "khalil_hybrid",
+      "hybrid",
       "it",
       "garage_manager",
       "garage_staff",
@@ -109,7 +109,7 @@ export const CRUD_PERMISSIONS = {
     create: [
       "owner",
       "assistant",
-      "khalil_hybrid",
+      "hybrid",
       "it",
       "garage_manager",
       "garage_staff",
@@ -120,7 +120,7 @@ export const CRUD_PERMISSIONS = {
     view: [
       "owner",
       "assistant",
-      "khalil_hybrid",
+      "hybrid",
       "it",
       "garage_manager",
       "garage_staff",
@@ -128,10 +128,10 @@ export const CRUD_PERMISSIONS = {
     ] as AppRole[],
   },
   accessory_collections: {
-    create: ["owner", "assistant", "khalil_hybrid", "it", "sales_ops"] as AppRole[],
-    edit: ["owner", "assistant", "khalil_hybrid", "it", "sales_ops"] as AppRole[],
+    create: ["owner", "assistant", "hybrid", "it", "sales_ops"] as AppRole[],
+    edit: ["owner", "assistant", "hybrid", "it", "sales_ops"] as AppRole[],
     delete: ["owner"] as AppRole[],
-    view: ["owner", "assistant", "khalil_hybrid", "it", "sales_ops"] as AppRole[],
+    view: ["owner", "assistant", "hybrid", "it", "sales_ops"] as AppRole[],
   },
 } as const;
 

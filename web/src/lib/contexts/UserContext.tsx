@@ -263,27 +263,27 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const isKareem = false;
   const isHoussam = false;
   const isMark = appRole === "garage_manager";
-  const isKhalil = appRole === "khalil_hybrid";
+  const isKhalil = appRole === "hybrid";
   const isOwner = appRole === "owner";
 
   const canSeeDashboard = appRole === "owner";
   const canSeeCars =
     appRole === "owner" ||
     appRole === "assistant" ||
-    appRole === "khalil_hybrid" ||
+    appRole === "hybrid" ||
     appRole === "it" ||
     appRole === "sales_ops";
   const canSeeDocuments =
     appRole === "owner" ||
     appRole === "assistant" ||
-    appRole === "khalil_hybrid" ||
+    appRole === "hybrid" ||
     appRole === "it" ||
     appRole === "garage_manager" ||
     appRole === "sales_ops";
   const canSeePartsInventory =
     appRole === "owner" ||
     appRole === "assistant" ||
-    appRole === "khalil_hybrid" ||
+    appRole === "hybrid" ||
     appRole === "it" ||
     appRole === "garage_manager" ||
     appRole === "garage_staff";
