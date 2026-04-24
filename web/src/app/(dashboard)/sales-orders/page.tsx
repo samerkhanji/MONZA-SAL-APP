@@ -68,11 +68,9 @@ const STATUS_COLORS: Record<string, string> = {
 
 function customerName(so: SalesOrderFull): string {
   if (!so.customers) return "—";
-  return (
-    so.customers.full_name ??
-    `${so.customers.first_name ?? ""} ${so.customers.last_name ?? ""}`.trim() ||
-    "—"
-  );
+  const full = so.customers.full_name
+    ?? `${so.customers.first_name ?? ""} ${so.customers.last_name ?? ""}`.trim();
+  return full || "—";
 }
 
 function matchesSearch(so: SalesOrderFull, q: string): boolean {
