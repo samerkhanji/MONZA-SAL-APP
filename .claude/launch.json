@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "web"],
+      "port": 3000
+    },
+    {
+      "name": "web-localhost",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:localhost", "--prefix", "web"],
+      "port": 3000
+    },
+    {
+      "name": "supabase",
+      "runtimeExecutable": "supabase",
+      "runtimeArgs": ["start"],
+      "port": 54321
+    }
+  ]
+}

@@ -1,0 +1,137 @@
+{
+  "title": "MONZA CRM — Supabase",
+  "tags": ["monza", "supabase"],
+  "schemaVersion": 39,
+  "refresh": "1m",
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "type": "datasource",
+        "name": "DS_PROM",
+        "label": "Prometheus",
+        "query": "prometheus",
+        "current": {},
+        "hide": 0
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "DB CPU load (1m / 5m)",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "targets": [
+        { "expr": "node_load1{project=\"monza-crm\"}", "legendFormat": "1m", "refId": "A" },
+        { "expr": "node_load5{project=\"monza-crm\"}", "legendFormat": "5m", "refId": "B" }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [
+          { "color": "green", "value": null }, { "color": "orange", "value": 1 }, { "color": "red", "value": 2 }
+        ]}}
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Memory available",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "targets": [
+        {
+          "expr": "node_memory_MemAvailable_bytes{project=\"monza-crm\"} / node_memory_MemTotal_bytes{project=\"monza-crm\"}",
+          "legendFormat": "free",
+          "refId": "A"
+        }
+      ],
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "fieldConfig": {
+        "defaults": { "unit": "percentunit", "min": 0, "max": 1, "thresholds": { "mode": "absolute", "steps": [
+          { "color": "red", "value": null }, { "color": "orange", "value": 0.1 }, { "color": "green", "value": 0.3 }
+        ]}}
+      },
+      "options": { "colorMode": "value", "graphMode": "area" }
+    },
+    {
+      "type": "stat",
+      "title": "/data disk free",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "targets": [
+        {
+          "expr": "node_filesystem_avail_bytes{project=\"monza-crm\",mountpoint=\"/data\"} / node_filesystem_size_bytes{project=\"monza-crm\",mountpoint=\"/data\"}",
+          "legendFormat": "free",
+          "refId": "A"
+        }
+      ],
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "fieldConfig": {
+        "defaults": { "unit": "percentunit", "min": 0, "max": 1, "thresholds": { "mode": "absolute", "steps": [
+          { "color": "red", "value": null }, { "color": "orange", "value": 0.15 }, { "color": "green", "value": 0.3 }
+        ]}}
+      },
+      "options": { "colorMode": "value", "graphMode": "area" }
+    },
+    {
+      "type": "timeseries",
+      "title": "Disk IO (bytes/s)",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "targets": [
+        { "expr": "rate(node_disk_read_bytes_total{project=\"monza-crm\"}[5m])", "legendFormat": "read {{device}}", "refId": "A" },
+        { "expr": "rate(node_disk_written_bytes_total{project=\"monza-crm\"}[5m])", "legendFormat": "write {{device}}", "refId": "B" }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "fieldConfig": { "defaults": { "unit": "Bps" } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Postgres connections (open)",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "targets": [
+        { "expr": "sum(db_sql_connection_open{project=\"monza-crm\"}) by (service_type)", "legendFormat": "{{service_type}}", "refId": "A" }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [
+          { "color": "green", "value": null }, { "color": "orange", "value": 200 }, { "color": "red", "value": 300 }
+        ]}}
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "pgbouncer active client connections",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "targets": [
+        {
+          "expr": "sum(pgbouncer_pools_client_active_connections{project=\"monza-crm\"}) by (database)",
+          "legendFormat": "{{database}}",
+          "refId": "A"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 }
+    },
+    {
+      "type": "stat",
+      "title": "Auth users total",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "targets": [
+        { "expr": "max(auth_users_user_count{project=\"monza-crm\"})", "refId": "A" }
+      ],
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 16 },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "options": { "colorMode": "value" }
+    },
+    {
+      "type": "timeseries",
+      "title": "API latency p95 (ms)",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(db_sql_latency_milliseconds_bucket{project=\"monza-crm\"}[5m])) by (le, service_type))",
+          "legendFormat": "p95 {{service_type}}",
+          "refId": "A"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 18, "x": 6, "y": 16 },
+      "fieldConfig": { "defaults": { "unit": "ms" } }
+    }
+  ]
+}
