@@ -95,13 +95,21 @@ export async function updateSession(request: NextRequest) {
   // Bearer ADMIN_API_SECRET protects the API; page is reachable without app login (ops tool).
   const isAdminForceResetPage =
     pathname === "/admin/force-reset" || pathname.startsWith("/admin/force-reset/");
+  // PWA service worker fallback shell — must be reachable without auth so
+  // it can be pre-cached on SW install and served when the network is down.
+  const isPwaOfflineShell =
+    pathname === "/offline.html" ||
+    pathname === "/offline" ||
+    pathname === "/sw.js" ||
+    pathname === "/manifest.json";
   const isPublicPage =
     isLoginPage ||
     isRootPage ||
     isAuthCallbackPage ||
     isAuthConfirmPage ||
     isResetPasswordPage ||
-    isAdminForceResetPage;
+    isAdminForceResetPage ||
+    isPwaOfflineShell;
 
   if (!user && !isPublicPage) {
     const url = request.nextUrl.clone();
