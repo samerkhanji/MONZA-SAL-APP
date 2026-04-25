@@ -479,6 +479,10 @@ export interface JobPart {
   note: string | null;
   created_by: string | null;
   created_at: string;
+  unit_cost_snapshot?: number | null;
+  currency_snapshot?: string | null;
+  returned_at?: string | null;
+  returned_quantity?: number | null;
 }
 
 export interface JobDocument {

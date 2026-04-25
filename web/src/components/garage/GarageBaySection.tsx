@@ -17,7 +17,8 @@ import { AssignJobToBayDialog } from "@/components/garage/AssignJobToBayDialog";
 import { ManageBaysDialog } from "@/components/garage/ManageBaysDialog";
 import { ReleaseBayMenu } from "@/components/garage/ReleaseBayMenu";
 import { useUser } from "@/lib/contexts/UserContext";
-import { Settings2 } from "lucide-react";
+import { Settings2, ScanLine } from "lucide-react";
+import { ScannerDialog } from "@/components/scanner/ScannerDialog";
 
 interface JobInBay extends GarageJob {
   cars?: {
@@ -59,6 +60,30 @@ export function GarageBaySection({ onRefreshJobs }: { onRefreshJobs: () => void 
 
   const [assignBay, setAssignBay] = useState<GarageBay | null>(null);
   const [manageOpen, setManageOpen] = useState(false);
+  const [scanBay, setScanBay] = useState<GarageBay | null>(null);
+
+  const handleScanIntoBay = useCallback(
+    async (vin: string) => {
+      if (!scanBay) return;
+      const trimmed = vin.trim().toUpperCase();
+      if (!trimmed) return;
+      const { error } = await supabase.rpc("scan_vin_to_bay", {
+        p_vin: trimmed,
+        p_bay_id: scanBay.id,
+      });
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      toast.success(`VIN …${trimmed.slice(-8)} parked in ${scanBay.name}`);
+      setScanBay(null);
+      void load();
+      onRefreshJobs();
+    },
+    // load is created below - safe to omit; we capture supabase + scanBay
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [scanBay, supabase, onRefreshJobs]
+  );
 
   const load = useCallback(async () => {
     const { data: bayRows, error: bayErr } = await supabase
@@ -256,15 +281,27 @@ export function GarageBaySection({ onRefreshJobs }: { onRefreshJobs: () => void 
                             </p>
                           )}
                           {canManageBays && (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="secondary"
-                              className="mt-auto w-full"
-                              onClick={() => setAssignBay(bay)}
-                            >
-                              Assign car
-                            </Button>
+                            <div className="mt-auto flex flex-col gap-2">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => setAssignBay(bay)}
+                              >
+                                Assign car
+                              </Button>
+                              {!isBattery && (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => setScanBay(bay)}
+                                >
+                                  <ScanLine className="mr-2 size-4" />
+                                  Scan VIN
+                                </Button>
+                              )}
+                            </div>
                           )}
                         </>
                       ) : (
@@ -338,6 +375,15 @@ export function GarageBaySection({ onRefreshJobs }: { onRefreshJobs: () => void 
           void load();
           onRefreshJobs();
         }}
+      />
+
+      <ScannerDialog
+        open={!!scanBay}
+        onClose={() => setScanBay(null)}
+        onScan={handleScanIntoBay}
+        scanType="vin"
+        title={scanBay ? `Scan VIN into ${scanBay.name}` : "Scan VIN"}
+        placeholder="Scan or type VIN..."
       />
     </section>
   );

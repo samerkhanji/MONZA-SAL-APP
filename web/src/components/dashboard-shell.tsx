@@ -115,6 +115,12 @@ const BASE_NAV_ITEMS: Array<{
         tourId: "nav-garage-history",
       },
       {
+        href: "/garage/efficiency",
+        label: "Efficiency",
+        icon: BarChart3,
+        tourId: "nav-garage-efficiency",
+      },
+      {
         href: "/garage/settings",
         label: "Workflow setup",
         icon: Settings,
@@ -146,6 +152,7 @@ function getPageTitle(pathname: string): string {
   if (pathname.startsWith("/garage/settings")) return "Garage Workflow";
   if (pathname.startsWith("/garage/inventory")) return "Parts Inventory";
   if (pathname.startsWith("/garage/history")) return "Garage History";
+  if (pathname.startsWith("/garage/efficiency")) return "Garage Efficiency";
   if (pathname.startsWith("/garage")) return "Garage";
   if (pathname.startsWith("/settings")) return "Settings";
   return "Monza S.A.L.";
@@ -247,6 +254,10 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               return ["owner", "assistant", "garage_manager", "sales_ops"].includes(
                 appRole
               );
+            if (child.href === "/garage/efficiency")
+              return ["owner", "assistant", "garage_manager", "hybrid"].includes(
+                appRole
+              );
             if (child.href === "/garage/tasks")
               return ["owner", "assistant", "garage_manager", "garage_staff"].includes(
                 appRole
@@ -321,6 +332,10 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                   {item.children!.filter((child) => {
                     if (child.href === "/garage/inventory") return canSeePartsInventory;
                     if (child.href === "/garage/history") return canSeeGarageJobs;
+                    if (child.href === "/garage/efficiency")
+                      return ["owner", "assistant", "garage_manager", "hybrid"].includes(
+                        appRole ?? ""
+                      );
                     if (child.href === "/garage/tasks") return canSeeGarageJobs;
                     if (child.href === "/garage/settings")
                       return (

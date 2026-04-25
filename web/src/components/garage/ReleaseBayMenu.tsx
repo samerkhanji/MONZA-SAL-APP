@@ -58,7 +58,7 @@ export function ReleaseBayMenu({
   bayId,
   onReleased,
 }: {
-  bayId: number;
+  bayId: string | number;
   onReleased: () => void;
 }) {
   const supabase = createClient();

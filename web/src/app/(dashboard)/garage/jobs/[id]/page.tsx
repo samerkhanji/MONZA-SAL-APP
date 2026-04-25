@@ -143,10 +143,26 @@ export default function JobDetailPage() {
   async function fetchParts() {
     const { data } = await supabase
       .from("job_parts")
-      .select("*, parts:part_id(part_name, oe_number, unit_cost, currency)")
+      .select(
+        "id, job_id, part_id, quantity, note, created_by, created_at, unit_cost_snapshot, currency_snapshot, returned_at, returned_quantity, parts:part_id(part_name, oe_number, unit_cost, currency)"
+      )
       .eq("job_id", id)
       .order("created_at", { ascending: false });
-    setParts((data as JobPartWithPart[]) ?? []);
+    setParts((data as unknown as JobPartWithPart[]) ?? []);
+  }
+
+  async function handleReturnPart(jobPartId: string, partName: string) {
+    const ok = window.confirm(`Return ${partName} to stock?`);
+    if (!ok) return;
+    const { error } = await supabase.rpc("return_part_from_job", {
+      p_job_part_id: jobPartId,
+    });
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success(`${partName} returned to stock`);
+    fetchParts();
   }
 
   useEffect(() => {
@@ -188,7 +204,7 @@ export default function JobDetailPage() {
     }
     setPartSubmitting(true);
     const { data: { user } } = await supabase.auth.getUser();
-    const { error } = await supabase.rpc("use_part_on_job", {
+    const { error } = await supabase.rpc("apply_part_to_job", {
       p_job_id: job.id,
       p_part_id: selectedPartId,
       p_quantity: qty,
@@ -280,10 +296,9 @@ export default function JobDetailPage() {
   }
 
   const totalPartsCost = parts.reduce((sum, p) => {
-    const part = p.parts;
-    const cost = part?.unit_cost ?? 0;
-    const qty = p.quantity;
-    return sum + cost * qty;
+    if (p.returned_at) return sum;
+    const cost = p.unit_cost_snapshot ?? p.parts?.unit_cost ?? 0;
+    return sum + cost * p.quantity;
   }, 0);
 
   if (loading || !job) {
@@ -589,23 +604,50 @@ export default function JobDetailPage() {
             <p className="text-muted-foreground">No parts used yet.</p>
           ) : (
             <div className="space-y-2">
-              <div className="grid grid-cols-4 gap-2 text-sm font-medium text-muted-foreground">
+              <div className="grid grid-cols-6 gap-2 text-sm font-medium text-muted-foreground">
                 <span>Part Name</span>
                 <span>OE Number</span>
-                <span>Quantity</span>
+                <span>Qty</span>
+                <span>Unit cost</span>
                 <span>Note</span>
+                <span className="text-right">Action</span>
               </div>
-              {parts.map((p) => (
-                <div
-                  key={p.id}
-                  className="grid grid-cols-4 gap-2 rounded border p-2 text-sm"
-                >
-                  <span>{p.parts?.part_name ?? "—"}</span>
-                  <span className="font-mono">{p.parts?.oe_number ?? "—"}</span>
-                  <span>{p.quantity}</span>
-                  <span>{p.note ?? "—"}</span>
-                </div>
-              ))}
+              {parts.map((p) => {
+                const cost = p.unit_cost_snapshot ?? p.parts?.unit_cost ?? null;
+                const ccy = p.currency_snapshot ?? p.parts?.currency ?? "";
+                const returned = !!p.returned_at;
+                return (
+                  <div
+                    key={p.id}
+                    className={`grid grid-cols-6 gap-2 rounded border p-2 text-sm ${
+                      returned ? "opacity-60 line-through" : ""
+                    }`}
+                  >
+                    <span>{p.parts?.part_name ?? "—"}</span>
+                    <span className="font-mono">{p.parts?.oe_number ?? "—"}</span>
+                    <span>{p.quantity}</span>
+                    <span>
+                      {cost != null ? `${cost.toFixed(2)} ${ccy}` : "—"}
+                    </span>
+                    <span>{p.note ?? "—"}</span>
+                    <span className="flex justify-end">
+                      {canManageGarage && !returned ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            handleReturnPart(p.id, p.parts?.part_name ?? "Part")
+                          }
+                        >
+                          Return
+                        </Button>
+                      ) : returned ? (
+                        <span className="text-xs text-muted-foreground">Returned</span>
+                      ) : null}
+                    </span>
+                  </div>
+                );
+              })}
               {totalPartsCost > 0 && (
                 <p className="mt-2 font-medium">
                   Total parts cost: {totalPartsCost.toFixed(2)}
