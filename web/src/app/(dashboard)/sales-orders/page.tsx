@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
+import { useDebouncedValue } from "@/lib/hooks/useDebouncedValue";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -60,10 +61,12 @@ interface SalesOrderFull {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  active: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
-  completed: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
+  draft:     "bg-slate-100 text-slate-700 dark:bg-slate-900 dark:text-slate-300",
+  reserved:  "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300",
+  confirmed: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
+  paid:      "bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300",
+  delivered: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
   cancelled: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
-  reserved: "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300",
 };
 
 function customerName(so: SalesOrderFull): string {
@@ -94,6 +97,7 @@ export default function SalesOrdersPage() {
   const [orders, setOrders] = useState<SalesOrderFull[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search, 250);
   const [statusFilter, setStatusFilter] = useState("all");
 
   const supabase = createClient();
@@ -126,11 +130,11 @@ export default function SalesOrdersPage() {
 
   const filtered = useMemo(() => {
     return orders.filter((so) => {
-      if (!matchesSearch(so, search)) return false;
+      if (!matchesSearch(so, debouncedSearch)) return false;
       if (statusFilter !== "all" && so.status !== statusFilter) return false;
       return true;
     });
-  }, [orders, search, statusFilter]);
+  }, [orders, debouncedSearch, statusFilter]);
 
   const totalRevenue = useMemo(
     () =>
@@ -216,9 +220,14 @@ export default function SalesOrdersPage() {
         </Card>
         <Card>
           <CardContent className="pt-4">
-            <p className="text-muted-foreground text-sm">Active / completed</p>
+            <p className="text-muted-foreground text-sm">In progress</p>
             <p className="text-2xl font-semibold">
-              {filtered.filter((s) => s.status === "active" || s.status === "completed").length}
+              {filtered.filter((s) =>
+                s.status === "draft" ||
+                s.status === "reserved" ||
+                s.status === "confirmed" ||
+                s.status === "paid"
+              ).length}
             </p>
           </CardContent>
         </Card>
@@ -254,9 +263,11 @@ export default function SalesOrdersPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All statuses</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="draft">Draft</SelectItem>
                 <SelectItem value="reserved">Reserved</SelectItem>
+                <SelectItem value="confirmed">Confirmed</SelectItem>
+                <SelectItem value="paid">Paid</SelectItem>
+                <SelectItem value="delivered">Delivered</SelectItem>
                 <SelectItem value="cancelled">Cancelled</SelectItem>
               </SelectContent>
             </Select>
@@ -289,9 +300,7 @@ export default function SalesOrdersPage() {
                       <TableRow
                         key={so.id}
                         className="cursor-pointer hover:bg-muted/40"
-                        onClick={() => {
-                          if (car?.vin) router.push(`/cars/${encodeURIComponent(car.vin)}`);
-                        }}
+                        onClick={() => router.push(`/sales-orders/${so.id}`)}
                       >
                         <TableCell className="font-medium">
                           {car

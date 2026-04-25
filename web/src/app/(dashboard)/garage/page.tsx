@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
+import { useDebouncedValue } from "@/lib/hooks/useDebouncedValue";
 import { canPerform } from "@/lib/permissions";
 import type { GarageJob } from "@/types/database";
 import {
@@ -77,6 +78,7 @@ export default function GarageJobsPage() {
   const [jobs, setJobs] = useState<JobWithCar[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search, 200);
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
   useEffect(() => {
@@ -223,7 +225,7 @@ export default function GarageJobsPage() {
   }, [jobs]);
 
   const filteredJobs = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = debouncedSearch.trim().toLowerCase();
     return jobs.filter((j) => {
       if (statusFilter !== "all" && j.status !== statusFilter) return false;
       if (priorityFilter !== "all" && j.priority !== priorityFilter) return false;
@@ -245,7 +247,7 @@ export default function GarageJobsPage() {
       }
       return true;
     });
-  }, [jobs, search, statusFilter, priorityFilter]);
+  }, [jobs, debouncedSearch, statusFilter, priorityFilter]);
 
   const sortedJobs = useMemo(() => {
     return [...filteredJobs].sort((a, b) => {

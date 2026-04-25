@@ -6,6 +6,7 @@ import { ThemeToaster } from "@/components/theme-toaster";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
 import { AbortErrorHandler } from "@/components/AbortErrorHandler";
 import { DevHostBanner } from "@/components/dev-host-banner";
+import { GlobalKeyboardShortcuts } from "@/components/GlobalKeyboardShortcuts";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 
@@ -65,6 +66,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <ThemeProvider>
+          <GlobalKeyboardShortcuts />
           <AbortErrorHandler />
           {children}
           <ThemeToaster />

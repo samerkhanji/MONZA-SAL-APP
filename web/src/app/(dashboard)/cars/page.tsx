@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { MoreHorizontal, FileText, ScanLine, FileSpreadsheet } from "lucide-react";
 import { useUser } from "@/lib/contexts/UserContext";
+import { useDebouncedValue } from "@/lib/hooks/useDebouncedValue";
 import type { CarDisplay } from "@/types/database";
 import {
   CAR_STATUS_LABELS,
@@ -353,6 +354,8 @@ export default function CarsListPage() {
   const [pendingDeletes, setPendingDeletes] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  // Debounce so the 23-column compareInventoryRows sort doesn't run on every keystroke.
+  const debouncedSearch = useDebouncedValue(search, 250);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [locationFilter, setLocationFilter] = useState<string>("all");
 
@@ -508,14 +511,14 @@ export default function CarsListPage() {
 
   const filteredCars = useMemo(() => {
     return cars.filter((car) => {
-      if (!matchesSearch(car, search)) return false;
+      if (!matchesSearch(car, debouncedSearch)) return false;
       if (statusFilter !== "all" && car.status !== statusFilter) return false;
       if (locationFilter !== "all" && car.location_type !== locationFilter)
         return false;
       if (brandFilter !== "all" && car.brand !== brandFilter) return false;
       return true;
     });
-  }, [cars, search, statusFilter, locationFilter, brandFilter]);
+  }, [cars, debouncedSearch, statusFilter, locationFilter, brandFilter]);
 
   const sortedCars = useMemo(() => {
     if (!sortKey) return filteredCars;

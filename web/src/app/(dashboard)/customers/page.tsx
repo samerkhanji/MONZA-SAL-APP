@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { MoreHorizontal } from "lucide-react";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
+import { useDebouncedValue } from "@/lib/hooks/useDebouncedValue";
 import type { CustomerDisplay } from "@/types/database";
 import { LEAD_STATUS_LABELS, LEAD_SOURCE_LABELS } from "@/lib/constants/customers";
 import { Button } from "@/components/ui/button";
@@ -97,6 +98,7 @@ export default function CustomersPage() {
   const [loading, setLoading] = useState(true);
   const [soldLoading, setSoldLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search, 250);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [editCustomer, setEditCustomer] = useState<CustomerDisplay | null>(null);
@@ -160,12 +162,12 @@ export default function CustomersPage() {
 
   const filteredCustomers = useMemo(() => {
     return customers.filter((c) => {
-      if (!matchesSearch(c, search)) return false;
+      if (!matchesSearch(c, debouncedSearch)) return false;
       if (statusFilter !== "all" && c.lead_status !== statusFilter) return false;
       if (sourceFilter !== "all" && c.lead_source !== sourceFilter) return false;
       return true;
     });
-  }, [customers, search, statusFilter, sourceFilter]);
+  }, [customers, debouncedSearch, statusFilter, sourceFilter]);
 
   const leadCustomers = useMemo(
     () => customers.filter((c) => c.lead_status === "new_lead"),

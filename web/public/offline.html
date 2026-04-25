@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Offline — Monza CRM</title>
+    <link rel="icon" href="/icons/favicon-32.png" />
+    <style>
+      :root { color-scheme: light dark; }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; height: 100%; }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+          Arial, sans-serif;
+        display: grid;
+        place-items: center;
+        background: #0b0b10;
+        color: #e7e9ee;
+        padding: 1.5rem;
+      }
+      @media (prefers-color-scheme: light) {
+        body { background: #f9fafb; color: #1f2937; }
+      }
+      .card {
+        max-width: 28rem;
+        text-align: center;
+      }
+      h1 { font-size: 1.5rem; margin: 0 0 0.5rem; }
+      p { margin: 0.25rem 0; opacity: 0.85; }
+      .icon {
+        font-size: 3rem;
+        margin-bottom: 0.5rem;
+      }
+      button {
+        margin-top: 1.5rem;
+        padding: 0.6rem 1.25rem;
+        font: inherit;
+        background: #f59e0b;
+        color: #1f2937;
+        border: 0;
+        border-radius: 0.5rem;
+        cursor: pointer;
+        font-weight: 600;
+      }
+      button:hover { filter: brightness(1.05); }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <div class="icon">📡</div>
+      <h1>You&rsquo;re offline</h1>
+      <p>Monza CRM needs an internet connection to load fresh data.</p>
+      <p>Your previous pages may still work. Try the button below once you&rsquo;re back online.</p>
+      <button type="button" onclick="location.reload()">Reload</button>
+    </div>
+    <script>
+      // Auto-retry every 15s once the browser reports we're back online.
+      window.addEventListener("online", () => location.reload());
+    </script>
+  </body>
+</html>

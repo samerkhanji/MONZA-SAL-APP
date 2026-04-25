@@ -356,45 +356,51 @@ export default function JobDetailPage() {
         </p>
       )}
 
-      <div className="flex flex-wrap gap-2">
-        {(canEditJob || canGarageStaffEditLimited) && (
-          <>
-            {job.status !== "done" && job.status !== "cancelled" && (
-              <Button size="lg" onClick={() => setFinishOpen(true)}>
-                <Check className="mr-2 size-4" />
-                Complete Job
+      {/* Sticky timer + actions bar so a mechanic can always see clock state */}
+      <div className="sticky top-0 z-30 -mx-4 border-b border-border bg-background/95 px-4 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:-mx-6 sm:px-6">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex-1 min-w-[260px]">
+            <JobTimeEntryControls
+              jobId={job.id}
+              jobStatus={job.status}
+              actualHours={job.actual_hours ?? null}
+              canControl={canEditJob || canGarageStaffEditLimited}
+              carVinShort={
+                car?.vin
+                  ? car.vin.length >= 8
+                    ? `…${car.vin.slice(-8)}`
+                    : car.vin
+                  : job.is_battery_only
+                    ? "battery unit"
+                    : ""
+              }
+              onChanged={() => void fetchJob()}
+            />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {(canEditJob || canGarageStaffEditLimited) && (
+              <>
+                {job.status !== "done" && job.status !== "cancelled" && (
+                  <Button size="sm" onClick={() => setFinishOpen(true)}>
+                    <Check className="mr-2 size-4" />
+                    Complete
+                  </Button>
+                )}
+              </>
+            )}
+            {canDeleteJob && (
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => setDeleteOpen(true)}
+              >
+                <Trash2 className="mr-2 size-4" />
+                Delete
               </Button>
             )}
-          </>
-        )}
-        {canDeleteJob && (
-          <Button
-            size="lg"
-            variant="destructive"
-            onClick={() => setDeleteOpen(true)}
-          >
-            <Trash2 className="mr-2 size-4" />
-            Delete
-          </Button>
-        )}
+          </div>
+        </div>
       </div>
-
-      <JobTimeEntryControls
-        jobId={job.id}
-        jobStatus={job.status}
-        actualHours={job.actual_hours ?? null}
-        canControl={canEditJob || canGarageStaffEditLimited}
-        carVinShort={
-          car?.vin
-            ? car.vin.length >= 8
-              ? `…${car.vin.slice(-8)}`
-              : car.vin
-            : job.is_battery_only
-              ? "battery unit"
-              : ""
-        }
-        onChanged={() => void fetchJob()}
-      />
 
       {canManageGarage && (
         <Card>

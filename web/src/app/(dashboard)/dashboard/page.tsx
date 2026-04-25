@@ -19,6 +19,9 @@ import {
   RefreshCw,
   ChevronRight,
   ClipboardList,
+  DollarSign,
+  Clock,
+  AlertTriangle,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -192,10 +195,30 @@ export default function DashboardPage() {
   const [lowStockParts, setLowStockParts] = useState<LowStockPart[]>([]);
   const [activities, setActivities] = useState<CarEventRow[]>([]);
 
+  // Owner-priority KPIs (added April 2026 per audit).
+  // - cashCollected7d: paid installments + deposits in the last 7 days.
+  // - staleJobs: open garage jobs older than 7 days (pending or waiting_parts).
+  // - overdueInstallments: count + sum of installments past due_date.
+  const [cashCollected7d, setCashCollected7d] = useState<{ total: number; currency: string }>({
+    total: 0,
+    currency: "USD",
+  });
+  const [staleJobsCount, setStaleJobsCount] = useState<number>(0);
+  const [overdueInstallments, setOverdueInstallments] = useState<{ count: number; total: number }>({
+    count: 0,
+    total: 0,
+  });
+
   const fetchData = useCallback(async () => {
     if (shouldRedirect) return;
     const supabase = createClient();
     setLoading(true);
+
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+    const sevenDaysAgoDate = new Date(Date.now() - 7 * 24 * 3600 * 1000)
+      .toISOString()
+      .slice(0, 10);
+    const todayDate = new Date().toISOString().slice(0, 10);
 
     const [
       carsAllRes,
@@ -208,6 +231,10 @@ export default function DashboardPage() {
       partsRes,
       requestsRes,
       eventsRes,
+      paidInstallmentsRes,
+      paidDepositsRes,
+      staleJobsRes,
+      overdueInstallmentsRes,
     ] = await Promise.all([
       supabase
         .from("cars_display")
@@ -254,6 +281,31 @@ export default function DashboardPage() {
         .select("*, profiles:created_by(full_name), cars:car_id(vin, brand, model)")
         .order("created_at", { ascending: false })
         .limit(10),
+      // Cash collected (last 7d) — installments
+      supabase
+        .from("installment_payments")
+        .select("paid_amount")
+        .eq("status", "paid")
+        .gte("paid_at", sevenDaysAgo),
+      // Cash collected (last 7d) — deposits stamped via deposit_paid_at
+      supabase
+        .from("sales_orders")
+        .select("deposit_amount")
+        .gte("deposit_paid_at", sevenDaysAgo),
+      // Stale garage jobs (>7d open)
+      supabase
+        .from("garage_jobs")
+        .select("*", { count: "exact", head: true })
+        .is("deleted_at", null)
+        .in("status", ["pending", "waiting_parts"])
+        .lt("created_at", sevenDaysAgoDate),
+      // Overdue installments
+      supabase
+        .from("installment_payments")
+        .select("amount_due, paid_amount")
+        .neq("status", "paid")
+        .neq("status", "waived")
+        .lt("due_date", todayDate),
     ]);
 
     if (carsAllRes.error) {
@@ -395,6 +447,34 @@ export default function DashboardPage() {
       setActivities((eventsRes.data as CarEventRow[]) ?? []);
     }
 
+    // Cash collected (last 7 days): installment payments + deposits.
+    if (!paidInstallmentsRes.error && !paidDepositsRes.error) {
+      const installments = (paidInstallmentsRes.data ?? []) as { paid_amount: number | null }[];
+      const deposits = (paidDepositsRes.data ?? []) as { deposit_amount: number | null }[];
+      const total =
+        installments.reduce((s, r) => s + (Number(r.paid_amount) || 0), 0) +
+        deposits.reduce((s, r) => s + (Number(r.deposit_amount) || 0), 0);
+      setCashCollected7d({ total, currency: "USD" });
+    }
+
+    if (!staleJobsRes.error) {
+      setStaleJobsCount(staleJobsRes.count ?? 0);
+    }
+
+    if (!overdueInstallmentsRes.error) {
+      const rows = (overdueInstallmentsRes.data ?? []) as {
+        amount_due: number | null;
+        paid_amount: number | null;
+      }[];
+      setOverdueInstallments({
+        count: rows.length,
+        total: rows.reduce(
+          (s, r) => s + (Number(r.amount_due) || 0) - (Number(r.paid_amount) || 0),
+          0
+        ),
+      });
+    }
+
     setLastUpdated(new Date());
     setLoading(false);
   }, [
@@ -473,6 +553,45 @@ export default function DashboardPage() {
             bgColor:
               pendingRequestsCount > 0
                 ? "bg-violet-100 dark:bg-violet-900/30"
+                : "bg-muted/50",
+          },
+        ]
+      : []),
+    // Owner-priority KPIs — visible only to owner. These are the numbers
+    // a 7-employee dealership owner asks first thing in the morning.
+    ...(isOwner
+      ? [
+          {
+            label: "Cash collected (7d)",
+            value: `${Math.round(cashCollected7d.total).toLocaleString()} ${cashCollected7d.currency}`,
+            icon: DollarSign,
+            href: "/installments",
+            color: "text-emerald-600 dark:text-emerald-400",
+            bgColor: "bg-emerald-100 dark:bg-emerald-900/30",
+          },
+          {
+            label: "Stale jobs (>7d)",
+            value: staleJobsCount,
+            icon: Clock,
+            href: "/garage",
+            color: staleJobsCount > 0 ? "text-orange-600 dark:text-orange-400" : "text-muted-foreground",
+            bgColor: staleJobsCount > 0 ? "bg-orange-100 dark:bg-orange-900/30" : "bg-muted/50",
+          },
+          {
+            label: "Overdue installments",
+            value:
+              overdueInstallments.count === 0
+                ? "0"
+                : `${overdueInstallments.count} · ${Math.round(overdueInstallments.total).toLocaleString()} USD`,
+            icon: AlertTriangle,
+            href: "/installments",
+            color:
+              overdueInstallments.count > 0
+                ? "text-red-600 dark:text-red-400"
+                : "text-muted-foreground",
+            bgColor:
+              overdueInstallments.count > 0
+                ? "bg-red-100 dark:bg-red-900/30"
                 : "bg-muted/50",
           },
         ]
