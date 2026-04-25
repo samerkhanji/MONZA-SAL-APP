@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { addDays, format, isWithinInterval, parseISO, startOfDay } from "date-fns";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionUserAndRole } from "@/lib/server/session-app-role";
-import { CAR_STATUS_LABELS, type CarStatus } from "@/types/database";
+import { CAR_STATUS_EDITABLE, CAR_STATUS_LABELS } from "@/types/database";
 import {
   OverviewDashboard,
   type OwnerOverviewData,
@@ -25,6 +25,36 @@ const PRIORITY_LABELS: Record<string, string> = {
 
 type DashboardSupabase = Awaited<ReturnType<typeof createClient>>;
 
+const POSTGREST_PAGE = 1000;
+
+type CarOverviewRow = {
+  status: string;
+  warranty_vehicle_expiry?: string | null;
+  warranty_battery_expiry?: string | null;
+};
+
+/** Paginate past PostgREST max_rows so status / warranty aggregates match the full fleet. */
+async function fetchAllCarsDisplayForOverview(
+  supabase: DashboardSupabase
+): Promise<{ rows: CarOverviewRow[]; error: { message: string } | null }> {
+  const rows: CarOverviewRow[] = [];
+  let from = 0;
+  for (;;) {
+    const { data, error } = await supabase
+      .from("cars_display")
+      .select("status, warranty_vehicle_expiry, warranty_battery_expiry")
+      .is("deleted_at", null)
+      .order("id", { ascending: true })
+      .range(from, from + POSTGREST_PAGE - 1);
+    if (error) return { rows: [], error };
+    const batch = (data ?? []) as CarOverviewRow[];
+    rows.push(...batch);
+    if (batch.length < POSTGREST_PAGE) break;
+    from += POSTGREST_PAGE;
+  }
+  return { rows, error: null };
+}
+
 async function fetchOverviewData(supabase: DashboardSupabase): Promise<OwnerOverviewData> {
   const errors: string[] = [];
 
@@ -32,10 +62,14 @@ async function fetchOverviewData(supabase: DashboardSupabase): Promise<OwnerOver
   const weekEnd = format(addDays(new Date(), 7), "yyyy-MM-dd");
 
   const [
-    carsRes,
+    carsCountRes,
+    carsRowsResult,
     tasksRes,
     requestsRes,
-    requestsPendingCountRes,
+    deletePendingCountRes,
+    requestsMgmtPendingCountRes,
+    docAccessPendingCountRes,
+    pageAccessPendingCountRes,
     installmentsRes,
     partsRes,
     customersCountRes,
@@ -43,8 +77,9 @@ async function fetchOverviewData(supabase: DashboardSupabase): Promise<OwnerOver
   ] = await Promise.all([
     supabase
       .from("cars_display")
-      .select("status, warranty_vehicle_expiry, warranty_battery_expiry")
+      .select("id", { count: "exact", head: true })
       .is("deleted_at", null),
+    fetchAllCarsDisplayForOverview(supabase),
     supabase
       .from("garage_tasks")
       .select("id", { count: "exact", head: true })
@@ -54,9 +89,22 @@ async function fetchOverviewData(supabase: DashboardSupabase): Promise<OwnerOver
       .select("priority")
       .in("status", [...PENDING_REQUEST_STATUSES]),
     supabase
+      .from("delete_requests")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pending"),
+    supabase
       .from("requests")
       .select("id", { count: "exact", head: true })
-      .in("status", [...PENDING_REQUEST_STATUSES]),
+      .eq("status", "submitted")
+      .in("send_to", ["houssam", "kareem"]),
+    supabase
+      .from("document_access_requests")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pending"),
+    supabase
+      .from("page_access_requests")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pending"),
     supabase
       .from("installment_payments")
       .select(
@@ -82,18 +130,31 @@ async function fetchOverviewData(supabase: DashboardSupabase): Promise<OwnerOver
       .lt("quantity", 5)
       .order("quantity", { ascending: true })
       .limit(40),
-    supabase.from("customers").select("id", { count: "exact", head: true }),
+    supabase
+      .from("customers")
+      .select("id", { count: "exact", head: true })
+      .is("deleted_at", null),
     supabase
       .from("sales_orders")
       .select("id", { count: "exact", head: true })
       .neq("status", "cancelled"),
   ]);
 
-  if (carsRes.error) errors.push(`Cars: ${carsRes.error.message}`);
+  if (carsCountRes.error) errors.push(`Cars count: ${carsCountRes.error.message}`);
+  if (carsRowsResult.error) errors.push(`Cars: ${carsRowsResult.error.message}`);
   if (tasksRes.error) errors.push(`Garage tasks: ${tasksRes.error.message}`);
   if (requestsRes.error) errors.push(`Requests: ${requestsRes.error.message}`);
-  if (requestsPendingCountRes.error) {
-    errors.push(`Requests count: ${requestsPendingCountRes.error.message}`);
+  if (deletePendingCountRes.error) {
+    errors.push(`Delete requests count: ${deletePendingCountRes.error.message}`);
+  }
+  if (requestsMgmtPendingCountRes.error) {
+    errors.push(`Requests (mgmt queue) count: ${requestsMgmtPendingCountRes.error.message}`);
+  }
+  if (docAccessPendingCountRes.error) {
+    errors.push(`Document access requests count: ${docAccessPendingCountRes.error.message}`);
+  }
+  if (pageAccessPendingCountRes.error) {
+    errors.push(`Page access requests count: ${pageAccessPendingCountRes.error.message}`);
   }
   if (installmentsRes.error) errors.push(`Installments: ${installmentsRes.error.message}`);
   if (partsRes.error) errors.push(`Parts: ${partsRes.error.message}`);
@@ -114,12 +175,7 @@ async function fetchOverviewData(supabase: DashboardSupabase): Promise<OwnerOver
 
   const statusCounts: Record<string, number> = {};
   let warrantiesExpiringSoon = 0;
-  for (const row of carsRes.data ?? []) {
-    const r = row as {
-      status: string;
-      warranty_vehicle_expiry?: string | null;
-      warranty_battery_expiry?: string | null;
-    };
+  for (const r of carsRowsResult.rows) {
     const s = r.status;
     statusCounts[s] = (statusCounts[s] ?? 0) + 1;
     if (expiryInWindow(r.warranty_vehicle_expiry) || expiryInWindow(r.warranty_battery_expiry)) {
@@ -127,14 +183,21 @@ async function fetchOverviewData(supabase: DashboardSupabase): Promise<OwnerOver
     }
   }
 
-  const totalCars = carsRes.data?.length ?? 0;
+  const totalCars =
+    carsCountRes.count ??
+    (carsRowsResult.error ? 0 : carsRowsResult.rows.length);
 
-  const carStatusChart = (Object.keys(CAR_STATUS_LABELS) as CarStatus[])
-    .map((status) => ({
+  const pendingQueueTotal =
+    (deletePendingCountRes.count ?? 0) +
+    (requestsMgmtPendingCountRes.count ?? 0) +
+    (docAccessPendingCountRes.count ?? 0) +
+    (pageAccessPendingCountRes.count ?? 0);
+
+  /** All four lifecycle statuses (including zeros) — same source as totalCars / chart. */
+  const carStatusChart = CAR_STATUS_EDITABLE.map((status) => ({
       name: CAR_STATUS_LABELS[status],
       count: statusCounts[status] ?? 0,
     }))
-    .filter((d) => d.count > 0)
     .sort((a, b) => b.count - a.count);
 
   const priorityCounts: Record<string, number> = { low: 0, normal: 0, urgent: 0 };
@@ -204,7 +267,7 @@ async function fetchOverviewData(supabase: DashboardSupabase): Promise<OwnerOver
       totalCars,
       totalCustomers: customersCountRes.count ?? 0,
       activeSalesOrders: salesOrdersCountRes.count ?? 0,
-      pendingRequests: requestsPendingCountRes.count ?? 0,
+      pendingRequests: pendingQueueTotal,
       warrantiesExpiringSoon,
     },
     carStatusChart,

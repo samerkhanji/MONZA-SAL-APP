@@ -54,6 +54,7 @@ import {
   SECTION_LABELS,
 } from "@/lib/data-health-config";
 import { toast } from "sonner";
+import { VinScanButton } from "@/components/scanner/VinScanButton";
 
 type CarRow = {
   id: string;
@@ -939,14 +940,17 @@ export default function DataHealthPage() {
 
       {/* Search and filters */}
       <div className="flex flex-wrap items-center gap-4 rounded-lg border bg-muted/30 p-4">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search by VIN, customer name, phone..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
-          />
+        <div className="relative flex flex-1 min-w-[200px] items-center gap-1">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search by VIN, customer name, phone..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <VinScanButton onScan={(vin) => setSearchQuery(vin)} />
         </div>
         <div className="flex items-center gap-2">
           <Filter className="size-4 text-muted-foreground" />

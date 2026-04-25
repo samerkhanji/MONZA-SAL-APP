@@ -57,6 +57,7 @@ import {
   UserPlus,
 } from "lucide-react";
 import { LEAD_SOURCE_LABELS, LANGUAGE_LABELS } from "@/lib/constants/customers";
+import { VinScanButton } from "@/components/scanner/VinScanButton";
 
 interface PlanWithRelations extends PaymentPlan {
   customer: Customer | null;
@@ -2278,11 +2279,15 @@ export default function InstallmentsPage() {
                   </div>
                 </div>
                 <div className="flex items-center justify-between gap-2">
-                  <Input
-                    placeholder="Search sold cars by VIN or model..."
-                    value={linkCarSearch}
-                    onChange={(e) => void searchCarsForLinking(e.target.value)}
-                  />
+                  <div className="flex flex-1 items-center gap-1">
+                    <Input
+                      placeholder="Search sold cars by VIN or model..."
+                      value={linkCarSearch}
+                      onChange={(e) => void searchCarsForLinking(e.target.value)}
+                      className="flex-1"
+                    />
+                    <VinScanButton onScan={(vin) => void searchCarsForLinking(vin)} />
+                  </div>
                   <Button
                     variant="outline"
                     size="sm"

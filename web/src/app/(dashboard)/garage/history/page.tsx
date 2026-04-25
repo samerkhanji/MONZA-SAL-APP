@@ -25,6 +25,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { History, Lock } from "lucide-react";
 import { ExportButton } from "@/components/ExportButton";
 import type { ExportColumn } from "@/lib/exportToExcel";
+import { VinScanButton } from "@/components/scanner/VinScanButton";
 
 interface JobWithCar extends GarageJob {
   cars?: {
@@ -306,14 +307,17 @@ export default function GarageHistoryPage() {
             </button>
           ))}
         </div>
-        <Input
-          id="garage-history-search"
-          name="garage-history-search"
-          placeholder="Search VIN, title, assigned to..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="h-10 w-64"
-        />
+        <div className="flex items-center gap-1">
+          <Input
+            id="garage-history-search"
+            name="garage-history-search"
+            placeholder="Search VIN, title, assigned to..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-10 w-64"
+          />
+          <VinScanButton onScan={(vin) => setSearch(vin)} />
+        </div>
       </div>
 
       {loading ? (
