@@ -6,6 +6,7 @@ import { ThemeToaster } from "@/components/theme-toaster";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
 import { AbortErrorHandler } from "@/components/AbortErrorHandler";
 import { DevHostBanner } from "@/components/dev-host-banner";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -70,6 +71,7 @@ export default function RootLayout({
           <ServiceWorkerRegistration />
           {process.env.NODE_ENV === "development" ? <DevHostBanner /> : null}
         </ThemeProvider>
+        <SpeedInsights />
       </body>
     </html>
   );
