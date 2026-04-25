@@ -189,8 +189,8 @@ function computeChecklist(car: CarDisplay): ChecklistResult {
       label: "Warranty on Vehicle (Expiry)",
       section: "inspections",
       isFilled:
-        !!(car as any).warranty_vehicle_expiry ||
-        !!(car as any).warranty_expiry ||
+        !!car.warranty_vehicle_expiry ||
+        !!car.warranty_expiry ||
         !!car.warranty_monza_start_date,
       editTarget: { type: "edit", fieldId: "editWarrantyVehicle" },
     },
@@ -198,7 +198,7 @@ function computeChecklist(car: CarDisplay): ChecklistResult {
       key: "warranty_battery_expiry",
       label: "Warranty Battery Monza (Expiry)",
       section: "inspections",
-      isFilled: !!(car as any).warranty_battery_expiry,
+      isFilled: !!car.warranty_battery_expiry,
       editTarget: { type: "edit", fieldId: "editWarrantyBattery" },
     },
     {

@@ -1,5 +1,6 @@
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { type SupabaseClient } from "@supabase/supabase-js";
 import { withExponentialBackoff } from "@/lib/infrastructure/exponential-backoff";
+import { tryCreateAdminClient } from "@/lib/supabase/admin";
 import {
   fetchBillingAddons,
   getSupabaseProjectRef,
@@ -29,12 +30,9 @@ export type ComputeStatusPayload = {
   }>;
 };
 
-function createServiceClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
-  if (!url || !key) return null;
-  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
-}
+// Thin alias kept for local readability; the underlying factory is the
+// centralized one in `lib/supabase/admin.ts`.
+const createServiceClient = tryCreateAdminClient;
 
 export async function insertSystemEvent(
   event_type: string,

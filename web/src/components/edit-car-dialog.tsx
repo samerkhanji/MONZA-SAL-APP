@@ -126,21 +126,21 @@ export function EditCarDialog({
         (car as { warranty_battery_dms?: string | null }).warranty_battery_dms ?? ""
       );
       const vehicleExpiry =
-        (car as any).warranty_vehicle_expiry ??
-        (car as any).warranty_expiry ??
-        (car as any).warranty_monza_start_date ??
+        car.warranty_vehicle_expiry ??
+        car.warranty_expiry ??
+        car.warranty_monza_start_date ??
         "";
       setWarrantyVehicleExpiry(vehicleExpiry ?? "");
-      setWarrantyBatteryExpiry((car as any).warranty_battery_expiry ?? "");
+      setWarrantyBatteryExpiry(car.warranty_battery_expiry ?? "");
       setWarrantyMonzaStartDate(car.warranty_monza_start_date ?? "");
       setWarrantyVehicleKmLimit(
-        (car as any).warranty_vehicle_km_limit != null
-          ? String((car as any).warranty_vehicle_km_limit)
+        car.warranty_vehicle_km_limit != null
+          ? String(car.warranty_vehicle_km_limit)
           : ""
       );
       setWarrantyBatteryKmLimit(
-        (car as any).warranty_battery_km_limit != null
-          ? String((car as any).warranty_battery_km_limit)
+        car.warranty_battery_km_limit != null
+          ? String(car.warranty_battery_km_limit)
           : ""
       );
       setCustomsStatus(car.customs_status ?? "pending");

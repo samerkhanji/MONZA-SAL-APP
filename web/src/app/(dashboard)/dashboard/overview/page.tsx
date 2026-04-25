@@ -37,9 +37,13 @@ type CarOverviewRow = {
 async function fetchAllCarsDisplayForOverview(
   supabase: DashboardSupabase
 ): Promise<{ rows: CarOverviewRow[]; error: { message: string } | null }> {
+  // Hard cap so a runaway view can never spin this loop forever (H4).
+  // 50 * POSTGREST_PAGE rows is well above the realistic fleet size; if we
+  // ever hit it, surface an error rather than silently truncating.
+  const MAX_PAGES = 50;
   const rows: CarOverviewRow[] = [];
   let from = 0;
-  for (;;) {
+  for (let page = 0; page < MAX_PAGES; page++) {
     const { data, error } = await supabase
       .from("cars_display")
       .select("status, warranty_vehicle_expiry, warranty_battery_expiry")
@@ -49,10 +53,15 @@ async function fetchAllCarsDisplayForOverview(
     if (error) return { rows: [], error };
     const batch = (data ?? []) as CarOverviewRow[];
     rows.push(...batch);
-    if (batch.length < POSTGREST_PAGE) break;
+    if (batch.length < POSTGREST_PAGE) return { rows, error: null };
     from += POSTGREST_PAGE;
   }
-  return { rows, error: null };
+  return {
+    rows,
+    error: {
+      message: `cars_display exceeded ${MAX_PAGES * POSTGREST_PAGE} rows; aborting paginated fetch.`,
+    },
+  };
 }
 
 async function fetchOverviewData(supabase: DashboardSupabase): Promise<OwnerOverviewData> {

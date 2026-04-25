@@ -518,18 +518,19 @@ export default function InstallmentsPage() {
       exterior_color: string | null;
     }[] = [];
 
-    (data as any[]).forEach((row) => {
-      const car = row.cars as
-        | {
-            id?: string;
-            model?: string;
-            vin?: string;
-            model_year?: number | null;
-            exterior_color?: string | null;
-            status?: string;
-            client_name?: string | null;
-          }
-        | null;
+    type CarJoinRow = {
+      cars: {
+        id?: string;
+        model?: string;
+        vin?: string;
+        model_year?: number | null;
+        exterior_color?: string | null;
+        status?: string;
+        client_name?: string | null;
+      } | null;
+    };
+    ((data ?? []) as unknown as CarJoinRow[]).forEach((row) => {
+      const car = row.cars;
       if (!car?.id) return;
       if (
         !["sold", "inventory", "available", "reserved"].includes(

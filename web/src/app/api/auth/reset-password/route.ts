@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import {
   getPasswordResetRedirectUrlFromServer,
   validatePasswordResetRedirectUrl,
 } from "@/lib/auth-app-url";
-import { getSupabaseUrl } from "@/lib/supabase/public-env";
+import { tryCreateAdminClient } from "@/lib/supabase/admin";
 
 /**
  * Env (Vercel / server):
@@ -36,12 +35,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
-  const supabaseUrl = getSupabaseUrl();
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  const admin = tryCreateAdminClient();
   const resendKey = process.env.RESEND_API_KEY?.trim();
   const fromEmail = process.env.RESEND_FROM_EMAIL?.trim();
 
-  if (!supabaseUrl || !serviceKey || !resendKey || !fromEmail) {
+  if (!admin || !resendKey || !fromEmail) {
     console.error(
       "[api/auth/reset-password] Missing env: NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, RESEND_API_KEY, and/or RESEND_FROM_EMAIL"
     );
@@ -61,10 +59,6 @@ export async function POST(request: NextRequest) {
       { status: 503 }
     );
   }
-
-  const admin = createClient(supabaseUrl, serviceKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
 
   const { data, error: genError } = await admin.auth.admin.generateLink({
     type: "recovery",

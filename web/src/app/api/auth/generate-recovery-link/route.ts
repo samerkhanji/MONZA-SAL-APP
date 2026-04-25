@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import {
   getPasswordResetRedirectUrlFromServer,
   validatePasswordResetRedirectUrl,
 } from "@/lib/auth-app-url";
-import { getSupabaseUrl } from "@/lib/supabase/public-env";
+import { tryCreateAdminClient } from "@/lib/supabase/admin";
 
 /**
  * **Does not send email.** Returns GoTrue’s `action_link` for debugging or for a custom mailer /
@@ -19,9 +18,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
-  const supabaseUrl = getSupabaseUrl();
-  if (!serviceKey || !supabaseUrl) {
+  const admin = tryCreateAdminClient();
+  if (!admin) {
     return NextResponse.json({ error: "Server configuration error" }, { status: 503 });
   }
 
@@ -43,10 +41,6 @@ export async function POST(request: NextRequest) {
   if (invalid) {
     return NextResponse.json({ error: invalid }, { status: 400 });
   }
-
-  const admin = createClient(supabaseUrl, serviceKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
 
   const { data, error } = await admin.auth.admin.generateLink({
     type: "recovery",

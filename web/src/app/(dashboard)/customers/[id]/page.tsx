@@ -139,52 +139,76 @@ export default function CustomerDetailPage() {
       return;
     }
 
-    const enrichedOrders: EnrichedSaleOrder[] = await Promise.all(
-      (orders as unknown as EnrichedSaleOrder[]).map(async (order) => {
-        const carId = (order.cars as { id?: string } | null)?.id;
-        if (!carId) {
-          return { ...order, visits: 0, maintenance: 0, visitEvents: [] };
-        }
+    // C1: collapse the per-car N+1 into 2 batched queries.
+    const typedOrders = orders as unknown as EnrichedSaleOrder[];
+    const carIds: string[] = typedOrders
+      .map((o) => (o.cars as { id?: string } | null)?.id ?? null)
+      .filter((id): id is string => Boolean(id));
 
-        const [movedEventsRes, maintenanceRes] = await Promise.all([
-          supabase
-            .from("car_events")
-            .select("id, event_type, from_value, to_value, created_at")
-            .eq("car_id", carId)
-            .eq("event_type", "moved")
-            .order("created_at", { ascending: false }),
-          supabase
-            .from("car_events")
-            .select("*", { count: "exact", head: true })
-            .eq("car_id", carId)
-            .eq("event_type", "status_changed")
-            .eq("to_value", "service"),
-        ]);
+    type EventRow = {
+      id: string;
+      car_id: string;
+      event_type: string;
+      from_value: string | null;
+      to_value: string | null;
+      created_at: string;
+    };
 
-        const movedEvents = (movedEventsRes.data ?? []).map((ev: any) => ({
-          id: ev.id as string,
-          event_type: ev.event_type as string,
-          from_value: ev.from_value as string | null,
-          to_value: ev.to_value as string | null,
-          created_at: ev.created_at as string,
-        }));
+    let movedByCar = new Map<string, EventRow[]>();
+    let maintByCar = new Map<string, number>();
 
-        const visitEvents: VisitEvent[] = movedEvents.map((ev) => {
-          const toVal = (ev.to_value ?? "").toLowerCase();
-          const isGarage = toVal.includes("garage");
-          return { ...ev, visitType: isGarage ? "garage" : "company_entry" };
-        });
+    if (carIds.length > 0) {
+      const [movedRes, maintRes] = await Promise.all([
+        supabase
+          .from("car_events")
+          .select("id, car_id, event_type, from_value, to_value, created_at")
+          .in("car_id", carIds)
+          .eq("event_type", "moved")
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("car_events")
+          .select("car_id")
+          .in("car_id", carIds)
+          .eq("event_type", "status_changed")
+          .eq("to_value", "service"),
+      ]);
 
-        const garageCount = visitEvents.filter((v) => v.visitType === "garage").length;
+      for (const ev of (movedRes.data ?? []) as EventRow[]) {
+        const arr = movedByCar.get(ev.car_id) ?? [];
+        arr.push(ev);
+        movedByCar.set(ev.car_id, arr);
+      }
+      for (const ev of (maintRes.data ?? []) as { car_id: string }[]) {
+        maintByCar.set(ev.car_id, (maintByCar.get(ev.car_id) ?? 0) + 1);
+      }
+    }
 
+    const enrichedOrders: EnrichedSaleOrder[] = typedOrders.map((order) => {
+      const carId = (order.cars as { id?: string } | null)?.id;
+      if (!carId) {
+        return { ...order, visits: 0, maintenance: 0, visitEvents: [] };
+      }
+      const movedEvents = movedByCar.get(carId) ?? [];
+      const visitEvents: VisitEvent[] = movedEvents.map((ev) => {
+        const toVal = (ev.to_value ?? "").toLowerCase();
+        const isGarage = toVal.includes("garage");
         return {
-          ...order,
-          visits: garageCount,
-          maintenance: maintenanceRes.count ?? 0,
-          visitEvents,
+          id: ev.id,
+          event_type: ev.event_type,
+          from_value: ev.from_value,
+          to_value: ev.to_value,
+          created_at: ev.created_at,
+          visitType: isGarage ? "garage" : "company_entry",
         };
-      })
-    );
+      });
+      const garageCount = visitEvents.filter((v) => v.visitType === "garage").length;
+      return {
+        ...order,
+        visits: garageCount,
+        maintenance: maintByCar.get(carId) ?? 0,
+        visitEvents,
+      };
+    });
 
     setVehicles(enrichedOrders);
   }

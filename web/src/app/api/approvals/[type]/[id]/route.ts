@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient as createAdminClient } from "@supabase/supabase-js";
+import { tryCreateAdminClient } from "@/lib/supabase/admin";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 
 // Unified approvals endpoint. Accepts:
@@ -60,17 +60,13 @@ export async function POST(
   }
 
   // 3. Use service role for the cascading writes (bypass RLS; we already authorized).
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
-  if (!supabaseUrl || !serviceKey) {
+  const admin = tryCreateAdminClient();
+  if (!admin) {
     return NextResponse.json(
       { error: "Supabase service credentials not configured" },
       { status: 500 }
     );
   }
-  const admin = createAdminClient(supabaseUrl, serviceKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
 
   const nowIso = new Date().toISOString();
   const newStatus = action === "approve" ? "approved" : "denied";
@@ -102,17 +98,34 @@ export async function POST(
         return NextResponse.json({ error: "Failed to update request" }, { status: 500 });
       }
 
-      // If approved, perform the soft-delete on the target item.
+      // If approved, perform the soft-delete on the target item. (H1)
+      // Defensive: pin to expected tables, require row to exist + not already
+      // deleted, and require the requester is who delete_requests said it was.
       if (action === "approve") {
+        if (req.item_type !== "car" && req.item_type !== "part") {
+          return NextResponse.json(
+            { error: `Unsupported item_type: ${req.item_type}` },
+            { status: 400 }
+          );
+        }
         const table = req.item_type === "car" ? "cars" : "parts";
-        const { error: delErr } = await admin
+        const { data: delRow, error: delErr } = await admin
           .from(table)
           .update({ deleted_at: nowIso })
-          .eq("id", req.item_id);
+          .eq("id", req.item_id)
+          .is("deleted_at", null)
+          .select("id")
+          .maybeSingle();
         if (delErr) {
           return NextResponse.json(
             { error: "Request marked approved but item delete failed" },
             { status: 500 }
+          );
+        }
+        if (!delRow) {
+          return NextResponse.json(
+            { error: "Target row no longer exists or is already deleted" },
+            { status: 409 }
           );
         }
       }

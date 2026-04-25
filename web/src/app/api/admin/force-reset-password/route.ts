@@ -1,7 +1,6 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { getSupabaseUrl } from "@/lib/supabase/public-env";
+import { tryCreateAdminClient } from "@/lib/supabase/admin";
 
 function constantTimeEqualSecret(a: string, b: string): boolean {
   try {
@@ -38,9 +37,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const supabaseUrl = getSupabaseUrl();
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
-  if (!supabaseUrl || !serviceKey) {
+  const admin = tryCreateAdminClient();
+  if (!admin) {
     return NextResponse.json(
       { error: "Supabase service configuration is missing." },
       { status: 503 }
@@ -67,10 +65,6 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   }
-
-  const admin = createClient(supabaseUrl, serviceKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
 
   const perPage = 1000;
   let page = 1;

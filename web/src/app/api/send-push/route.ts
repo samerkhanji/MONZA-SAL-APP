@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import webpush from "web-push";
+import { tryCreateAdminClient } from "@/lib/supabase/admin";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
@@ -75,17 +75,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Only proceed with service role (we already authorized the caller).
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
-    if (!supabaseUrl || !serviceKey) {
+    const supabase = tryCreateAdminClient();
+    if (!supabase) {
       return NextResponse.json(
         { error: "Supabase service credentials not configured" },
         { status: 500 }
       );
     }
-    const supabase = createClient(supabaseUrl, serviceKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
 
     const { data: subs } = await supabase
       .from("push_subscriptions")

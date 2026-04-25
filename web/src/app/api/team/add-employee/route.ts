@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { tryCreateAdminClient } from "@/lib/supabase/admin";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 
 export async function POST(request: NextRequest) {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !serviceRoleKey) {
+  const adminClient = tryCreateAdminClient();
+  if (!adminClient) {
     return NextResponse.json(
       { error: "Server configuration error" },
       { status: 500 }
@@ -86,8 +84,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Clamp to allowed roles; silently default to assistant if unknown/owner supplied.
-    const user_role: string = ASSIGNABLE_ROLES.has(rawRole) ? rawRole : "assistant";
+    // Reject unknown / privilege-escalating roles outright (M2 — was silent
+    // downgrade-to-assistant, which masked client bugs and made auditing harder).
+    if (typeof rawRole !== "string" || !ASSIGNABLE_ROLES.has(rawRole)) {
+      return NextResponse.json(
+        {
+          error: `user_role must be one of: ${[...ASSIGNABLE_ROLES].join(", ")}. Owner accounts must be promoted manually.`,
+        },
+        { status: 400 }
+      );
+    }
+    const user_role: string = rawRole;
 
     // Sanitize capabilities: strip anything not in the allowlist.
     const capabilities: string[] = Array.isArray(rawCapabilities)
@@ -102,10 +109,6 @@ export async function POST(request: NextRequest) {
     const is_active_bool = typeof is_active === "boolean" ? is_active : true;
 
     const tempPassword = crypto.randomUUID() + "A1!";
-
-    const adminClient = createClient(supabaseUrl, serviceRoleKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
 
     const { data: authUser, error: authError } = await adminClient.auth.admin.createUser({
       email,
@@ -123,11 +126,10 @@ export async function POST(request: NextRequest) {
     });
 
     if (authError) {
-      console.error("[add-employee] auth.admin.createUser failed:", {
-        message: authError.message,
-        code: (authError as { code?: string }).code,
-        status: (authError as { status?: number }).status,
-      });
+      // H3: do NOT log Supabase auth error details to console — they leak
+      // user-enumeration signal (status 422 vs 400 etc.) into shared logs.
+      // Surface a generic message; the caller already gets the original
+      // Supabase message in the JSON response if they're authorized.
       return NextResponse.json(
         { error: authError.message },
         { status: 400 }
@@ -153,7 +155,6 @@ export async function POST(request: NextRequest) {
       .upsert(profileData, { onConflict: "id" });
 
     if (profileError) {
-      console.error("[add-employee] profiles upsert failed:", profileError.message);
       return NextResponse.json(
         { error: profileError.message },
         { status: 400 }

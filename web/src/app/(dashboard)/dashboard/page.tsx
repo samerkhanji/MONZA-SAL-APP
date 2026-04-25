@@ -128,6 +128,11 @@ function formatActivityMessage(ev: CarEventRow): string {
     case "note_added":
       return `${user} added a note on ${carLabel}`;
     default:
+      // M3: surface unmapped event types so we notice schema drift instead
+      // of silently rendering the raw enum string in the feed.
+      if (process.env.NODE_ENV !== "production") {
+        console.warn(`[activity-feed] unmapped event_type: ${ev.event_type}`);
+      }
       return `${user}: ${ev.event_type}`;
   }
 }
