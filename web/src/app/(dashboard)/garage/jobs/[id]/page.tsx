@@ -144,7 +144,7 @@ export default function JobDetailPage() {
     const { data } = await supabase
       .from("job_parts")
       .select(
-        "id, job_id, part_id, quantity, note, created_by, created_at, unit_cost_snapshot, currency_snapshot, returned_at, returned_quantity, parts:part_id(part_name, oe_number, unit_cost, currency)"
+        "id, job_id, part_id, quantity, note, created_by, created_at, unit_cost_snapshot, currency_snapshot, parts:part_id(part_name, oe_number, unit_cost, currency)"
       )
       .eq("job_id", id)
       .order("created_at", { ascending: false });
@@ -296,7 +296,6 @@ export default function JobDetailPage() {
   }
 
   const totalPartsCost = parts.reduce((sum, p) => {
-    if (p.returned_at) return sum;
     const cost = p.unit_cost_snapshot ?? p.parts?.unit_cost ?? 0;
     return sum + cost * p.quantity;
   }, 0);
@@ -615,13 +614,10 @@ export default function JobDetailPage() {
               {parts.map((p) => {
                 const cost = p.unit_cost_snapshot ?? p.parts?.unit_cost ?? null;
                 const ccy = p.currency_snapshot ?? p.parts?.currency ?? "";
-                const returned = !!p.returned_at;
                 return (
                   <div
                     key={p.id}
-                    className={`grid grid-cols-6 gap-2 rounded border p-2 text-sm ${
-                      returned ? "opacity-60 line-through" : ""
-                    }`}
+                    className="grid grid-cols-6 gap-2 rounded border p-2 text-sm"
                   >
                     <span>{p.parts?.part_name ?? "—"}</span>
                     <span className="font-mono">{p.parts?.oe_number ?? "—"}</span>
@@ -631,7 +627,7 @@ export default function JobDetailPage() {
                     </span>
                     <span>{p.note ?? "—"}</span>
                     <span className="flex justify-end">
-                      {canManageGarage && !returned ? (
+                      {canManageGarage && (
                         <Button
                           size="sm"
                           variant="outline"
@@ -641,9 +637,7 @@ export default function JobDetailPage() {
                         >
                           Return
                         </Button>
-                      ) : returned ? (
-                        <span className="text-xs text-muted-foreground">Returned</span>
-                      ) : null}
+                      )}
                     </span>
                   </div>
                 );
