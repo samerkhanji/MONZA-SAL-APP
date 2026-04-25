@@ -39,7 +39,21 @@
       "Bash(gh --version)",
       "mcp__4de16d43-081a-462b-9b29-67938c0847fa__get_deployment_build_logs",
       "Bash(npm install *)",
-      "Bash(npx --no-install next build)"
+      "Bash(npx --no-install next build)",
+      "Bash(vercel promote *)",
+      "mcp__4de16d43-081a-462b-9b29-67938c0847fa__get_deployment",
+      "Bash(python3 -c \"import json,sys;d=json.load\\(sys.stdin\\);print\\(json.dumps\\(d.get\\('scripts',{}\\),indent=2\\)\\)\" echo \"\" echo \"=== web/package.json scripts ===\" cat web/package.json)",
+      "Bash(python3 -c \"import json,sys;d=json.load\\(sys.stdin\\);print\\(json.dumps\\(d.get\\('scripts',{}\\),indent=2\\)\\)\" echo \"\" echo \"=== supabase config.toml \\(api port\\) ===\" grep -E \"^port\\\\s*=|^\\\\[\\(api|db|studio\\)\" supabase/config.toml)",
+      "Bash(curl -s -o /tmp/pat_test.json -w 'HTTP %{http_code}\\\\n' -H 'Authorization: Bearer sbp_REDACTED' https://api.supabase.com/v1/projects/okxpsvukzjjubinhamek/billing/addons)",
+      "Bash(python3 -c ' *)",
+      "Bash(rm -f /tmp/pat_test.json)",
+      "Bash(curl -s -o /c/Users/User/AppData/Local/Temp/pat_test.json -w 'HTTP %{http_code}\\\\n' -H 'Authorization: Bearer sbp_REDACTED' https://api.supabase.com/v1/projects/okxpsvukzjjubinhamek/billing/addons)",
+      "Bash(vercel redeploy *)",
+      "Bash(curl -s -o /tmp/k.json -w 'HTTP %{http_code}\\\\n' -H 'Authorization: Bearer sbp_REDACTED' 'https://api.supabase.com/v1/projects/okxpsvukzjjubinhamek/api-keys?reveal=true')",
+      "Bash(curl -s -o /dev/null -w 'HTTP %{http_code}\\\\n' https://okxpsvukzjjubinhamek.supabase.co/customer/v1/privileged/metrics)",
+      "Bash(curl -s -o /c/Users/User/AppData/Local/Temp/sbkeys.json -H 'Authorization: Bearer sbp_REDACTED' 'https://api.supabase.com/v1/projects/okxpsvukzjjubinhamek/api-keys?reveal=true')",
+      "Bash(fly version *)",
+      "Bash(fly auth *)"
     ]
   }
 }
