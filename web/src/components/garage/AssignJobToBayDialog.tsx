@@ -69,10 +69,13 @@ export function AssignJobToBayDialog({
   async function assign(jobId: string) {
     if (!bay) return;
     setAssigning(jobId);
-    const { error } = await supabase
-      .from("garage_jobs")
-      .update({ garage_bay_id: bay.id, updated_at: new Date().toISOString() })
-      .eq("id", jobId);
+    // Atomic: updates the job, flips bay.status='occupied',
+    // sets bay.current_job_id, sets bay_entered_at, and logs to
+    // bay_assignment_history. Server enforces battery-lab routing.
+    const { error } = await supabase.rpc("attach_job_to_bay", {
+      p_job_id: jobId,
+      p_bay_id: bay.id,
+    });
     setAssigning(null);
     if (error) {
       toast.error(error.message);

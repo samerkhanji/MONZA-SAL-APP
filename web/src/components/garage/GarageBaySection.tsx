@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { AssignJobToBayDialog } from "@/components/garage/AssignJobToBayDialog";
 import { ManageBaysDialog } from "@/components/garage/ManageBaysDialog";
+import { ReleaseBayMenu } from "@/components/garage/ReleaseBayMenu";
 import { useUser } from "@/lib/contexts/UserContext";
 import { Settings2 } from "lucide-react";
 
@@ -308,6 +309,15 @@ export function GarageBaySection({ onRefreshJobs }: { onRefreshJobs: () => void 
                             <Button type="button" size="sm" variant="default" asChild>
                               <Link href={`/garage/jobs/${job.id}`}>View job</Link>
                             </Button>
+                            {canManageBays && (
+                              <ReleaseBayMenu
+                                bayId={bay.id}
+                                onReleased={() => {
+                                  void load();
+                                  onRefreshJobs();
+                                }}
+                              />
+                            )}
                           </div>
                         </>
                       )}
