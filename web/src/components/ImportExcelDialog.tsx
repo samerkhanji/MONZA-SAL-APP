@@ -2,7 +2,9 @@
 
 import { useState, useRef } from "react";
 import { toast } from "sonner";
-import * as XLSX from "xlsx";
+// @e965/xlsx: maintained fork shipping fixes for the proto-pollution +
+// ReDoS advisories upstream xlsx no longer patches on npm.
+import * as XLSX from "@e965/xlsx";
 import { createClient } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import {
