@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useUser } from "@/lib/contexts/UserContext";
+import { createClient } from "@/lib/supabase";
 
 /**
  * LogRocket SDK initialization for Monza CRM.
@@ -126,11 +127,17 @@ export function LogRocketInit() {
     if (!profile?.id) return;
 
     void (async () => {
+      // Email lives on auth.users, not on the profile row, so fetch it
+      // from the active session. Phone is intentionally not included.
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      const email = user?.email ?? "";
+
       const { default: LogRocket } = await import("logrocket");
       LogRocket.identify(profile.id, {
         name: profile.full_name ?? "",
+        email,
         role: profile.user_role ?? "unknown",
-        // Don't pass phone/email — minimize PII on identity payload.
       });
     })();
   }, [profile?.id, profile?.full_name, profile?.user_role]);

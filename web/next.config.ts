@@ -24,6 +24,12 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: webRoot,
   },
+  // Generate source maps for the production browser bundle so LogRocket
+  // can map session-replay stack traces back to readable lines. The
+  // postbuild script (scripts/upload-logrocket-sourcemaps.mjs) uploads
+  // the .map files to LogRocket and then strips them from .next/ so
+  // they aren't served publicly via the CDN.
+  productionBrowserSourceMaps: true,
   // Expose the Vercel commit SHA + ref to the client bundle as
   // NEXT_PUBLIC_RELEASE so LogRocket / Speed Insights can tag sessions
   // with the exact build that produced them.
