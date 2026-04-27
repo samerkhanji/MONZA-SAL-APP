@@ -9,6 +9,7 @@ import { SessionEnforcer } from "@/components/auth/SessionEnforcer";
 import { FirstLoginGuard } from "@/components/auth/FirstLoginGuard";
 import { OnboardingTour } from "@/components/OnboardingTour";
 import { ProfileActivityHeartbeat } from "@/components/ProfileActivityHeartbeat";
+import { LogRocketInit } from "@/components/LogRocketInit";
 
 export default function DashboardLayout({
   children,
@@ -18,6 +19,7 @@ export default function DashboardLayout({
   return (
     <UserProvider>
       <ClientOnly>
+        <LogRocketInit />
         <SessionEnforcer>
           <InstallProvider>
             <DashboardShell>

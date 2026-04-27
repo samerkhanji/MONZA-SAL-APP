@@ -24,6 +24,13 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: webRoot,
   },
+  // Expose the Vercel commit SHA + ref to the client bundle as
+  // NEXT_PUBLIC_RELEASE so LogRocket / Speed Insights can tag sessions
+  // with the exact build that produced them.
+  env: {
+    NEXT_PUBLIC_RELEASE:
+      process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.NEXT_PUBLIC_RELEASE ?? "",
+  },
 };
 
 export default nextConfig;
