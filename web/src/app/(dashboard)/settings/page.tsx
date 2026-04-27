@@ -35,6 +35,7 @@ import {
 import { EditTeamMemberDialog } from "@/components/settings/EditTeamMemberDialog";
 import { AddEmployeeDialog } from "@/components/settings/AddEmployeeDialog";
 import { ChangePasswordDialog } from "@/components/settings/ChangePasswordDialog";
+import { TwoFactorAuthSection } from "@/components/settings/TwoFactorAuthSection";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 import { getProfileFullName } from "@/lib/supabase-profile";
@@ -558,6 +559,7 @@ export default function SettingsPage() {
                   Change Password
                 </Button>
               </div>
+              <TwoFactorAuthSection />
               <div className="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                 <div className="min-w-0 flex-1 space-y-1">
                   <p className="font-medium">Language</p>

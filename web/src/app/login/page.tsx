@@ -75,10 +75,30 @@ function LoginForm() {
 
     markAuthSessionUnlocked();
 
-    // If an explicit redirectTo was provided, honor it.
+    // MFA gate: if the user has a verified TOTP factor, the session is at
+    // AAL1 and we redirect to /mfa to escalate to AAL2 before sending them
+    // anywhere sensitive. listFactors() works at AAL1.
+    let nextTarget: string | null = null;
     if (redirectParam) {
-      const target = redirectTo.startsWith("/") ? redirectTo : `/${redirectTo}`;
-      window.location.href = target;
+      nextTarget = redirectTo.startsWith("/") ? redirectTo : `/${redirectTo}`;
+    }
+
+    {
+      const { data: factorsRes } = await supabase.auth.mfa.listFactors();
+      const hasVerifiedTotp = (factorsRes?.totp ?? []).some(
+        (f) => f.status === "verified"
+      );
+      if (hasVerifiedTotp) {
+        const finalTarget = nextTarget ?? ""; // computed below if not provided
+        const url = `/mfa${finalTarget ? `?redirectTo=${encodeURIComponent(finalTarget)}` : ""}`;
+        window.location.href = url;
+        return;
+      }
+    }
+
+    // If an explicit redirectTo was provided, honor it.
+    if (nextTarget) {
+      window.location.href = nextTarget;
       return;
     }
 
