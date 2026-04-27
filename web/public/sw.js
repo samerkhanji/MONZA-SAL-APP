@@ -12,7 +12,7 @@
 // Bump CACHE_VERSION any time you ship a meaningful change to this file
 // or the offline fallback page so old SWs don't keep serving stale shells.
 
-const CACHE_VERSION = "monza-v3";
+const CACHE_VERSION = "monza-v4";
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 const OFFLINE_URL = "/offline.html";
