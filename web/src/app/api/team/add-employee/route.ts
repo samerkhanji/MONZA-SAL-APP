@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
       sales_ops: "sales",
       garage_manager: "garage_manager",
       garage_staff: "garage_manager",
-      khalil_hybrid: "assistant",
+      hybrid: "assistant",
       it: "assistant",
     };
     const profileData = {

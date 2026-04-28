@@ -32,7 +32,7 @@ type CapRow = {
 export default function GarageWorkflowSettingsPage() {
   const { appRole } = useUser();
   const canUsePage =
-    appRole === "owner" || appRole === "garage_manager" || appRole === "khalil_hybrid";
+    appRole === "owner" || appRole === "garage_manager" || appRole === "hybrid";
   const canManageTemplates = appRole === "owner" || appRole === "garage_manager";
   const isGm = appRole === "garage_manager";
   const supabase = createClient();

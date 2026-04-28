@@ -49,7 +49,7 @@ export async function GET() {
   }
 }
 
-/** PATCH: { resource_name, capacity } — owner / khalil_hybrid (any non‑negative); garage_manager +1 on listed resources only (not car_wash). */
+/** PATCH: { resource_name, capacity } — owner / hybrid (any non‑negative); garage_manager +1 on listed resources only (not car_wash). */
 export async function PATCH(req: Request) {
   try {
     const session = await getSessionUserAndRole();

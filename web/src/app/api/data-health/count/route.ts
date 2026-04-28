@@ -39,7 +39,7 @@ export async function GET() {
     jobsQuery = jobsQuery.eq("assigned_to", profile.id);
   }
   let reqQuery = supabase.from("requests").select("id, category, status, description, assigned_to");
-  if (appRole === "khalil_hybrid" && profile?.id) {
+  if (appRole === "hybrid" && profile?.id) {
     reqQuery = reqQuery.eq("assigned_to", profile.id);
   }
 

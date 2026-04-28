@@ -47,9 +47,9 @@ export function GarageBaySection({ onRefreshJobs }: { onRefreshJobs: () => void 
   const supabase = createClient();
   const { appRole, isOwner } = useUser();
   const canManageBays =
-    isOwner || appRole === "garage_manager" || appRole === "khalil_hybrid";
+    isOwner || appRole === "garage_manager" || appRole === "hybrid";
   const canSeeActiveTimers =
-    isOwner || appRole === "garage_manager" || appRole === "assistant" || appRole === "khalil_hybrid";
+    isOwner || appRole === "garage_manager" || appRole === "assistant" || appRole === "hybrid";
 
   const [bays, setBays] = useState<GarageBay[]>([]);
   const [jobsByBay, setJobsByBay] = useState<Record<string, JobInBay>>({});

@@ -33,5 +33,5 @@ export function isGarageMgmtRole(role: AppRole | null): boolean {
 
 /** Garage capacity PATCH + settings page (capacities); templates remain owner + garage_manager via RLS. */
 export function canEditGarageCapacities(role: AppRole | null): boolean {
-  return role === "owner" || role === "garage_manager" || role === "khalil_hybrid";
+  return role === "owner" || role === "garage_manager" || role === "hybrid";
 }

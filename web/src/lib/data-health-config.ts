@@ -52,7 +52,7 @@ export const DATA_HEALTH_SECTIONS_BY_ROLE: Record<AppRole, DataHealthSectionId[]
   ],
   garage_staff: ["garage_health"],
   it: ["software_health"],
-  khalil_hybrid: ["parts_health", "requests_health"],
+  hybrid: ["parts_health", "requests_health"],
 };
 
 export const ROLES_WITH_DATA_HEALTH_ACCESS: AppRole[] = [
@@ -62,7 +62,7 @@ export const ROLES_WITH_DATA_HEALTH_ACCESS: AppRole[] = [
   "garage_manager",
   "garage_staff",
   "it",
-  "khalil_hybrid",
+  "hybrid",
 ];
 
 export const SECTION_LABELS: Record<DataHealthSectionId, string> = {

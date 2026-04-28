@@ -199,14 +199,14 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           return [
             "owner",
             "assistant",
-            "khalil_hybrid",
+            "hybrid",
             "it",
             "garage_manager",
             "garage_staff",
             "sales_ops",
           ].includes(appRole);
         if (item.href === "/cars")
-          return ["owner", "assistant", "khalil_hybrid", "it", "sales_ops"].includes(
+          return ["owner", "assistant", "hybrid", "it", "sales_ops"].includes(
             appRole
           );
         if (item.href === "/customers")
@@ -217,7 +217,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           return [
             "owner",
             "assistant",
-            "khalil_hybrid",
+            "hybrid",
             "it",
             "garage_manager",
             "sales_ops",
@@ -233,7 +233,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               return [
                 "owner",
                 "assistant",
-                "khalil_hybrid",
+                "hybrid",
                 "it",
                 "garage_manager",
                 "garage_staff",
@@ -250,7 +250,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               return (
                 appRole === "owner" ||
                 appRole === "garage_manager" ||
-                appRole === "khalil_hybrid"
+                appRole === "hybrid"
               );
             return false;
           });
@@ -321,7 +321,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                       return (
                         appRole === "owner" ||
                         appRole === "garage_manager" ||
-                        appRole === "khalil_hybrid"
+                        appRole === "hybrid"
                       );
                     if (child.href === "/garage") return canSeeGarageJobs;
                     if (child.href === "/requests/pending") return canSeeSettings;

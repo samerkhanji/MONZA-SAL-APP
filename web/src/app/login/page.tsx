@@ -97,7 +97,7 @@ function LoginForm() {
       const ROLE_HOME_ROUTES: Record<string, string> = {
         owner: "/dashboard",
         assistant: "/assistant-dashboard",
-        khalil_hybrid: "/requests",
+        hybrid: "/requests",
         it: "/requests",
         garage_manager: "/garage",
         garage_staff: "/garage",
