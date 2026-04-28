@@ -26,6 +26,11 @@ jobs:
             echo "::error::GITLAB_TOKEN secret missing. Add it under Settings → Secrets → Actions."
             exit 1
           fi
-          git push --force-with-lease \
-            "https://oauth2:${GITLAB_TOKEN}@gitlab.com/skhanji55/monza-crm.git" \
-            HEAD:main
+          # Add GitLab as a remote and fetch its main, so --force-with-lease has
+          # a real reference to compare against (otherwise the lease check fails
+          # with "stale info" because the runner never knew gitlab/main).
+          git remote add gitlab "https://oauth2:${GITLAB_TOKEN}@gitlab.com/skhanji55/monza-crm.git"
+          git fetch --no-tags gitlab main
+          # Push with lease — refuses if gitlab/main moved since our fetch.
+          git push --force-with-lease=main:"$(git rev-parse refs/remotes/gitlab/main)" \
+            gitlab HEAD:main
