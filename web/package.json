@@ -39,12 +39,6 @@
     "web-push": "^3.6.7",
     "xlsx-js-style": "^1.2.0"
   },
-  "//overrides": "Pinned to block accidental downgrades by `npm audit fix --force`. Each `$pkg` references the version range in `dependencies` above, so normal upgrades still work.",
-  "overrides": {
-    "next": "$next",
-    "resend": "$resend",
-    "@vercel/speed-insights": "$@vercel/speed-insights"
-  },
   "devDependencies": {
     "@playwright/test": "^1.50.0",
     "@tailwindcss/postcss": "^4",
