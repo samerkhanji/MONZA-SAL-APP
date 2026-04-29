@@ -38,6 +38,13 @@ const CAPABILITY_LABELS: Record<UserCapability, string> = {
   vehicle_software: "Software",
   cashier: "Cashier",
   events_ops: "Events",
+  sales: "Sales",
+  inventory: "Inventory",
+  manage_team: "Manage Team",
+  edit_users: "Edit Users",
+  deactivate_users: "Deactivate Users",
+  view_reports: "View Reports",
+  data_health: "Data Health",
 };
 
 const ROLE_COLORS: Record<string, string> = {

@@ -22,18 +22,14 @@ describe("getAppRoleFromProfile", () => {
     expect(getAppRoleFromProfile(profile)).toBe("owner");
   });
 
-  it("falls back from legacy role field when user_role is missing", () => {
-    const owner = { role: "owner" } as any;
-    const garageManager = { role: "garage_manager" } as any;
-    const sales = { role: "sales" } as any;
-    const assistant = { role: "assistant" } as any;
-    const unknown = { role: "something_else" } as any;
-
-    expect(getAppRoleFromProfile(owner)).toBe("owner");
-    expect(getAppRoleFromProfile(garageManager)).toBe("garage_manager");
-    expect(getAppRoleFromProfile(sales)).toBe("sales_ops");
-    expect(getAppRoleFromProfile(assistant)).toBe("assistant");
-    expect(getAppRoleFromProfile(unknown)).toBeNull();
+  it("returns null when user_role is missing (legacy `role` column was dropped)", () => {
+    // The legacy `profiles.role` column was dropped in
+    // 20260420141019_drop_profiles_role_v2_20260420.sql, so the old
+    // fallback from `profile.role` was removed from
+    // getAppRoleFromProfile. Profiles without user_role now resolve
+    // to null and are denied at canAccessPage.
+    expect(getAppRoleFromProfile({ role: "owner" } as any)).toBeNull();
+    expect(getAppRoleFromProfile({} as any)).toBeNull();
   });
 });
 
@@ -177,3 +173,117 @@ describe("canPerform", () => {
   });
 });
 
+
+// ============================================================================
+// Phase 3 — capability-based permission tests
+// ============================================================================
+
+import {
+  type AppCapability,
+  APP_CAPABILITIES,
+  MODULE_CAPABILITY,
+  getCapabilitiesFromProfile,
+  hasCapability,
+  hasAnyCapability,
+  hasAllCapabilities,
+  canAccessModule,
+} from "@/lib/permissions";
+
+describe("getCapabilitiesFromProfile", () => {
+  it("returns empty array when profile is null", () => {
+    expect(getCapabilitiesFromProfile(null)).toEqual([]);
+  });
+
+  it("returns empty array when capabilities is missing", () => {
+    expect(getCapabilitiesFromProfile({ id: "x" } as any)).toEqual([]);
+  });
+
+  it("returns the array as-is when present", () => {
+    const profile = { id: "x", capabilities: ["garage", "sales"] } as any;
+    expect(getCapabilitiesFromProfile(profile)).toEqual(["garage", "sales"]);
+  });
+});
+
+describe("hasCapability", () => {
+  it("returns false for null profile", () => {
+    expect(hasCapability(null, "garage")).toBe(false);
+  });
+
+  it("returns true when capability is present", () => {
+    const profile = { id: "x", capabilities: ["garage"] } as any;
+    expect(hasCapability(profile, "garage")).toBe(true);
+  });
+
+  it("returns false when capability is absent", () => {
+    const profile = { id: "x", capabilities: ["sales"] } as any;
+    expect(hasCapability(profile, "garage")).toBe(false);
+  });
+});
+
+describe("hasAnyCapability", () => {
+  it("returns false for empty caps list", () => {
+    const profile = { id: "x", capabilities: ["garage"] } as any;
+    expect(hasAnyCapability(profile, [])).toBe(false);
+  });
+
+  it("returns true when any cap matches", () => {
+    const profile = { id: "x", capabilities: ["garage"] } as any;
+    expect(hasAnyCapability(profile, ["sales", "garage"])).toBe(true);
+  });
+
+  it("returns false when none match", () => {
+    const profile = { id: "x", capabilities: ["garage"] } as any;
+    expect(hasAnyCapability(profile, ["sales", "data_health"])).toBe(false);
+  });
+});
+
+describe("hasAllCapabilities", () => {
+  it("returns true when all caps present", () => {
+    const profile = { id: "x", capabilities: ["garage", "sales", "inventory"] } as any;
+    expect(hasAllCapabilities(profile, ["garage", "sales"])).toBe(true);
+  });
+
+  it("returns false when one is missing", () => {
+    const profile = { id: "x", capabilities: ["garage"] } as any;
+    expect(hasAllCapabilities(profile, ["garage", "sales"])).toBe(false);
+  });
+
+  it("returns true for empty caps (vacuously)", () => {
+    const profile = { id: "x", capabilities: [] } as any;
+    expect(hasAllCapabilities(profile, [])).toBe(true);
+  });
+});
+
+describe("canAccessModule", () => {
+  it("grants access when user has the module's capability", () => {
+    const profile = { id: "x", capabilities: ["garage"], user_role: "garage_staff" } as any;
+    expect(canAccessModule(profile, "garage_jobs")).toBe(true);
+  });
+
+  it("grants access via fallback role even without capability", () => {
+    const profile = { id: "x", capabilities: [], user_role: "owner" } as any;
+    expect(canAccessModule(profile, "garage_jobs", ["owner"])).toBe(true);
+  });
+
+  it("denies when neither capability nor fallback role matches", () => {
+    const profile = { id: "x", capabilities: ["sales"], user_role: "sales_ops" } as any;
+    expect(canAccessModule(profile, "garage_jobs", ["owner", "garage_manager"])).toBe(false);
+  });
+
+  it("returns false for null profile", () => {
+    expect(canAccessModule(null, "cars")).toBe(false);
+  });
+});
+
+describe("APP_CAPABILITIES + MODULE_CAPABILITY contracts", () => {
+  it("APP_CAPABILITIES has 11 entries (mirrors DB enum)", () => {
+    expect(APP_CAPABILITIES).toHaveLength(11);
+  });
+
+  it("MODULE_CAPABILITY values are all valid AppCapability", () => {
+    const caps = new Set<string>(APP_CAPABILITIES);
+    for (const [mod, cap] of Object.entries(MODULE_CAPABILITY)) {
+      expect(caps.has(cap)).toBe(true);
+    }
+  });
+});

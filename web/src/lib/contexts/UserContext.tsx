@@ -9,7 +9,11 @@ import {
 } from "react";
 import { createClient } from "@/lib/supabase";
 import { handleSessionExpiredError, isConnectionError } from "@/lib/auth-utils";
-import type { AppRole } from "@/lib/permissions";
+import type { AppRole, AppCapability } from "@/lib/permissions";
+import {
+  hasCapability as hasCapabilityFn,
+  hasAnyCapability as hasAnyCapabilityFn,
+} from "@/lib/permissions";
 import {
   canEditDmsWarrantyOnCar,
   canEditMonzaWarrantyOnCar,
@@ -23,11 +27,11 @@ export type UserRole =
   | "garage_manager"
   | "assistant";
 
-export type UserCapability =
-  | "garage"
-  | "vehicle_software"
-  | "cashier"
-  | "events_ops";
+/**
+ * Re-export from @/lib/permissions for components still importing the
+ * old name. Source of truth lives in permissions.ts.
+ */
+export type UserCapability = AppCapability;
 
 export interface UserProfile {
   id: string;
@@ -50,6 +54,9 @@ export interface UserContextType {
   connectionError: boolean;
   retryConnection: () => void;
   refreshProfile: () => Promise<void>;
+  /** Phase 3 — capability checks. Bound to current profile's capabilities. */
+  hasCapability: (cap: AppCapability) => boolean;
+  hasAnyCapability: (caps: AppCapability[]) => boolean;
   canEditInventory: boolean;
   canDelete: boolean;
   canSeeSettings: boolean;
@@ -91,6 +98,8 @@ const UserContext = createContext<UserContextType>({
   connectionError: false,
   retryConnection: () => {},
   refreshProfile: async () => {},
+  hasCapability: () => false,
+  hasAnyCapability: () => false,
   canEditInventory: false,
   canDelete: false,
   canSeeSettings: false,
@@ -313,6 +322,18 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     profile?.full_name
   );
 
+  // Capability-checking helpers bound to the current profile.
+  // Phase 3 callers can use `useUser().hasCapability("garage")` instead of
+  // hard-coding role lists, gradually replacing role-based gating.
+  const hasCapability = useCallback(
+    (cap: AppCapability) => hasCapabilityFn(profile, cap),
+    [profile]
+  );
+  const hasAnyCapability = useCallback(
+    (caps: AppCapability[]) => hasAnyCapabilityFn(profile, caps),
+    [profile]
+  );
+
   return (
     <UserContext.Provider
       value={{
@@ -321,6 +342,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         connectionError,
         retryConnection,
         refreshProfile,
+        hasCapability,
+        hasAnyCapability,
         canEditInventory,
         canDelete,
         canSeeSettings,

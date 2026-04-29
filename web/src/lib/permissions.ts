@@ -164,3 +164,128 @@ export function canPerform(
   return allowed.includes(role);
 }
 
+// ============================================================================
+// Capability-based permissions (Phase 3 — coexists with role-based above)
+//
+// Background: profiles.capabilities (user_capability[]) already exists in the
+// DB and is checked by some RLS policies (see has_capability() helper). The
+// frontend has been ignoring it and gating purely on user_role. This adds
+// capability-aware helpers so individual entities can be migrated to read
+// capabilities one-at-a-time without breaking the role-based code that
+// already works.
+//
+// Decision (2026-04-29): COARSE capability set. Each capability gates a
+// feature MODULE (cars, sales, garage, etc.). Fine-grained per-action
+// permissions remain on user_role via CRUD_PERMISSIONS above.
+// ============================================================================
+
+/** Mirrors public.user_capability enum (DB-side). */
+export type AppCapability =
+  | "garage"
+  | "vehicle_software"
+  | "cashier"
+  | "events_ops"
+  | "manage_team"
+  | "edit_users"
+  | "deactivate_users"
+  | "view_reports"
+  | "inventory"
+  | "sales"
+  | "data_health";
+
+/** All known capability values (use for type-safe lookups, dropdowns, etc). */
+export const APP_CAPABILITIES: readonly AppCapability[] = [
+  "garage",
+  "vehicle_software",
+  "cashier",
+  "events_ops",
+  "manage_team",
+  "edit_users",
+  "deactivate_users",
+  "view_reports",
+  "inventory",
+  "sales",
+  "data_health",
+] as const;
+
+/**
+ * Module → capability map. The capability that gates ACCESS to this module's
+ * pages and entities. Use with `hasCapability(profile, MODULE_CAPABILITY[mod])`.
+ *
+ * Owners and Garage Managers are "full access" by role, so they bypass these
+ * checks via canPerform() / role-based code. These mappings apply when role
+ * alone doesn't grant access.
+ */
+export const MODULE_CAPABILITY: Record<string, AppCapability> = {
+  cars: "inventory",
+  accessories: "inventory",
+  customers: "sales",
+  sales_orders: "sales",
+  test_drives: "sales",
+  installments: "cashier",
+  garage_jobs: "garage",
+  garage_tasks: "garage",
+  parts: "garage",
+  garage_history: "garage",
+  garage_efficiency: "view_reports",
+  data_health: "data_health",
+  team_management: "manage_team",
+  vehicle_software: "vehicle_software",
+  events: "events_ops",
+};
+
+/** Pull capabilities from a profile, defaulting to []. */
+export function getCapabilitiesFromProfile(
+  profile: UserProfile | null
+): AppCapability[] {
+  return (profile?.capabilities ?? []) as AppCapability[];
+}
+
+/** True if profile has the given capability. */
+export function hasCapability(
+  profile: UserProfile | null,
+  cap: AppCapability
+): boolean {
+  if (!profile) return false;
+  return getCapabilitiesFromProfile(profile).includes(cap);
+}
+
+/** True if profile has ANY of the given capabilities. */
+export function hasAnyCapability(
+  profile: UserProfile | null,
+  caps: AppCapability[]
+): boolean {
+  if (!profile || caps.length === 0) return false;
+  const userCaps = getCapabilitiesFromProfile(profile);
+  return caps.some((cap) => userCaps.includes(cap));
+}
+
+/** True if profile has ALL of the given capabilities. */
+export function hasAllCapabilities(
+  profile: UserProfile | null,
+  caps: AppCapability[]
+): boolean {
+  if (!profile) return false;
+  const userCaps = getCapabilitiesFromProfile(profile);
+  return caps.every((cap) => userCaps.includes(cap));
+}
+
+/**
+ * Combined check: passes if EITHER the role grants access (legacy)
+ * OR the user has the module's capability (new). Used during the gradual
+ * migration so existing UI that gates on role keeps working while
+ * capability-aware code can be added in parallel.
+ */
+export function canAccessModule(
+  profile: UserProfile | null,
+  module: keyof typeof MODULE_CAPABILITY,
+  fallbackRoles: AppRole[] = []
+): boolean {
+  if (!profile) return false;
+  const role = getAppRoleFromProfile(profile);
+  if (role && fallbackRoles.includes(role)) return true;
+  const cap = MODULE_CAPABILITY[module];
+  if (!cap) return false;
+  return hasCapability(profile, cap);
+}
+

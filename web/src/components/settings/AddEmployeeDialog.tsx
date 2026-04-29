@@ -28,8 +28,18 @@ const CAPABILITY_LABELS: Record<UserCapability, string> = {
   vehicle_software: "Software",
   cashier: "Cashier",
   events_ops: "Events",
+  sales: "Sales",
+  inventory: "Inventory",
+  manage_team: "Manage Team",
+  edit_users: "Edit Users",
+  deactivate_users: "Deactivate Users",
+  view_reports: "View Reports",
+  data_health: "Data Health",
 };
 
+// Capabilities surfaced in the Add Employee dialog UI. The remaining
+// capabilities (sales/inventory/manage_team/edit_users/deactivate_users/
+// view_reports/data_health) are admin-controlled and managed elsewhere.
 const CAPABILITIES: UserCapability[] = [
   "garage",
   "vehicle_software",
