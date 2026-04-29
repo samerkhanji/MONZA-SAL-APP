@@ -24,6 +24,9 @@ scripts/bulk-reset-passwords-report.csv
 *.tsbuildinfo
 web/.vercel
 
+# Claude Code per-machine settings (auto-generated, contains permission allowlists)
+.claude/settings.local.json
+
 # Optional: keep .env.example so others know what vars to set
 !.env.example
 .vercel
