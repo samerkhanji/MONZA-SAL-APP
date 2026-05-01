@@ -1,260 +1,229 @@
 # Monza CRM — Database Schema (Supabase)
 
-> This document summarizes the main tables, relationships, and security rules in the Monza CRM Supabase project. For exact definitions, see the SQL in `supabase/migrations/`.
+> Source of truth for the application's logical data model. Exact DDL lives in `supabase/migrations/`. Last refreshed after migration `068_lockdown_internal_definer_fns`.
 
 ---
 
 ## Overview
 
-- **Engine**: PostgreSQL (Supabase)
-- **Access**: Supabase REST, Realtime, and RPC
-- **Auth**: Supabase Auth (`auth.users`) + `profiles` table
-- **Security**: Row-Level Security (RLS) enabled on application tables
+- **Engine**: PostgreSQL 17 (Supabase project `okxpsvukzjjubinhamek`, region eu-central-1)
+- **Access**: Supabase REST, Realtime, RPC
+- **Auth**: Supabase Auth (`auth.users`) + `public.profiles`
+- **Security**: Row-Level Security (RLS) enabled on every application table; capability-based RPC guards via `_require_any_capability()`
 
 High-level domains:
 
-- **Inventory**: `cars`, `cars_display`, warranty and status fields
-- **CRM**: `customers`, `requests`
-- **Sales**: `sales_orders`, installments-related tables
-- **Garage**: `garage_jobs`, `parts_inventory`, movement/history tables
-- **Users / Roles**: `profiles`, capabilities, RLS policies
+- **Inventory** — `cars`, `cars_display`, `car_events`, `car_warranties`, `car_documents`
+- **CRM** — `customers`, `customers_display`, `customer_notes`, `customer_documents`, `customer_interactions`, `requests`
+- **Sales** — `sales_orders`, `payment_plans`, `installment_payments`, `test_drives`, `invoices`, `commissions`
+- **Garage** — `garage_jobs`, `garage_bays`, `garage_capacities`, `garage_tasks`, `garage_task_templates`, `parts`, `part_movements`, `job_parts`, `job_documents`, `job_time_entries`, `repair_proposals`, `repair_proposal_items`, `bay_assignment_history`, `garage_job_bay_context`, `task_timers`, `accessory_custom_tables`, `accessory_custom_items`
+- **Scheduling** — `appointments`, `tasks`
+- **Procurement** — `suppliers`
+- **Users / Roles** — `profiles` (RBAC: `user_role` + `user_capability[]`)
+- **Notifications & Audit** — `notifications`, `system_events`, `push_subscriptions`, `warranty_notifications_sent`, `service_day_notifications_sent`, `delete_requests`, `document_access_requests`, `page_access_requests`
+- **System** — `system_preferences`, `infrastructure_compute_target`
 
 ---
 
-## Core Tables
+## Enums
+
+| Enum | Values |
+|---|---|
+| `car_status` | inbound, in_stock, showroom, reserved, sold, delivered, service, sent_to_sub_dealer, demo, registered, under_registration, sent_to_customs, company_car, inventory, test_drive, available, scrapped |
+| `car_event_type` | created, moved, status_changed, battery_updated, pdi_updated, details_updated, note_added |
+| `car_document_type` | pdi, job_card |
+| `customs_status` | pending, in_progress, cleared, exempt |
+| `garage_task_status` | pending, in_progress, blocked, done, cancelled |
+| `installment_status` | upcoming, due, overdue, paid, waived |
+| `job_priority` | low, normal, urgent |
+| `job_status` | pending, in_progress, waiting_parts, done, cancelled |
+| `lead_source` | walk_in, phone, whatsapp, instagram, facebook, website, referral, event, other |
+| `lead_status` | new_lead, contacted, interested, test_drive, negotiation, converted, lost |
+| `location_type` | showroom1, showroom2, garage, storage, inventory |
+| `part_status` | in_stock, low_stock, out_of_stock, discontinued |
+| `payment_plan_status` | active, completed, defaulted, cancelled |
+| `payment_type` | full, installments |
+| `pdi_status` | pending, in_progress, done |
+| `sale_status` | reserved, draft, confirmed, paid, delivered, cancelled |
+| `shipping_status` | pending, in_transit, arrived_port, customs, ready, received |
+| `user_role` | owner, sales, garage_manager, assistant, khalil_hybrid, it, garage_staff, sales_ops, hybrid |
+| `user_capability` | garage, vehicle_software, cashier, events_ops, manage_team, edit_users, deactivate_users, view_reports, inventory, sales, data_health |
+
+---
+
+## Core tables
 
 ### `cars`
+Inventory: one row per physical vehicle (VIN unique).
 
-Represents each vehicle in Monza’s inventory.
-
-- **Key columns (partial)**:
-  - `id uuid PK`
-  - `vin text UNIQUE NOT NULL` — primary vehicle identifier
-  - `status car_status` — enum (`inbound`, `in_stock`, `showroom`, `reserved`, `sold`, `delivered`, `service`, `sent_to_sub_dealer`, `demo`, `registered`, `under_registration`, `sent_to_customs`, `company_car`)
-  - `location_type location_type` — enum (`showroom1`, `showroom2`, `garage`, `storage`, `inventory`)
-  - `location_slot text`
-  - `brand text`
-  - `model text`
-  - Warranty fields (vehicle & battery), customs fields
-  - **Legacy fallback fields**:
-    - `client_name text`
-    - `client_phone text`
-
-- **Invariants**:
-  - `vin` is globally unique.
-  - `client_name` and `client_phone` are **read-only legacy fields**; new flows must not write to them.
-  - Canonical customer linkage is via `sales_orders` (see below).
-
-- **Important relationships**:
-  - Referenced by `sales_orders.car_id`.
-  - Referenced by garage/job tables for service history.
-
----
+- `vin text unique not null`
+- `status car_status` — terminal states `delivered` and `scrapped` (trigger 063)
+- `location_type location_type`, `location_slot text`
+- `brand`, `model`, `model_year`, `exterior_color`, `interior_color`, `is_erev`, `ev_km`, `motor_km`
+- `price numeric`, `price_currency text default 'USD'`, `customs_amount_paid numeric` — all `>= 0` (CHECK constraints, migration 062)
+- `supplier_id uuid → suppliers.id` (nullable)
+- Audit: `created_at`, `created_by`, `updated_at`, `deleted_at`
 
 ### `customers`
-
-Represents people or companies buying/reserving vehicles.
-
-- **Key columns (partial)**:
-  - `id uuid PK`
-  - `full_name text`
-  - `phone_primary text`
-  - `email_primary text`
-  - Address and notes fields
-
-- **Relationships**:
-  - `sales_orders.customer_id` → `customers.id`
-  - Customer docs/notes tables (where present) reference `customers.id`.
-
----
+Doubles as the leads table (no separate `leads`).
+- `first_name`, `last_name`, `phone_primary`, `phone_secondary`, `email`, `company`, `address`, `date_of_birth`, `notes`
+- `lead_status lead_status not null`, `lead_source lead_source` — populated by sales pipeline
+- Audit fields + `deleted_at`
 
 ### `sales_orders`
-
-Connects cars and customers and encodes the sales lifecycle.
-
-- **Key columns (partial)**:
-  - `id uuid PK`
-  - `car_id uuid FK → cars.id`
-  - `customer_id uuid FK → customers.id`
-  - `status text` — e.g. draft, reserved, sold, delivered, cancelled
-  - `created_at timestamptz`
-  - Links to payment plans / installments (see installments tables)
-
-- **Invariants**:
-  - For **displaying customer info for a car**:
-    - Prefer following `sales_orders` → `customers`.
-    - Only fall back to `cars.client_name` / `cars.client_phone` when no order exists.
-
----
+Connects cars and customers; encodes the sales lifecycle.
+- `car_id → cars.id`, `customer_id → customers.id`
+- `status sale_status` — terminal states `delivered` and `cancelled` (trigger 063)
+- `selling_price`, `deposit_amount`, `quote_amount` — `>= 0` (CHECK constraints)
+- `delivered_at`, `delivered_by`, `delivery_notes`
+- Trigger `trg_sync_car_status_from_sale` keeps `cars.status` in sync.
 
 ### `profiles`
-
-Application-level user profiles, joined to Supabase Auth.
-
-- **Key columns (partial)**:
-  - `id uuid PK` — matches `auth.users.id`
-  - `full_name text`
-  - `email text` — synced from `auth.users.email`
-  - `user_role text` — high-level app role (`owner`, `assistant`, `sales_ops`, `garage_manager`, `garage_staff`, `khalil_hybrid`/`hybrid`, `it`, …)
-  - `capabilities user_capability[]` — enum array for granular permissions (e.g. `garage`, `vehicle_software`, `cashier`, `events_ops`)
-  - Employment fields: `job_title`, `department`, `employment_status`, `terminated_at`, `termination_reason`
-  - Audit fields: `created_by`, `updated_by`, `updated_at`
-
-- **Invariants**:
-  - `profiles.user_role` is the **single source of truth** for high-level roles.
-  - `capabilities` is used for finer-grained checks; any deprecated `capabilities_jsonb` field is no longer authoritative.
-  - Email is synchronized from `auth.users` via triggers (see migrations around `024_profiles_email_sync_auth.sql`).
-
-- **RLS** (high level):
-  - Users can read and update their own profile.
-  - `owner` role can insert/update other profiles (team management).
-
----
-
-### `parts_inventory`
-
-Tracks spare parts for the garage.
-
-- **Key columns (typical)**:
-  - `id uuid PK`
-  - `part_number text`
-  - `part_name text`
-  - `quantity int`
-  - `location text`
-  - `min_stock int`
-
-- **Relationships**:
-  - Garage job line items reference `parts_inventory.id` when parts are used.
-
----
+- `id uuid pk` = `auth.users.id`
+- `user_role user_role` — single source of truth for high-level role
+- `capabilities user_capability[]` — fine-grained gates (used by `_require_any_capability`)
+- `email` synced from `auth.users` via trigger
+- `employment_status`, `terminated_at`, `termination_reason`
+- Self-update + owner-update via RLS; trigger `profiles_block_self_privilege_escalation_trg` blocks privilege climbs.
 
 ### `garage_jobs`
+- `car_id`, `customer_id`, `garage_bay_id`, `assigned_to`
+- `status text` constrained to `job_status` enum set (CHECK, migration 063); terminal `done`/`cancelled`
+- `priority job_priority`, `is_battery_only bool`
+- `estimated_hours`, `actual_hours` `>= 0` (CHECK)
+- Time entries via `job_time_entries` recompute `actual_hours` (trigger).
 
-Represents service jobs performed on vehicles.
+### `parts`
+- `part_name`, `oe_number`, `quantity`, `min_quantity`, `unit_cost`, `currency`
+- `supplier_id → suppliers.id` (nullable; migration 066). Legacy `supplier`/`supplier_contact` text columns retained.
+- `status part_status` auto-maintained by `update_part_status` trigger.
+- Low-stock crossing fans out notifications via `parts_notify_low_stock` trigger (067).
 
-- **Key columns (typical)**:
-  - `id uuid PK`
-  - `car_id uuid FK → cars.id`
-  - `status text` — pending, in_progress, done, etc.
-  - `reason_of_visit text`
-  - `created_at timestamptz`
-  - Relationships to job-part usage tables.
+### `tasks` *(added 065)*
+General-purpose cross-domain task tracker. Resurrects the `complete_task` and `create_task_from_request` RPCs that referenced this missing table.
+- `title`, `description`, `status` (open/in_progress/blocked/done/cancelled)
+- `priority job_priority`, `assigned_to_user_id`, `due_at`, `completed_at`
+- `(source_type, source_id)` unique — used by `create_task_from_request`
 
-- **Relationships**:
-  - Jobs link to `cars` (which car is being serviced).
-  - Job documents and notes link back to `garage_jobs.id`.
+### `customer_interactions` *(added 065)*
+Communications log: phone, WhatsApp, email, SMS, in-person, social, website, other.
+- `customer_id` (cascade), `car_id` (set null), `direction`, `subject`, `body`, `occurred_at`
 
----
+### `appointments` *(added 065)*
+Scheduled events: test drive, service, sales meeting, delivery, follow-up.
+- `kind`, `customer_id`, `car_id`, `assigned_to`, `scheduled_for`, `duration_minutes`, `status`, `location`, `notes`
 
-### `requests`
+### `suppliers` *(added 066)*
+Vendors: parts / vehicles / services / other.
+- `(name, kind)` unique. Linked from `parts.supplier_id` and `cars.supplier_id`.
 
-General internal request center.
+### `invoices` *(added 066)*
+Customer invoices, separate from `sales_orders` so accounting can reconcile.
+- `invoice_number unique`, `sales_order_id` (set null), `customer_id` (restrict)
+- `total_amount`, `paid_amount`, `currency`, `status` (draft/sent/paid/overdue/cancelled)
+- CHECK: `paid_amount <= total_amount`
 
-- **Key columns (typical)**:
-  - `id uuid PK`
-  - `subject text`
-  - `category text`
-  - `submitted_by uuid FK → profiles.id`
-  - `status text` — open, in_progress, closed, etc.
-  - `created_at timestamptz`
+### `commissions` *(added 066)*
+Sales commission records.
+- `(sales_order_id, beneficiary_profile_id)` unique
+- `amount >= 0`, `currency`, `status` (pending/approved/paid/cancelled), `approved_at`, `paid_at`
+- RLS: owner-managed; beneficiary sees their own; `view_reports`/`cashier` capabilities can view.
 
-- **Relationships**:
-  - May join to `profiles` for “submitted by” display (via `profiles.email` / `full_name`).
-
----
-
-### `cars_display` (view or materialized view)
-
-Convenience view for inventory screens.
-
-- **Purpose**:
-  - Flatten core fields from `cars` plus computed labels and joins (e.g. location labels, combined model, maybe sales/customer info).
-
-- **Usage**:
-  - `web/src/app/(dashboard)/cars/page.tsx` queries `cars_display` via the data layer (`lib/data/cars.ts`).
-
----
-
-## Functions, Triggers, and RPC
-
-### RPC: `move_car`
-
-Used by the frontend when moving a car between locations.
-
-- **Responsibilities**:
-  - Update `cars.location_type`, `location_slot`, `status`, etc.
-  - Insert a row into a car events/history table tracking movement.
-
-### Email / profile sync triggers
-
-Migrations such as `024_profiles_email_sync_auth.sql` and `025+` introduce:
-
-- Triggers to keep `profiles.email` synchronized with `auth.users.email`.
-- Triggers to maintain `profiles.updated_at` and audit columns.
-
-### Employee management triggers
-
-Later migrations (e.g. `026_profiles_rls_owner_update.sql`) configure:
-
-- RLS policies so that:
-  - Owners can insert/update other profiles.
-  - Employees can update their own profile fields safely.
+### Audit & notifications
+- `system_events` — generic event log; `cars/sales_orders/garage_jobs` status changes auto-log here (trigger 067).
+- `notifications` — per-user inbox; populated by triggers (parts low-stock) and the cron-callable `notify_expiring_warranties()` fn.
+- `warranty_notifications_sent` — dedup table for warranty expiry alerts.
 
 ---
 
-## Row-Level Security (RLS) Summary
+## RPCs (public API)
 
-> Exact SQL lives in `supabase/migrations/0xx_*.sql`. This section is a conceptual overview.
+### Inventory
+- `create_car(...)` — requires `inventory` capability. `created_by = auth.uid()` (062, 064).
+- `move_car(...)` — requires `inventory|garage|sales` capability (064).
 
-- **General**
-  - RLS is enabled on key tables (e.g. `profiles`, `cars`, `customers`, `sales_orders`, `garage_jobs`, `requests`).
-  - Policies generally check:
-    - `auth.uid()` (current user id)
-    - `profiles.user_role` and `profiles.capabilities`
+### Sales
+- `complete_delivery(p_sales_order_id, p_notes)` — requires `sales` capability. Updates `sales_orders.status -> delivered`, marks customer `converted`, emits `car_events` row.
 
-- **Profiles**
-  - Policy allowing users to select/update their own profile by `id = auth.uid()`.
-  - Policy allowing `owner` role to select/insert/update any profile.
+### Garage
+- `apply_part_to_job(p_job_id, p_part_id, p_quantity, ...)` — requires `garage`. Decrements parts, writes `part_movements` + `job_parts`.
+- `return_part_from_job(p_job_part_id)` — reverses an apply.
+- `attach_job_to_bay(p_job_id, p_bay_id)` — requires `garage`. Validates battery-lab type matching.
+- `scan_vin_to_bay(p_vin, p_bay_id)` — opens or attaches a job for a scanned VIN.
+- `release_bay(p_bay_id, p_new_job_status, p_set_bay_status)` — closes a bay.
 
-- **Cars**
-  - All authenticated users can typically read `cars` / `cars_display` (with possible restrictions).
-  - Only certain roles (`owner`, `sales_ops`, possibly `it`) can insert or soft-delete (`deleted_at`).
-  - Garage roles can update service-related fields but not legacy client data.
+### RBAC helpers (RLS use)
+- `is_owner()`, `is_role(role)`, `is_any_role(role[])`, `has_role(role)`, `has_capability(cap)`, `get_my_user_role()`, `is_pipeline_user()`, `can_view_owner_requests()`.
 
-- **Sales Orders / Customers**
-  - Sales-related roles have read/write access.
-  - Policies ensure users cannot touch data outside their Monza project boundaries.
-
-- **Garage Jobs / Parts**
-  - Garage roles can read/write jobs and parts inventory.
-  - Non-garage roles usually have read-only or no access.
-
-- **Requests**
-  - Owners and assistants can see broader sets of requests.
-  - Other roles see only requests they submitted or those targeted to them.
+### Internal / cron
+- `_require_any_capability(caps[])` — internal guard, **not** REST-callable (068).
+- `notify_expiring_warranties(threshold_days int)` — service-role only (068). Walks `car_warranties`, fans out alerts.
 
 ---
 
-## How to Extend Safely
+## Triggers (selected)
 
-When adding new tables or columns:
+| Table | Trigger | Purpose |
+|---|---|---|
+| `cars` | `trg_log_car_events_insert/update` | Writes `car_events` rows on insert/update |
+| `cars` | `trg_cars_block_terminal_status_revert` | Blocks reverts from `delivered`/`scrapped` (owner override) |
+| `cars` | `trg_cars_log_status_change` | Writes `system_events` row on status change |
+| `cars` | `trg_cars_set_changed_timestamps` | Sets `pdi_changed_at`/`battery_changed_at` |
+| `sales_orders` | `trg_sync_car_status_from_sale` | Keeps `cars.status` in sync with order lifecycle |
+| `sales_orders` | `trg_sales_orders_block_terminal_status_revert` | Blocks reverts from `delivered`/`cancelled` |
+| `sales_orders` | `trg_sales_orders_log_status_change` | Writes `system_events` row |
+| `garage_jobs` | `trg_garage_jobs_block_terminal_status_revert` | Blocks reverts from `done`/`cancelled` |
+| `garage_jobs` | `trg_garage_jobs_log_status_change` | Writes `system_events` row |
+| `parts` | `trg_parts_auto_status` | Recomputes `part_status` from quantity vs min |
+| `parts` | `trg_parts_notify_low_stock` | Fans out notifications when crossing `min_quantity` |
+| `job_time_entries` | `trg_recompute_job_actual_hours` | Recomputes `garage_jobs.actual_hours` |
+| `profiles` | `profiles_block_self_privilege_escalation_trg` | Blocks self privilege climbs |
+| `test_drives` | `test_drive_advance_lead` | Auto-advances `customers.lead_status` on return |
 
-1. **Define clear ownership**:
-   - Which role(s) should read/write?
-   - Is the data tied to a `car`, `customer`, or `profile`?
+`set_updated_at` is wired into every table that has an `updated_at` column.
 
-2. **Add migrations** in `supabase/migrations/`:
-   - Create tables, enums, indexes.
-   - Add RLS policies that reuse the existing role model (`profiles.user_role`, `capabilities`).
+---
 
-3. **Document changes**:
-   - Update this `database-schema.md` with new tables/columns.
-   - Note any new invariants or relationships.
+## Row-Level Security (high level)
 
-4. **Keep legacy fields read-only**:
-   - Any new flow involving customers and cars must:
-     - Use `customers` + `sales_orders`.
-     - Avoid writing to `cars.client_name` and `cars.client_phone`.
+- **Read:** authenticated users can read most application tables.
+- **Write:** mostly capability-gated through both RLS policies and RPC entry checks.
+- **Owner:** can do almost anything; bypasses terminal-status guards via `is_owner()`.
+- **Profiles:** users may read/update their own row; owner may insert/update others.
+- **Commissions / financials:** restricted reads (owner / beneficiary / `view_reports` / `cashier`).
+- **Service role:** used by privileged RPCs (e.g. `notify_expiring_warranties`) and Edge Functions.
 
-This discipline keeps Monza CRM maintainable as it grows across inventory, CRM, sales, garage, and analytics domains.
+---
 
+## Migration apply order (as of 068)
+
+```
+053  garage_workflow_buildout
+054  rls_perf
+055  index_cleanup
+056  sales_pipeline (+ 056b complete_delivery_fix)
+057  fix_profiles_escalation_trigger_department_column
+058  cars_scrapped_enum_value
+059  cars_scrapped_constraint_and_cleanup
+060  lockdown_security_definer_functions
+061  tighten_policy_roles_and_fk_indexes
+062  hard_integrity_checks_and_rpc_actor          (>= 0 CHECKs + auth.uid() in create_car/move_car)
+063  status_transition_guards                     (terminal-state triggers + garage_jobs.status enum CHECK)
+064  rpc_capability_guards                        (capability gates on destructive RPCs; drops dead receive_shipped_car_by_vin)
+065  tasks_interactions_appointments              (3 new tables + RLS)
+066  suppliers_invoices_commissions               (3 new tables + parts/cars supplier_id FKs)
+067  notification_and_audit_triggers              (parts low-stock fan-out + status_change audit + warranty cron fn)
+068  lockdown_internal_definer_fns                (revoke REST EXECUTE on internal/trigger DEFINER fns)
+```
+
+---
+
+## Extension notes
+
+When adding tables/columns:
+
+1. Define ownership: which capability/role read/writes? Tied to which root entity (`car`, `customer`, `profile`)?
+2. Add migration in `supabase/migrations/<NNN>_<name>.sql`. Idempotent constructs (`if not exists`, `or replace`).
+3. Always: enable RLS, add policies, add `set_updated_at` trigger if `updated_at` exists, index FKs.
+4. If the table exposes a SECURITY DEFINER RPC, gate with `_require_any_capability(...)` at the function entry and revoke EXECUTE from `anon`/`authenticated` if it's purely internal.
+5. Update this doc.
