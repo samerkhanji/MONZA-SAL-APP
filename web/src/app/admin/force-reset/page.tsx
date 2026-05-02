@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,12 +15,40 @@ import {
 } from "@/components/ui/card";
 
 export default function AdminForceResetPage() {
+  const router = useRouter();
+  const [authState, setAuthState] = useState<"checking" | "ok" | "forbidden">("checking");
   const [email, setEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [adminSecret, setAdminSecret] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [isError, setIsError] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        router.replace("/?redirectTo=/admin/force-reset");
+        return;
+      }
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("user_role, is_active")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (cancelled) return;
+      const isOwner =
+        profile?.is_active === true && profile?.user_role === "owner";
+      setAuthState(isOwner ? "ok" : "forbidden");
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -65,15 +95,40 @@ export default function AdminForceResetPage() {
     }
   }
 
+  if (authState === "checking") {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-muted/30 p-4">
+        <p className="text-muted-foreground text-sm">Checking access…</p>
+      </div>
+    );
+  }
+
+  if (authState === "forbidden") {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-muted/30 p-4">
+        <Card className="w-full max-w-md border-border shadow-md">
+          <CardHeader>
+            <CardTitle>Forbidden</CardTitle>
+            <CardDescription>
+              Force-reset is restricted to owner accounts. If you are locked out, use
+              <code className="mx-1 text-xs">scripts/bulk-reset-passwords.mjs</code>
+              from a trusted machine instead.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-muted/30 p-4">
       <Card className="w-full max-w-md border-border shadow-md">
         <CardHeader>
           <CardTitle>Force password reset</CardTitle>
           <CardDescription>
-            Sets a new password directly in Supabase Auth (no email, no PKCE). Requires{" "}
-            <code className="text-xs">ADMIN_API_SECRET</code> on the server and the same value
-            below. Use only from a trusted environment.
+            Sets a new password directly in Supabase Auth (no email, no PKCE). Requires
+            owner sign-in plus <code className="text-xs">ADMIN_API_SECRET</code> on the
+            server and the same value below.
           </CardDescription>
         </CardHeader>
         <CardContent>

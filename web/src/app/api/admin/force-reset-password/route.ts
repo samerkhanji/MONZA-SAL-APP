@@ -1,6 +1,7 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { tryCreateAdminClient } from "@/lib/supabase/admin";
+import { getSessionUserAndRole } from "@/lib/server/session-app-role";
 
 function constantTimeEqualSecret(a: string, b: string): boolean {
   try {
@@ -17,7 +18,12 @@ function constantTimeEqualSecret(a: string, b: string): boolean {
  * Body: { email: string, newPassword: string }
  * Header: Authorization: Bearer <ADMIN_API_SECRET>
  *
- * Uses service role only on the server. Does not send email or use PKCE.
+ * Defense in depth: requires BOTH an authenticated owner session AND the
+ * shared bearer secret. Either one missing returns a generic 401 so a
+ * caller cannot tell which gate they failed.
+ *
+ * Emergency lockout (no owners can sign in): use scripts/bulk-reset-passwords.mjs
+ * with the service role key from a trusted machine instead of this endpoint.
  *
  * Env: ADMIN_API_SECRET (strong random; set in Vercel Production and Preview),
  *      SUPABASE_SERVICE_ROLE_KEY, NEXT_PUBLIC_SUPABASE_URL
@@ -31,6 +37,13 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Gate 1: owner session.
+  const session = await getSessionUserAndRole();
+  if (!session || session.appRole !== "owner") {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Gate 2: shared bearer secret.
   const authHeader = request.headers.get("authorization") ?? "";
   const bearer = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
   if (!bearer || !constantTimeEqualSecret(bearer, configuredSecret)) {
@@ -89,7 +102,9 @@ export async function POST(request: NextRequest) {
   }
 
   if (!userId) {
-    return NextResponse.json({ error: "No user found with that email." }, { status: 404 });
+    // Generic message — do not distinguish "user not found" from other
+    // failures so callers cannot enumerate users via this endpoint.
+    return NextResponse.json({ error: "Could not update password." }, { status: 400 });
   }
 
   const { data: updated, error: updateError } = await admin.auth.admin.updateUserById(userId, {
@@ -108,7 +123,11 @@ export async function POST(request: NextRequest) {
     event_type: "admin.force_reset_password",
     severity: "warning",
     message: `Password force-reset for ${email}`,
-    metadata: { target_user_id: userId, target_email: email },
+    metadata: {
+      target_user_id: userId,
+      target_email: email,
+      actor_user_id: session.userId,
+    },
   });
 
   return NextResponse.json({

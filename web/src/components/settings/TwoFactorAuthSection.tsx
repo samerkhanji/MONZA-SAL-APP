@@ -46,6 +46,9 @@ export function TwoFactorAuthSection() {
   const [enrollment, setEnrollment] = useState<EnrollResult | null>(null);
   const [code, setCode] = useState("");
   const [verifying, setVerifying] = useState(false);
+  const [disablePrompt, setDisablePrompt] = useState<{ factorId: string } | null>(null);
+  const [disableCode, setDisableCode] = useState("");
+  const [disabling, setDisabling] = useState(false);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -122,17 +125,55 @@ export function TwoFactorAuthSection() {
     void refresh();
   }
 
-  async function disableMFA(factorId: string) {
-    const ok = window.confirm(
-      "Remove two-factor authentication from your account? You'll only need a password to log in until you re-enable it."
-    );
-    if (!ok) return;
-    const { error } = await supabase.auth.mfa.unenroll({ factorId });
-    if (error) {
-      toast.error(error.message);
+  function startDisable(factorId: string) {
+    setDisableCode("");
+    setDisablePrompt({ factorId });
+  }
+
+  function cancelDisable() {
+    setDisablePrompt(null);
+    setDisableCode("");
+  }
+
+  async function confirmDisable() {
+    if (!disablePrompt) return;
+    const trimmed = disableCode.trim();
+    if (!/^\d{6}$/.test(trimmed)) {
+      toast.error("Enter the 6-digit code from your authenticator app");
+      return;
+    }
+    setDisabling(true);
+    // Require a fresh challenge + verify before unenroll. Without this,
+    // a stolen AAL1 session could disable MFA and keep persistent access.
+    const { data: challenge, error: chErr } = await supabase.auth.mfa.challenge({
+      factorId: disablePrompt.factorId,
+    });
+    if (chErr || !challenge) {
+      setDisabling(false);
+      toast.error(chErr?.message ?? "Failed to start verification");
+      return;
+    }
+    const { error: vErr } = await supabase.auth.mfa.verify({
+      factorId: disablePrompt.factorId,
+      challengeId: challenge.id,
+      code: trimmed,
+    });
+    if (vErr) {
+      setDisabling(false);
+      toast.error(vErr.message);
+      return;
+    }
+    const { error: unErr } = await supabase.auth.mfa.unenroll({
+      factorId: disablePrompt.factorId,
+    });
+    setDisabling(false);
+    if (unErr) {
+      toast.error(unErr.message);
       return;
     }
     toast.success("Two-factor authentication disabled");
+    setDisablePrompt(null);
+    setDisableCode("");
     void refresh();
   }
 
@@ -162,13 +203,45 @@ export function TwoFactorAuthSection() {
             <div className="rounded-md border border-green-500/30 bg-green-50 p-3 text-sm dark:bg-green-950">
               ✓ Two-factor authentication is <span className="font-semibold">enabled</span>.
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => disableMFA(verified.id)}
-            >
-              Disable two-factor auth
-            </Button>
+            {disablePrompt ? (
+              <div className="space-y-3 rounded-md border border-amber-500/30 bg-amber-50 p-3 dark:bg-amber-950">
+                <p className="text-sm">
+                  Enter your current 6-digit code to disable two-factor auth. After this you&apos;ll
+                  only need a password to log in until you re-enable it.
+                </p>
+                <Input
+                  inputMode="numeric"
+                  maxLength={6}
+                  placeholder="123456"
+                  value={disableCode}
+                  onChange={(e) => setDisableCode(e.target.value.replace(/\D/g, ""))}
+                  className="max-w-[140px] tracking-widest text-center text-lg"
+                  autoComplete="one-time-code"
+                  autoFocus
+                />
+                <div className="flex gap-2">
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={confirmDisable}
+                    disabled={disabling || disableCode.length !== 6}
+                  >
+                    {disabling ? "Disabling…" : "Confirm disable"}
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={cancelDisable} disabled={disabling}>
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => startDisable(verified.id)}
+              >
+                Disable two-factor auth
+              </Button>
+            )}
           </div>
         ) : enrollment ? (
           <div className="space-y-4">

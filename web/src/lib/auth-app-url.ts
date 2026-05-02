@@ -167,6 +167,40 @@ export function isPkceVerifierOrCrossDeviceError(err: { message?: string } | nul
 }
 
 /**
+ * Hosts allowed as the destination of `redirectTo`. Defense-in-depth on top of
+ * Supabase's project-level redirect URL allow-list: even if that list is
+ * permissive, an attacker controlling the `Origin` header can't pivot a
+ * recovery link to a host that isn't on this list.
+ *
+ * Defaults: production canonical + localhost. Add additional hosts (e.g. a
+ * Vercel preview pattern your team owns) by setting
+ * `NEXT_PUBLIC_AUTH_REDIRECT_ALLOWED_HOSTS` to a comma-separated list. Each
+ * entry matches `host` (host:port for non-default ports). Wildcards aren't
+ * supported on purpose — list the exact hosts you trust.
+ */
+const DEFAULT_ALLOWED_REDIRECT_HOSTS = [
+  "monzacrm.vercel.app",
+  "localhost:3000",
+  "127.0.0.1:3000",
+];
+
+function parseAllowedRedirectHosts(): string[] {
+  const fromEnv =
+    process.env.NEXT_PUBLIC_AUTH_REDIRECT_ALLOWED_HOSTS?.trim() ?? "";
+  const extra = fromEnv
+    ? fromEnv
+        .split(",")
+        .map((s) => s.trim().toLowerCase())
+        .filter(Boolean)
+    : [];
+  return Array.from(new Set([...DEFAULT_ALLOWED_REDIRECT_HOSTS, ...extra]));
+}
+
+function isAllowedRedirectHost(host: string): boolean {
+  return parseAllowedRedirectHosts().includes(host.toLowerCase());
+}
+
+/**
  * Validates the same `redirectTo` shape Supabase expects for recovery `redirect_to` / template `RedirectTo`.
  * Returns an English error message, or null if the URL looks valid.
  */
@@ -182,11 +216,14 @@ export function validatePasswordResetRedirectUrl(redirectTo: string): string | n
   if (u.protocol !== "http:" && u.protocol !== "https:") {
     return "Password reset redirect must use http or https.";
   }
-  const host = u.hostname.toLowerCase();
+  const hostname = u.hostname.toLowerCase();
   const isLocal =
-    host === "localhost" || host === "127.0.0.1" || host.endsWith(".localhost");
+    hostname === "localhost" || hostname === "127.0.0.1" || hostname.endsWith(".localhost");
   if (u.protocol === "http:" && !isLocal) {
     return "Password reset redirect should use https except for localhost.";
+  }
+  if (!isAllowedRedirectHost(u.host)) {
+    return `Password reset redirect host "${u.host}" is not in the allow-list. Add it via NEXT_PUBLIC_AUTH_REDIRECT_ALLOWED_HOSTS.`;
   }
   const path = u.pathname.replace(/\/$/, "") || "/";
   if (path !== "/reset-password") {

@@ -92,9 +92,6 @@ export async function updateSession(request: NextRequest) {
   // Password recovery (PKCE): allow full URL including ?code= without forcing login first
   const isResetPasswordPage =
     pathname === "/reset-password" || pathname.startsWith("/reset-password/");
-  // Bearer ADMIN_API_SECRET protects the API; page is reachable without app login (ops tool).
-  const isAdminForceResetPage =
-    pathname === "/admin/force-reset" || pathname.startsWith("/admin/force-reset/");
   // PWA service worker fallback shell — must be reachable without auth so
   // it can be pre-cached on SW install and served when the network is down.
   const isPwaOfflineShell =
@@ -108,7 +105,6 @@ export async function updateSession(request: NextRequest) {
     isAuthCallbackPage ||
     isAuthConfirmPage ||
     isResetPasswordPage ||
-    isAdminForceResetPage ||
     isPwaOfflineShell;
 
   if (!user && !isPublicPage) {
