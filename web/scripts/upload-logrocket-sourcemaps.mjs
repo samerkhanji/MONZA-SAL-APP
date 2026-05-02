@@ -14,7 +14,7 @@
 //
 // Run automatically as part of `npm run build` after `next build`.
 
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync, statSync, unlinkSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 
@@ -81,13 +81,22 @@ console.log("[logrocket] Source-map upload complete.");
 // production deployment. LogRocket already has its copy; keeping them
 // in /_next/static/chunks would expose readable client source via the
 // CDN to anyone who guesses the chunk URLs.
-import { readdirSync, statSync, unlinkSync } from "node:fs";
-
 let removed = 0;
 function purgeMaps(dir) {
-  for (const entry of readdirSync(dir)) {
+  let entries;
+  try {
+    entries = readdirSync(dir);
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
     const full = path.join(dir, entry);
-    const s = statSync(full);
+    let s;
+    try {
+      s = statSync(full);
+    } catch {
+      continue;
+    }
     if (s.isDirectory()) {
       purgeMaps(full);
     } else if (entry.endsWith(".map")) {
