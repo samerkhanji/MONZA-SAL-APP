@@ -19,38 +19,10 @@ import {
   RefreshCw,
   ChevronRight,
   ClipboardList,
-  DollarSign,
-  Clock,
-  AlertTriangle,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getProfileFullName } from "@/lib/supabase-profile";
-
-function timeAgo(date: string): string {
-  const now = new Date();
-  const then = new Date(date);
-  const seconds = Math.floor((now.getTime() - then.getTime()) / 1000);
-
-  if (seconds < 60) return "just now";
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-  if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
-  return then.toLocaleDateString();
-}
-
-interface CarEventRow {
-  id: string;
-  car_id: string;
-  event_type: string;
-  from_value: string | null;
-  to_value: string | null;
-  created_at: string;
-  profiles?: { full_name: string | null } | null;
-  cars?: { vin: string; brand: string; model: string } | null;
-}
-
 interface LowStockPart {
   id: string;
   part_name: string;
@@ -104,63 +76,6 @@ const STATUS_DOT_COLORS: Record<string, string> = {
   sold: "bg-violet-500",
 };
 
-function formatActivityMessage(ev: CarEventRow): string {
-  const name = getProfileFullName(ev.profiles);
-  const user = name !== "Unknown" ? name : "System";
-  const car = ev.cars as
-    | { vin?: string; brand?: string; model?: string }
-    | undefined;
-  const brand = car?.brand ?? "";
-  const model = car?.model ?? "";
-  const vinShort = car?.vin ? `...${String(car.vin).slice(-4)}` : "";
-  const carLabel = [brand, model].filter(Boolean).join(" ") || "car";
-
-  switch (ev.event_type) {
-    case "created":
-      return `${user} added ${carLabel}${vinShort ? ` (VIN ${vinShort})` : ""}`;
-    case "moved":
-      return `${user} moved ${carLabel} to ${ev.to_value ?? "new location"}`;
-    case "status_changed":
-      return `${user} changed ${carLabel} status to ${ev.to_value ?? ""}`;
-    case "battery_updated":
-      return `${user} updated battery on ${carLabel}`;
-    case "pdi_updated":
-      return `${user} updated PDI on ${carLabel}`;
-    case "details_updated":
-      return `${user} edited ${carLabel} details`;
-    case "note_added":
-      return `${user} added a note on ${carLabel}`;
-    default:
-      // M3: surface unmapped event types so we notice schema drift instead
-      // of silently rendering the raw enum string in the feed.
-      if (process.env.NODE_ENV !== "production") {
-        console.warn(`[activity-feed] unmapped event_type: ${ev.event_type}`);
-      }
-      return `${user}: ${ev.event_type}`;
-  }
-}
-
-function getActivityIcon(eventType: string): string {
-  switch (eventType) {
-    case "created":
-      return "🚗";
-    case "moved":
-      return "🔄";
-    case "status_changed":
-      return "📊";
-    case "battery_updated":
-      return "🔋";
-    case "pdi_updated":
-      return "📋";
-    case "details_updated":
-      return "✏️";
-    case "note_added":
-      return "📝";
-    default:
-      return "📌";
-  }
-}
-
 export default function DashboardPage() {
   const router = useRouter();
   const {
@@ -193,32 +108,11 @@ export default function DashboardPage() {
   const [jobStatusCounts, setJobStatusCounts] = useState<Record<string, number>>({});
   const [recentJobs, setRecentJobs] = useState<GarageJobRow[]>([]);
   const [lowStockParts, setLowStockParts] = useState<LowStockPart[]>([]);
-  const [activities, setActivities] = useState<CarEventRow[]>([]);
-
-  // Owner-priority KPIs (added April 2026 per audit).
-  // - cashCollected7d: paid installments + deposits in the last 7 days.
-  // - staleJobs: open garage jobs older than 7 days (pending or waiting_parts).
-  // - overdueInstallments: count + sum of installments past due_date.
-  const [cashCollected7d, setCashCollected7d] = useState<{ total: number; currency: string }>({
-    total: 0,
-    currency: "USD",
-  });
-  const [staleJobsCount, setStaleJobsCount] = useState<number>(0);
-  const [overdueInstallments, setOverdueInstallments] = useState<{ count: number; total: number }>({
-    count: 0,
-    total: 0,
-  });
 
   const fetchData = useCallback(async () => {
     if (shouldRedirect) return;
     const supabase = createClient();
     setLoading(true);
-
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
-    const sevenDaysAgoDate = new Date(Date.now() - 7 * 24 * 3600 * 1000)
-      .toISOString()
-      .slice(0, 10);
-    const todayDate = new Date().toISOString().slice(0, 10);
 
     const [
       carsAllRes,
@@ -230,11 +124,6 @@ export default function DashboardPage() {
       carsStatusRes,
       partsRes,
       requestsRes,
-      eventsRes,
-      paidInstallmentsRes,
-      paidDepositsRes,
-      staleJobsRes,
-      overdueInstallmentsRes,
     ] = await Promise.all([
       supabase
         .from("cars_display")
@@ -276,36 +165,6 @@ export default function DashboardPage() {
       supabase
         .from("requests")
         .select("id, status, submitted_by, assigned_to, send_to, send_to_user_id"),
-      supabase
-        .from("car_events")
-        .select("*, profiles:created_by(full_name), cars:car_id(vin, brand, model)")
-        .order("created_at", { ascending: false })
-        .limit(10),
-      // Cash collected (last 7d) — installments
-      supabase
-        .from("installment_payments")
-        .select("paid_amount")
-        .eq("status", "paid")
-        .gte("paid_at", sevenDaysAgo),
-      // Cash collected (last 7d) — deposits stamped via deposit_paid_at
-      supabase
-        .from("sales_orders")
-        .select("deposit_amount")
-        .gte("deposit_paid_at", sevenDaysAgo),
-      // Stale garage jobs (>7d open)
-      supabase
-        .from("garage_jobs")
-        .select("*", { count: "exact", head: true })
-        .is("deleted_at", null)
-        .in("status", ["pending", "waiting_parts"])
-        .lt("created_at", sevenDaysAgoDate),
-      // Overdue installments
-      supabase
-        .from("installment_payments")
-        .select("amount_due, paid_amount")
-        .neq("status", "paid")
-        .neq("status", "waived")
-        .lt("due_date", todayDate),
     ]);
 
     if (carsAllRes.error) {
@@ -441,40 +300,6 @@ export default function DashboardPage() {
       }
     }
 
-    if (eventsRes.error) {
-      toast.error(eventsRes.error.message ?? "Failed to load activity");
-    } else {
-      setActivities((eventsRes.data as CarEventRow[]) ?? []);
-    }
-
-    // Cash collected (last 7 days): installment payments + deposits.
-    if (!paidInstallmentsRes.error && !paidDepositsRes.error) {
-      const installments = (paidInstallmentsRes.data ?? []) as { paid_amount: number | null }[];
-      const deposits = (paidDepositsRes.data ?? []) as { deposit_amount: number | null }[];
-      const total =
-        installments.reduce((s, r) => s + (Number(r.paid_amount) || 0), 0) +
-        deposits.reduce((s, r) => s + (Number(r.deposit_amount) || 0), 0);
-      setCashCollected7d({ total, currency: "USD" });
-    }
-
-    if (!staleJobsRes.error) {
-      setStaleJobsCount(staleJobsRes.count ?? 0);
-    }
-
-    if (!overdueInstallmentsRes.error) {
-      const rows = (overdueInstallmentsRes.data ?? []) as {
-        amount_due: number | null;
-        paid_amount: number | null;
-      }[];
-      setOverdueInstallments({
-        count: rows.length,
-        total: rows.reduce(
-          (s, r) => s + (Number(r.amount_due) || 0) - (Number(r.paid_amount) || 0),
-          0
-        ),
-      });
-    }
-
     setLastUpdated(new Date());
     setLoading(false);
   }, [
@@ -553,45 +378,6 @@ export default function DashboardPage() {
             bgColor:
               pendingRequestsCount > 0
                 ? "bg-violet-100 dark:bg-violet-900/30"
-                : "bg-muted/50",
-          },
-        ]
-      : []),
-    // Owner-priority KPIs — visible only to owner. These are the numbers
-    // a 7-employee dealership owner asks first thing in the morning.
-    ...(isOwner
-      ? [
-          {
-            label: "Cash collected (7d)",
-            value: `${Math.round(cashCollected7d.total).toLocaleString()} ${cashCollected7d.currency}`,
-            icon: DollarSign,
-            href: "/installments",
-            color: "text-emerald-600 dark:text-emerald-400",
-            bgColor: "bg-emerald-100 dark:bg-emerald-900/30",
-          },
-          {
-            label: "Stale jobs (>7d)",
-            value: staleJobsCount,
-            icon: Clock,
-            href: "/garage",
-            color: staleJobsCount > 0 ? "text-orange-600 dark:text-orange-400" : "text-muted-foreground",
-            bgColor: staleJobsCount > 0 ? "bg-orange-100 dark:bg-orange-900/30" : "bg-muted/50",
-          },
-          {
-            label: "Overdue installments",
-            value:
-              overdueInstallments.count === 0
-                ? "0"
-                : `${overdueInstallments.count} · ${Math.round(overdueInstallments.total).toLocaleString()} USD`,
-            icon: AlertTriangle,
-            href: "/installments",
-            color:
-              overdueInstallments.count > 0
-                ? "text-red-600 dark:text-red-400"
-                : "text-muted-foreground",
-            bgColor:
-              overdueInstallments.count > 0
-                ? "bg-red-100 dark:bg-red-900/30"
                 : "bg-muted/50",
           },
         ]
@@ -841,48 +627,6 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Recent Activity */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Activity</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="space-y-3">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <Skeleton key={i} className="h-12 w-full" />
-              ))}
-            </div>
-          ) : activities.length === 0 ? (
-            <p className="py-8 text-center text-muted-foreground">
-              No recent activity
-            </p>
-          ) : (
-            <ul className="space-y-3">
-              {activities.map((ev) => (
-                <li key={ev.id}>
-                  <Link
-                    href={`/cars/${ev.car_id}`}
-                    className="flex flex-col gap-1 rounded-lg px-3 py-2 transition-colors hover:bg-muted/50 sm:flex-row sm:items-center sm:gap-3"
-                  >
-                    <span className="flex items-start gap-2 sm:min-w-0 sm:flex-1">
-                      <span className="text-lg leading-none" aria-hidden>
-                        {getActivityIcon(ev.event_type)}
-                      </span>
-                      <span className="min-w-0 flex-1 text-sm sm:truncate">
-                        {formatActivityMessage(ev)}
-                      </span>
-                    </span>
-                    <span className="shrink-0 pl-7 text-xs text-muted-foreground sm:pl-0 sm:text-sm">
-                      {timeAgo(ev.created_at)}
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 }

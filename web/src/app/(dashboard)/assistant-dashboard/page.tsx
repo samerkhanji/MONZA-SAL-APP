@@ -18,6 +18,8 @@ import {
   FileCheck,
   BarChart3,
   FileText,
+  DollarSign,
+  Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -101,6 +103,15 @@ export default function AssistantDashboardPage() {
   const [overduePickupsCount, setOverduePickupsCount] = useState(0);
   const [pendingDeletionsCount, setPendingDeletionsCount] = useState(0);
   const [todaysServiceCount, setTodaysServiceCount] = useState(0);
+  const [cashCollected7d, setCashCollected7d] = useState<{ total: number; currency: string }>({
+    total: 0,
+    currency: "USD",
+  });
+  const [staleJobsCount, setStaleJobsCount] = useState<number>(0);
+  const [overdueInstallments, setOverdueInstallments] = useState<{ count: number; total: number }>({
+    count: 0,
+    total: 0,
+  });
 
   const [pendingRequests, setPendingRequests] = useState<RequestRow[]>([]);
   const [workshopJobs, setWorkshopJobs] = useState<JobWithCar[]>([]);
@@ -149,6 +160,10 @@ export default function AssistantDashboardPage() {
 
     const today = new Date().toISOString().slice(0, 10);
     const threeDaysAgo = new Date(Date.now() - 3 * 86400000).toISOString();
+    const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString();
+    const sevenDaysAgoDate = new Date(Date.now() - 7 * 86400000)
+      .toISOString()
+      .slice(0, 10);
 
     const [
       jobsRes,
@@ -156,6 +171,10 @@ export default function AssistantDashboardPage() {
       carsRes,
       requestsWithProfiles,
       proposalsRes,
+      paidInstallmentsRes,
+      paidDepositsRes,
+      staleJobsRes,
+      overdueInstallmentsRes,
     ] = await Promise.all([
       supabase
         .from("garage_jobs")
@@ -186,6 +205,27 @@ export default function AssistantDashboardPage() {
         .neq("status", "draft")
         .order("updated_at", { ascending: false })
         .limit(30),
+      supabase
+        .from("installment_payments")
+        .select("paid_amount")
+        .eq("status", "paid")
+        .gte("paid_at", sevenDaysAgo),
+      supabase
+        .from("sales_orders")
+        .select("deposit_amount")
+        .gte("deposit_paid_at", sevenDaysAgo),
+      supabase
+        .from("garage_jobs")
+        .select("*", { count: "exact", head: true })
+        .is("deleted_at", null)
+        .in("status", ["pending", "waiting_parts"])
+        .lt("created_at", sevenDaysAgoDate),
+      supabase
+        .from("installment_payments")
+        .select("amount_due, paid_amount")
+        .neq("status", "paid")
+        .neq("status", "waived")
+        .lt("due_date", today),
     ]);
 
     const jobs = (jobsRes.data ?? []) as JobWithCar[];
@@ -312,6 +352,33 @@ export default function AssistantDashboardPage() {
       })
     );
 
+    if (!paidInstallmentsRes.error && !paidDepositsRes.error) {
+      const installments = (paidInstallmentsRes.data ?? []) as { paid_amount: number | null }[];
+      const deposits = (paidDepositsRes.data ?? []) as { deposit_amount: number | null }[];
+      const total =
+        installments.reduce((s, r) => s + (Number(r.paid_amount) || 0), 0) +
+        deposits.reduce((s, r) => s + (Number(r.deposit_amount) || 0), 0);
+      setCashCollected7d({ total, currency: "USD" });
+    }
+
+    if (!staleJobsRes.error) {
+      setStaleJobsCount(staleJobsRes.count ?? 0);
+    }
+
+    if (!overdueInstallmentsRes.error) {
+      const rows = (overdueInstallmentsRes.data ?? []) as {
+        amount_due: number | null;
+        paid_amount: number | null;
+      }[];
+      setOverdueInstallments({
+        count: rows.length,
+        total: rows.reduce(
+          (s, r) => s + (Number(r.amount_due) || 0) - (Number(r.paid_amount) || 0),
+          0
+        ),
+      });
+    }
+
     setLastUpdated(new Date());
     setLoading(false);
   }, [canAccess]);
@@ -338,6 +405,30 @@ export default function AssistantDashboardPage() {
     { label: "Overdue Pickups", value: overduePickupsCount, color: "red" as const, icon: AlertTriangle, ref: carsReadyRef },
     { label: "Pending Approvals", value: pendingDeletionsCount, color: "amber" as const, icon: FileCheck, href: "/requests/pending" },
     { label: "Today's Service", value: todaysServiceCount, color: "amber" as const, icon: Calendar, ref: workshopRef },
+    {
+      label: "Cash collected (7d)",
+      value: `${Math.round(cashCollected7d.total).toLocaleString()} ${cashCollected7d.currency}`,
+      color: "green" as const,
+      icon: DollarSign,
+      href: "/installments",
+    },
+    {
+      label: "Stale jobs (>7d)",
+      value: staleJobsCount,
+      color: "amber" as const,
+      icon: Clock,
+      href: "/garage",
+    },
+    {
+      label: "Overdue installments",
+      value:
+        overdueInstallments.count === 0
+          ? "0"
+          : `${overdueInstallments.count} · ${Math.round(overdueInstallments.total).toLocaleString()} USD`,
+      color: "red" as const,
+      icon: AlertTriangle,
+      href: "/installments",
+    },
   ];
 
   return (
