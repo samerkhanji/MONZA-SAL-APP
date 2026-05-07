@@ -253,17 +253,20 @@ export function NewJobDialog({
       }
     }
 
-    const markId = (await import("@/lib/user-lookup").then((m) => m.getProfileIdByName("Mark"))) ?? null;
-    if (markId && user.id !== markId) {
+    const garageIds = await import("@/lib/user-lookup").then((m) =>
+      m.getProfileIdsByCapability("garage")
+    );
+    const recipients = garageIds.filter((id) => id !== user.id);
+    if (recipients.length > 0) {
       await import("@/lib/notifications").then((m) =>
-        m.createNotification({
-          userId: markId,
-          title: "New garage job",
-          message: batteryOnlyJob
+        m.createNotificationsForUsers(
+          recipients,
+          "New garage job",
+          batteryOnlyJob
             ? `New battery-lab job: ${title.trim()}`
             : `New garage job created: ${title.trim()} for VIN ${selectedCar?.vin ?? "—"}`,
-          link: `/garage/jobs/${jobId}`,
-        })
+          `/garage/jobs/${jobId}`
+        )
       );
     }
 

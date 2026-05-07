@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase";
-import { getProfileIdsByNames } from "@/lib/user-lookup";
+import { getProfileIdsByRole } from "@/lib/user-lookup";
 import { createNotificationsForUsers } from "@/lib/notifications";
 
 const THRESHOLDS = [30, 14, 7];
@@ -29,12 +29,8 @@ export function WarrantyNotificationChecker() {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      const [laraId, samayaId, khalilId] = await getProfileIdsByNames([
-        "Lara",
-        "Samaya",
-        "Khalil",
-      ]);
-      const recipientIds = [laraId, samayaId, khalilId].filter(Boolean);
+      // Customer-service assistants + hybrids handle warranty follow-up.
+      const recipientIds = await getProfileIdsByRole(["assistant", "hybrid"]);
       if (recipientIds.length === 0) return;
 
       const { data } = await supabase

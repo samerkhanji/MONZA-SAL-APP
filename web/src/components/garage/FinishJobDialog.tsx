@@ -164,9 +164,8 @@ export function FinishJobDialog({
     const carVin = job.cars?.vin ?? "—";
     const workSummary = workDone ? (workDone.length > 80 ? `${workDone.slice(0, 80)}...` : workDone) : "See details";
 
-    const { getProfileIdsByNames } = await import("@/lib/user-lookup");
-    const [laraId, samayaId] = await getProfileIdsByNames(["Lara", "Samaya"]);
-    const assistantIds = [laraId, samayaId].filter(Boolean);
+    const { getProfileIdsByRole } = await import("@/lib/user-lookup");
+    const assistantIds = await getProfileIdsByRole("assistant");
     if (assistantIds.length > 0) {
       await import("@/lib/notifications").then((m) =>
         m.createNotificationsForUsers(

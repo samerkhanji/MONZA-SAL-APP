@@ -169,15 +169,17 @@ export default function GarageJobsPage() {
             .eq("sent_date", today)
             .limit(1);
           if (existing && existing.length > 0) continue;
-          const markId = (await import("@/lib/user-lookup").then((m) => m.getProfileIdByName("Mark"))) ?? null;
-          if (markId) {
+          const garageIds = await import("@/lib/user-lookup").then((m) =>
+            m.getProfileIdsByCapability("garage")
+          );
+          if (garageIds.length > 0) {
             await import("@/lib/notifications").then((m) =>
-              m.createNotification({
-                userId: markId,
-                title: "Service reminder",
-                message: `Reminder: VIN ${j.cars?.vin ?? "—"} is scheduled for service today — ${j.title}`,
-                link: "/garage",
-              })
+              m.createNotificationsForUsers(
+                garageIds,
+                "Service reminder",
+                `Reminder: VIN ${j.cars?.vin ?? "—"} is scheduled for service today — ${j.title}`,
+                "/garage"
+              )
             );
             await supabase.from("service_day_notifications_sent").insert({
               job_id: j.id,
@@ -204,15 +206,17 @@ export default function GarageJobsPage() {
       const expectedEndMs = startMs + (j.estimated_hours ?? 0) * 60 * 60 * 1000;
       if (now > expectedEndMs) {
         (async () => {
-          const markId = (await import("@/lib/user-lookup").then((m) => m.getProfileIdByName("Mark"))) ?? null;
-          if (markId) {
+          const garageIds = await import("@/lib/user-lookup").then((m) =>
+            m.getProfileIdsByCapability("garage")
+          );
+          if (garageIds.length > 0) {
             await import("@/lib/notifications").then((m) =>
-              m.createNotification({
-                userId: markId,
-                title: "Overtime alert",
-                message: `Overtime alert: Job ${j.title} for VIN ${j.cars?.vin ?? "—"} has exceeded the estimated ${j.estimated_hours} hours`,
-                link: "/garage",
-              })
+              m.createNotificationsForUsers(
+                garageIds,
+                "Overtime alert",
+                `Overtime alert: Job ${j.title} for VIN ${j.cars?.vin ?? "—"} has exceeded the estimated ${j.estimated_hours} hours`,
+                "/garage"
+              )
             );
             await supabase
               .from("garage_jobs")
@@ -344,9 +348,8 @@ export default function GarageJobsPage() {
 
     if (newStatus === "delivered") {
       const carVin = job.cars?.vin ?? "—";
-      const { getProfileIdsByNames } = await import("@/lib/user-lookup");
-      const [laraId, samayaId] = await getProfileIdsByNames(["Lara", "Samaya"]);
-      const assistantIds = [laraId, samayaId].filter(Boolean);
+      const { getProfileIdsByRole } = await import("@/lib/user-lookup");
+      const assistantIds = await getProfileIdsByRole("assistant");
       if (assistantIds.length > 0) {
         await import("@/lib/notifications").then((m) =>
           m.createNotificationsForUsers(

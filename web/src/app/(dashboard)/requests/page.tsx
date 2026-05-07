@@ -404,9 +404,8 @@ export default function RequestCenterPage() {
 
     const submitterName = profile?.full_name ?? "Someone";
     if (isToHoussam) {
-      const { getProfileIdsByNames } = await import("@/lib/user-lookup");
-      const [laraId, samayaId] = await getProfileIdsByNames(["Lara", "Samaya"]);
-      const assistantIds = [laraId, samayaId].filter(Boolean);
+      const { getProfileIdsByRole } = await import("@/lib/user-lookup");
+      const assistantIds = await getProfileIdsByRole("assistant");
       const ownerId = newSendToUserId;
       const notifyIds = [...assistantIds];
       if (ownerId && !assistantIds.includes(ownerId)) notifyIds.push(ownerId);
@@ -476,9 +475,8 @@ export default function RequestCenterPage() {
       return;
     }
 
-    const { getProfileIdsByNames } = await import("@/lib/user-lookup");
-    const [houssamId, kareemId] = await getProfileIdsByNames(["Houssam", "Kareem"]);
-    const ownerIds = [houssamId, kareemId].filter(Boolean);
+    const { getOwnerIds } = await import("@/lib/user-lookup");
+    const ownerIds = await getOwnerIds();
     if (ownerIds.length > 0) {
       await createNotificationsForUsers(
         ownerIds,
@@ -488,7 +486,7 @@ export default function RequestCenterPage() {
       );
     }
 
-    toast.success("Request forwarded to Houssam and Kareem");
+    toast.success("Request forwarded to owners");
     setDetailOpen(null);
     setAssistantNotes("");
     setAssistantPriority("normal");
