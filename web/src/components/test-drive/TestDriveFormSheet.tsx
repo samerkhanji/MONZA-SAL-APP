@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { Loader2 } from "lucide-react";
+import { formatError } from "@/lib/error-messages";
 
 export type TestDriveCarSummary = {
   id: string;
@@ -221,7 +222,7 @@ export function TestDriveFormSheet({
       ) {
         toast.error("This vehicle already has an active test drive.");
       } else {
-        toast.error(insErr.message);
+        toast.error(formatError(insErr));
       }
       setSaving(false);
       return;
@@ -267,7 +268,7 @@ export function TestDriveFormSheet({
       })
       .eq("id", existing.id);
 
-    if (error) toast.error(error.message);
+    if (error) toast.error(formatError(error));
     else toast.success("Test drive updated.");
     setSaving(false);
     if (!error) {
@@ -299,7 +300,7 @@ export function TestDriveFormSheet({
       .eq("id", existing.id);
 
     if (uErr) {
-      toast.error(uErr.message);
+      toast.error(formatError(uErr));
       setSaving(false);
       return;
     }
@@ -328,7 +329,7 @@ export function TestDriveFormSheet({
       .update({ status: "cancelled", updated_at: now })
       .eq("id", existing.id);
     if (uErr) {
-      toast.error(uErr.message);
+      toast.error(formatError(uErr));
       setSaving(false);
       return;
     }

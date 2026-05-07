@@ -58,6 +58,7 @@ import {
 } from "lucide-react";
 import { LEAD_SOURCE_LABELS, LANGUAGE_LABELS } from "@/lib/constants/customers";
 import { VinScanButton } from "@/components/scanner/VinScanButton";
+import { formatError } from "@/lib/error-messages";
 
 interface PlanWithRelations extends PaymentPlan {
   customer: Customer | null;
@@ -546,7 +547,7 @@ export default function InstallmentsPage() {
 
     if (error) {
       setMarkingPaid(false);
-      toast.error(error.message);
+      toast.error(formatError(error));
       return;
     }
 

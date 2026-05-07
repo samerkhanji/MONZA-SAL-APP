@@ -28,6 +28,7 @@ import {
 import { ExportButton } from "@/components/ExportButton";
 import type { ExportColumn } from "@/lib/exportToExcel";
 import { RefreshCw } from "lucide-react";
+import { formatError } from "@/lib/error-messages";
 
 interface SalesOrderFull {
   id: string;
@@ -115,7 +116,7 @@ export default function SalesOrdersPage() {
       .order("created_at", { ascending: false });
 
     if (error) {
-      toast.error(error.message);
+      toast.error(formatError(error));
       setOrders([]);
     } else {
       // Supabase types FK embeds as arrays by default; cast via unknown.

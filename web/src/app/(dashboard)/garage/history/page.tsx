@@ -26,6 +26,7 @@ import { History, Lock } from "lucide-react";
 import { ExportButton } from "@/components/ExportButton";
 import type { ExportColumn } from "@/lib/exportToExcel";
 import { VinScanButton } from "@/components/scanner/VinScanButton";
+import { formatError } from "@/lib/error-messages";
 
 interface JobWithCar extends GarageJob {
   cars?: {
@@ -110,7 +111,7 @@ export default function GarageHistoryPage() {
       .order("created_at", { ascending: false });
 
     if (error) {
-      toast.error(error.message);
+      toast.error(formatError(error));
       setJobs([]);
     } else {
       const jobsData = (data as JobWithCar[]) ?? [];

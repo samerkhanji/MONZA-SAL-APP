@@ -51,6 +51,7 @@ import { ScannerDialog } from "@/components/scanner/ScannerDialog";
 import { JobTimeEntryControls } from "@/components/garage/JobTimeEntryControls";
 import { JobBayTypeControls } from "@/components/garage/JobBayTypeControls";
 import { RepairProposalPanel } from "@/components/garage/RepairProposalPanel";
+import { formatError } from "@/lib/error-messages";
 
 interface JobWithCar extends GarageJob {
   cars?: {
@@ -167,7 +168,7 @@ export default function JobDetailPage() {
         p_job_part_id: jobPartId,
       });
       if (error) {
-        toast.error(error.message);
+        toast.error(formatError(error));
         return;
       }
       toast.success(`${partName} returned to stock`);
@@ -225,7 +226,7 @@ export default function JobDetailPage() {
         p_user_id: user?.id ?? null,
       });
       if (error) {
-        toast.error(error.message);
+        toast.error(formatError(error));
         return;
       }
       const partName = partsList.find((p) => p.id === selectedPartId)?.part_name ?? "Part";
@@ -287,7 +288,7 @@ export default function JobDetailPage() {
       .from("garage_jobs")
       .update({ [field]: value })
       .eq("id", job.id);
-    if (error) toast.error(error.message);
+    if (error) toast.error(formatError(error));
     else fetchJob();
   }
 
@@ -443,7 +444,7 @@ export default function JobDetailPage() {
                     updated_at: new Date().toISOString(),
                   })
                   .eq("id", job.id);
-                if (error) toast.error(error.message);
+                if (error) toast.error(formatError(error));
                 else {
                   toast.success(bayId ? "Bay updated" : "Bay cleared");
                   void fetchJob();
@@ -514,7 +515,7 @@ export default function JobDetailPage() {
                       .update({ work_checklist: next })
                       .eq("id", job.id);
                     if (error) {
-                      toast.error(error.message);
+                      toast.error(formatError(error));
                       void fetchJob();
                     }
                   }}

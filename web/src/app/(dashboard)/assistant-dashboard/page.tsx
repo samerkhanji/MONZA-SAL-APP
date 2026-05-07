@@ -30,6 +30,7 @@ import { ExportButton } from "@/components/ExportButton";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { cn } from "@/lib/utils";
 import { getProfileFullName } from "@/lib/supabase-profile";
+import { formatError } from "@/lib/error-messages";
 
 const REFRESH_INTERVAL_MS = 60000;
 
@@ -141,7 +142,7 @@ export default function AssistantDashboardPage() {
       .eq("id", job.id);
     setMarkingDelivered(null);
     if (error) {
-      toast.error(error.message);
+      toast.error(formatError(error));
     } else {
       toast.success("Marked as delivered");
       fetchData();

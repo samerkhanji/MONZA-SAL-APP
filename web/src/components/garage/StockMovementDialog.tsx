@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import { ScanLine } from "lucide-react";
 import { ScannerDialog } from "@/components/scanner/ScannerDialog";
+import { formatError } from "@/lib/error-messages";
 
 interface CarOption {
   id: string;
@@ -116,7 +117,7 @@ export function StockMovementDialog({
     setSubmitting(false);
 
     if (error) {
-      toast.error(error.message);
+      toast.error(formatError(error));
       return;
     }
 

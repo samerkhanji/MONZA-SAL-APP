@@ -46,19 +46,26 @@ function getStatusBg(value: string): string | undefined {
   return STATUS_BG[lower] ?? STATUS_BG[value.toLowerCase()];
 }
 
-function formatDate(val: string | null | undefined): string {
+/**
+ * Returns a real Date object so xlsx-js-style serializes it as an Excel
+ * date serial (sortable, filterable, usable in pivot tables). Previously
+ * we returned "DD/MM/YYYY" strings which Excel sorted alphabetically.
+ */
+function formatDate(val: string | null | undefined): Date | "" {
   if (!val) return "";
   const d = new Date(val);
   if (isNaN(d.getTime())) return "";
-  const day = String(d.getDate()).padStart(2, "0");
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const year = d.getFullYear();
-  return `${day}/${month}/${year}`;
+  return d;
 }
 
-function formatCurrency(val: number | null | undefined): string {
+/**
+ * Returns a number so Excel can SUM / AVG / chart the column. Previously
+ * returned "USD 10000" as a string, which made every export financially
+ * useless. The currency code goes in the column header instead.
+ */
+function formatCurrency(val: number | null | undefined): number | "" {
   if (val == null || isNaN(val)) return "";
-  return `USD ${val.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  return Number(val);
 }
 
 export interface ExportOptions {
@@ -86,12 +93,23 @@ export function exportToExcel(
     )
   );
 
-  const aoa: (string | number)[][] = [];
+  const aoa: (string | number | Date | "")[][] = [];
   if (includeTitleRow && pageName) {
     aoa.push([`Monza CRM — ${pageName} Export`]);
   }
   aoa.push(columns.map((c) => c.header));
-  rows.forEach((r) => aoa.push(columns.map((c) => (r[c.header] as string | number) ?? "")));
+  rows.forEach((r) =>
+    aoa.push(
+      columns.map((c) => {
+        const v = r[c.header];
+        // Allow numbers, dates, and strings through unchanged so Excel
+        // serializes them with the right type.
+        if (v instanceof Date) return v;
+        if (typeof v === "number") return v;
+        return (v as string) ?? "";
+      })
+    )
+  );
   if (summary) {
     aoa.push([summary, ...Array(columns.length - 1).fill("")]);
   }
@@ -154,7 +172,20 @@ export function exportToExcel(
         fill: { fgColor: { rgb: statusBg && !isSummary ? statusBg : bg } },
         alignment: { horizontal: align, wrapText: true },
         border: BORDER,
+        ...(col?.type === "date"
+          ? { numFmt: "dd/mm/yyyy" }
+          : col?.type === "currency"
+            ? { numFmt: "#,##0" }
+            : col?.type === "number"
+              ? { numFmt: "#,##0.##" }
+              : {}),
       };
+      // Tell Excel the cell value is a date so it serializes as a date serial.
+      if (col?.type === "date" && cell.v instanceof Date) {
+        cell.t = "d";
+      } else if ((col?.type === "currency" || col?.type === "number") && typeof cell.v === "number") {
+        cell.t = "n";
+      }
     }
   }
 
@@ -163,6 +194,8 @@ export function exportToExcel(
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Data");
-  const dateStr = new Date().toISOString().split("T")[0];
-  XLSX.writeFile(wb, `${filename}_${dateStr}.xlsx`);
+  // Include time as well as date so multiple exports per day don't overwrite
+  // each other in the user's Downloads folder.
+  const tsStr = new Date().toISOString().slice(0, 19).replace(/:/g, "-");
+  XLSX.writeFile(wb, `${filename}_${tsStr}.xlsx`);
 }

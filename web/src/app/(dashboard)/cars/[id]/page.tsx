@@ -57,6 +57,7 @@ import { getProfileFullName } from "@/lib/supabase-profile";
 import { AlertCircle, Check, Loader2, User, X } from "lucide-react";
 import dynamic from "next/dynamic";
 import {
+import { formatError } from "@/lib/error-messages";
   Dialog,
   DialogContent,
   DialogDescription,
@@ -1031,7 +1032,7 @@ export default function CarProfilePage() {
     setNoteSubmitting(false);
 
     if (error) {
-      toast.error(error.message);
+      toast.error(formatError(error));
       return;
     }
 

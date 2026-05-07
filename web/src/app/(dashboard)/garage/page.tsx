@@ -33,6 +33,7 @@ import type { ExportColumn } from "@/lib/exportToExcel";
 import { NewJobDialog } from "@/components/garage/NewJobDialog";
 import { FinishJobDialog } from "@/components/garage/FinishJobDialog";
 import { GarageBaySection } from "@/components/garage/GarageBaySection";
+import { formatError } from "@/lib/error-messages";
 
 const ScannerDialog = dynamic(
   () => import("@/components/scanner/ScannerDialog").then((m) => ({ default: m.ScannerDialog })),
@@ -138,7 +139,7 @@ export default function GarageJobsPage() {
       .order("created_at", { ascending: false });
 
     if (error) {
-      toast.error(error.message);
+      toast.error(formatError(error));
       setJobs([]);
     } else {
       setJobs((data as JobWithCar[]) ?? []);
@@ -323,7 +324,7 @@ export default function GarageJobsPage() {
       .eq("id", job.id);
 
     if (error) {
-      toast.error(error.message);
+      toast.error(formatError(error));
       return;
     }
 

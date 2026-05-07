@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/table";
 import { ScannerDialog } from "@/components/scanner/ScannerDialog";
 import { ScanLine, Loader2 } from "lucide-react";
+import { formatError } from "@/lib/error-messages";
 
 const VIN_REGEX = /^[A-HJ-NPR-Z0-9]{17}$/;
 
@@ -119,7 +120,7 @@ export default function TestDrivePage() {
         .maybeSingle();
 
       if (tdErr) {
-        toast.error(tdErr.message);
+        toast.error(formatError(tdErr));
         setLookupLoading(false);
         return;
       }

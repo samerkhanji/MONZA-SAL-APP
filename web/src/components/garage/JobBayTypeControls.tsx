@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { formatLiveDuration } from "@/lib/garage-bays";
+import { formatError } from "@/lib/error-messages";
 
 function paintActive(ctx: GarageJobBayContext | null) {
   return !!(ctx?.paint_started_at && !ctx?.paint_ended_at);
@@ -51,7 +52,7 @@ export function JobBayTypeControls({
       .eq("job_id", jobId)
       .maybeSingle();
     if (error) {
-      toast.error(error.message);
+      toast.error(formatError(error));
       setCtx(null);
     } else {
       setCtx((data as GarageJobBayContext) ?? null);
@@ -122,7 +123,7 @@ export function JobBayTypeControls({
       .update({ ...partial, updated_at: new Date().toISOString() })
       .eq("job_id", jobId);
     setBusy(false);
-    if (error) toast.error(error.message);
+    if (error) toast.error(formatError(error));
     else {
       await load();
     }

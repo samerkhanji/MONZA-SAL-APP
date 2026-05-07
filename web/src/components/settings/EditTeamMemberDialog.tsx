@@ -32,6 +32,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { USER_ROLE_LABELS } from "@/lib/constants/user";
+import { formatError } from "@/lib/error-messages";
 
 const CAPABILITY_LABELS: Record<UserCapability, string> = {
   garage: "Garage",
@@ -154,7 +155,7 @@ export function EditTeamMemberDialog({
     setSubmitting(false);
 
     if (error) {
-      toast.error(error.message);
+      toast.error(formatError(error));
       return;
     }
     toast.success("Team member updated");
@@ -183,7 +184,7 @@ export function EditTeamMemberDialog({
     setDeactivateOpen(false);
 
     if (error) {
-      toast.error(error.message);
+      toast.error(formatError(error));
       return;
     }
     toast.success("Employee deactivated");
@@ -211,7 +212,7 @@ export function EditTeamMemberDialog({
     setSubmitting(false);
 
     if (error) {
-      toast.error(error.message);
+      toast.error(formatError(error));
       return;
     }
     toast.success("Employee reactivated");

@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ShieldCheck, ShieldAlert } from "lucide-react";
+import { formatError } from "@/lib/error-messages";
 
 /**
  * Two-Factor Authentication enrollment + management.
@@ -51,7 +52,7 @@ export function TwoFactorAuthSection() {
     setLoading(true);
     const { data, error } = await supabase.auth.mfa.listFactors();
     if (error) {
-      toast.error(error.message);
+      toast.error(formatError(error));
       setFactors([]);
     } else {
       const all: Factor[] = [
@@ -85,7 +86,7 @@ export function TwoFactorAuthSection() {
     });
     setEnrolling(false);
     if (error) {
-      toast.error(error.message);
+      toast.error(formatError(error));
       return;
     }
     setEnrollment(data as unknown as EnrollResult);
@@ -113,7 +114,7 @@ export function TwoFactorAuthSection() {
     });
     setVerifying(false);
     if (vErr) {
-      toast.error(vErr.message);
+      toast.error(formatError(vErr));
       return;
     }
     toast.success("Two-factor authentication enabled");
@@ -129,7 +130,7 @@ export function TwoFactorAuthSection() {
     if (!ok) return;
     const { error } = await supabase.auth.mfa.unenroll({ factorId });
     if (error) {
-      toast.error(error.message);
+      toast.error(formatError(error));
       return;
     }
     toast.success("Two-factor authentication disabled");

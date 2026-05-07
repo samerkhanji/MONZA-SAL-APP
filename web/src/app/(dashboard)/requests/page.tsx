@@ -50,6 +50,7 @@ const ScannerDialog = dynamic(
 );
 import { ExportButton } from "@/components/ExportButton";
 import type { ExportColumn } from "@/lib/exportToExcel";
+import { formatError } from "@/lib/error-messages";
 
 interface RequestWithProfiles extends Request {
   submitter?: { full_name: string | null } | null;
@@ -398,7 +399,7 @@ export default function RequestCenterPage() {
 
     setNewSubmitting(false);
     if (error) {
-      toast.error(error.message);
+      toast.error(formatError(error));
       return;
     }
 
@@ -471,7 +472,7 @@ export default function RequestCenterPage() {
 
     setActionSubmitting(false);
     if (error) {
-      toast.error(error.message);
+      toast.error(formatError(error));
       return;
     }
 
@@ -520,7 +521,7 @@ export default function RequestCenterPage() {
 
     setActionSubmitting(false);
     if (error) {
-      toast.error(error.message);
+      toast.error(formatError(error));
       return;
     }
     if (submitterId) {
@@ -565,7 +566,7 @@ export default function RequestCenterPage() {
 
     setActionSubmitting(false);
     if (error) {
-      toast.error(error.message);
+      toast.error(formatError(error));
       return;
     }
     if (submitterId) {
@@ -601,7 +602,7 @@ export default function RequestCenterPage() {
 
     setActionSubmitting(false);
     if (error) {
-      toast.error(error.message);
+      toast.error(formatError(error));
       return;
     }
     if (submitterId) {
