@@ -276,7 +276,7 @@ export default function GarageWorkflowSettingsPage() {
                   ) : (
                     <>
                       <Input
-                        type="number"
+                        type="number" inputMode="decimal"
                         min={0}
                         className="w-28"
                         key={`${c.resource_name}-${c.capacity}`}

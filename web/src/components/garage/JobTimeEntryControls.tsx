@@ -108,12 +108,22 @@ export function JobTimeEntryControls({
       return;
     }
 
+    // Preserve the FIRST started_at across pause/resume so audit trails and
+    // overtime calculations always reference the original start of work, not
+    // the most recent resume. Each session's per-resume start is captured
+    // in the job_time_entries row itself.
     const now = new Date().toISOString();
+    const { data: jobRow } = await supabase
+      .from("garage_jobs")
+      .select("started_at")
+      .eq("id", jobId)
+      .single();
+    const existingStartedAt = (jobRow as { started_at?: string | null } | null)?.started_at;
     const { error: upErr } = await supabase
       .from("garage_jobs")
       .update({
         status: "in_progress",
-        started_at: now,
+        started_at: existingStartedAt ?? now,
       })
       .eq("id", jobId);
     if (upErr) {
@@ -155,10 +165,12 @@ export function JobTimeEntryControls({
     const current = (jobRow as { actual_hours?: number } | null)?.actual_hours ?? 0;
     const addH = mins / 60;
 
+    // Don't null garage_jobs.started_at on pause — the original start time is
+    // preserved across pauses. Whether a session is currently open is
+    // determined by the existence of a job_time_entries row with ended_at IS NULL.
     const { error: e2 } = await supabase
       .from("garage_jobs")
       .update({
-        started_at: null,
         actual_hours: current + addH,
       })
       .eq("id", jobId);

@@ -747,7 +747,7 @@ export default function JobDetailPage() {
                   <Input
                     id="add-part-quantity"
                     name="add-part-quantity"
-                    type="number"
+                    type="number" inputMode="decimal"
                     min={1}
                     value={partQuantity}
                     onChange={(e) => setPartQuantity(e.target.value)}

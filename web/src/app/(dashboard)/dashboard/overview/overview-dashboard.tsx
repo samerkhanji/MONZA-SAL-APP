@@ -245,7 +245,7 @@ function CarsByStatusChartCard({
                   margin={{ left: 8, right: 16, top: 8, bottom: 8 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis type="number" allowDecimals={false} className="text-xs" />
+                  <XAxis type="number" inputMode="decimal" allowDecimals={false} className="text-xs" />
                   <YAxis
                     type="category"
                     dataKey="name"

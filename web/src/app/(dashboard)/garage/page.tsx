@@ -193,19 +193,18 @@ export default function GarageJobsPage() {
 
   useEffect(() => {
     if (jobs.length === 0) return;
+    // Compare actual cumulative hours worked (job_time_entries → garage_jobs.actual_hours)
+    // against the estimate, NOT wall-clock since started_at — the latter would
+    // fire on jobs that were paused most of the day.
     const overtimeJobs = jobs.filter(
       (j) =>
         j.status === "in_progress" &&
-        j.started_at &&
         (j.estimated_hours ?? 0) > 0 &&
+        (j.actual_hours ?? 0) > (j.estimated_hours ?? 0) &&
         !j.overtime_notified
     );
-    const now = Date.now();
     for (const j of overtimeJobs) {
-      const startMs = new Date(j.started_at!).getTime();
-      const expectedEndMs = startMs + (j.estimated_hours ?? 0) * 60 * 60 * 1000;
-      if (now > expectedEndMs) {
-        (async () => {
+      (async () => {
           const garageIds = await import("@/lib/user-lookup").then((m) =>
             m.getProfileIdsByCapability("garage")
           );
@@ -224,7 +223,6 @@ export default function GarageJobsPage() {
               .eq("id", j.id);
           }
         })();
-      }
     }
   }, [jobs]);
 
