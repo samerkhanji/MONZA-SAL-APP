@@ -429,7 +429,7 @@ export default function AddCarPage() {
                 <Input
                   id="car-model-year"
                   name="car-model-year"
-                  type="number"
+                  type="number" inputMode="decimal"
                   min={1900}
                   max={2100}
                   value={modelYear}
@@ -687,7 +687,7 @@ export default function AddCarPage() {
                 <Input
                   id="car-battery-percent"
                   name="car-battery-percent"
-                  type="number"
+                  type="number" inputMode="decimal"
                   min={0}
                   max={100}
                   value={batteryPercent}
@@ -700,7 +700,7 @@ export default function AddCarPage() {
                 <Input
                   id="car-current-km"
                   name="car-current-km"
-                  type="number"
+                  type="number" inputMode="decimal"
                   min={0}
                   value={currentKm}
                   onChange={(e) => setCurrentKm(e.target.value)}
@@ -764,7 +764,7 @@ export default function AddCarPage() {
                     <Input
                       id="car-ev-km"
                       name="car-ev-km"
-                      type="number"
+                      type="number" inputMode="decimal"
                       min={0}
                       value={evKm}
                       onChange={(e) => setEvKm(e.target.value)}
@@ -776,7 +776,7 @@ export default function AddCarPage() {
                     <Input
                       id="car-motor-km"
                       name="car-motor-km"
-                      type="number"
+                      type="number" inputMode="decimal"
                       min={0}
                       value={motorKm}
                       onChange={(e) => setMotorKm(e.target.value)}
@@ -949,7 +949,7 @@ export default function AddCarPage() {
                       <Input
                         id="sale-deposit-amount"
                         name="sale-deposit-amount"
-                        type="number"
+                        type="number" inputMode="decimal"
                         min={0}
                         step="0.01"
                         value={depositAmount}

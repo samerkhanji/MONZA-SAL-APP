@@ -1617,7 +1617,7 @@ export default function InstallmentsPage() {
                 <Label htmlFor="paid-amount">Amount Paid</Label>
                 <Input
                   id="paid-amount"
-                  type="number"
+                  type="number" inputMode="decimal"
                   min={0}
                   step="0.01"
                   value={paidAmount}
@@ -2265,7 +2265,7 @@ export default function InstallmentsPage() {
                     <Input
                       value={newPlanTotal}
                       onChange={(e) => setNewPlanTotal(e.target.value)}
-                      type="number"
+                      type="number" inputMode="decimal"
                       min={0}
                       step="0.01"
                     />
@@ -2275,7 +2275,7 @@ export default function InstallmentsPage() {
                     <Input
                       value={newPlanDown}
                       onChange={(e) => setNewPlanDown(e.target.value)}
-                      type="number"
+                      type="number" inputMode="decimal"
                       min={0}
                       step="0.01"
                     />
@@ -2285,7 +2285,7 @@ export default function InstallmentsPage() {
                     <Input
                       value={newPlanMonths}
                       onChange={(e) => setNewPlanMonths(e.target.value)}
-                      type="number"
+                      type="number" inputMode="decimal"
                       min={1}
                       step={1}
                     />
@@ -2295,7 +2295,7 @@ export default function InstallmentsPage() {
                     <Input
                       value={newPlanMonthly}
                       onChange={(e) => setNewPlanMonthly(e.target.value)}
-                      type="number"
+                      type="number" inputMode="decimal"
                       min={0}
                       step="0.01"
                     />
@@ -2313,7 +2313,7 @@ export default function InstallmentsPage() {
                     <Input
                       value={newPlanDueDay}
                       onChange={(e) => setNewPlanDueDay(e.target.value)}
-                      type="number"
+                      type="number" inputMode="decimal"
                       min={1}
                       max={31}
                     />
@@ -2323,7 +2323,7 @@ export default function InstallmentsPage() {
                     <Input
                       value={newPlanInterestRate}
                       onChange={(e) => setNewPlanInterestRate(e.target.value)}
-                      type="number"
+                      type="number" inputMode="decimal"
                       min={0}
                       step="0.01"
                       placeholder="0"

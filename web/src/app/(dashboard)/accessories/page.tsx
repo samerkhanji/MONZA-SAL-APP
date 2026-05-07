@@ -35,6 +35,8 @@ import {
 import { Plus, RotateCcw, Search, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CustomAccessoryCollections } from "@/components/accessories/CustomAccessoryCollections";
+import { ExportButton } from "@/components/ExportButton";
+import type { ExportColumn } from "@/lib/exportToExcel";
 
 const STORAGE_KEY = "monza-crm-accessories-inventory-v2";
 const LEGACY_STORAGE_KEY = "monza-crm-accessories-inventory-v1";
@@ -382,6 +384,34 @@ export default function AccessoriesPage() {
             {saveState === "error" && "Save failed"}
             {saveState === "idle" && "—"}
           </span>
+          <ExportButton
+            data={filtered.map((r) => ({
+              category:
+                ACCESSORY_CATEGORIES.find((c) => c.id === r.category)?.label ?? r.category,
+              label: r.label,
+              quantity: r.quantity,
+              note: r.note,
+              linked_plate: r.linked_plate ?? "",
+            }))}
+            allData={rows.map((r) => ({
+              category:
+                ACCESSORY_CATEGORIES.find((c) => c.id === r.category)?.label ?? r.category,
+              label: r.label,
+              quantity: r.quantity,
+              note: r.note,
+              linked_plate: r.linked_plate ?? "",
+            }))}
+            columns={[
+              { key: "category", header: "Category" },
+              { key: "label", header: "Label" },
+              { key: "quantity", header: "Quantity", type: "number" },
+              { key: "note", header: "Note" },
+              { key: "linked_plate", header: "Linked plate" },
+            ] satisfies ExportColumn[]}
+            filename="Accessories"
+            options={{ pageName: "Accessories", summary: `Total quantity: ${grandTotalQty}` }}
+            disabled={!hydrated}
+          />
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="outline" size="sm" className="gap-1.5">

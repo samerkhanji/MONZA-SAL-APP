@@ -199,12 +199,17 @@ export default function SalesOrderDetailPage() {
   }
 
   async function saveContract() {
+    const trimmed = contractUrl.trim();
+    if (trimmed && !/^https?:\/\/[^\s]+$/i.test(trimmed)) {
+      toast.error("Contract URL must start with http:// or https://");
+      return;
+    }
     const ok = await patchOrder({
-      signed_contract_url: contractUrl || null,
-      contract_signed_at: contractUrl ? new Date().toISOString() : null,
+      signed_contract_url: trimmed || null,
+      contract_signed_at: trimmed ? new Date().toISOString() : null,
       status: order?.status === "draft" || order?.status === "reserved" ? ("confirmed" as SaleStatus) : order!.status,
     });
-    if (ok) toast.success(contractUrl ? "Contract recorded" : "Contract cleared");
+    if (ok) toast.success(trimmed ? "Contract recorded" : "Contract cleared");
   }
 
   async function markDelivered() {
@@ -365,7 +370,7 @@ export default function SalesOrderDetailPage() {
             <div>
               <Label htmlFor="quote-amount">Amount</Label>
               <Input
-                id="quote-amount" type="number" min={0} step="any"
+                id="quote-amount" type="number" inputMode="decimal" min={0} step="any"
                 value={quoteAmount} onChange={(e) => setQuoteAmount(e.target.value)}
                 disabled={!canEdit}
               />
@@ -408,7 +413,7 @@ export default function SalesOrderDetailPage() {
             <div>
               <Label htmlFor="deposit-amount">Amount</Label>
               <Input
-                id="deposit-amount" type="number" min={0} step="any"
+                id="deposit-amount" type="number" inputMode="decimal" min={0} step="any"
                 value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)}
                 disabled={!canEdit}
               />
@@ -454,6 +459,8 @@ export default function SalesOrderDetailPage() {
             <Label htmlFor="contract-url">Contract URL</Label>
             <Input
               id="contract-url"
+              type="url"
+              inputMode="url"
               placeholder="https://… (Drive / Dropbox / Supabase storage link)"
               value={contractUrl}
               onChange={(e) => setContractUrl(e.target.value)}
