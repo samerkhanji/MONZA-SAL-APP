@@ -11,8 +11,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { CarDocuments } from "@/components/car-documents";
 import { Search, FileText, ScanLine } from "lucide-react";
 import { ScannerDialog } from "@/components/scanner/ScannerDialog";
-import { createNotification } from "@/lib/notifications";
-import { getProfileIdByName } from "@/lib/user-lookup";
+import { createNotificationsForUsers } from "@/lib/notifications";
+import { getOwnerIds } from "@/lib/user-lookup";
 
 const VIN_REGEX = /^[A-HJ-NPR-Z0-9]{17}$/i;
 
@@ -125,15 +125,15 @@ export default function DocumentsPage() {
       return;
     }
 
-    const houssamId = await getProfileIdByName("Houssam");
-    if (houssamId) {
-      await createNotification({
-        userId: houssamId,
-        title: "Document access requested",
-        message: `${profile?.full_name ?? "An employee"} is requesting access to documents matching: "${vin}"`,
-        link: "/documents",
-        metadata: { type: "document_access_request", document_access_request_id: (req as { id: string }).id },
-      });
+    const ownerIds = await getOwnerIds();
+    if (ownerIds.length > 0) {
+      await createNotificationsForUsers(
+        ownerIds,
+        "Document access requested",
+        `${profile?.full_name ?? "An employee"} is requesting access to documents matching: "${vin}"`,
+        "/documents",
+        { type: "document_access_request", document_access_request_id: (req as { id: string }).id }
+      );
     }
 
     setCar(null);

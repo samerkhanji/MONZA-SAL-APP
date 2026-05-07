@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase";
-import { createNotification } from "./notifications";
-import { getProfileIdByName } from "./user-lookup";
+import { createNotification, createNotificationsForUsers } from "./notifications";
+import { getOwnerIds } from "./user-lookup";
 
 export type DeleteRequestItemType = "car" | "part";
 
@@ -52,19 +52,19 @@ export async function createDeleteRequest(
   const id = (data as { id: string })?.id;
   if (!id) return null;
 
-  const houssamId = await getProfileIdByName("Houssam");
-  if (houssamId) {
+  const ownerIds = await getOwnerIds();
+  if (ownerIds.length > 0) {
     const itemLabel =
       itemType === "car"
         ? `${(itemDetails as CarDeleteDetails).brand} ${(itemDetails as CarDeleteDetails).model} (${(itemDetails as CarDeleteDetails).vin})`
         : `${(itemDetails as PartDeleteDetails).part_name} (OE: ${(itemDetails as PartDeleteDetails).oe_number ?? "—"})`;
-    await createNotification({
-      userId: houssamId,
-      title: "Delete request pending",
-      message: `${itemType === "car" ? "Car" : "Part"} deletion requested: ${itemLabel}`,
-      link: "/requests/pending",
-      metadata: { type: "delete_request", delete_request_id: id },
-    });
+    await createNotificationsForUsers(
+      ownerIds,
+      "Delete request pending",
+      `${itemType === "car" ? "Car" : "Part"} deletion requested: ${itemLabel}`,
+      "/requests/pending",
+      { type: "delete_request", delete_request_id: id }
+    );
   }
 
   return id;

@@ -207,9 +207,9 @@ export function RepairProposalPanel({
       toast.error(error.message);
       return;
     }
-    const { getProfileIdsByNames } = await import("@/lib/user-lookup");
+    const { getProfileIdsByRole } = await import("@/lib/user-lookup");
     const { createNotificationsForUsers } = await import("@/lib/notifications");
-    const ids = await getProfileIdsByNames(["Lara", "Samaya"]);
+    const ids = await getProfileIdsByRole("assistant");
     if (ids.length > 0) {
       await createNotificationsForUsers(
         ids,
@@ -270,9 +270,9 @@ export function RepairProposalPanel({
       toast.error(error.message);
       return;
     }
-    const { getProfileIdsByNames } = await import("@/lib/user-lookup");
+    const { getProfileIdsByRole } = await import("@/lib/user-lookup");
     const { createNotificationsForUsers } = await import("@/lib/notifications");
-    const gmIds = await getProfileIdsByNames(["Mark"]);
+    const gmIds = await getProfileIdsByRole("garage_manager");
     if (gmIds.length > 0) {
       await createNotificationsForUsers(
         gmIds,

@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase";
-import { createNotification } from "./notifications";
-import { getProfileIdByName } from "./user-lookup";
+import { createNotification, createNotificationsForUsers } from "./notifications";
+import { getOwnerIds } from "./user-lookup";
 
 export async function requestPageAccess(
   requestedBy: string,
@@ -34,18 +34,18 @@ export async function requestPageAccess(
 
   if (error) return { success: false };
 
-  const houssamId = await getProfileIdByName("Houssam");
-  if (houssamId) {
-    await createNotification({
-      userId: houssamId,
-      title: "Page access requested",
-      message: `${requesterName} is requesting access to Garage History`,
-      link: "/garage/history",
-      metadata: {
+  const ownerIds = await getOwnerIds();
+  if (ownerIds.length > 0) {
+    await createNotificationsForUsers(
+      ownerIds,
+      "Page access requested",
+      `${requesterName} is requesting access to Garage History`,
+      "/garage/history",
+      {
         type: "page_access_request",
         page_access_request_id: (req as { id: string }).id,
-      },
-    });
+      }
+    );
   }
 
   return { success: true, requestId: (req as { id: string }).id };
