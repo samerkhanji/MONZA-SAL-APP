@@ -162,15 +162,19 @@ export default function JobDetailPage() {
   async function handleReturnPart(jobPartId: string, partName: string) {
     const ok = window.confirm(`Return ${partName} to stock?`);
     if (!ok) return;
-    const { error } = await supabase.rpc("return_part_from_job", {
-      p_job_part_id: jobPartId,
-    });
-    if (error) {
-      toast.error(error.message);
-      return;
+    try {
+      const { error } = await supabase.rpc("return_part_from_job", {
+        p_job_part_id: jobPartId,
+      });
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      toast.success(`${partName} returned to stock`);
+    } finally {
+      // Always refetch — even on error the RPC may have partially applied.
+      await fetchParts();
     }
-    toast.success(`${partName} returned to stock`);
-    fetchParts();
   }
 
   useEffect(() => {
@@ -211,37 +215,41 @@ export default function JobDetailPage() {
       return;
     }
     setPartSubmitting(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    const { error } = await supabase.rpc("apply_part_to_job", {
-      p_job_id: job.id,
-      p_part_id: selectedPartId,
-      p_quantity: qty,
-      p_note: partNote.trim() || null,
-      p_user_id: user?.id ?? null,
-    });
-    setPartSubmitting(false);
-    if (error) {
-      toast.error(error.message);
-      return;
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error } = await supabase.rpc("apply_part_to_job", {
+        p_job_id: job.id,
+        p_part_id: selectedPartId,
+        p_quantity: qty,
+        p_note: partNote.trim() || null,
+        p_user_id: user?.id ?? null,
+      });
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      const partName = partsList.find((p) => p.id === selectedPartId)?.part_name ?? "Part";
+      const c = job?.cars;
+      const vinShort = c?.vin ? (c.vin.length >= 8 ? `...${c.vin.slice(-8)}` : c.vin) : "";
+      const { data: partAfter } = await supabase
+        .from("parts")
+        .select("quantity")
+        .eq("id", selectedPartId)
+        .single();
+      const remaining = (partAfter as { quantity?: number } | null)?.quantity ?? "?";
+      toast.success(
+        `${partName} ×${qty} added${vinShort ? ` · Used on VIN ${vinShort}` : ""} · Stock: ${remaining} remaining`
+      );
+      setAddPartOpen(false);
+      setSelectedPartId(null);
+      setPartQuantity("1");
+      setPartNote("");
+    } finally {
+      // Always refetch — even on error the RPC may have partially applied
+      // (e.g. decremented stock but failed to insert the job_parts row).
+      setPartSubmitting(false);
+      await Promise.all([fetchParts(), fetchJob()]);
     }
-    const partName = partsList.find((p) => p.id === selectedPartId)?.part_name ?? "Part";
-    const c = job?.cars;
-    const vinShort = c?.vin ? (c.vin.length >= 8 ? `...${c.vin.slice(-8)}` : c.vin) : "";
-    const { data: partAfter } = await supabase
-      .from("parts")
-      .select("quantity")
-      .eq("id", selectedPartId)
-      .single();
-    const remaining = (partAfter as { quantity?: number } | null)?.quantity ?? "?";
-    toast.success(
-      `${partName} ×${qty} added${vinShort ? ` · Used on VIN ${vinShort}` : ""} · Stock: ${remaining} remaining`
-    );
-    setAddPartOpen(false);
-    setSelectedPartId(null);
-    setPartQuantity("1");
-    setPartNote("");
-    fetchParts();
-    fetchJob();
   }
 
   async function handlePartScan(oeNumber: string) {
@@ -289,18 +297,25 @@ export default function JobDetailPage() {
       toast.error("You don't have permission to delete this job.");
       return;
     }
-    const res = await fetch(`/api/garage/jobs/${job.id}`, {
-      method: "DELETE",
-      credentials: "include",
-    });
-    const j = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      toast.error(typeof j?.error === "string" ? j.error : "Delete failed");
-      return;
+    try {
+      const res = await fetch(`/api/garage/jobs/${job.id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(typeof j?.error === "string" ? j.error : "Delete failed");
+        // Refetch — the soft-delete may have partially applied.
+        await fetchJob();
+        return;
+      }
+      toast.success("Job removed");
+      setDeleteOpen(false);
+      router.push("/garage");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Delete failed");
+      await fetchJob();
     }
-    toast.success("Job removed");
-    setDeleteOpen(false);
-    router.push("/garage");
   }
 
   const totalPartsCost = parts.reduce((sum, p) => {
