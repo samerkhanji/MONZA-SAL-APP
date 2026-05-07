@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ChevronDown, Loader2 } from "lucide-react";
+import { formatError } from "@/lib/error-messages";
 
 type Action = {
   label: string;
@@ -73,7 +74,7 @@ export function ReleaseBayMenu({
     });
     setBusy(false);
     if (error) {
-      toast.error(error.message);
+      toast.error(formatError(error));
       return;
     }
     toast.success(`Released — ${action.label}`);

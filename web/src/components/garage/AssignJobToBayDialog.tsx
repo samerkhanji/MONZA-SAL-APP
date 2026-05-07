@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase";
 import type { GarageBay, GarageJob } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import {
+import { formatError } from "@/lib/error-messages";
   Dialog,
   DialogContent,
   DialogFooter,
@@ -51,7 +52,7 @@ export function AssignJobToBayDialog({
         .in("status", ["pending", "in_progress", "waiting_parts"]);
 
       if (error) {
-        toast.error(error.message);
+        toast.error(formatError(error));
         setJobs([]);
       } else {
         let list = (data as JobRow[]) ?? [];
@@ -78,7 +79,7 @@ export function AssignJobToBayDialog({
     });
     setAssigning(null);
     if (error) {
-      toast.error(error.message);
+      toast.error(formatError(error));
       return;
     }
     toast.success("Job assigned to bay");

@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase";
 import { formatLiveDuration, formatDurationMinutes } from "@/lib/garage-bays";
 import { Button } from "@/components/ui/button";
 import { Play, Pause, PlayCircle } from "lucide-react";
+import { formatError } from "@/lib/error-messages";
 
 interface EntryRow {
   id: string;
@@ -50,7 +51,7 @@ export function JobTimeEntryControls({
       .eq("job_id", jobId)
       .order("started_at", { ascending: true });
     if (error) {
-      toast.error(error.message);
+      toast.error(formatError(error));
       setEntries([]);
     } else {
       setEntries((data as EntryRow[]) ?? []);
@@ -71,6 +72,39 @@ export function JobTimeEntryControls({
     () => entries.find((e) => !e.ended_at) ?? null,
     [entries]
   );
+
+  // Warn if the user closes / refreshes the tab while still clocked in.
+  // (Modern browsers ignore the custom message, but the prompt itself appears.)
+  useEffect(() => {
+    if (!openEntry) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [openEntry]);
+
+  // Persistent banner once the current open session has been running 8h+.
+  // Triggers once per session — when the user pauses/closes the toast clears
+  // because openEntry changes.
+  useEffect(() => {
+    if (!openEntry) return;
+    const start = new Date(openEntry.started_at).getTime();
+    const eightHoursMs = 8 * 60 * 60 * 1000;
+    const fireAt = start + eightHoursMs;
+    const delay = Math.max(0, fireAt - Date.now());
+    const id = window.setTimeout(() => {
+      toast.warning(
+        "You've been clocked in for 8+ hours. If your shift ended, please pause or finish the job.",
+        { duration: Infinity, id: `clockin-${openEntry.id}` }
+      );
+    }, delay);
+    return () => {
+      window.clearTimeout(id);
+      toast.dismiss(`clockin-${openEntry.id}`);
+    };
+  }, [openEntry]);
 
   const closedMinutes = useMemo(
     () =>
@@ -103,7 +137,7 @@ export function JobTimeEntryControls({
       started_at: new Date().toISOString(),
     });
     if (insErr) {
-      toast.error(insErr.message);
+      toast.error(formatError(insErr));
       setBusy(false);
       return;
     }
@@ -127,7 +161,7 @@ export function JobTimeEntryControls({
       })
       .eq("id", jobId);
     if (upErr) {
-      toast.error(upErr.message);
+      toast.error(formatError(upErr));
       setBusy(false);
       return;
     }
@@ -152,7 +186,7 @@ export function JobTimeEntryControls({
       .update({ ended_at: nowIso, duration_minutes: mins })
       .eq("id", openEntry.id);
     if (e1) {
-      toast.error(e1.message);
+      toast.error(formatError(e1));
       setBusy(false);
       return;
     }
@@ -175,7 +209,7 @@ export function JobTimeEntryControls({
       })
       .eq("id", jobId);
     if (e2) {
-      toast.error(e2.message);
+      toast.error(formatError(e2));
       setBusy(false);
       return;
     }

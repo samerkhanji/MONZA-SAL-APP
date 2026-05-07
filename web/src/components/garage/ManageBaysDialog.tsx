@@ -16,6 +16,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useUser } from "@/lib/contexts/UserContext";
+import { formatError } from "@/lib/error-messages";
 
 const TYPE_LABEL = BAY_TYPE_ADD_LABEL;
 
@@ -42,7 +43,7 @@ export function ManageBaysDialog({
       .select("*")
       .order("sort_order", { ascending: true });
     if (error) {
-      toast.error(error.message);
+      toast.error(formatError(error));
       setBays([]);
     } else {
       setBays((data as GarageBay[]) ?? []);
@@ -96,7 +97,7 @@ export function ManageBaysDialog({
     });
     setAdding(null);
     if (error) {
-      toast.error(error.message);
+      toast.error(formatError(error));
       return;
     }
     toast.success("Bay added");
@@ -113,7 +114,7 @@ export function ManageBaysDialog({
       .eq("id", b.id);
     setDeactivating(null);
     if (error) {
-      toast.error(error.message);
+      toast.error(formatError(error));
       return;
     }
     toast.success("Bay deactivated");

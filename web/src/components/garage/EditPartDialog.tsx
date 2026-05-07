@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import { ScanLine } from "lucide-react";
 import { ScannerDialog } from "@/components/scanner/ScannerDialog";
+import { formatError } from "@/lib/error-messages";
 
 interface EditPartDialogProps {
   part: Part | null;
@@ -106,7 +107,7 @@ export function EditPartDialog({
     setSubmitting(false);
 
     if (error) {
-      toast.error(error.message);
+      toast.error(formatError(error));
       return;
     }
 

@@ -14,6 +14,7 @@ import {
 } from "@/lib/constants/garage-workflow";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import {
+import { formatError } from "@/lib/error-messages";
   Dialog,
   DialogContent,
   DialogDescription,
@@ -65,7 +66,7 @@ export default function GarageWorkflowSettingsPage() {
       .select("id, name, is_system")
       .order("name");
     if (error) {
-      toast.error(error.message);
+      toast.error(formatError(error));
       return;
     }
     const list = (tpl as typeof templates) ?? [];
@@ -81,7 +82,7 @@ export default function GarageWorkflowSettingsPage() {
       .in("template_id", ids)
       .order("sort_order");
     if (iErr) {
-      toast.error(iErr.message);
+      toast.error(formatError(iErr));
       return;
     }
     type ItemRow = {
@@ -159,7 +160,7 @@ export default function GarageWorkflowSettingsPage() {
       created_by: u.user?.id ?? null,
     });
     if (error) {
-      toast.error(error.message);
+      toast.error(formatError(error));
       return;
     }
     toast.success("Template created");
@@ -172,7 +173,7 @@ export default function GarageWorkflowSettingsPage() {
     if (!confirm("Delete this template and all its lines?")) return;
     const { error } = await supabase.from("garage_task_templates").delete().eq("id", id);
     if (error) {
-      toast.error(error.message);
+      toast.error(formatError(error));
       return;
     }
     toast.success("Template removed");
@@ -190,7 +191,7 @@ export default function GarageWorkflowSettingsPage() {
       default_resource_type: null,
     });
     if (error) {
-      toast.error(error.message);
+      toast.error(formatError(error));
       return;
     }
     setNewItemDesc("");
@@ -201,7 +202,7 @@ export default function GarageWorkflowSettingsPage() {
   async function deleteItem(itemId: string) {
     const { error } = await supabase.from("garage_task_template_items").delete().eq("id", itemId);
     if (error) {
-      toast.error(error.message);
+      toast.error(formatError(error));
       return;
     }
     await loadTemplates();

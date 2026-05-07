@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
+import { formatError } from "@/lib/error-messages";
   Dialog,
   DialogContent,
   DialogFooter,
@@ -126,7 +127,7 @@ export function FinishJobDialog({
       .eq("id", job.id);
 
     if (error) {
-      toast.error(error.message);
+      toast.error(formatError(error));
       setSubmitting(false);
       return;
     }

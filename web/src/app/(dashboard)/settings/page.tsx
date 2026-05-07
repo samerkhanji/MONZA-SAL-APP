@@ -41,6 +41,7 @@ import { cn } from "@/lib/utils";
 import { getProfileFullName } from "@/lib/supabase-profile";
 import { ProfileActivityDot } from "@/components/profile-activity-dot";
 import { DatabaseComputeSection } from "@/components/settings/DatabaseComputeSection";
+import { formatError } from "@/lib/error-messages";
 
 function formatLastOnline(iso: string | null | undefined): string {
   if (!iso) return "Never";
@@ -191,7 +192,7 @@ export default function SettingsPage() {
       .order("created_at", { ascending: true });
 
     if (error) {
-      toast.error(error.message);
+      toast.error(formatError(error));
       setProfiles([]);
     } else {
       setProfiles((data as ProfileRow[]) ?? []);
@@ -226,7 +227,7 @@ export default function SettingsPage() {
       .eq("id", user.id);
     setSavingLanguage(false);
     if (error) {
-      toast.error(error.message);
+      toast.error(formatError(error));
       return;
     }
     toast.success("Language preference saved");
@@ -238,7 +239,7 @@ export default function SettingsPage() {
     const { data, error } = await supabase.from("system_preferences").select("*");
 
     if (error) {
-      toast.error(error.message);
+      toast.error(formatError(error));
     } else {
       const prefs = (data ?? []).reduce(
         (acc: Record<string, string>, row: { key: string; value: string }) => {
@@ -319,7 +320,7 @@ export default function SettingsPage() {
       .eq("id", p.id);
 
     if (error) {
-      toast.error(error.message);
+      toast.error(formatError(error));
     } else {
       toast.success(willActivate ? "Employee reactivated" : "Employee deactivated");
       fetchProfiles();

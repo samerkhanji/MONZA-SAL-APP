@@ -42,6 +42,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Plus, Loader2, MoreVertical, Pencil, Trash2, Table2 } from "lucide-react";
+import { formatError } from "@/lib/error-messages";
 
 function profileName(t: AccessoryCustomTable): string | null {
   const p = t.profiles;
@@ -143,7 +144,7 @@ export function CustomAccessoryCollections() {
     });
     setCreating(false);
     if (error) {
-      toast.error(error.message);
+      toast.error(formatError(error));
       return;
     }
     toast.success("Collection created");
@@ -167,7 +168,7 @@ export function CustomAccessoryCollections() {
       .eq("id", t.id);
     setRenaming(false);
     if (error) {
-      toast.error(error.message);
+      toast.error(formatError(error));
       return;
     }
     toast.success("Collection renamed");
@@ -210,7 +211,7 @@ export function CustomAccessoryCollections() {
       })
       .eq("id", id);
     if (error) {
-      toast.error(error.message);
+      toast.error(formatError(error));
       return;
     }
     void refresh();
@@ -234,7 +235,7 @@ export function CustomAccessoryCollections() {
       .single();
 
     if (error) {
-      toast.error(error.message);
+      toast.error(formatError(error));
       return;
     }
     toast.success("Line added");

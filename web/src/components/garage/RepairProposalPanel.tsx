@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Printer, Plus, ListChecks } from "lucide-react";
+import { formatError } from "@/lib/error-messages";
 
 const STATUS_LABEL: Record<RepairProposalStatus, string> = {
   draft: "Draft",
@@ -68,7 +69,7 @@ export function RepairProposalPanel({
       .limit(1)
       .maybeSingle();
     if (pe) {
-      toast.error(pe.message);
+      toast.error(formatError(pe));
       setProposal(null);
       setItems([]);
       setLoading(false);
@@ -87,7 +88,7 @@ export function RepairProposalPanel({
       .eq("proposal_id", prop.id)
       .order("sort_order", { ascending: true });
     if (ie) {
-      toast.error(ie.message);
+      toast.error(formatError(ie));
       setItems([]);
     } else {
       setItems((its as RepairProposalItem[]) ?? []);
@@ -132,7 +133,7 @@ export function RepairProposalPanel({
       .single();
     setBusy(false);
     if (error) {
-      toast.error(error.message);
+      toast.error(formatError(error));
       return;
     }
     setProposal(data as RepairProposal);
@@ -160,7 +161,7 @@ export function RepairProposalPanel({
       .single();
     setBusy(false);
     if (error) {
-      toast.error(error.message);
+      toast.error(formatError(error));
       return;
     }
     setItems((prev) => [...prev, data as RepairProposalItem]);
@@ -177,7 +178,7 @@ export function RepairProposalPanel({
       .update(patch)
       .eq("id", id);
     setBusy(false);
-    if (error) toast.error(error.message);
+    if (error) toast.error(formatError(error));
     else void load();
   }
 
@@ -204,7 +205,7 @@ export function RepairProposalPanel({
       .eq("id", proposal.id);
     setBusy(false);
     if (error) {
-      toast.error(error.message);
+      toast.error(formatError(error));
       return;
     }
     const { getProfileIdsByRole } = await import("@/lib/user-lookup");
@@ -231,7 +232,7 @@ export function RepairProposalPanel({
       .eq("id", proposal.id);
     setBusy(false);
     if (error) {
-      toast.error(error.message);
+      toast.error(formatError(error));
       return;
     }
     toast.success("Marked as sent to customer");
@@ -245,7 +246,7 @@ export function RepairProposalPanel({
       .update({ customer_decision })
       .eq("id", id);
     setBusy(false);
-    if (error) toast.error(error.message);
+    if (error) toast.error(formatError(error));
     else void load();
   }
 
@@ -267,7 +268,7 @@ export function RepairProposalPanel({
       .eq("id", proposal.id);
     setBusy(false);
     if (error) {
-      toast.error(error.message);
+      toast.error(formatError(error));
       return;
     }
     const { getProfileIdsByRole } = await import("@/lib/user-lookup");
@@ -304,7 +305,7 @@ export function RepairProposalPanel({
       .eq("id", jobId);
     setBusy(false);
     if (error) {
-      toast.error(error.message);
+      toast.error(formatError(error));
       return;
     }
     toast.success("Work checklist created from approved items");

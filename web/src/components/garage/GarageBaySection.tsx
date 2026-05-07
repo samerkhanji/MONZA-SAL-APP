@@ -19,6 +19,7 @@ import { ReleaseBayMenu } from "@/components/garage/ReleaseBayMenu";
 import { useUser } from "@/lib/contexts/UserContext";
 import { Settings2, ScanLine } from "lucide-react";
 import { ScannerDialog } from "@/components/scanner/ScannerDialog";
+import { formatError } from "@/lib/error-messages";
 
 interface JobInBay extends GarageJob {
   cars?: {
@@ -72,7 +73,7 @@ export function GarageBaySection({ onRefreshJobs }: { onRefreshJobs: () => void 
         p_bay_id: scanBay.id,
       });
       if (error) {
-        toast.error(error.message);
+        toast.error(formatError(error));
         return;
       }
       toast.success(`VIN …${trimmed.slice(-8)} parked in ${scanBay.name}`);
@@ -92,7 +93,7 @@ export function GarageBaySection({ onRefreshJobs }: { onRefreshJobs: () => void 
       .eq("is_active", true)
       .order("sort_order", { ascending: true });
     if (bayErr) {
-      toast.error(bayErr.message);
+      toast.error(formatError(bayErr));
       setBays([]);
       return;
     }
@@ -108,7 +109,7 @@ export function GarageBaySection({ onRefreshJobs }: { onRefreshJobs: () => void 
       .not("garage_bay_id", "is", null);
 
     if (jobErr) {
-      toast.error(jobErr.message);
+      toast.error(formatError(jobErr));
       setJobsByBay({});
       return;
     }

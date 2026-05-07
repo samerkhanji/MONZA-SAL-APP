@@ -56,6 +56,7 @@ import {
 } from "@/lib/delete-requests";
 import { ExportButton } from "@/components/ExportButton";
 import type { ExportColumn } from "@/lib/exportToExcel";
+import { formatError } from "@/lib/error-messages";
 
 function formatOeShort(oe: string | null | undefined): string {
   const v = (oe ?? "").trim();
@@ -103,7 +104,7 @@ export default function GarageInventoryPage() {
       .order("part_name", { ascending: true });
 
     if (error) {
-      toast.error(error.message);
+      toast.error(formatError(error));
       setParts([]);
     } else {
       setParts((data as Part[]) ?? []);

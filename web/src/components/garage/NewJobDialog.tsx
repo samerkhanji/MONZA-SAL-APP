@@ -18,6 +18,7 @@ import {
 import { Trash2, ScanLine, Camera } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScannerDialog } from "@/components/scanner/ScannerDialog";
+import { formatError } from "@/lib/error-messages";
 
 interface CarOption {
   id: string;
@@ -210,7 +211,7 @@ export function NewJobDialog({
       .single();
 
     if (jobError) {
-      toast.error(jobError.message);
+      toast.error(formatError(jobError));
       setSubmitting(false);
       return;
     }

@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ArrowLeft, FileText, CheckCircle2, Truck, Receipt } from "lucide-react";
+import { formatError } from "@/lib/error-messages";
 
 type SaleStatus = "draft" | "reserved" | "confirmed" | "paid" | "delivered" | "cancelled";
 
@@ -152,7 +153,7 @@ export default function SalesOrderDetailPage() {
       .eq("id", id);
     setSaving(false);
     if (error) {
-      toast.error(error.message);
+      toast.error(formatError(error));
       return false;
     }
     await fetchOrder();
@@ -231,7 +232,7 @@ export default function SalesOrderDetailPage() {
         p_notes: deliveryNotes || null,
       });
       if (error) {
-        toast.error(error.message);
+        toast.error(formatError(error));
         return;
       }
       toast.success("Delivered. Customer marked as converted.");
