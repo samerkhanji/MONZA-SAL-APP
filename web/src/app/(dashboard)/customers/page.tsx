@@ -78,7 +78,14 @@ function matchesSearch(customer: CustomerDisplay, search: string): boolean {
   ).toLowerCase();
   const phone = (customer.phone_primary ?? "").toLowerCase();
   const email = (customer.email ?? "").toLowerCase();
-  return fullName.includes(q) || phone.includes(q) || email.includes(q);
+  // Phone match also tries digits-only on both sides so "+961 1 234 5678"
+  // matches a search of "9611234" or "961-1-234".
+  const phoneDigits = phone.replace(/[^\d]/g, "");
+  const qDigits = q.replace(/[^\d]/g, "");
+  const phoneMatches =
+    phone.includes(q) ||
+    (qDigits.length >= 3 && phoneDigits.includes(qDigits));
+  return fullName.includes(q) || phoneMatches || email.includes(q);
 }
 
 const CUSTOMERS_TABLE_COL_PX = [240, 180, 320, 110, 200, 80, 130, 110] as const;

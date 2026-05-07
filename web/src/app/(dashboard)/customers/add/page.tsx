@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
+import { normalizePhone } from "@/lib/phone";
 import type { LeadStatus, LeadSource } from "@/types/database";
 import {
   LEAD_STATUS_LABELS,
@@ -66,6 +67,33 @@ export default function AddCustomerPage() {
     setSubmitting(true);
 
     const supabase = createClient();
+
+    // Pre-check for an existing active customer with the same normalized
+    // phone. Catches duplicates with cleaner messaging than the DB unique
+    // index (which fires only on insert and gives a less friendly error).
+    const normalized = normalizePhone(phonePrimary);
+    if (normalized) {
+      const { data: existing } = await supabase
+        .from("customers")
+        .select("id, first_name, last_name")
+        .is("deleted_at", null)
+        .ilike("phone_primary", `%${normalized.replace("+", "")}%`)
+        .limit(20);
+      const match = (existing ?? []).find(
+        (c: { phone_primary?: string | null }) =>
+          normalizePhone((c as { phone_primary?: string }).phone_primary) === normalized
+      ) as { id: string; first_name: string; last_name: string | null } | undefined;
+      if (match) {
+        const fullName = `${match.first_name}${match.last_name ? ` ${match.last_name}` : ""}`;
+        setSubmitting(false);
+        toast.error(
+          `A customer with this phone already exists: ${fullName}. Open their record instead.`
+        );
+        router.push(`/customers/${match.id}`);
+        return;
+      }
+    }
+
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -92,6 +120,13 @@ export default function AddCustomerPage() {
     setSubmitting(false);
 
     if (error) {
+      // Unique-index violation = race against another tab beating us to insert.
+      if (error.code === "23505") {
+        toast.error(
+          "A customer with this phone was just added by someone else. Please refresh."
+        );
+        return;
+      }
       toast.error(`Failed to add customer: ${error.message}`);
       return;
     }
@@ -144,6 +179,8 @@ export default function AddCustomerPage() {
                   id="customer-phone-primary"
                   name="customer-phone-primary"
                   type="tel"
+                  inputMode="tel"
+                  placeholder="+961 1 234 5678"
                   value={phonePrimary}
                   onChange={(e) => setPhonePrimary(e.target.value)}
                   required
@@ -155,6 +192,8 @@ export default function AddCustomerPage() {
                   id="customer-phone-secondary"
                   name="customer-phone-secondary"
                   type="tel"
+                  inputMode="tel"
+                  placeholder="Optional"
                   value={phoneSecondary}
                   onChange={(e) => setPhoneSecondary(e.target.value)}
                 />

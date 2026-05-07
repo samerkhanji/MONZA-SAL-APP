@@ -21,6 +21,12 @@ export async function DELETE(
       .eq("id", id);
 
     if (error) {
+      // Trigger tg_customers_block_delete_with_active_orders raises 23503
+      // (foreign_key_violation errcode) with a human-friendly message.
+      // Surface that text to the user as a 409 instead of a 500.
+      if (error.code === "23503") {
+        return NextResponse.json({ error: error.message }, { status: 409 });
+      }
       const status = error.code === "42501" ? 403 : 500;
       return NextResponse.json({ error: error.message }, { status });
     }
