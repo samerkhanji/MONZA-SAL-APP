@@ -52,6 +52,10 @@ interface SalesOrderDetail {
   delivered_at: string | null;
   delivered_by: string | null;
   delivery_notes: string | null;
+  // Void / reversal (added in migration 078)
+  void_at: string | null;
+  void_reason: string | null;
+  void_by: string | null;
   created_at: string;
   cars?: {
     id: string;
@@ -105,11 +109,12 @@ export default function SalesOrderDetailPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // Editable form state for the lifecycle blocks
+  // Editable form state for the lifecycle blocks. Currency is shared
+  // across all amounts on a single order — the DB enforces this with
+  // the sales_orders_currencies_consistent CHECK (migration 078).
   const [quoteAmount, setQuoteAmount] = useState("");
-  const [quoteCurrency, setQuoteCurrency] = useState("USD");
+  const [orderCurrency, setOrderCurrency] = useState("USD");
   const [depositAmount, setDepositAmount] = useState("");
-  const [depositCurrency, setDepositCurrency] = useState("USD");
   const [depositMethod, setDepositMethod] = useState("");
   const [contractUrl, setContractUrl] = useState("");
   const [deliveryNotes, setDeliveryNotes] = useState("");
@@ -133,9 +138,12 @@ export default function SalesOrderDetailPage() {
     const row = data as unknown as SalesOrderDetail;
     setOrder(row);
     setQuoteAmount(row.quote_amount != null ? String(row.quote_amount) : "");
-    setQuoteCurrency(row.quote_currency ?? row.currency ?? "USD");
+    // Single currency for the whole order. Default to whichever is set,
+    // or USD.
+    setOrderCurrency(
+      row.currency ?? row.quote_currency ?? row.deposit_currency ?? "USD"
+    );
     setDepositAmount(row.deposit_amount != null ? String(row.deposit_amount) : "");
-    setDepositCurrency(row.deposit_currency ?? row.currency ?? "USD");
     setDepositMethod(row.deposit_method ?? "");
     setContractUrl(row.signed_contract_url ?? "");
     setLoading(false);
@@ -168,7 +176,8 @@ export default function SalesOrderDetailPage() {
     }
     const ok = await patchOrder({
       quote_amount: amt,
-      quote_currency: quoteCurrency,
+      quote_currency: orderCurrency,
+      currency: orderCurrency,
       quote_sent_at: order?.quote_sent_at ?? new Date().toISOString(),
     });
     if (ok) toast.success("Quote saved");
@@ -200,7 +209,8 @@ export default function SalesOrderDetailPage() {
     }
     const ok = await patchOrder({
       deposit_amount: amt,
-      deposit_currency: depositCurrency,
+      deposit_currency: orderCurrency,
+      currency: orderCurrency,
       deposit_method: depositMethod || null,
       deposit_paid_at: order?.deposit_paid_at ?? new Date().toISOString(),
       // Auto-advance status
@@ -240,6 +250,32 @@ export default function SalesOrderDetailPage() {
       // Always refetch — even on error the RPC may have partially applied
       // (e.g. updated the order but failed to insert the car_event row).
       // Refetching keeps the UI honest with the DB.
+      setSaving(false);
+      await fetchOrder();
+    }
+  }
+
+  async function voidSale() {
+    if (!order) return;
+    const reason = window.prompt(
+      "Reason for voiding this sale (required). The car returns to inventory and the customer reverts to 'interested':"
+    );
+    if (!reason || !reason.trim()) {
+      toast.error("A reason is required to void a sale.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const { error } = await supabase.rpc("void_sales_order", {
+        p_sales_order_id: order.id,
+        p_reason: reason.trim(),
+      });
+      if (error) {
+        toast.error(formatError(error));
+        return;
+      }
+      toast.success("Sale voided.");
+    } finally {
       setSaving(false);
       await fetchOrder();
     }
@@ -398,7 +434,7 @@ export default function SalesOrderDetailPage() {
             </div>
             <div>
               <Label htmlFor="quote-currency">Currency</Label>
-              <Select value={quoteCurrency} onValueChange={setQuoteCurrency} disabled={!canEdit}>
+              <Select value={orderCurrency} onValueChange={setOrderCurrency} disabled={!canEdit}>
                 <SelectTrigger id="quote-currency"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {CCY_OPTIONS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
@@ -441,7 +477,7 @@ export default function SalesOrderDetailPage() {
             </div>
             <div>
               <Label htmlFor="deposit-currency">Currency</Label>
-              <Select value={depositCurrency} onValueChange={setDepositCurrency} disabled={!canEdit}>
+              <Select value={orderCurrency} onValueChange={setOrderCurrency} disabled={!canEdit}>
                 <SelectTrigger id="deposit-currency"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {CCY_OPTIONS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
@@ -552,6 +588,42 @@ export default function SalesOrderDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Void notice — only when the sale was voided */}
+      {order.status === "cancelled" && order.void_at && (
+        <Card className="border-red-300/60 bg-red-50/60 dark:border-red-900/60 dark:bg-red-950/20">
+          <CardHeader>
+            <CardTitle className="text-base text-red-700 dark:text-red-300">Sale voided</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-1 text-sm">
+            <p>Voided on {fmtDT(order.void_at)}.</p>
+            {order.void_reason && (
+              <p className="text-muted-foreground">
+                <span className="font-medium">Reason:</span> {order.void_reason}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Owner-only void action — for delivered or in-progress sales that
+          need to be reversed (return, cancel, error). */}
+      {appRole === "owner" && order.status !== "cancelled" && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Reverse this sale</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <p className="text-muted-foreground">
+              Owner-only. Cancels the sale, returns the car to inventory, and
+              reverts the customer&apos;s lead status if they were auto-converted.
+            </p>
+            <Button variant="destructive" onClick={voidSale} disabled={saving}>
+              Void sale…
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Notes */}
       {order.notes && (
