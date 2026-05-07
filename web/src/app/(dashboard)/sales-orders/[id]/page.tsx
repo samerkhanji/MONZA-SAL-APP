@@ -187,6 +187,16 @@ export default function SalesOrderDetailPage() {
       toast.error("Enter a positive deposit amount");
       return;
     }
+    if (
+      order?.selling_price != null &&
+      Number.isFinite(order.selling_price) &&
+      amt > order.selling_price
+    ) {
+      toast.error(
+        `Deposit (${amt.toLocaleString()}) cannot exceed the selling price (${order.selling_price.toLocaleString()}).`
+      );
+      return;
+    }
     const ok = await patchOrder({
       deposit_amount: amt,
       deposit_currency: depositCurrency,
@@ -235,6 +245,14 @@ export default function SalesOrderDetailPage() {
   }
 
   async function changeStatus(next: SaleStatus) {
+    // Going TO 'delivered' must happen via complete_delivery() — the DB
+    // enforces (status='delivered') = (delivered_at IS NOT NULL), so a plain
+    // patch would either be blocked or leave the row in an inconsistent
+    // state. Route the user to the proper button.
+    if (next === "delivered") {
+      toast.error("Use the 'Mark delivered' button at the bottom — it runs the proper checks.");
+      return;
+    }
     const ok = await patchOrder({ status: next });
     if (ok) toast.success(`Status: ${next}`);
   }
@@ -276,7 +294,7 @@ export default function SalesOrderDetailPage() {
         </div>
         <div className="flex items-center gap-2">
           <Badge className={STATUS_COLORS[order.status]}>{order.status}</Badge>
-          {canEdit && (
+          {canEdit && order.status !== "delivered" && order.status !== "cancelled" && (
             <Select value={order.status} onValueChange={(v) => changeStatus(v as SaleStatus)}>
               <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -284,7 +302,9 @@ export default function SalesOrderDetailPage() {
                 <SelectItem value="reserved">Reserved</SelectItem>
                 <SelectItem value="confirmed">Confirmed</SelectItem>
                 <SelectItem value="paid">Paid</SelectItem>
-                <SelectItem value="delivered">Delivered</SelectItem>
+                {/* "Delivered" intentionally NOT a manual option — use the
+                    "Mark delivered" button so complete_delivery() runs its
+                    quote/deposit/contract checks. */}
                 <SelectItem value="cancelled">Cancelled</SelectItem>
               </SelectContent>
             </Select>
