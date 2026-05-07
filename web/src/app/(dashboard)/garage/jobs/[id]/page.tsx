@@ -30,6 +30,14 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -671,89 +679,99 @@ export default function JobDetailPage() {
       {/* Section 5: Time - inline in Job Info */}
 
       {/* Add Part Dialog */}
-      {addPartOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-lg bg-background p-6">
-            <h3 className="mb-4 text-lg font-semibold">Add Part to Job</h3>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="add-part-search">Search Part</Label>
-                <Input
-                  id="add-part-search"
-                  name="add-part-search"
-                  placeholder="Part name or OE number..."
-                  value={partSearch}
-                  onChange={(e) => setPartSearch(e.target.value)}
-                  className="mt-1"
-                />
+      <Dialog
+        open={addPartOpen}
+        onOpenChange={(open) => {
+          setAddPartOpen(open);
+          if (!open) setSelectedPartId(null);
+        }}
+      >
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Part to Job</DialogTitle>
+            <DialogDescription>
+              Search for a part by name or OE number, then choose how many to use.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="add-part-search">Search Part</Label>
+              <Input
+                id="add-part-search"
+                name="add-part-search"
+                placeholder="Part name or OE number..."
+                value={partSearch}
+                onChange={(e) => setPartSearch(e.target.value)}
+                className="mt-1"
+                autoFocus
+              />
+            </div>
+            {partsList.length > 0 && (
+              <div className="space-y-1">
+                {partsList.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setSelectedPartId(p.id)}
+                    className={`flex w-full justify-between rounded border p-2 text-left text-sm ${
+                      selectedPartId === p.id ? "border-primary" : ""
+                    }`}
+                  >
+                    {p.part_name}
+                    <span className="font-mono text-muted-foreground">
+                      {p.oe_number}
+                    </span>
+                  </button>
+                ))}
               </div>
-              {partsList.length > 0 && (
-                <div className="space-y-1">
-                  {partsList.map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => setSelectedPartId(p.id)}
-                      className={`flex w-full justify-between rounded border p-2 text-left text-sm ${
-                        selectedPartId === p.id ? "border-primary" : ""
-                      }`}
-                    >
-                      {p.part_name}
-                      <span className="font-mono text-muted-foreground">
-                        {p.oe_number}
-                      </span>
-                    </button>
-                  ))}
+            )}
+            {selectedPartId && (
+              <>
+                <div>
+                  <Label htmlFor="add-part-quantity">Quantity</Label>
+                  <Input
+                    id="add-part-quantity"
+                    name="add-part-quantity"
+                    type="number"
+                    min={1}
+                    value={partQuantity}
+                    onChange={(e) => setPartQuantity(e.target.value)}
+                    className="mt-1"
+                  />
                 </div>
-              )}
-              {selectedPartId && (
-                <>
-                  <div>
-                    <Label htmlFor="add-part-quantity">Quantity</Label>
-                    <Input
-                      id="add-part-quantity"
-                      name="add-part-quantity"
-                      type="number"
-                      min={1}
-                      value={partQuantity}
-                      onChange={(e) => setPartQuantity(e.target.value)}
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="add-part-note">Note</Label>
-                    <Input
-                      id="add-part-note"
-                      name="add-part-note"
-                      value={partNote}
-                      onChange={(e) => setPartNote(e.target.value)}
-                      placeholder="Optional"
-                      className="mt-1"
-                    />
-                  </div>
-                </>
-              )}
-            </div>
-            <div className="mt-6 flex gap-2">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setAddPartOpen(false);
-                  setSelectedPartId(null);
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleAddPart}
-                disabled={!selectedPartId || partSubmitting}
-              >
-                {partSubmitting ? "Adding..." : "Add Part"}
-              </Button>
-            </div>
+                <div>
+                  <Label htmlFor="add-part-note">Note</Label>
+                  <Input
+                    id="add-part-note"
+                    name="add-part-note"
+                    value={partNote}
+                    onChange={(e) => setPartNote(e.target.value)}
+                    placeholder="Optional"
+                    className="mt-1"
+                  />
+                </div>
+              </>
+            )}
           </div>
-        </div>
-      )}
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setAddPartOpen(false);
+                setSelectedPartId(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAddPart}
+              disabled={!selectedPartId || partSubmitting}
+            >
+              {partSubmitting ? "Adding..." : "Add Part"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <FinishJobDialog
         job={job}

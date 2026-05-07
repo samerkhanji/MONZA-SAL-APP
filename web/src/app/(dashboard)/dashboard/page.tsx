@@ -19,6 +19,7 @@ import {
   RefreshCw,
   ChevronRight,
   ClipboardList,
+  AlertTriangle,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -108,11 +109,15 @@ export default function DashboardPage() {
   const [jobStatusCounts, setJobStatusCounts] = useState<Record<string, number>>({});
   const [recentJobs, setRecentJobs] = useState<GarageJobRow[]>([]);
   const [lowStockParts, setLowStockParts] = useState<LowStockPart[]>([]);
+  // Tracks which sections failed to load so we can show a persistent
+  // "Couldn't load X" banner instead of silently rendering 0s.
+  const [loadErrors, setLoadErrors] = useState<string[]>([]);
 
   const fetchData = useCallback(async () => {
     if (shouldRedirect) return;
     const supabase = createClient();
     setLoading(true);
+    const errors: string[] = [];
 
     const [
       carsAllRes,
@@ -168,37 +173,37 @@ export default function DashboardPage() {
     ]);
 
     if (carsAllRes.error) {
-      toast.error(carsAllRes.error.message ?? "Failed to load dashboard");
+      errors.push("Total Cars");
     } else {
       setTotalCars(carsAllRes.count ?? 0);
     }
 
     if (carsServiceRes.error) {
-      toast.error(carsServiceRes.error.message ?? "Failed to load garage count");
+      errors.push("In Garage");
     } else {
       setInGarageCount(carsServiceRes.count ?? 0);
     }
 
     if (customersRes.error) {
-      toast.error(customersRes.error.message ?? "Failed to load customers");
+      errors.push("Leads & Clients");
     } else {
       setCustomersCount(customersRes.count ?? 0);
     }
 
     if (jobsRes.error) {
-      toast.error(jobsRes.error.message ?? "Failed to load jobs");
+      errors.push("Active Jobs");
     } else {
       setActiveJobsCount(jobsRes.count ?? 0);
     }
 
     if (jobsDetailRes.error) {
-      toast.error(jobsDetailRes.error.message ?? "Failed to load garage jobs");
+      errors.push("Recent Jobs");
     } else {
       setRecentJobs((jobsDetailRes.data as unknown as GarageJobRow[]) ?? []);
     }
 
     if (jobsStatusRes.error) {
-      toast.error(jobsStatusRes.error.message ?? "Failed to load job statuses");
+      errors.push("Job Statuses");
     } else {
       const counts: Record<string, number> = {
         pending: 0,
@@ -214,7 +219,7 @@ export default function DashboardPage() {
     }
 
     if (carsStatusRes.error) {
-      toast.error(carsStatusRes.error.message ?? "Failed to load car statuses");
+      errors.push("Car Statuses");
     } else {
       const counts: Record<string, number> = {};
       CAR_STATUS_ORDER.forEach((s) => (counts[s] = 0));
@@ -225,12 +230,13 @@ export default function DashboardPage() {
     }
 
     if (partsRes.error) {
-      toast.error(partsRes.error.message ?? "Failed to load parts");
+      errors.push("Low Stock Parts");
     } else {
       setLowStockParts((partsRes.data as LowStockPart[]) ?? []);
     }
 
     if (requestsRes.error) {
+      errors.push("Pending Requests");
       setPendingRequestsCount(0);
     } else {
       const myId = profile?.id ?? null;
@@ -300,6 +306,7 @@ export default function DashboardPage() {
       }
     }
 
+    setLoadErrors(errors);
     setLastUpdated(new Date());
     setLoading(false);
   }, [
@@ -389,6 +396,35 @@ export default function DashboardPage() {
   return (
     <div className="container mx-auto space-y-6 overflow-x-hidden px-4 py-6 pb-20 sm:px-6 sm:pb-6 lg:px-8">
       <InstallBanner />
+      {loadErrors.length > 0 && (
+        <div
+          role="alert"
+          className="flex flex-col gap-2 rounded-lg border border-amber-500/40 bg-amber-50 p-3 text-sm dark:bg-amber-950/30 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div className="flex items-start gap-2 text-amber-800 dark:text-amber-300">
+            <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
+            <div>
+              <p className="font-medium">Some numbers couldn&apos;t load.</p>
+              <p className="text-amber-700 dark:text-amber-400">
+                Affected: {loadErrors.join(", ")}.
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => fetchData()}
+            disabled={loading}
+            className="self-start sm:self-center"
+          >
+            <RefreshCw
+              className={`mr-1 size-4 ${loading ? "animate-spin" : ""}`}
+              aria-hidden
+            />
+            Retry
+          </Button>
+        </div>
+      )}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-semibold sm:text-2xl">Dashboard</h1>

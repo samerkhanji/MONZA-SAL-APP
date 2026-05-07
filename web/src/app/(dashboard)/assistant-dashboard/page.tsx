@@ -103,6 +103,9 @@ export default function AssistantDashboardPage() {
   const [overduePickupsCount, setOverduePickupsCount] = useState(0);
   const [pendingDeletionsCount, setPendingDeletionsCount] = useState(0);
   const [todaysServiceCount, setTodaysServiceCount] = useState(0);
+  // Tracks which sections failed to load so we can show a persistent
+  // "Couldn't load X" banner instead of silently rendering 0s.
+  const [loadErrors, setLoadErrors] = useState<string[]>([]);
   const [cashCollected7d, setCashCollected7d] = useState<{ total: number; currency: string }>({
     total: 0,
     currency: "USD",
@@ -157,6 +160,7 @@ export default function AssistantDashboardPage() {
     if (!canAccess) return;
 
     setLoading(true);
+    const errors: string[] = [];
 
     const today = new Date().toISOString().slice(0, 10);
     const threeDaysAgo = new Date(Date.now() - 3 * 86400000).toISOString();
@@ -227,6 +231,12 @@ export default function AssistantDashboardPage() {
         .neq("status", "waived")
         .lt("due_date", today),
     ]);
+
+    if (jobsRes.error) errors.push("Workshop Jobs");
+    if (carsRes.error) errors.push("Warranty Alerts");
+    if (deleteRes.error) errors.push("Pending Approvals");
+    if (requestsWithProfiles.error) errors.push("Pending Requests");
+    if (proposalsRes.error) errors.push("Repair Proposals");
 
     const jobs = (jobsRes.data ?? []) as JobWithCar[];
     const cars = carsRes.data ?? [];
@@ -352,7 +362,9 @@ export default function AssistantDashboardPage() {
       })
     );
 
-    if (!paidInstallmentsRes.error && !paidDepositsRes.error) {
+    if (paidInstallmentsRes.error || paidDepositsRes.error) {
+      errors.push("Cash collected (7d)");
+    } else {
       const installments = (paidInstallmentsRes.data ?? []) as { paid_amount: number | null }[];
       const deposits = (paidDepositsRes.data ?? []) as { deposit_amount: number | null }[];
       const total =
@@ -361,11 +373,15 @@ export default function AssistantDashboardPage() {
       setCashCollected7d({ total, currency: "USD" });
     }
 
-    if (!staleJobsRes.error) {
+    if (staleJobsRes.error) {
+      errors.push("Stale jobs (>7d)");
+    } else {
       setStaleJobsCount(staleJobsRes.count ?? 0);
     }
 
-    if (!overdueInstallmentsRes.error) {
+    if (overdueInstallmentsRes.error) {
+      errors.push("Overdue installments");
+    } else {
       const rows = (overdueInstallmentsRes.data ?? []) as {
         amount_due: number | null;
         paid_amount: number | null;
@@ -379,6 +395,7 @@ export default function AssistantDashboardPage() {
       });
     }
 
+    setLoadErrors(errors);
     setLastUpdated(new Date());
     setLoading(false);
   }, [canAccess]);
@@ -433,6 +450,35 @@ export default function AssistantDashboardPage() {
 
   return (
     <div className="container mx-auto space-y-6 overflow-x-hidden px-4 py-6 pb-20 sm:px-6 sm:pb-6 lg:px-8">
+      {loadErrors.length > 0 && (
+        <div
+          role="alert"
+          className="flex flex-col gap-2 rounded-lg border border-amber-500/40 bg-amber-50 p-3 text-sm dark:bg-amber-950/30 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div className="flex items-start gap-2 text-amber-800 dark:text-amber-300">
+            <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
+            <div>
+              <p className="font-medium">Some numbers couldn&apos;t load.</p>
+              <p className="text-amber-700 dark:text-amber-400">
+                Affected: {loadErrors.join(", ")}.
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => fetchData()}
+            disabled={loading}
+            className="self-start sm:self-center"
+          >
+            <RefreshCw
+              className={`mr-1 size-4 ${loading ? "animate-spin" : ""}`}
+              aria-hidden
+            />
+            Retry
+          </Button>
+        </div>
+      )}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-semibold sm:text-2xl">Assistant Dashboard</h1>
