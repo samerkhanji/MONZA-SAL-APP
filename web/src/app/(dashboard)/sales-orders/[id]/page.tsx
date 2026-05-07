@@ -210,17 +210,23 @@ export default function SalesOrderDetailPage() {
   async function markDelivered() {
     if (!confirm("Mark this sale as delivered? This is the final step and will set the customer to converted.")) return;
     setSaving(true);
-    const { error } = await supabase.rpc("complete_delivery", {
-      p_sales_order_id: id,
-      p_notes: deliveryNotes || null,
-    });
-    setSaving(false);
-    if (error) {
-      toast.error(error.message);
-      return;
+    try {
+      const { error } = await supabase.rpc("complete_delivery", {
+        p_sales_order_id: id,
+        p_notes: deliveryNotes || null,
+      });
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      toast.success("Delivered. Customer marked as converted.");
+    } finally {
+      // Always refetch — even on error the RPC may have partially applied
+      // (e.g. updated the order but failed to insert the car_event row).
+      // Refetching keeps the UI honest with the DB.
+      setSaving(false);
+      await fetchOrder();
     }
-    toast.success("Delivered. Customer marked as converted.");
-    await fetchOrder();
   }
 
   async function changeStatus(next: SaleStatus) {
