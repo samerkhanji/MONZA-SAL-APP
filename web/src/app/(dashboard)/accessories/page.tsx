@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { createClient } from "@/lib/supabase";
 import { ACCESSORY_SEED_ROWS } from "@/lib/data/accessory-seed";
 import {
   ACCESSORY_CATEGORIES,
@@ -134,32 +135,106 @@ function matchesSearch(row: AccessoryInventoryRow, q: string): boolean {
   );
 }
 
-function newRowId(): string {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
-  }
-  return `row-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+type SaveState = "idle" | "saving" | "saved" | "error";
+
+function rowToDb(r: AccessoryInventoryRow) {
+  return {
+    id: r.id,
+    category: r.category,
+    label: r.label,
+    quantity: r.quantity,
+    note: r.note,
+    linked_plate: r.linked_plate,
+  };
 }
 
 export default function AccessoriesPage() {
+  const supabase = useMemo(() => createClient(), []);
   const [rows, setRows] = useState<AccessoryInventoryRow[]>([]);
   const [hydrated, setHydrated] = useState(false);
   const [search, setSearch] = useState("");
+  const [saveState, setSaveState] = useState<SaveState>("idle");
+  const dirtyIdsRef = useRef<Set<string>>(new Set());
 
+  // Load from Supabase. If empty + we have localStorage data from a prior
+  // version of this page, migrate it once. Otherwise insert the seed list.
   useEffect(() => {
-    const stored = loadFromStorage();
-    setRows(stored ?? cloneSeed());
-    setHydrated(true);
-  }, []);
+    let cancelled = false;
+    async function init() {
+      const { data, error } = await supabase
+        .from("accessory_inventory")
+        .select("*");
+      if (cancelled) return;
 
-  useEffect(() => {
-    if (!hydrated) return;
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(rows));
-    } catch {
-      toast.error("Could not save accessories to browser storage.");
+      if (error) {
+        toast.error(`Could not load accessories: ${error.message}`);
+        const local = loadFromStorage();
+        setRows(local ?? cloneSeed());
+        setHydrated(true);
+        return;
+      }
+
+      const dbRows = (data ?? []) as AccessoryInventoryRow[];
+      if (dbRows.length > 0) {
+        setRows(dbRows);
+        setHydrated(true);
+        return;
+      }
+
+      // DB empty — bootstrap.
+      const local = loadFromStorage();
+      const bootstrap = local && local.length > 0 ? local : cloneSeed();
+      const { error: insertError } = await supabase
+        .from("accessory_inventory")
+        .insert(bootstrap.map(rowToDb));
+      if (cancelled) return;
+      if (insertError) {
+        toast.error(`Could not save accessories: ${insertError.message}`);
+        setRows(bootstrap);
+      } else {
+        if (local && local.length > 0) {
+          toast.success("Migrated this device's accessories to the server");
+          try {
+            localStorage.removeItem(STORAGE_KEY);
+            localStorage.removeItem(LEGACY_STORAGE_KEY);
+          } catch {
+            // ignore
+          }
+        }
+        setRows(bootstrap);
+      }
+      setHydrated(true);
     }
-  }, [rows, hydrated]);
+    void init();
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase]);
+
+  // Debounced auto-save: 1s after the last edit, push dirty rows to Supabase.
+  useEffect(() => {
+    if (!hydrated || dirtyIdsRef.current.size === 0) return;
+    const timer = setTimeout(async () => {
+      const dirtyIds = Array.from(dirtyIdsRef.current);
+      dirtyIdsRef.current = new Set();
+      const dirtyRows = rows.filter((r) => dirtyIds.includes(r.id));
+      if (dirtyRows.length === 0) return;
+      setSaveState("saving");
+      const { error } = await supabase
+        .from("accessory_inventory")
+        .upsert(dirtyRows.map(rowToDb));
+      if (error) {
+        setSaveState("error");
+        toast.error(`Could not save changes: ${error.message}`);
+        // Re-mark as dirty so a later edit retries.
+        dirtyIds.forEach((id) => dirtyIdsRef.current.add(id));
+      } else {
+        setSaveState("saved");
+        setTimeout(() => setSaveState("idle"), 1500);
+      }
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [rows, hydrated, supabase]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -184,51 +259,92 @@ export default function AccessoriesPage() {
     [filtered]
   );
 
-  const patchRow = useCallback((id: string, patch: Partial<AccessoryInventoryRow>) => {
-    const now = new Date().toISOString();
-    setRows((prev) =>
-      prev.map((r) => {
-        if (r.id !== id) return r;
-        const next: AccessoryInventoryRow = { ...r, ...patch, updated_at: now };
-        if (patch.created_at === undefined) next.created_at = r.created_at;
-        if (next.category === "plates" && patch.label !== undefined) {
-          const trimmed = String(patch.label).trim();
-          next.linked_plate = trimmed || null;
-        }
-        if (patch.linked_plate !== undefined) {
-          const v = patch.linked_plate;
-          next.linked_plate = typeof v === "string" && v.trim() === "" ? null : v;
-        }
-        return next;
-      })
-    );
-  }, []);
+  const patchRow = useCallback(
+    (id: string, patch: Partial<AccessoryInventoryRow>) => {
+      const now = new Date().toISOString();
+      setRows((prev) =>
+        prev.map((r) => {
+          if (r.id !== id) return r;
+          const next: AccessoryInventoryRow = { ...r, ...patch, updated_at: now };
+          if (patch.created_at === undefined) next.created_at = r.created_at;
+          if (next.category === "plates" && patch.label !== undefined) {
+            const trimmed = String(patch.label).trim();
+            next.linked_plate = trimmed || null;
+          }
+          if (patch.linked_plate !== undefined) {
+            const v = patch.linked_plate;
+            next.linked_plate = typeof v === "string" && v.trim() === "" ? null : v;
+          }
+          return next;
+        })
+      );
+      dirtyIdsRef.current.add(id);
+    },
+    []
+  );
 
-  const deleteRow = useCallback((id: string) => {
-    setRows((prev) => prev.filter((r) => r.id !== id));
-    toast.success("Row removed");
-  }, []);
+  const deleteRow = useCallback(
+    async (id: string) => {
+      const removed = rows.find((r) => r.id === id);
+      setRows((prev) => prev.filter((r) => r.id !== id));
+      const { error } = await supabase.from("accessory_inventory").delete().eq("id", id);
+      if (error) {
+        toast.error(`Could not delete: ${error.message}`);
+        if (removed) setRows((prev) => [...prev, removed]);
+        return;
+      }
+      toast.success("Row removed");
+    },
+    [rows, supabase]
+  );
 
-  const addRow = useCallback((category: AccessoryCategoryId) => {
-    const now = new Date().toISOString();
-    const row: AccessoryInventoryRow = {
-      id: newRowId(),
-      category,
-      label: "",
-      quantity: 1,
-      note: "",
-      linked_plate: null,
-      created_at: now,
-      updated_at: now,
-    };
-    setRows((prev) => [...prev, row]);
-    toast.success("Line added");
-  }, []);
+  const addRow = useCallback(
+    async (category: AccessoryCategoryId) => {
+      const { data, error } = await supabase
+        .from("accessory_inventory")
+        .insert({
+          category,
+          label: "",
+          quantity: 1,
+          note: "",
+          linked_plate: null,
+        })
+        .select("*")
+        .single();
+      if (error || !data) {
+        toast.error(`Could not add row: ${error?.message ?? "unknown error"}`);
+        return;
+      }
+      setRows((prev) => [...prev, data as AccessoryInventoryRow]);
+      toast.success("Line added");
+    },
+    [supabase]
+  );
 
-  const resetToSeed = useCallback(() => {
-    setRows(cloneSeed());
+  const resetToSeed = useCallback(async () => {
+    const seed = cloneSeed();
+    // Wipe and re-insert in two steps. Use a never-matching uuid filter to
+    // satisfy Supabase's "DELETE without filter" guard.
+    const { error: delError } = await supabase
+      .from("accessory_inventory")
+      .delete()
+      .gte("created_at", "1970-01-01");
+    if (delError) {
+      toast.error(`Reset failed: ${delError.message}`);
+      return;
+    }
+    const { data, error: insError } = await supabase
+      .from("accessory_inventory")
+      .insert(seed.map(rowToDb))
+      .select("*");
+    if (insError) {
+      toast.error(`Reset failed: ${insError.message}`);
+      return;
+    }
+    setRows((data ?? []) as AccessoryInventoryRow[]);
+    dirtyIdsRef.current = new Set();
     toast.success("Reset to seed data");
-  }, []);
+  }, [supabase]);
 
   if (!hydrated) {
     return (
@@ -244,14 +360,28 @@ export default function AccessoriesPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Accessories</h1>
           <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
-            Standard lists below are stored in this browser until you wire{" "}
-            <code className="rounded bg-muted px-1 text-xs">033_accessory_inventory</code>.{" "}
-            <strong>Custom collections</strong> at the bottom live in Supabase (
-            <code className="rounded bg-muted px-1 text-xs">035_accessory_custom_tables</code>) — staff
-            can create them and edit lines; only owners can rename or delete a collection.
+            Standard lists below are saved to the server — every device sees the same data.
+            Changes save automatically about a second after you stop typing.{" "}
+            <strong>Custom collections</strong> at the bottom are also synced; staff can
+            create them and edit lines; only owners can rename or delete a collection.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <span
+            aria-live="polite"
+            className={cn(
+              "text-xs tabular-nums",
+              saveState === "saving" && "text-amber-600 dark:text-amber-400",
+              saveState === "saved" && "text-emerald-600 dark:text-emerald-400",
+              saveState === "error" && "text-destructive",
+              saveState === "idle" && "text-transparent select-none"
+            )}
+          >
+            {saveState === "saving" && "Saving…"}
+            {saveState === "saved" && "Saved"}
+            {saveState === "error" && "Save failed"}
+            {saveState === "idle" && "—"}
+          </span>
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="outline" size="sm" className="gap-1.5">
