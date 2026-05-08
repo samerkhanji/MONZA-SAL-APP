@@ -316,7 +316,7 @@ export default function AccessoriesPage() {
         .select("*")
         .single();
       if (error || !data) {
-        toast.error(`Could not add row: ${error?.message ?? "unknown error"}`);
+        toast.error(`Could not add row: ${error ? formatError(error) : "unknown error"}`);
         return;
       }
       setRows((prev) => [...prev, data as AccessoryInventoryRow]);

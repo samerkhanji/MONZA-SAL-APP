@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/table";
 import { ExportButton } from "@/components/ExportButton";
 import type { ExportColumn } from "@/lib/exportToExcel";
-import { RefreshCw } from "lucide-react";
+import { Loader2, RefreshCw } from "lucide-react";
 import { formatError } from "@/lib/error-messages";
 
 interface SalesOrderFull {
@@ -275,7 +275,10 @@ export default function SalesOrdersPage() {
           </div>
 
           {loading ? (
-            <p className="text-muted-foreground py-8">Loading…</p>
+            <div className="text-muted-foreground flex items-center gap-2 py-8">
+              <Loader2 className="size-4 animate-spin" />
+              <span>Loading sales orders…</span>
+            </div>
           ) : filtered.length === 0 ? (
             orders.length === 0 ? (
               <div className="flex flex-col items-center gap-2 py-10 text-center">

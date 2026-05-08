@@ -742,9 +742,17 @@ export default function CustomersPage() {
               {loading ? (
                 <p className="text-muted-foreground">Loading...</p>
               ) : exclusiveLeadCustomers.length === 0 ? (
-                <p className="text-muted-foreground">
-                  No leads found. Add your first lead contact.
-                </p>
+                <div className="flex flex-col items-start gap-3 py-2">
+                  <p className="text-muted-foreground">
+                    No leads yet. New customers added with a status other than
+                    &ldquo;Converted&rdquo; show up here.
+                  </p>
+                  {canCreateCustomer && (
+                    <Button asChild size="sm">
+                      <Link href="/customers/add">Add a lead</Link>
+                    </Button>
+                  )}
+                </div>
               ) : (
                 <CustomerTable list={exclusiveLeadCustomers} />
               )}

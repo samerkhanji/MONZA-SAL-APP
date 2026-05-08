@@ -5,6 +5,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatError } from "@/lib/error-messages";
 
 interface JobEfficiencyRow {
   job_id: string;
@@ -75,9 +76,9 @@ export default function GarageEfficiencyPage() {
           .order("total_hours_30d", { ascending: false, nullsFirst: false }),
       ]);
       if (cancelled) return;
-      if (jobsRes.error) toast.error(jobsRes.error.message);
-      if (baysRes.error) toast.error(baysRes.error.message);
-      if (empsRes.error) toast.error(empsRes.error.message);
+      if (jobsRes.error) toast.error(formatError(jobsRes.error));
+      if (baysRes.error) toast.error(formatError(baysRes.error));
+      if (empsRes.error) toast.error(formatError(empsRes.error));
       setJobs((jobsRes.data as JobEfficiencyRow[]) ?? []);
       setBays((baysRes.data as BayUtilizationRow[]) ?? []);
       setEmployees((empsRes.data as EmployeeEfficiencyRow[]) ?? []);
