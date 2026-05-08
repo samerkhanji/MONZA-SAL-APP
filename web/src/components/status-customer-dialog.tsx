@@ -563,10 +563,15 @@ export function StatusCustomerDialog({
     }
 
     if (showPlateField && plateNumber.trim() !== (car.plate_number ?? "")) {
-      await supabase
+      const { error: plateError } = await supabase
         .from("cars")
         .update({ plate_number: plateNumber.trim() || null })
         .eq("id", car.id);
+      if (plateError) {
+        setSubmitting(false);
+        toast.error(`Status saved, but failed to update plate: ${formatError(plateError)}`);
+        return;
+      }
     }
 
     setSubmitting(false);
