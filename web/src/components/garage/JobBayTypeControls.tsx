@@ -111,7 +111,7 @@ export function JobBayTypeControls({
         .select("*")
         .single();
       if (ins.error) {
-        toast.error(ins.error.message);
+        toast.error(formatError(ins.error));
         setBusy(false);
         return;
       }

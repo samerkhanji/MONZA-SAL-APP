@@ -58,8 +58,8 @@ export default function TestDrivePage() {
       fetchActiveTestDrives(supabase),
       fetchRecentReturnedTestDrives(supabase, 30),
     ]);
-    if (a.error) toast.error(a.error.message);
-    if (r.error) toast.error(r.error.message);
+    if (a.error) toast.error(formatError(a.error));
+    if (r.error) toast.error(formatError(r.error));
     setActiveRows(a.data);
     setReturnedRows(r.data);
     setListLoading(false);

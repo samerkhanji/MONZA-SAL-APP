@@ -698,7 +698,7 @@ export default function CarProfilePage() {
       }
       const { error } = await supabase.from("cars").update(updates).eq("id", car.id);
       if (error) {
-        toast.error(error.message ?? "Update failed");
+        toast.error(formatError(error));
         return;
       }
       if (patch.status != null && patch.status !== prev.status) {
@@ -913,7 +913,7 @@ export default function CarProfilePage() {
       .update({ status: "sold" })
       .eq("id", car.id);
     if (error) {
-      toast.error(error.message ?? "Failed to update status");
+      toast.error(formatError(error));
       return;
     }
     toast.success("Status updated to Sold");
