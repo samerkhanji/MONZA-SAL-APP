@@ -34,7 +34,7 @@ interface BayUtilizationRow {
 }
 
 interface EmployeeEfficiencyRow {
-  employee_id: string;
+  user_id: string;
   employee_name: string | null;
   role: string | null;
   jobs_count_30d: number | null;
@@ -235,7 +235,7 @@ export default function GarageEfficiencyPage() {
                 </thead>
                 <tbody>
                   {employees.map((e) => (
-                    <tr key={e.employee_id} className="border-t">
+                    <tr key={e.user_id} className="border-t">
                       <td className="py-2 pr-3">{e.employee_name ?? "—"}</td>
                       <td className="py-2 pr-3">{e.role ?? "—"}</td>
                       <td className="py-2 pr-3">{e.jobs_count_30d ?? 0}</td>
