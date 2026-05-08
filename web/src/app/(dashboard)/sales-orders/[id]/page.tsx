@@ -10,6 +10,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -118,6 +126,8 @@ export default function SalesOrderDetailPage() {
   const [depositMethod, setDepositMethod] = useState("");
   const [contractUrl, setContractUrl] = useState("");
   const [deliveryNotes, setDeliveryNotes] = useState("");
+  const [voidOpen, setVoidOpen] = useState(false);
+  const [voidReason, setVoidReason] = useState("");
 
   const fetchOrder = useCallback(async () => {
     setLoading(true);
@@ -255,12 +265,9 @@ export default function SalesOrderDetailPage() {
     }
   }
 
-  async function voidSale() {
+  async function confirmVoidSale() {
     if (!order) return;
-    const reason = window.prompt(
-      "Reason for voiding this sale (required). The car returns to inventory and the customer reverts to 'interested':"
-    );
-    if (!reason || !reason.trim()) {
+    if (!voidReason.trim()) {
       toast.error("A reason is required to void a sale.");
       return;
     }
@@ -268,13 +275,15 @@ export default function SalesOrderDetailPage() {
     try {
       const { error } = await supabase.rpc("void_sales_order", {
         p_sales_order_id: order.id,
-        p_reason: reason.trim(),
+        p_reason: voidReason.trim(),
       });
       if (error) {
         toast.error(formatError(error));
         return;
       }
       toast.success("Sale voided.");
+      setVoidOpen(false);
+      setVoidReason("");
     } finally {
       setSaving(false);
       await fetchOrder();
@@ -620,7 +629,7 @@ export default function SalesOrderDetailPage() {
               Owner-only. Cancels the sale, returns the car to inventory, and
               reverts the customer&apos;s lead status if they were auto-converted.
             </p>
-            <Button variant="destructive" onClick={voidSale} disabled={saving}>
+            <Button variant="destructive" onClick={() => setVoidOpen(true)} disabled={saving}>
               Void sale…
             </Button>
           </CardContent>
@@ -649,6 +658,61 @@ export default function SalesOrderDetailPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Void dialog — replaces the old window.prompt(). Owner-only access
+          is still enforced by the void_sales_order RPC; this just gives a
+          properly-styled, accessible modal for the reason. */}
+      <Dialog
+        open={voidOpen}
+        onOpenChange={(open) => {
+          setVoidOpen(open);
+          if (!open) setVoidReason("");
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Void this sale?</DialogTitle>
+            <DialogDescription>
+              The car returns to inventory and the customer&apos;s lead status
+              reverts from &quot;converted&quot; back to &quot;interested&quot;. The void is
+              recorded in the audit log. A reason is required.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <label
+              htmlFor="void-reason"
+              className="text-sm font-medium leading-none"
+            >
+              Reason
+            </label>
+            <Textarea
+              id="void-reason"
+              autoFocus
+              rows={3}
+              placeholder="e.g. Customer changed their mind; returned within 24h."
+              value={voidReason}
+              onChange={(e) => setVoidReason(e.target.value)}
+            />
+          </div>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setVoidOpen(false)}
+              disabled={saving}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmVoidSale}
+              disabled={saving || !voidReason.trim()}
+            >
+              {saving && <Loader2 className="mr-2 size-4 animate-spin" aria-hidden />}
+              Void sale
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
