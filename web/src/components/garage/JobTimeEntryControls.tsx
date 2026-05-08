@@ -5,6 +5,16 @@ import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 import { formatLiveDuration, formatDurationMinutes } from "@/lib/garage-bays";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Play, Pause, PlayCircle, X } from "lucide-react";
 import { formatError } from "@/lib/error-messages";
 
@@ -43,6 +53,7 @@ export function JobTimeEntryControls({
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [, setTick] = useState(0);
+  const [pendingDeleteEntryId, setPendingDeleteEntryId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const { data, error } = await supabase
@@ -226,7 +237,6 @@ export function JobTimeEntryControls({
    * after the delete.
    */
   async function handleDeleteEntry(entryId: string) {
-    if (!window.confirm("Delete this time entry? This recalculates job hours.")) return;
     setBusy(true);
     const { error } = await supabase.rpc("delete_job_time_entry", {
       p_entry_id: entryId,
@@ -285,7 +295,7 @@ export function JobTimeEntryControls({
                   className="text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100"
                   aria-label="Delete entry"
                   title="Delete entry (your own, or any if you're a manager)"
-                  onClick={() => void handleDeleteEntry(e.id)}
+                  onClick={() => setPendingDeleteEntryId(e.id)}
                   disabled={busy}
                 >
                   <X className="size-3.5" />
@@ -326,6 +336,34 @@ export function JobTimeEntryControls({
           Recorded on job (actual_hours, includes closed sessions): {actualHours.toFixed(2)}h
         </p>
       )}
+
+      <AlertDialog
+        open={pendingDeleteEntryId !== null}
+        onOpenChange={(open) => !open && setPendingDeleteEntryId(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this time entry?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The job&apos;s recorded hours will be recalculated. You can re-clock-in
+              to add a new entry, but this specific session record will be gone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (pendingDeleteEntryId) {
+                  void handleDeleteEntry(pendingDeleteEntryId);
+                  setPendingDeleteEntryId(null);
+                }
+              }}
+            >
+              Delete entry
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
