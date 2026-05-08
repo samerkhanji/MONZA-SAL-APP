@@ -89,6 +89,7 @@ export function TestDriveFormSheet({
   const [testDriveStartAt, setTestDriveStartAt] = useState("");
   const [expectedReturnAt, setExpectedReturnAt] = useState("");
   const [actualReturnAt, setActualReturnAt] = useState("");
+  const [outcome, setOutcome] = useState<string>("");
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerId, setCustomerId] = useState<string | null>(null);
@@ -120,6 +121,7 @@ export function TestDriveFormSheet({
       setActualReturnAt(
         existing.actual_return_at ? fromIsoToLocalValue(existing.actual_return_at) : ""
       );
+      setOutcome((existing as { outcome?: string | null }).outcome ?? "");
       setCustomerName(existing.customer_name ?? "");
       setCustomerPhone(existing.customer_phone ?? "");
       setCustomerId(existing.customer_id);
@@ -146,6 +148,7 @@ export function TestDriveFormSheet({
       setTestDriveStartAt(toLocalDatetimeValue(new Date()));
       setExpectedReturnAt("");
       setActualReturnAt("");
+      setOutcome("");
       setCustomerName("");
       setCustomerPhone("");
       setCustomerId(null);
@@ -295,6 +298,7 @@ export function TestDriveFormSheet({
         fuel_in: numOrNullDecimal(fuelIn),
         incident_notes: incidentNotes.trim() || null,
         notes: notes.trim() || null,
+        outcome: outcome || null,
         updated_at: now,
       })
       .eq("id", existing.id);
@@ -532,6 +536,30 @@ export function TestDriveFormSheet({
                 <div className="grid gap-2">
                   <Label>Incident notes</Label>
                   <Textarea value={incidentNotes} onChange={(e) => setIncidentNotes(e.target.value)} rows={2} disabled={!isOut} />
+                </div>
+                {/* Outcome captures the whole point of the test drive: did
+                    the customer like the car? Lead status auto-progresses
+                    via DB trigger when this is set. */}
+                <div className="grid gap-2">
+                  <Label htmlFor="td-outcome">How did it go?</Label>
+                  <select
+                    id="td-outcome"
+                    className="border-input bg-background h-10 rounded-md border px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                    value={outcome}
+                    onChange={(e) => setOutcome(e.target.value)}
+                    disabled={!isOut && !readOnlyReturned}
+                  >
+                    <option value="">Not yet captured</option>
+                    <option value="interested">Customer is interested</option>
+                    <option value="purchased">Customer wants to buy</option>
+                    <option value="not_interested">Not interested</option>
+                    <option value="no_decision">Undecided</option>
+                  </select>
+                  <p className="text-muted-foreground text-xs">
+                    This automatically updates the customer&apos;s lead status
+                    (interested → Interested, wants to buy → Negotiation, not
+                    interested → Lost).
+                  </p>
                 </div>
               </>
             )}

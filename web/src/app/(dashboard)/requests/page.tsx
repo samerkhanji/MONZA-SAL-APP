@@ -121,6 +121,7 @@ export default function RequestCenterPage() {
   const [assistantNotes, setAssistantNotes] = useState("");
   const [assistantPriority, setAssistantPriority] = useState<string>("normal");
   const [managementComments, setManagementComments] = useState("");
+  const [resubmitNotes, setResubmitNotes] = useState("");
   const [actionSubmitting, setActionSubmitting] = useState(false);
 
   const supabase = createClient();
@@ -624,6 +625,48 @@ export default function RequestCenterPage() {
     setAssistantNotes(r.assistant_notes ?? "");
     setAssistantPriority(r.priority);
     setManagementComments(r.management_comments ?? "");
+    setResubmitNotes("");
+  }
+
+  /**
+   * Submitter resubmits a request that management marked "needs_more_info".
+   * Appends the new info to the description with a timestamp, flips status
+   * back to "submitted", clears the management_comments so the next
+   * reviewer sees a clean slate, and notifies the original reviewer.
+   */
+  async function handleResubmit(rid: string) {
+    if (!resubmitNotes.trim()) return;
+    const req = detailOpen ?? requests.find((r) => r.id === rid);
+    if (!req) return;
+    setActionSubmitting(true);
+    const stamp = new Date().toLocaleString();
+    const appended = `${req.description ?? ""}\n\n--- Resubmitted ${stamp} ---\n${resubmitNotes.trim()}`;
+    const { error } = await supabase
+      .from("requests")
+      .update({
+        status: "submitted",
+        description: appended,
+        management_comments: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", rid);
+    setActionSubmitting(false);
+    if (error) {
+      toast.error(formatError(error));
+      return;
+    }
+    if (req.reviewed_by) {
+      await createNotification({
+        userId: req.reviewed_by,
+        title: "Request resubmitted with new information",
+        message: `"${req.subject}" — submitter added the requested information`,
+        link: "/requests",
+      });
+    }
+    toast.success("Request resubmitted");
+    setDetailOpen(null);
+    setResubmitNotes("");
+    fetchRequests();
   }
 
   const submitterName = (r: RequestWithProfiles) =>
@@ -1044,6 +1087,33 @@ export default function RequestCenterPage() {
                   </p>
                 </div>
               )}
+
+              {/* Submitter resubmit flow: when management has marked the request
+                  "needs_more_info", the original submitter sees a Resubmit button
+                  here with a textarea. Closes audit B4. */}
+              {detailOpen.status === "needs_more_info" &&
+                detailOpen.submitted_by === profile?.id && (
+                  <div className="space-y-3 border-t pt-4">
+                    <h4 className="font-medium">Add the requested information</h4>
+                    <p className="text-muted-foreground text-xs">
+                      Management asked for more details. Add them below and
+                      resubmit — they&apos;ll see your updated request.
+                    </p>
+                    <Textarea
+                      id="request-resubmit-notes"
+                      placeholder="What did they ask for? Add the new information here."
+                      value={resubmitNotes}
+                      onChange={(e) => setResubmitNotes(e.target.value)}
+                      rows={3}
+                    />
+                    <Button
+                      onClick={() => handleResubmit(detailOpen.id)}
+                      disabled={actionSubmitting || !resubmitNotes.trim()}
+                    >
+                      {actionSubmitting ? "Resubmitting…" : "Resubmit request"}
+                    </Button>
+                  </div>
+                )}
 
               {appRole === "assistant" &&
                 (detailOpen.status === "submitted" || detailOpen.status === "awaiting_approval") && (
