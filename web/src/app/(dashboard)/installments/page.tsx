@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -114,29 +115,33 @@ export default function InstallmentsPage() {
   const canCreatePlan = canPerform("installments", "create", appRole);
   const isOwner = appRole === "owner";
 
+  const [recoverPlanId, setRecoverPlanId] = useState<string | null>(null);
+  const [recoverReason, setRecoverReason] = useState("");
+  const [recovering, setRecovering] = useState(false);
+
   /** Owner-only recovery for plans that auto-flipped to 'defaulted'. */
-  async function handleRecoverPlan(planId: string) {
-    const reason = window.prompt(
-      "Reason for recovering this plan from default? (e.g. customer paid the arrears, plan renegotiated)"
-    );
-    if (!reason || !reason.trim()) {
+  async function handleRecoverPlan() {
+    if (!recoverPlanId) return;
+    if (!recoverReason.trim()) {
       toast.error("A reason is required.");
       return;
     }
+    setRecovering(true);
     const { error } = await supabase.rpc("recover_payment_plan_from_default", {
-      p_plan_id: planId,
-      p_reason: reason.trim(),
+      p_plan_id: recoverPlanId,
+      p_reason: recoverReason.trim(),
     });
+    setRecovering(false);
     if (error) {
       toast.error(formatError(error));
       return;
     }
     toast.success("Plan returned to active.");
-    // Optimistic local update — the trigger writes a system_event so it's
-    // not lost. A full re-fetch happens on the next page load.
     setPlans((prev) =>
-      prev.map((pp) => (pp.id === planId ? { ...pp, status: "active" } : pp))
+      prev.map((pp) => (pp.id === recoverPlanId ? { ...pp, status: "active" } : pp))
     );
+    setRecoverPlanId(null);
+    setRecoverReason("");
   }
 
   const [newPlanOpen, setNewPlanOpen] = useState(false);
@@ -1509,7 +1514,10 @@ export default function InstallmentsPage() {
                         variant="default"
                         size="sm"
                         className="mt-2 w-full touch-manipulation"
-                        onClick={() => void handleRecoverPlan(p.id)}
+                        onClick={() => {
+                          setRecoverPlanId(p.id);
+                          setRecoverReason("");
+                        }}
                       >
                         Recover from default…
                       </Button>
@@ -2681,6 +2689,57 @@ export default function InstallmentsPage() {
               </div>
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={recoverPlanId !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setRecoverPlanId(null);
+            setRecoverReason("");
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Recover plan from default</DialogTitle>
+            <DialogDescription>
+              Marking this plan as active again. Why? (linked renegotiation,
+              partial payment received, or any context the owner should see in
+              the audit log).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="recover-reason">Reason *</Label>
+            <Textarea
+              id="recover-reason"
+              value={recoverReason}
+              onChange={(e) => setRecoverReason(e.target.value)}
+              rows={4}
+              placeholder="e.g. Customer paid arrears in cash on May 6, plan renegotiated to 36 months."
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setRecoverPlanId(null);
+                setRecoverReason("");
+              }}
+              disabled={recovering}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void handleRecoverPlan()}
+              disabled={recovering || !recoverReason.trim()}
+            >
+              {recovering ? "Recovering…" : "Recover plan"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
