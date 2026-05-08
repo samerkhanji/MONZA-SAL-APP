@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { normalizePhone } from "@/lib/phone";
 import {
   Select,
   SelectContent,
@@ -87,6 +88,34 @@ export function EditCustomerDialog({
       return;
     }
 
+    // If the phone changed, pre-check for an existing customer with the same
+    // normalized phone (matches the unique partial index — closes audit H9).
+    const newNormalized = normalizePhone(phonePrimary);
+    const oldNormalized = normalizePhone(customer?.phone_primary ?? "");
+    if (newNormalized && newNormalized !== oldNormalized) {
+      const { data: hits } = await supabase
+        .from("customers")
+        .select("id, first_name, last_name, phone_primary")
+        .is("deleted_at", null)
+        .neq("id", customer.id)
+        .ilike("phone_primary", `%${newNormalized.replace("+", "")}%`)
+        .limit(20);
+      const collision = (hits ?? []).find(
+        (c: { phone_primary?: string | null }) =>
+          normalizePhone((c as { phone_primary?: string }).phone_primary) ===
+          newNormalized
+      ) as
+        | { id: string; first_name: string; last_name: string | null }
+        | undefined;
+      if (collision) {
+        const fullName = `${collision.first_name}${collision.last_name ? ` ${collision.last_name}` : ""}`;
+        toast.error(
+          `That phone number already belongs to ${fullName}. Open their record instead.`
+        );
+        return;
+      }
+    }
+
     setSubmitting(true);
 
     const { error } = await supabase
@@ -157,10 +186,23 @@ export function EditCustomerDialog({
                 id="edit-phone"
                 name="edit-phone"
                 type="tel"
+                inputMode="tel"
+                placeholder="+961 1 234 5678"
                 value={phonePrimary}
                 onChange={(e) => setPhonePrimary(e.target.value)}
                 required
               />
+              {phonePrimary.trim() &&
+                normalizePhone(phonePrimary) !==
+                  normalizePhone(customer?.phone_primary ?? "") && (
+                  <p className="text-muted-foreground text-xs">
+                    Saved as{" "}
+                    <span className="font-mono">
+                      {normalizePhone(phonePrimary)}
+                    </span>{" "}
+                    (spaces and dashes are stripped before comparing for duplicates).
+                  </p>
+                )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-phone2">Phone 2</Label>

@@ -112,6 +112,32 @@ export default function InstallmentsPage() {
 
   const canMarkPaid = canPerform("installments", "mark_paid", appRole);
   const canCreatePlan = canPerform("installments", "create", appRole);
+  const isOwner = appRole === "owner";
+
+  /** Owner-only recovery for plans that auto-flipped to 'defaulted'. */
+  async function handleRecoverPlan(planId: string) {
+    const reason = window.prompt(
+      "Reason for recovering this plan from default? (e.g. customer paid the arrears, plan renegotiated)"
+    );
+    if (!reason || !reason.trim()) {
+      toast.error("A reason is required.");
+      return;
+    }
+    const { error } = await supabase.rpc("recover_payment_plan_from_default", {
+      p_plan_id: planId,
+      p_reason: reason.trim(),
+    });
+    if (error) {
+      toast.error(formatError(error));
+      return;
+    }
+    toast.success("Plan returned to active.");
+    // Optimistic local update — the trigger writes a system_event so it's
+    // not lost. A full re-fetch happens on the next page load.
+    setPlans((prev) =>
+      prev.map((pp) => (pp.id === planId ? { ...pp, status: "active" } : pp))
+    );
+  }
 
   const [newPlanOpen, setNewPlanOpen] = useState(false);
   const [newPlanCustomerId, setNewPlanCustomerId] = useState("");
@@ -1478,6 +1504,16 @@ export default function InstallmentsPage() {
                     <Button variant="outline" size="sm" className="mt-3 w-full touch-manipulation">
                       View Details
                     </Button>
+                    {p.status === "defaulted" && isOwner && (
+                      <Button
+                        variant="default"
+                        size="sm"
+                        className="mt-2 w-full touch-manipulation"
+                        onClick={() => void handleRecoverPlan(p.id)}
+                      >
+                        Recover from default…
+                      </Button>
+                    )}
                   </div>
                 );
               })}
