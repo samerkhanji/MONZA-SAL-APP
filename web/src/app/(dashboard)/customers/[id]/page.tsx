@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { formatError } from "@/lib/error-messages";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
 import { canPerform } from "@/lib/permissions";
@@ -778,6 +779,78 @@ export default function CustomerDetailPage() {
           <CustomerDocuments customerId={customer.id} />
         </TabsContent>
       </Tabs>
+
+      {/* GDPR / privacy tools — owner-only. Anonymization is irreversible
+          and overwrites PII; the export gives the customer a copy of
+          everything the dealership stores about them. */}
+      {appRole === "owner" && !customer.anonymized_at && (
+        <Card className="border-amber-300/50">
+          <CardHeader>
+            <CardTitle className="text-base">Privacy / GDPR</CardTitle>
+            <CardDescription>
+              Owner-only. Use these to satisfy GDPR right-of-access (export)
+              and right-to-erasure (anonymize) requests.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                window.location.href = `/api/customers/${customer.id}/export`;
+              }}
+            >
+              Export customer data (JSON)
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={async () => {
+                const reason = window.prompt(
+                  "Reason for anonymization (required — link the GDPR request, ticket, or note):"
+                );
+                if (!reason || !reason.trim()) {
+                  toast.error("A reason is required to anonymize a customer.");
+                  return;
+                }
+                if (
+                  !window.confirm(
+                    "This will replace name, phone, email, and address with [Anonymized] and cannot be undone. Continue?"
+                  )
+                ) {
+                  return;
+                }
+                const supabase = createClient();
+                const { error } = await supabase.rpc("gdpr_anonymize_customer", {
+                  p_customer_id: customer.id,
+                  p_reason: reason.trim(),
+                });
+                if (error) {
+                  toast.error(formatError(error));
+                  return;
+                }
+                toast.success("Customer anonymized.");
+                router.push("/customers");
+              }}
+            >
+              Anonymize this customer…
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {customer.anonymized_at && (
+        <Card className="border-red-300/60 bg-red-50/60 dark:border-red-900/60 dark:bg-red-950/20">
+          <CardHeader>
+            <CardTitle className="text-base text-red-700 dark:text-red-300">
+              Customer data anonymized
+            </CardTitle>
+            <CardDescription>
+              Anonymized {new Date(customer.anonymized_at).toLocaleString()} per
+              GDPR request. PII has been removed; transactional records
+              (sales, installments) remain for tax/audit retention.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      )}
     </div>
   );
 }
