@@ -277,7 +277,28 @@ export default function SalesOrdersPage() {
           {loading ? (
             <p className="text-muted-foreground py-8">Loading…</p>
           ) : filtered.length === 0 ? (
-            <p className="text-muted-foreground py-8">No sales orders match your filters.</p>
+            orders.length === 0 ? (
+              <div className="flex flex-col items-center gap-2 py-10 text-center">
+                <p className="text-muted-foreground">No sales orders yet.</p>
+                <p className="text-muted-foreground text-xs">
+                  Orders are created when a customer reserves or buys a car.
+                </p>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-3 py-10 text-center">
+                <p className="text-muted-foreground">No sales orders match your filters.</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setSearch("");
+                    setStatusFilter("all");
+                  }}
+                >
+                  Clear filters
+                </Button>
+              </div>
+            )
           ) : (
             <div className="overflow-x-auto rounded-lg border border-border/50">
               <Table className="min-w-[900px] w-full">

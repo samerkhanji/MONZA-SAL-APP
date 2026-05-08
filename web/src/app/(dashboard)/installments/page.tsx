@@ -59,6 +59,7 @@ import {
 import { LEAD_SOURCE_LABELS, LANGUAGE_LABELS } from "@/lib/constants/customers";
 import { VinScanButton } from "@/components/scanner/VinScanButton";
 import { formatError } from "@/lib/error-messages";
+import { cn } from "@/lib/utils";
 
 interface PlanWithRelations extends PaymentPlan {
   customer: Customer | null;
@@ -1695,6 +1696,41 @@ export default function InstallmentsPage() {
           <DialogHeader>
             <DialogTitle>New Payment Plan</DialogTitle>
           </DialogHeader>
+          {/* Step indicator — the dialog walks through 3 stages:
+              pick/add customer → pick car → fill plan details. */}
+          <div className="-mt-2 flex items-center gap-2 text-xs text-muted-foreground" aria-label="Progress">
+            <span
+              className={cn(
+                "rounded-full px-2 py-0.5",
+                (newPlanStep === "choose" ||
+                  newPlanStep === "existingCustomer" ||
+                  newPlanStep === "newCustomer") &&
+                  "bg-amber-100 text-amber-800 font-medium dark:bg-amber-900/40 dark:text-amber-200"
+              )}
+            >
+              1. Customer
+            </span>
+            <span aria-hidden>→</span>
+            <span
+              className={cn(
+                "rounded-full px-2 py-0.5",
+                newPlanStep === "linkCar" &&
+                  "bg-amber-100 text-amber-800 font-medium dark:bg-amber-900/40 dark:text-amber-200"
+              )}
+            >
+              2. Car
+            </span>
+            <span aria-hidden>→</span>
+            <span
+              className={cn(
+                "rounded-full px-2 py-0.5",
+                newPlanStep === "planForm" &&
+                  "bg-amber-100 text-amber-800 font-medium dark:bg-amber-900/40 dark:text-amber-200"
+              )}
+            >
+              3. Plan
+            </span>
+          </div>
           <div className="space-y-4">
             {newPlanStep === "choose" && (
               <div className="space-y-4">

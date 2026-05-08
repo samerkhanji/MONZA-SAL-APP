@@ -4,7 +4,8 @@ import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { MoreHorizontal } from "lucide-react";
+import { MoreHorizontal, Plus } from "lucide-react";
+import { pluralize } from "@/lib/plural";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
 import { useDebouncedValue } from "@/lib/hooks/useDebouncedValue";
@@ -416,7 +417,7 @@ export default function CustomersPage() {
         <div>
           <h1 className="text-xl font-semibold sm:text-2xl">Customers</h1>
           <p className="text-muted-foreground">
-            {loading ? "Loading..." : `${filteredCustomers.length} contact(s)`}
+            {loading ? "Loading..." : pluralize(filteredCustomers.length, "contact")}
           </p>
         </div>
         <div className="flex gap-2">
@@ -521,16 +522,41 @@ export default function CustomersPage() {
             <CardHeader>
               <CardTitle>Customers</CardTitle>
               <CardDescription>
-                {loading ? "Loading..." : `${filteredCustomers.length} contact(s)`}
+                {loading ? "Loading..." : pluralize(filteredCustomers.length, "contact")}
               </CardDescription>
             </CardHeader>
             <CardContent className="min-w-0 overflow-hidden">
               {loading ? (
                 <p className="text-muted-foreground">Loading...</p>
               ) : filteredCustomers.length === 0 ? (
-                <p className="text-muted-foreground">
-                  No customers or leads found. Add your first contact.
-                </p>
+                customers.length === 0 ? (
+                  <div className="flex flex-col items-center gap-3 py-10 text-center">
+                    <p className="text-muted-foreground">No customers yet.</p>
+                    <Button asChild size="sm">
+                      <Link href="/customers/add">
+                        <Plus className="mr-2 size-4" />
+                        Add your first customer
+                      </Link>
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-3 py-10 text-center">
+                    <p className="text-muted-foreground">
+                      No customers match your filters or search.
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setSearch("");
+                        setStatusFilter("all");
+                        setSourceFilter("all");
+                      }}
+                    >
+                      Clear filters
+                    </Button>
+                  </div>
+                )
               ) : (
                 <CustomerTable list={filteredCustomers} />
               )}
@@ -545,7 +571,7 @@ export default function CustomersPage() {
               <CardDescription>
                 {soldLoading
                   ? "Loading..."
-                  : `${soldCustomers.length} customer(s) with sold cars (converted)`}
+                  : `${pluralize(soldCustomers.length, "customer")} with sold cars (converted)`}
               </CardDescription>
             </CardHeader>
             <CardContent className="min-w-0 overflow-hidden">
@@ -709,7 +735,7 @@ export default function CustomersPage() {
             <CardHeader>
               <CardTitle>Leads</CardTitle>
               <CardDescription>
-                {loading ? "Loading..." : `${exclusiveLeadCustomers.length} lead contact(s)`}
+                {loading ? "Loading..." : pluralize(exclusiveLeadCustomers.length, "lead contact")}
               </CardDescription>
             </CardHeader>
             <CardContent className="min-w-0 overflow-hidden">
