@@ -57,7 +57,6 @@ import { getProfileFullName } from "@/lib/supabase-profile";
 import { AlertCircle, Check, Loader2, User, X } from "lucide-react";
 import dynamic from "next/dynamic";
 import {
-import { formatError } from "@/lib/error-messages";
   Dialog,
   DialogContent,
   DialogDescription,
@@ -65,6 +64,7 @@ import { formatError } from "@/lib/error-messages";
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { formatError } from "@/lib/error-messages";
 
 const StatusCustomerDialog = dynamic(
   () => import("@/components/status-customer-dialog").then((m) => ({ default: m.StatusCustomerDialog })),

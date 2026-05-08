@@ -234,7 +234,7 @@ export function TestDriveFormSheet({
       .eq("id", carId);
 
     if (carErr) {
-      toast.error("Test drive saved but failed to update car status: " + carErr.message);
+      toast.error(`Test drive saved but failed to update car status: ${formatError(carErr)}`);
     } else {
       toast.success("Test drive started — vehicle marked out.");
     }
@@ -312,7 +312,7 @@ export function TestDriveFormSheet({
       .update({ status: restore, updated_at: now })
       .eq("id", carId);
 
-    if (cErr) toast.error("Return saved but car status not restored: " + cErr.message);
+    if (cErr) toast.error(`Return saved but car status not restored: ${formatError(cErr)}`);
     else toast.success("Vehicle marked returned.");
     setSaving(false);
     onOpenChange(false);
@@ -339,7 +339,7 @@ export function TestDriveFormSheet({
       .from("cars")
       .update({ status: restore, updated_at: now })
       .eq("id", carId);
-    if (cErr) toast.error("Cancelled but car status not restored: " + cErr.message);
+    if (cErr) toast.error(`Cancelled but car status not restored: ${formatError(cErr)}`);
     else toast.success("Test drive cancelled.");
     setSaving(false);
     onOpenChange(false);

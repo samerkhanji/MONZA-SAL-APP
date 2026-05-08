@@ -29,6 +29,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Upload, Download, Eye, FileText, Trash2 } from "lucide-react";
+import { formatError } from "@/lib/error-messages";
 
 const DAY_DOC_TYPES = [
   { value: "job_card", label: "Job Card / Work Order" },
@@ -224,7 +225,7 @@ export function DayDetailDialog({
 
     if (uploadError) {
       setUploading(false);
-      toast.error(`Upload failed: ${uploadError.message}`);
+      toast.error(`Upload failed: ${formatError(uploadError)}`);
       return;
     }
 
@@ -273,7 +274,7 @@ export function DayDetailDialog({
     }
 
     if (metaError) {
-      toast.error("Failed to save metadata: " + metaError.message);
+      toast.error(`Failed to save metadata: ${formatError(metaError)}`);
       await supabase.storage.from("car-documents").remove([filePath]);
     }
 

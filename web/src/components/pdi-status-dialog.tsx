@@ -22,6 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { formatError } from "@/lib/error-messages";
 
 const PDI_OPTIONS: { value: PdiStatus; label: string }[] = [
   { value: "done", label: "Done" },
@@ -63,7 +64,7 @@ export function PdiStatusDialog({
 
     setSubmitting(false);
     if (error) {
-      toast.error("Failed to update: " + error.message);
+      toast.error(`Failed to update: ${formatError(error)}`);
       return;
     }
     toast.success("PDI status updated");

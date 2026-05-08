@@ -282,7 +282,7 @@ export default function SettingsPage() {
 
     setPrefsSaving(false);
     if (error) {
-      toast.error(`Failed to save: ${error.message}`);
+      toast.error(`Failed to save: ${formatError(error)}`);
     } else {
       toast.success("Settings saved");
     }

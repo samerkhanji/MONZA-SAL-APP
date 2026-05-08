@@ -2453,8 +2453,7 @@ export default function InstallmentsPage() {
                       if (planError || !planData?.id) {
                         setSavingNewPlan(false);
                         toast.error(
-                          "Failed to create plan: " +
-                            (planError?.message ?? "Unknown error")
+                          `Failed to create plan: ${planError ? formatError(planError) : "Unknown error"}`
                         );
                         return;
                       }
@@ -2492,10 +2491,7 @@ export default function InstallmentsPage() {
 
                       if (instError) {
                         setSavingNewPlan(false);
-                        toast.error(
-                          "Plan created but failed to create installments: " +
-                            instError.message
-                        );
+                        toast.error(`Plan created but failed to create installments: ${formatError(instError)}`);
                         return;
                       }
 

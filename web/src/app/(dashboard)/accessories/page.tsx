@@ -37,6 +37,7 @@ import { cn } from "@/lib/utils";
 import { CustomAccessoryCollections } from "@/components/accessories/CustomAccessoryCollections";
 import { ExportButton } from "@/components/ExportButton";
 import type { ExportColumn } from "@/lib/exportToExcel";
+import { formatError } from "@/lib/error-messages";
 
 const STORAGE_KEY = "monza-crm-accessories-inventory-v2";
 const LEGACY_STORAGE_KEY = "monza-crm-accessories-inventory-v1";
@@ -169,7 +170,7 @@ export default function AccessoriesPage() {
       if (cancelled) return;
 
       if (error) {
-        toast.error(`Could not load accessories: ${error.message}`);
+        toast.error(`Could not load accessories: ${formatError(error)}`);
         const local = loadFromStorage();
         setRows(local ?? cloneSeed());
         setHydrated(true);
@@ -191,7 +192,7 @@ export default function AccessoriesPage() {
         .insert(bootstrap.map(rowToDb));
       if (cancelled) return;
       if (insertError) {
-        toast.error(`Could not save accessories: ${insertError.message}`);
+        toast.error(`Could not save accessories: ${formatError(insertError)}`);
         setRows(bootstrap);
       } else {
         if (local && local.length > 0) {
@@ -227,7 +228,7 @@ export default function AccessoriesPage() {
         .upsert(dirtyRows.map(rowToDb));
       if (error) {
         setSaveState("error");
-        toast.error(`Could not save changes: ${error.message}`);
+        toast.error(`Could not save changes: ${formatError(error)}`);
         // Re-mark as dirty so a later edit retries.
         dirtyIds.forEach((id) => dirtyIdsRef.current.add(id));
       } else {
@@ -291,7 +292,7 @@ export default function AccessoriesPage() {
       setRows((prev) => prev.filter((r) => r.id !== id));
       const { error } = await supabase.from("accessory_inventory").delete().eq("id", id);
       if (error) {
-        toast.error(`Could not delete: ${error.message}`);
+        toast.error(`Could not delete: ${formatError(error)}`);
         if (removed) setRows((prev) => [...prev, removed]);
         return;
       }
@@ -332,7 +333,7 @@ export default function AccessoriesPage() {
       .delete()
       .gte("created_at", "1970-01-01");
     if (delError) {
-      toast.error(`Reset failed: ${delError.message}`);
+      toast.error(`Reset failed: ${formatError(delError)}`);
       return;
     }
     const { data, error: insError } = await supabase
@@ -340,7 +341,7 @@ export default function AccessoriesPage() {
       .insert(seed.map(rowToDb))
       .select("*");
     if (insError) {
-      toast.error(`Reset failed: ${insError.message}`);
+      toast.error(`Reset failed: ${formatError(insError)}`);
       return;
     }
     setRows((data ?? []) as AccessoryInventoryRow[]);

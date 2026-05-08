@@ -36,6 +36,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { monzaWarrantySlotsEmpty, warrantyExpiryFromDeliveryYmd } from "@/lib/warranty-from-delivery";
+import { formatError } from "@/lib/error-messages";
 
 interface CustomerData {
   id: string;
@@ -297,7 +298,7 @@ export function StatusCustomerDialog({
 
         if (custError) {
           setSubmitting(false);
-          toast.error("Failed to update customer: " + custError.message);
+          toast.error(`Failed to update customer: ${formatError(custError)}`);
           return;
         }
 
@@ -324,7 +325,7 @@ export function StatusCustomerDialog({
             .eq("id", latestSo.id);
           if (saleUpdErr) {
             setSubmitting(false);
-            toast.error("Failed to update sales order dates: " + saleUpdErr.message);
+            toast.error(`Failed to update sales order dates: ${formatError(saleUpdErr)}`);
             return;
           }
         } else if (customer.id) {
@@ -341,7 +342,7 @@ export function StatusCustomerDialog({
             });
             if (saleInsErr) {
               setSubmitting(false);
-              toast.error("Failed to save sales order dates: " + saleInsErr.message);
+              toast.error(`Failed to save sales order dates: ${formatError(saleInsErr)}`);
               return;
             }
           }
@@ -384,7 +385,7 @@ export function StatusCustomerDialog({
 
         if (custError || !newCustomer?.id) {
           setSubmitting(false);
-          toast.error("Failed to create customer: " + (custError?.message ?? "Unknown error"));
+          toast.error(`Failed to create customer: ${custError ? formatError(custError) : "Unknown error"}`);
           return;
         }
 
@@ -411,7 +412,7 @@ export function StatusCustomerDialog({
 
         if (saleError) {
           setSubmitting(false);
-          toast.error("Failed to create sale: " + saleError.message);
+          toast.error(`Failed to create sale: ${formatError(saleError)}`);
           return;
         }
 
@@ -473,7 +474,7 @@ export function StatusCustomerDialog({
 
           if (planError || !planData?.id) {
             setSubmitting(false);
-            toast.error("Sale created but failed to create payment plan: " + (planError?.message ?? "Unknown error"));
+            toast.error(`Sale created but failed to create payment plan: ${planError ? formatError(planError) : "Unknown error"}`);
             return;
           }
 
@@ -509,7 +510,7 @@ export function StatusCustomerDialog({
 
           if (instError) {
             setSubmitting(false);
-            toast.error("Plan created but failed to create installments: " + instError.message);
+            toast.error(`Plan created but failed to create installments: ${formatError(instError)}`);
             return;
           }
         }
@@ -534,7 +535,7 @@ export function StatusCustomerDialog({
           .eq("id", lo.id);
         if (delErr) {
           setSubmitting(false);
-          toast.error("Failed to update delivery date: " + delErr.message);
+          toast.error(`Failed to update delivery date: ${formatError(delErr)}`);
           return;
         }
       } else {
@@ -557,7 +558,7 @@ export function StatusCustomerDialog({
 
     if (carError) {
       setSubmitting(false);
-      toast.error("Failed to update status: " + carError.message);
+      toast.error(`Failed to update status: ${formatError(carError)}`);
       return;
     }
 

@@ -30,6 +30,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { formatError } from "@/lib/error-messages";
 
 export default function AddCustomerPage() {
   const router = useRouter();
@@ -127,7 +128,7 @@ export default function AddCustomerPage() {
         );
         return;
       }
-      toast.error(`Failed to add customer: ${error.message}`);
+      toast.error(`Failed to add customer: ${formatError(error)}`);
       return;
     }
 

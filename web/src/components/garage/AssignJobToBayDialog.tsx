@@ -6,13 +6,13 @@ import { createClient } from "@/lib/supabase";
 import type { GarageBay, GarageJob } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import {
-import { formatError } from "@/lib/error-messages";
   Dialog,
   DialogContent,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { formatError } from "@/lib/error-messages";
 
 interface JobRow extends GarageJob {
   cars?: {

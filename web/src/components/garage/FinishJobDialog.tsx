@@ -7,13 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-import { formatError } from "@/lib/error-messages";
   Dialog,
   DialogContent,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { formatError } from "@/lib/error-messages";
 
 interface JobWithCar {
   id: string;
@@ -73,7 +73,7 @@ export function FinishJobDialog({
         });
 
       if (uploadError) {
-        toast.error(`Upload failed: ${uploadError.message}`);
+        toast.error(`Upload failed: ${formatError(uploadError)}`);
         setSubmitting(false);
         return;
       }
