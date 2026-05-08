@@ -32,6 +32,16 @@ import { EditCustomerDialog } from "@/components/customers/EditCustomerDialog";
 import { CustomerNotes } from "@/components/customers/CustomerNotes";
 import { CustomerDocuments } from "@/components/customers/CustomerDocuments";
 import { STATUS_BADGE_COLORS } from "@/lib/constants/badges";
+import { Plus } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog as StartSaleDialog,
+  DialogContent as StartSaleDialogContent,
+  DialogDescription as StartSaleDialogDescription,
+  DialogFooter as StartSaleDialogFooter,
+  DialogHeader as StartSaleDialogHeader,
+  DialogTitle as StartSaleDialogTitle,
+} from "@/components/ui/dialog";
 
 interface VisitEvent {
   id: string;
@@ -91,6 +101,12 @@ export default function CustomerDetailPage() {
   const [loading, setLoading] = useState(true);
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [startSaleOpen, setStartSaleOpen] = useState(false);
+  const [startSaleSearch, setStartSaleSearch] = useState("");
+  const [startSaleResults, setStartSaleResults] = useState<
+    Array<{ id: string; vin: string; brand: string; model: string; status: string | null }>
+  >([]);
+  const [startSaleSubmitting, setStartSaleSubmitting] = useState(false);
 
   const supabase = createClient();
 
@@ -313,6 +329,57 @@ export default function CustomerDetailPage() {
     setDeleteOpen(false);
     router.push("/customers");
   }
+
+  // Search for available cars to attach to a new sales order. Excludes
+  // already-sold/delivered/scrapped cars; matches VIN/brand/model substring.
+  useEffect(() => {
+    if (!startSaleOpen) return;
+    const q = startSaleSearch.trim().toLowerCase();
+    let cancelled = false;
+    (async () => {
+      const sb = createClient();
+      let query = sb
+        .from("cars")
+        .select("id, vin, brand, model, status")
+        .is("deleted_at", null)
+        .not("status", "in", "(sold,delivered,scrapped)")
+        .order("created_at", { ascending: false })
+        .limit(15);
+      if (q) {
+        query = query.or(`vin.ilike.%${q}%,brand.ilike.%${q}%,model.ilike.%${q}%`);
+      }
+      const { data } = await query;
+      if (!cancelled) setStartSaleResults((data ?? []) as typeof startSaleResults);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [startSaleOpen, startSaleSearch]);
+
+  async function startNewSale(carId: string) {
+    if (!customer) return;
+    setStartSaleSubmitting(true);
+    const sb = createClient();
+    const { data, error } = await sb
+      .from("sales_orders")
+      .insert({
+        customer_id: customer.id,
+        car_id: carId,
+        status: "draft",
+      })
+      .select("id")
+      .single();
+    setStartSaleSubmitting(false);
+    if (error || !data) {
+      toast.error(formatError(error));
+      return;
+    }
+    setStartSaleOpen(false);
+    setStartSaleSearch("");
+    toast.success("Draft sale created. Add the quote next.");
+    router.push(`/sales-orders/${(data as { id: string }).id}`);
+  }
+
 
   if (loading) {
     return (
@@ -547,15 +614,39 @@ export default function CustomerDetailPage() {
 
         <TabsContent value="vehicles" className="space-y-4">
           <Card>
-            <CardHeader>
-              <CardTitle>Linked Vehicles</CardTitle>
-              <CardDescription>Cars linked via sales orders</CardDescription>
+            <CardHeader className="flex flex-row items-start justify-between gap-2">
+              <div>
+                <CardTitle>Linked Vehicles</CardTitle>
+                <CardDescription>Cars linked via sales orders</CardDescription>
+              </div>
+              {!customer.anonymized_at && canEditCustomer && (
+                <Button
+                  size="sm"
+                  onClick={() => setStartSaleOpen(true)}
+                  className="shrink-0"
+                >
+                  <Plus className="mr-1 size-4" />
+                  Start a new sale
+                </Button>
+              )}
             </CardHeader>
             <CardContent>
               {vehicles.length === 0 ? (
-                <p className="text-muted-foreground text-sm">
-                  No vehicles linked to this customer.
-                </p>
+                <div className="space-y-3 text-sm">
+                  <p className="text-muted-foreground">
+                    No vehicles linked to this customer yet.
+                  </p>
+                  {!customer.anonymized_at && canEditCustomer && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setStartSaleOpen(true)}
+                    >
+                      <Plus className="mr-1 size-4" />
+                      Start a new sale for this customer
+                    </Button>
+                  )}
+                </div>
               ) : (
                 <div className="space-y-4">
                   {vehicles.map((so) => {
@@ -851,6 +942,68 @@ export default function CustomerDetailPage() {
           </CardHeader>
         </Card>
       )}
+
+      {/* Start a new sale for this customer — pick an available car, draft
+          sales order is created and we route to it. Closes audit B1. */}
+      <StartSaleDialog open={startSaleOpen} onOpenChange={setStartSaleOpen}>
+        <StartSaleDialogContent className="sm:max-w-lg">
+          <StartSaleDialogHeader>
+            <StartSaleDialogTitle>Start a new sale</StartSaleDialogTitle>
+            <StartSaleDialogDescription>
+              Pick an available car for {customer.first_name}
+              {customer.last_name ? ` ${customer.last_name}` : ""}. A draft
+              sales order will be created so you can record the quote next.
+            </StartSaleDialogDescription>
+          </StartSaleDialogHeader>
+          <div className="space-y-3">
+            <Input
+              autoFocus
+              placeholder="Search VIN, brand, or model…"
+              value={startSaleSearch}
+              onChange={(e) => setStartSaleSearch(e.target.value)}
+            />
+            <div className="max-h-[50vh] overflow-y-auto rounded-md border border-border/60">
+              {startSaleResults.length === 0 ? (
+                <p className="text-muted-foreground p-4 text-sm">
+                  No matching available cars.
+                </p>
+              ) : (
+                <ul className="divide-y divide-border/60">
+                  {startSaleResults.map((c) => (
+                    <li key={c.id}>
+                      <button
+                        type="button"
+                        disabled={startSaleSubmitting}
+                        onClick={() => startNewSale(c.id)}
+                        className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-muted/50 disabled:opacity-60"
+                      >
+                        <span className="min-w-0 flex-1">
+                          <span className="font-medium">{c.brand} {c.model}</span>
+                          <span className="text-muted-foreground ml-2 font-mono text-xs">
+                            {c.vin ? `…${c.vin.slice(-8)}` : "—"}
+                          </span>
+                        </span>
+                        <Badge variant="outline" className="shrink-0 text-xs">
+                          {CAR_STATUS_LABELS[c.status as keyof typeof CAR_STATUS_LABELS] ?? c.status ?? "—"}
+                        </Badge>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+          <StartSaleDialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setStartSaleOpen(false)}
+              disabled={startSaleSubmitting}
+            >
+              Cancel
+            </Button>
+          </StartSaleDialogFooter>
+        </StartSaleDialogContent>
+      </StartSaleDialog>
     </div>
   );
 }
