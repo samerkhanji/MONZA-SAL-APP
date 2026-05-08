@@ -23,6 +23,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Tabs,
   TabsContent,
   TabsList,
@@ -182,6 +192,15 @@ export default function InstallmentsPage() {
     }[]
   >([]);
   const [loadingCustomerCars, setLoadingCustomerCars] = useState(false);
+  const [pendingCarSelection, setPendingCarSelection] = useState<{
+    carId: string;
+    model: string;
+    vin: string;
+    modelYear: number | null;
+    exterior_color: string | null;
+    hasPlan: boolean;
+    clientName: string | null;
+  } | null>(null);
   const [newCustSubmitting, setNewCustSubmitting] = useState(false);
   const [newCustFirstName, setNewCustFirstName] = useState("");
   const [newCustLastName, setNewCustLastName] = useState("");
@@ -1944,17 +1963,17 @@ export default function InstallmentsPage() {
                           className="flex w-full items-center justify-between border-b px-3 py-2 text-left text-sm hover:bg-muted"
                           onClick={() => {
                             const hasPlan = activePlanCarIds.has(car.carId);
-                            if (hasPlan) {
-                              const ok = window.confirm(
-                                "This car already has an active payment plan. Do you want to create another plan for it?"
-                              );
-                              if (!ok) return;
-                            }
-                            if (car.client_name) {
-                              const okClient = window.confirm(
-                                `This car is currently linked to ${car.client_name}. Selecting it will reassign it to the current customer. Continue?`
-                              );
-                              if (!okClient) return;
+                            if (hasPlan || car.client_name) {
+                              setPendingCarSelection({
+                                carId: car.carId,
+                                model: car.model,
+                                vin: car.vin,
+                                modelYear: car.modelYear,
+                                exterior_color: car.exterior_color,
+                                hasPlan,
+                                clientName: car.client_name ?? null,
+                              });
+                              return;
                             }
                             setSelectedCar({
                               id: car.carId,
@@ -2742,6 +2761,57 @@ export default function InstallmentsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={pendingCarSelection !== null}
+        onOpenChange={(open) => !open && setPendingCarSelection(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm car selection</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                {pendingCarSelection?.hasPlan && (
+                  <p>
+                    This car already has an active payment plan. Continuing will
+                    create a <strong>second</strong> plan against the same car.
+                  </p>
+                )}
+                {pendingCarSelection?.clientName && (
+                  <p>
+                    This car is currently linked to{" "}
+                    <strong>{pendingCarSelection.clientName}</strong>. Selecting it
+                    will reassign it to the current customer.
+                  </p>
+                )}
+                <p className="text-muted-foreground text-xs">
+                  Vehicle: {pendingCarSelection?.model} ({pendingCarSelection?.vin})
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (!pendingCarSelection) return;
+                setSelectedCar({
+                  id: pendingCarSelection.carId,
+                  model: pendingCarSelection.model,
+                  vin: pendingCarSelection.vin,
+                  model_year: pendingCarSelection.modelYear,
+                  exterior_color: pendingCarSelection.exterior_color,
+                });
+                setNewPlanCarId(pendingCarSelection.carId);
+                setNewPlanStep("planForm");
+                setPendingCarSelection(null);
+              }}
+            >
+              Continue
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
