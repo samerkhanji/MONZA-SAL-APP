@@ -544,6 +544,7 @@ export function EditCarDialog({
               <Input
                 id="battery"
                 type="number"
+                inputMode="numeric"
                 min={0}
                 max={100}
                 value={batteryPercent}
@@ -557,6 +558,7 @@ export function EditCarDialog({
               <Input
                 id="evRange"
                 type="number"
+                inputMode="numeric"
                 min={0}
                 value={evRangeKm}
                 onChange={(e) => setEvRangeKm(e.target.value)}
@@ -572,6 +574,7 @@ export function EditCarDialog({
               <Input
                 id="currentKm"
                 type="number"
+                inputMode="numeric"
                 min={0}
                 value={currentKm}
                 onChange={(e) => setCurrentKm(e.target.value)}
@@ -610,6 +613,7 @@ export function EditCarDialog({
                 <Input
                   id="evKm"
                   type="number"
+                  inputMode="numeric"
                   min={0}
                   value={evKm}
                   onChange={(e) => setEvKm(e.target.value)}
@@ -622,6 +626,7 @@ export function EditCarDialog({
                 <Input
                   id="motorKm"
                   type="number"
+                  inputMode="numeric"
                   min={0}
                   value={motorKm}
                   onChange={(e) => setMotorKm(e.target.value)}
@@ -638,6 +643,7 @@ export function EditCarDialog({
               <Input
                 id="editPrice"
                 type="number"
+                inputMode="decimal"
                 min={0}
                 step="0.01"
                 value={price}

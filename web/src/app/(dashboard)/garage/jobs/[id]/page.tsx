@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   AlertDialog,
+  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -98,6 +99,7 @@ export default function JobDetailPage() {
   const [finishOpen, setFinishOpen] = useState(false);
   const [scanPartOpen, setScanPartOpen] = useState(false);
   const [bays, setBays] = useState<GarageBay[]>([]);
+  const [returnPartTarget, setReturnPartTarget] = useState<{ id: string; name: string } | null>(null);
 
   const supabase = createClient();
 
@@ -161,8 +163,6 @@ export default function JobDetailPage() {
   }
 
   async function handleReturnPart(jobPartId: string, partName: string) {
-    const ok = window.confirm(`Return ${partName} to stock?`);
-    if (!ok) return;
     try {
       const { error } = await supabase.rpc("return_part_from_job", {
         p_job_part_id: jobPartId,
@@ -662,7 +662,10 @@ export default function JobDetailPage() {
                           size="sm"
                           variant="outline"
                           onClick={() =>
-                            handleReturnPart(p.id, p.parts?.part_name ?? "Part")
+                            setReturnPartTarget({
+                              id: p.id,
+                              name: p.parts?.part_name ?? "Part",
+                            })
                           }
                         >
                           Return
@@ -821,6 +824,36 @@ export default function JobDetailPage() {
             <Button variant="destructive" onClick={handleDelete}>
               Delete
             </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={returnPartTarget !== null}
+        onOpenChange={(open) => !open && setReturnPartTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Return &ldquo;{returnPartTarget?.name ?? ""}&rdquo; to stock?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              The part will be removed from this job and its quantity returned to the
+              parts inventory.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (returnPartTarget) {
+                  void handleReturnPart(returnPartTarget.id, returnPartTarget.name);
+                  setReturnPartTarget(null);
+                }
+              }}
+            >
+              Return to stock
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

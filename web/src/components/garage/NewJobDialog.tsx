@@ -452,6 +452,7 @@ export function NewJobDialog({
               id="job-estimated-hours"
               name="job-estimated-hours"
               type="number"
+              inputMode="decimal"
               step="0.5"
               min={0}
               value={estimatedHours}

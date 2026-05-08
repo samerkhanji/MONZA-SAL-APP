@@ -206,6 +206,7 @@ export function JobBayTypeControls({
           <Label>Temperature (°C)</Label>
           <Input
             type="number"
+            inputMode="decimal"
             value={ctx?.oven_temp_c ?? ""}
             onChange={(e) => {
               const v = e.target.value;
@@ -383,6 +384,7 @@ export function JobBayTypeControls({
           <Label>Battery health (%)</Label>
           <Input
             type="number"
+            inputMode="decimal"
             step="0.1"
             value={ctx?.battery_health_pct ?? ""}
             onChange={(e) => {

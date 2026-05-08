@@ -153,6 +153,7 @@ export function StockMovementDialog({
               id="stock-movement-quantity"
               name="stock-movement-quantity"
               type="number"
+              inputMode="numeric"
               min={1}
               value={quantity}
               onChange={(e) => setQuantity(e.target.value)}

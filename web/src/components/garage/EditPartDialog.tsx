@@ -181,6 +181,7 @@ export function EditPartDialog({
                 id="edit-part-min-quantity"
                 name="edit-part-min-quantity"
                 type="number"
+                inputMode="numeric"
                 min={0}
                 value={minQuantity}
                 onChange={(e) => setMinQuantity(e.target.value)}
@@ -211,6 +212,7 @@ export function EditPartDialog({
                   id="edit-part-unit-cost"
                   name="edit-part-unit-cost"
                   type="number"
+                  inputMode="decimal"
                   step="0.01"
                   min={0}
                   value={unitCost}
