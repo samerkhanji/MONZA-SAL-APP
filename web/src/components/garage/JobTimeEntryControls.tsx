@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 import { formatLiveDuration, formatDurationMinutes } from "@/lib/garage-bays";
 import { Button } from "@/components/ui/button";
-import { Play, Pause, PlayCircle } from "lucide-react";
+import { Play, Pause, PlayCircle, X } from "lucide-react";
 import { formatError } from "@/lib/error-messages";
 
 interface EntryRow {
@@ -220,6 +220,27 @@ export function JobTimeEntryControls({
     setBusy(false);
   }
 
+  /**
+   * Delete a closed time entry. The RPC enforces "own entry, manager, or owner";
+   * the existing recompute_job_actual_hours trigger updates garage_jobs.actual_hours
+   * after the delete.
+   */
+  async function handleDeleteEntry(entryId: string) {
+    if (!window.confirm("Delete this time entry? This recalculates job hours.")) return;
+    setBusy(true);
+    const { error } = await supabase.rpc("delete_job_time_entry", {
+      p_entry_id: entryId,
+    });
+    setBusy(false);
+    if (error) {
+      toast.error(formatError(error));
+      return;
+    }
+    toast.success("Time entry removed");
+    await load();
+    onChanged();
+  }
+
   if (loading) {
     return <p className="text-muted-foreground text-sm">Loading time sessions…</p>;
   }
@@ -245,13 +266,31 @@ export function JobTimeEntryControls({
       )}
 
       {entries.length > 0 && (
-        <ul className="text-muted-foreground max-h-32 space-y-1 overflow-y-auto text-xs">
+        <ul className="text-muted-foreground max-h-40 space-y-1 overflow-y-auto text-xs">
           {entries.map((e) => (
-            <li key={e.id}>
-              {profileName(e.profiles) ?? "—"} ·{" "}
-              {e.ended_at
-                ? `${formatDurationMinutes(e.duration_minutes ?? 0)} (closed)`
-                : `${formatLiveDuration(e.started_at)} (live)`}
+            <li key={e.id} className="group flex items-center justify-between gap-2 pr-1">
+              <span>
+                {profileName(e.profiles) ?? "—"} ·{" "}
+                {e.ended_at
+                  ? `${formatDurationMinutes(e.duration_minutes ?? 0)} (closed)`
+                  : `${formatLiveDuration(e.started_at)} (live)`}
+              </span>
+              {/* Delete entry — RPC enforces "own entry, or manage_team, or owner".
+                  Hidden for the open session (use Pause first). */}
+              {e.ended_at && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
+                  className="text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100"
+                  aria-label="Delete entry"
+                  title="Delete entry (your own, or any if you're a manager)"
+                  onClick={() => void handleDeleteEntry(e.id)}
+                  disabled={busy}
+                >
+                  <X className="size-3.5" />
+                </Button>
+              )}
             </li>
           ))}
         </ul>
