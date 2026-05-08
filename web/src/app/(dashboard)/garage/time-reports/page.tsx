@@ -5,6 +5,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
+import {
+  DEALERSHIP_TZ,
+  dateKeyInTz,
+  monthKeyInTz,
+  weekStartKeyInTz,
+  shiftDateKey,
+} from "@/lib/dealership-tz";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft } from "lucide-react";
@@ -23,31 +30,6 @@ function profileName(p: EntryRow["profiles"]): string {
   if (!p) return "—";
   const one = Array.isArray(p) ? p[0] : p;
   return one?.full_name ?? "—";
-}
-
-function startOfLocalDay(d: Date): Date {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x;
-}
-
-function startOfLocalWeek(d: Date): Date {
-  const x = startOfLocalDay(d);
-  const day = x.getDay();
-  const diff = (day + 6) % 7;
-  x.setDate(x.getDate() - diff);
-  return x;
-}
-
-function startOfLocalMonth(d: Date): Date {
-  const x = new Date(d.getFullYear(), d.getMonth(), 1);
-  x.setHours(0, 0, 0, 0);
-  return x;
-}
-
-function inRange(iso: string, start: Date, end: Date): boolean {
-  const t = new Date(iso).getTime();
-  return t >= start.getTime() && t < end.getTime();
 }
 
 export default function GarageTimeReportsPage() {
@@ -85,16 +67,14 @@ export default function GarageTimeReportsPage() {
   }, [canManageGarage, supabase]);
 
   const table = useMemo(() => {
+    // Bucket by the dealership's local calendar in DEALERSHIP_TZ, regardless
+    // of where the viewer's browser is. Comparison is by "YYYY-MM-DD" string
+    // keys, which sort correctly and are DST-safe.
     const now = new Date();
-    const dayStart = startOfLocalDay(now);
-    const dayEnd = new Date(dayStart);
-    dayEnd.setDate(dayEnd.getDate() + 1);
-    const weekStart = startOfLocalWeek(now);
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekEnd.getDate() + 7);
-    const monthStart = startOfLocalMonth(now);
-    const monthEnd = new Date(monthStart);
-    monthEnd.setMonth(monthEnd.getMonth() + 1);
+    const todayKey = dateKeyInTz(now);
+    const weekStartKey = weekStartKeyInTz(now);
+    const weekEndKey = shiftDateKey(weekStartKey, 6); // inclusive
+    const thisMonthKey = monthKeyInTz(now);
 
     const closed = rows.filter((r) => r.ended_at && r.duration_minutes != null);
     const byUser = new Map<
@@ -103,7 +83,9 @@ export default function GarageTimeReportsPage() {
     >();
 
     for (const r of closed) {
-      const anchor = r.started_at;
+      const startedAt = new Date(r.started_at);
+      const dayKey = dateKeyInTz(startedAt);
+      const monthKey = monthKeyInTz(startedAt);
       const uid = r.user_id;
       const mins = r.duration_minutes ?? 0;
       const name = profileName(r.profiles);
@@ -118,14 +100,14 @@ export default function GarageTimeReportsPage() {
       }
       const agg = byUser.get(uid)!;
       agg.name = name;
-      if (inRange(anchor, dayStart, dayEnd)) {
+      if (dayKey === todayKey) {
         agg.minsToday += mins;
         agg.jobsToday.add(r.job_id);
       }
-      if (inRange(anchor, weekStart, weekEnd)) {
+      if (dayKey >= weekStartKey && dayKey <= weekEndKey) {
         agg.minsWeek += mins;
       }
-      if (inRange(anchor, monthStart, monthEnd)) {
+      if (monthKey === thisMonthKey) {
         agg.minsMonth += mins;
       }
     }
@@ -160,7 +142,10 @@ export default function GarageTimeReportsPage() {
         <h1 className="text-2xl font-semibold">Employee time reports</h1>
       </div>
       <p className="text-muted-foreground text-sm">
-        Hours from completed work sessions only (paused/stopped entries). Open timers are not included.
+        Hours from completed work sessions only (paused/stopped entries). Open
+        timers are not included. Today / week / month buckets are computed in{" "}
+        <span className="font-mono">{DEALERSHIP_TZ}</span> time, regardless of
+        where you&apos;re viewing from.
       </p>
 
       <Card>
