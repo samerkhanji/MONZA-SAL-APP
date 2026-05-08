@@ -157,6 +157,7 @@ export default function AccessoriesPage() {
   const [hydrated, setHydrated] = useState(false);
   const [search, setSearch] = useState("");
   const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [pendingDelete, setPendingDelete] = useState<AccessoryInventoryRow | null>(null);
   const dirtyIdsRef = useRef<Set<string>>(new Set());
 
   // Load from Supabase. If empty + we have localStorage data from a prior
@@ -575,7 +576,7 @@ export default function AccessoriesPage() {
                                 variant="ghost"
                                 size="icon"
                                 className="text-muted-foreground hover:text-destructive size-9 opacity-70 group-hover:opacity-100"
-                                onClick={() => deleteRow(row.id)}
+                                onClick={() => setPendingDelete(row)}
                                 aria-label="Remove row"
                               >
                                 <Trash2 className="size-4" />
@@ -596,6 +597,35 @@ export default function AccessoriesPage() {
       <hr className="border-border" />
 
       <CustomAccessoryCollections />
+
+      <AlertDialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => !open && setPendingDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove this accessory?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingDelete
+                ? `This permanently removes "${pendingDelete.label || "(unlabeled)"}" from the accessory list. You can re-add it later, but the current count and notes will be lost.`
+                : ""}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (pendingDelete) {
+                  void deleteRow(pendingDelete.id);
+                  setPendingDelete(null);
+                }
+              }}
+            >
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

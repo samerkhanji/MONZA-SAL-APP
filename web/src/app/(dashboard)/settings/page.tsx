@@ -32,6 +32,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { EditTeamMemberDialog } from "@/components/settings/EditTeamMemberDialog";
 import { AddEmployeeDialog } from "@/components/settings/AddEmployeeDialog";
 import { ChangePasswordDialog } from "@/components/settings/ChangePasswordDialog";
@@ -136,6 +146,7 @@ export default function SettingsPage() {
   const [editOpen, setEditOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<"active" | "inactive" | "all">("active");
+  const [deactivateTarget, setDeactivateTarget] = useState<ProfileRow | null>(null);
 
   // Company & prefs state
   const [companyName, setCompanyName] = useState("");
@@ -822,7 +833,13 @@ export default function SettingsPage() {
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => handleToggleActive(p)}
+                                  onClick={() => {
+                                    if (p.is_active) {
+                                      setDeactivateTarget(p);
+                                    } else {
+                                      void handleToggleActive(p);
+                                    }
+                                  }}
                                   title={p.is_active ? "Deactivate" : "Activate"}
                                 >
                                   {p.is_active ? (
@@ -1131,6 +1148,35 @@ export default function SettingsPage() {
         open={changePasswordOpen}
         onOpenChange={setChangePasswordOpen}
       />
+      <AlertDialog
+        open={deactivateTarget !== null}
+        onOpenChange={(open) => !open && setDeactivateTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Deactivate {deactivateTarget ? getProfileFullName(deactivateTarget) : "this user"}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              They will lose access to the system immediately and won&apos;t be able to
+              sign in. You can reactivate them later from this same screen.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deactivateTarget) {
+                  void handleToggleActive(deactivateTarget);
+                  setDeactivateTarget(null);
+                }
+              }}
+            >
+              Deactivate
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
