@@ -266,6 +266,9 @@ export interface Customer {
   created_by: string | null;
   last_visit_date: string | null;
   deleted_at: string | null;
+  // GDPR right-to-erasure (migration 079).
+  anonymized_at: string | null;
+  anonymized_by: string | null;
 }
 
 export interface CustomerDisplay extends Customer {
