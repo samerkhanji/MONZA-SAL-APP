@@ -33,6 +33,16 @@ import type { ExportColumn } from "@/lib/exportToExcel";
 import { NewJobDialog } from "@/components/garage/NewJobDialog";
 import { FinishJobDialog } from "@/components/garage/FinishJobDialog";
 import { GarageBaySection } from "@/components/garage/GarageBaySection";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { formatError } from "@/lib/error-messages";
 
 const ScannerDialog = dynamic(
@@ -91,6 +101,7 @@ export default function GarageJobsPage() {
   const [newJobOpen, setNewJobOpen] = useState(false);
   const [scanVinOpen, setScanVinOpen] = useState(false);
   const [finishJobOpen, setFinishJobOpen] = useState<JobWithCar | null>(null);
+  const [cancelJobConfirm, setCancelJobConfirm] = useState<JobWithCar | null>(null);
   const dueTodayNotifiedRef = useRef(false);
   const [preselectedCar, setPreselectedCar] = useState<{
     id: string;
@@ -653,7 +664,13 @@ export default function GarageJobsPage() {
                       )}
                       <Select
                         value={job.status}
-                        onValueChange={(v) => handleStatusChange(job, v)}
+                        onValueChange={(v) => {
+                          if (v === "cancelled" && job.status !== "cancelled") {
+                            setCancelJobConfirm(job);
+                            return;
+                          }
+                          void handleStatusChange(job, v);
+                        }}
                         disabled={!canManageGarage}
                       >
                         <SelectTrigger className="h-9 w-[160px]">
@@ -718,6 +735,35 @@ export default function GarageJobsPage() {
         onOpenChange={(o) => !o && setFinishJobOpen(null)}
         onSuccess={fetchJobs}
       />
+
+      <AlertDialog
+        open={cancelJobConfirm !== null}
+        onOpenChange={(open) => !open && setCancelJobConfirm(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel this job?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {cancelJobConfirm
+                ? `"${cancelJobConfirm.title}" will be marked as cancelled. Any in-progress timer is stopped, the bay is released, and the job is removed from the active list. The job and its checklist remain in history.`
+                : ""}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep job</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (cancelJobConfirm) {
+                  void handleStatusChange(cancelJobConfirm, "cancelled");
+                  setCancelJobConfirm(null);
+                }
+              }}
+            >
+              Cancel job
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

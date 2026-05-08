@@ -420,6 +420,7 @@ export function RepairProposalPanel({
                         <Input
                           className="mt-1 h-9"
                           type="number"
+                          inputMode="decimal"
                           step="0.01"
                           value={it.quantity}
                           onChange={(e) =>
@@ -439,6 +440,7 @@ export function RepairProposalPanel({
                         <Input
                           className="mt-1 h-9"
                           type="number"
+                          inputMode="decimal"
                           step="0.01"
                           value={it.unit_price}
                           onChange={(e) =>
@@ -456,7 +458,10 @@ export function RepairProposalPanel({
                       <div>
                         <Label className="text-xs">Line total</Label>
                         <p className="mt-2 font-mono">
-                          {(Number(it.quantity) * Number(it.unit_price)).toFixed(2)}
+                          {(Number(it.quantity) * Number(it.unit_price)).toLocaleString("en-US", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
                         </p>
                       </div>
                     </>

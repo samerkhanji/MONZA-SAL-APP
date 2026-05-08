@@ -750,7 +750,10 @@ export function StatusCustomerDialog({
                       <div className="rounded-md border p-3 text-sm">
                         <p className="font-medium">Sale info</p>
                         <p className="text-muted-foreground">
-                          Price: {sale.selling_price != null ? `${sale.selling_price} ${sale.currency ?? "USD"}` : "—"}
+                          Price:{" "}
+                          {sale.selling_price != null
+                            ? `${Number(sale.selling_price).toLocaleString("en-US", { maximumFractionDigits: 2 })} ${sale.currency ?? "USD"}`
+                            : "—"}
                         </p>
                         {sale.delivery_date && (
                           <p className="text-muted-foreground">
@@ -792,7 +795,13 @@ export function StatusCustomerDialog({
                       </p>
                     )}
                     {sale?.selling_price != null && (
-                      <p><span className="font-medium">Price:</span> {sale.selling_price} {sale.currency ?? "USD"}</p>
+                      <p>
+                        <span className="font-medium">Price:</span>{" "}
+                        {Number(sale.selling_price).toLocaleString("en-US", {
+                          maximumFractionDigits: 2,
+                        })}{" "}
+                        {sale.currency ?? "USD"}
+                      </p>
                     )}
                   </div>
                 )}
@@ -861,6 +870,7 @@ export function StatusCustomerDialog({
                       value={sellingPrice}
                       onChange={(e) => setSellingPrice(e.target.value)}
                       type="number"
+                      inputMode="decimal"
                       min={0}
                       placeholder="Optional"
                     />
@@ -1002,6 +1012,7 @@ export function StatusCustomerDialog({
                             value={sellingPrice}
                             onChange={(e) => setSellingPrice(e.target.value)}
                             type="number"
+                            inputMode="decimal"
                             min={0}
                             step="0.01"
                             placeholder="Optional"
@@ -1053,6 +1064,7 @@ export function StatusCustomerDialog({
                                   value={planTotalAmount}
                                   onChange={(e) => setPlanTotalAmount(e.target.value)}
                                   type="number"
+                                  inputMode="decimal"
                                   min={0}
                                   step="0.01"
                                   placeholder="Full car price"
@@ -1064,6 +1076,7 @@ export function StatusCustomerDialog({
                                   value={planDownPayment}
                                   onChange={(e) => setPlanDownPayment(e.target.value)}
                                   type="number"
+                                  inputMode="decimal"
                                   min={0}
                                   step="0.01"
                                   placeholder="0 if none"
@@ -1075,6 +1088,7 @@ export function StatusCustomerDialog({
                                   value={planMonths}
                                   onChange={(e) => setPlanMonths(e.target.value)}
                                   type="number"
+                                  inputMode="numeric"
                                   min={1}
                                   step={1}
                                 />
@@ -1085,6 +1099,7 @@ export function StatusCustomerDialog({
                                   value={planMonthlyAmount}
                                   onChange={(e) => setPlanMonthlyAmount(e.target.value)}
                                   type="number"
+                                  inputMode="decimal"
                                   min={0}
                                   step="0.01"
                                 />
@@ -1103,6 +1118,7 @@ export function StatusCustomerDialog({
                                   value={planDueDay}
                                   onChange={(e) => setPlanDueDay(e.target.value)}
                                   type="number"
+                                  inputMode="numeric"
                                   min={1}
                                   max={28}
                                 />

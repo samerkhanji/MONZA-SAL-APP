@@ -8,6 +8,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ShieldCheck, ShieldAlert } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { formatError } from "@/lib/error-messages";
 
 /**
@@ -47,6 +57,7 @@ export function TwoFactorAuthSection() {
   const [enrollment, setEnrollment] = useState<EnrollResult | null>(null);
   const [code, setCode] = useState("");
   const [verifying, setVerifying] = useState(false);
+  const [disableTarget, setDisableTarget] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -124,10 +135,6 @@ export function TwoFactorAuthSection() {
   }
 
   async function disableMFA(factorId: string) {
-    const ok = window.confirm(
-      "Remove two-factor authentication from your account? You'll only need a password to log in until you re-enable it."
-    );
-    if (!ok) return;
     const { error } = await supabase.auth.mfa.unenroll({ factorId });
     if (error) {
       toast.error(formatError(error));
@@ -166,7 +173,7 @@ export function TwoFactorAuthSection() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => disableMFA(verified.id)}
+              onClick={() => setDisableTarget(verified.id)}
             >
               Disable two-factor auth
             </Button>
@@ -225,6 +232,34 @@ export function TwoFactorAuthSection() {
           </Button>
         )}
       </CardContent>
+
+      <AlertDialog
+        open={disableTarget !== null}
+        onOpenChange={(open) => !open && setDisableTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove two-factor authentication?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You&apos;ll only need a password to log in until you re-enable it. This
+              significantly weakens your account&apos;s security.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (disableTarget) {
+                  void disableMFA(disableTarget);
+                  setDisableTarget(null);
+                }
+              }}
+            >
+              Disable 2FA
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

@@ -21,6 +21,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { formatError } from "@/lib/error-messages";
 
 type CapRow = {
@@ -49,6 +59,7 @@ export default function GarageWorkflowSettingsPage() {
   const [newTplName, setNewTplName] = useState("");
   const [newItemTplId, setNewItemTplId] = useState<string | null>(null);
   const [newItemDesc, setNewItemDesc] = useState("");
+  const [tplToDelete, setTplToDelete] = useState<{ id: string; name: string } | null>(null);
 
   const loadCapacities = useCallback(async () => {
     const res = await fetch("/api/garage/capacities", { credentials: "include" });
@@ -170,7 +181,6 @@ export default function GarageWorkflowSettingsPage() {
   }
 
   async function deleteTemplate(id: string) {
-    if (!confirm("Delete this template and all its lines?")) return;
     const { error } = await supabase.from("garage_task_templates").delete().eq("id", id);
     if (error) {
       toast.error(formatError(error));
@@ -352,7 +362,12 @@ export default function GarageWorkflowSettingsPage() {
                   </p>
                 </div>
                 {!t.is_system ? (
-                  <Button type="button" size="sm" variant="destructive" onClick={() => void deleteTemplate(t.id)}>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => setTplToDelete({ id: t.id, name: t.name })}
+                  >
                     <Trash2 className="size-4" />
                   </Button>
                 ) : null}
@@ -396,6 +411,36 @@ export default function GarageWorkflowSettingsPage() {
           Task templates are managed by owners and garage managers.
         </p>
       )}
+
+      <AlertDialog
+        open={tplToDelete !== null}
+        onOpenChange={(open) => !open && setTplToDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete &ldquo;{tplToDelete?.name ?? ""}&rdquo;?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes the template and all of its checklist lines. Existing
+              jobs that already pulled lines from this template are not affected.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (tplToDelete) {
+                  void deleteTemplate(tplToDelete.id);
+                  setTplToDelete(null);
+                }
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
