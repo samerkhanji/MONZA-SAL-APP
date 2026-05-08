@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, FileText, CheckCircle2, Truck, Receipt } from "lucide-react";
+import { ArrowLeft, FileText, CheckCircle2, Truck, Receipt, Loader2 } from "lucide-react";
 import { formatError } from "@/lib/error-messages";
 
 type SaleStatus = "draft" | "reserved" | "confirmed" | "paid" | "delivered" | "cancelled";
@@ -443,7 +443,8 @@ export default function SalesOrderDetailPage() {
             </div>
             <div className="flex items-end gap-2">
               <Button onClick={saveQuote} disabled={!canEdit || saving} className="flex-1">
-                {order.quote_sent_at ? "Update quote" : "Send quote"}
+                {saving && <Loader2 className="mr-2 size-4 animate-spin" aria-hidden />}
+                {saving ? "Saving…" : order.quote_sent_at ? "Update quote" : "Send quote"}
               </Button>
               {order.quote_sent_at && !order.quote_accepted_at && (
                 <Button variant="outline" onClick={markQuoteAccepted} disabled={!canEdit || saving}>
@@ -494,7 +495,8 @@ export default function SalesOrderDetailPage() {
             </div>
             <div className="flex items-end">
               <Button onClick={saveDeposit} disabled={!canEdit || saving} className="w-full">
-                {order.deposit_paid_at ? "Update deposit" : "Mark paid"}
+                {saving && <Loader2 className="mr-2 size-4 animate-spin" aria-hidden />}
+                {saving ? "Saving…" : order.deposit_paid_at ? "Update deposit" : "Mark paid"}
               </Button>
             </div>
           </div>

@@ -7,7 +7,8 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { MoreHorizontal, FileText, ScanLine, FileSpreadsheet } from "lucide-react";
+import { MoreHorizontal, FileText, ScanLine, FileSpreadsheet, Plus } from "lucide-react";
+import { pluralize } from "@/lib/plural";
 import { useUser } from "@/lib/contexts/UserContext";
 import { useDebouncedValue } from "@/lib/hooks/useDebouncedValue";
 import type { CarDisplay } from "@/types/database";
@@ -698,7 +699,7 @@ export default function CarsListPage() {
         <CardHeader>
           <CardTitle>Cars</CardTitle>
           <CardDescription>
-            {loading ? "Loading..." : `${sortedCars.length} car(s)`}
+            {loading ? "Loading..." : pluralize(sortedCars.length, "car")}
           </CardDescription>
         </CardHeader>
         <CardContent className="min-w-0 overflow-hidden">
@@ -709,7 +710,42 @@ export default function CarsListPage() {
               ))}
             </div>
           ) : sortedCars.length === 0 ? (
-            <p className="text-muted-foreground">No cars found.</p>
+            cars.length === 0 ? (
+              <div className="flex flex-col items-center gap-3 py-10 text-center">
+                <p className="text-muted-foreground">No cars yet.</p>
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  <Button asChild size="sm">
+                    <Link href="/cars/add">
+                      <Plus className="mr-2 size-4" />
+                      Add a car
+                    </Link>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setImportExcelOpen(true)}
+                  >
+                    Import from Excel
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-3 py-10 text-center">
+                <p className="text-muted-foreground">No cars match your filters.</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setSearch("");
+                    setStatusFilter("all");
+                    setLocationFilter("all");
+                    setBrandFilter("all");
+                  }}
+                >
+                  Clear filters
+                </Button>
+              </div>
+            )
           ) : (
             <div className="scrollbar-thick w-full min-w-0 max-h-[min(72vh,calc(100dvh-14rem))] overflow-x-auto overflow-y-auto rounded-md border border-border bg-card [-webkit-overflow-scrolling:touch]">
               <table className="w-max min-w-full table-fixed border-collapse">
@@ -838,7 +874,7 @@ export default function CarsListPage() {
                       sortKey={sortKey}
                       sortDir={sortDir}
                       onToggle={toggleSort}
-                      title="Warranty V.M"
+                      title="Warranty Vehicle (Monza) — vehicle warranty expiry from Monza"
                     >
                       W.V.M
                     </InventorySortTh>
@@ -857,7 +893,7 @@ export default function CarsListPage() {
                       sortKey={sortKey}
                       sortDir={sortDir}
                       onToggle={toggleSort}
-                      title="Warranty B.M"
+                      title="Warranty Battery (Monza) — battery warranty expiry from Monza"
                     >
                       W.B.M
                     </InventorySortTh>
@@ -1156,11 +1192,16 @@ export default function CarsListPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Mark vehicle as scrapped — enter your password
+              Permanently retire this car (scrapped)
             </AlertDialogTitle>
             <AlertDialogDescription>
-              This removes the car from active inventory (scrapped). It does not apply to returns or
-              resales; those use status and customer unlink. Confirm your password to continue.
+              Use this only when the car is being written off (totaled, scrapped,
+              decommissioned). The car stays in records for audit but is removed
+              from active inventory. Don&apos;t use this for returns or resales —
+              for those, change the status or unlink the customer.
+              <br />
+              <br />
+              Re-enter your password below to confirm.
             </AlertDialogDescription>
           </AlertDialogHeader>
           {(isOwner || profile?.user_role === "owner") ? (
