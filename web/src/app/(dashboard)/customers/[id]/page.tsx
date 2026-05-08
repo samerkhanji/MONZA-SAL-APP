@@ -28,6 +28,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { EditCustomerDialog } from "@/components/customers/EditCustomerDialog";
 import { CustomerNotes } from "@/components/customers/CustomerNotes";
 import { CustomerDocuments } from "@/components/customers/CustomerDocuments";
@@ -107,6 +117,9 @@ export default function CustomerDetailPage() {
     Array<{ id: string; vin: string; brand: string; model: string; status: string | null }>
   >([]);
   const [startSaleSubmitting, setStartSaleSubmitting] = useState(false);
+  const [anonymizeOpen, setAnonymizeOpen] = useState(false);
+  const [anonymizeReason, setAnonymizeReason] = useState("");
+  const [anonymizing, setAnonymizing] = useState(false);
 
   const supabase = createClient();
 
@@ -894,32 +907,9 @@ export default function CustomerDetailPage() {
             </Button>
             <Button
               variant="destructive"
-              onClick={async () => {
-                const reason = window.prompt(
-                  "Reason for anonymization (required — link the GDPR request, ticket, or note):"
-                );
-                if (!reason || !reason.trim()) {
-                  toast.error("A reason is required to anonymize a customer.");
-                  return;
-                }
-                if (
-                  !window.confirm(
-                    "This will replace name, phone, email, and address with [Anonymized] and cannot be undone. Continue?"
-                  )
-                ) {
-                  return;
-                }
-                const supabase = createClient();
-                const { error } = await supabase.rpc("gdpr_anonymize_customer", {
-                  p_customer_id: customer.id,
-                  p_reason: reason.trim(),
-                });
-                if (error) {
-                  toast.error(formatError(error));
-                  return;
-                }
-                toast.success("Customer anonymized.");
-                router.push("/customers");
+              onClick={() => {
+                setAnonymizeReason("");
+                setAnonymizeOpen(true);
               }}
             >
               Anonymize this customer…
@@ -1004,6 +994,69 @@ export default function CustomerDetailPage() {
           </StartSaleDialogFooter>
         </StartSaleDialogContent>
       </StartSaleDialog>
+
+      <Dialog
+        open={anonymizeOpen}
+        onOpenChange={(open) => {
+          if (!anonymizing) setAnonymizeOpen(open);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Anonymize this customer?</DialogTitle>
+            <DialogDescription>
+              This replaces name, phone, email, and address with{" "}
+              <span className="font-mono">[Anonymized]</span> and{" "}
+              <strong>cannot be undone</strong>. Sales history and audit trails
+              are preserved. Use this for GDPR right-to-erasure requests.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="anonymize-reason">Reason *</Label>
+            <Textarea
+              id="anonymize-reason"
+              value={anonymizeReason}
+              onChange={(e) => setAnonymizeReason(e.target.value)}
+              rows={4}
+              placeholder="e.g. GDPR erasure ticket #LB-2026-0142, customer email request dated 2026-05-04."
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setAnonymizeOpen(false)}
+              disabled={anonymizing}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={anonymizing || !anonymizeReason.trim()}
+              onClick={async () => {
+                if (!customer) return;
+                setAnonymizing(true);
+                const supabase = createClient();
+                const { error } = await supabase.rpc("gdpr_anonymize_customer", {
+                  p_customer_id: customer.id,
+                  p_reason: anonymizeReason.trim(),
+                });
+                setAnonymizing(false);
+                if (error) {
+                  toast.error(formatError(error));
+                  return;
+                }
+                toast.success("Customer anonymized.");
+                setAnonymizeOpen(false);
+                router.push("/customers");
+              }}
+            >
+              {anonymizing ? "Anonymizing…" : "Anonymize permanently"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
