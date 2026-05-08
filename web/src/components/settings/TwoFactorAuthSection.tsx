@@ -104,7 +104,7 @@ export function TwoFactorAuthSection() {
     });
     if (chErr || !challenge) {
       setVerifying(false);
-      toast.error(chErr?.message ?? "Failed to start MFA challenge");
+      toast.error(chErr ? formatError(chErr) : "Failed to start MFA challenge");
       return;
     }
     const { error: vErr } = await supabase.auth.mfa.verify({

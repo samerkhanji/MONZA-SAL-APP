@@ -28,6 +28,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { formatError } from "@/lib/error-messages";
 
 interface EditCustomerDialogProps {
   customer: CustomerDisplay | null;
@@ -109,7 +110,7 @@ export function EditCustomerDialog({
     setSubmitting(false);
 
     if (error) {
-      toast.error(`Failed to update: ${error.message}`);
+      toast.error(`Failed to update: ${formatError(error)}`);
       return;
     }
 

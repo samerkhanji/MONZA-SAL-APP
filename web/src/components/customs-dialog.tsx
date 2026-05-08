@@ -23,6 +23,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { formatError } from "@/lib/error-messages";
 
 const CUSTOMS_OPTIONS: { value: CustomsStatus; label: string }[] = [
   { value: "cleared", label: "Complete" },
@@ -82,7 +83,7 @@ export function CustomsDialog({
 
     setSubmitting(false);
     if (error) {
-      toast.error("Failed to update: " + error.message);
+      toast.error(`Failed to update: ${formatError(error)}`);
       return;
     }
     toast.success("Customs updated");

@@ -25,6 +25,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Upload, Trash2, Download, Eye } from "lucide-react";
 import { getProfileFullName } from "@/lib/supabase-profile";
+import { formatError } from "@/lib/error-messages";
 
 const DOCUMENT_TYPE_ICONS: Record<string, string> = {
   job_card: "🔧",
@@ -238,7 +239,7 @@ export function JobDocuments({ jobId, onDocumentsChange }: JobDocumentsProps) {
 
     if (uploadError) {
       setUploading(false);
-      toast.error(`Upload failed: ${uploadError.message}`);
+      toast.error(`Upload failed: ${formatError(uploadError)}`);
       return;
     }
 
@@ -256,7 +257,7 @@ export function JobDocuments({ jobId, onDocumentsChange }: JobDocumentsProps) {
     setUploading(false);
 
     if (metaError) {
-      toast.error(`File uploaded but failed to save metadata: ${metaError.message}`);
+      toast.error(`File uploaded but failed to save metadata: ${formatError(metaError)}`);
       await supabase.storage.from("job-documents").remove([filePath]);
       return;
     }

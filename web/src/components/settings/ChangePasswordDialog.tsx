@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Check } from "lucide-react";
+import { formatError } from "@/lib/error-messages";
 
 interface ChangePasswordDialogProps {
   open: boolean;
@@ -64,7 +65,7 @@ export function ChangePasswordDialog({
     setSubmitting(false);
 
     if (error) {
-      toast.error(`Failed to update password: ${error.message}`);
+      toast.error(`Failed to update password: ${formatError(error)}`);
       return;
     }
     toast.success("Password updated successfully");

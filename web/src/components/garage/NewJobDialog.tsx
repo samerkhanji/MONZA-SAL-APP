@@ -250,7 +250,7 @@ export function NewJobDialog({
         p_user_id: user.id,
       });
       if (error) {
-        toast.error(`Failed to add part ${p.part_name}: ${error.message}`);
+        toast.error(`Failed to add part ${p.part_name}: ${formatError(error)}`);
       }
     }
 

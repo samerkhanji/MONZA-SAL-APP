@@ -33,6 +33,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Upload, Trash2, Download, Eye } from "lucide-react";
 import { getProfileFullName } from "@/lib/supabase-profile";
+import { formatError } from "@/lib/error-messages";
 
 const DOCUMENT_TYPES = [
   { value: "pdi_report", label: "PDI Report" },
@@ -290,7 +291,7 @@ export function CarDocuments({ carId, carVin }: CarDocumentsProps) {
 
     if (uploadError) {
       setUploading(false);
-      toast.error(`Upload failed: ${uploadError.message}`);
+      toast.error(`Upload failed: ${formatError(uploadError)}`);
       return;
     }
 
@@ -325,7 +326,7 @@ export function CarDocuments({ carId, carVin }: CarDocumentsProps) {
     setUploading(false);
 
     if (metaError) {
-      toast.error(`File uploaded but failed to save metadata: ${metaError.message}`);
+      toast.error(`File uploaded but failed to save metadata: ${formatError(metaError)}`);
       await supabase.storage.from("car-documents").remove([filePath]);
       return;
     }

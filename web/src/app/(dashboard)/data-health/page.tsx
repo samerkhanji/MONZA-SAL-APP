@@ -55,6 +55,7 @@ import {
 } from "@/lib/data-health-config";
 import { toast } from "sonner";
 import { VinScanButton } from "@/components/scanner/VinScanButton";
+import { formatError } from "@/lib/error-messages";
 
 type CarRow = {
   id: string;
@@ -196,7 +197,7 @@ function QuickFixCustomerPhone({ customerId, onSaved }: { customerId: string; on
     const { error } = await supabase.from("customers").update({ phone_primary: trimmed, updated_at: new Date().toISOString() }).eq("id", customerId);
     setSaving(false);
     if (error) {
-      toast.error(`Failed to save: ${error.message}`);
+      toast.error(`Failed to save: ${formatError(error)}`);
     } else {
       toast.success("Phone saved");
       onSaved();
@@ -232,7 +233,7 @@ function QuickFixJobDiagnosis({ jobId, onSaved }: { jobId: string; onSaved: () =
     const { error } = await supabase.from("garage_jobs").update({ diagnosis: trimmed, updated_at: new Date().toISOString() }).eq("id", jobId);
     setSaving(false);
     if (error) {
-      toast.error(`Failed to save: ${error.message}`);
+      toast.error(`Failed to save: ${formatError(error)}`);
     } else {
       toast.success("Diagnosis saved");
       onSaved();
@@ -268,7 +269,7 @@ function QuickFixReservedBy({ carId, onSaved }: { carId: string; onSaved: () => 
     const { error } = await supabase.from("cars").update({ reserved_by: trimmed, updated_at: new Date().toISOString() }).eq("id", carId);
     setSaving(false);
     if (error) {
-      toast.error(`Failed to save: ${error.message}`);
+      toast.error(`Failed to save: ${formatError(error)}`);
     } else {
       toast.success("Reserved by saved");
       onSaved();

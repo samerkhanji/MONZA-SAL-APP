@@ -90,7 +90,7 @@ export default function TestDrivePage() {
         .maybeSingle();
 
       if (carErr || !carRow) {
-        toast.error(carErr?.message ?? "No vehicle found for this VIN.");
+        toast.error(carErr ? formatError(carErr) : "No vehicle found for this VIN.");
         setLookupLoading(false);
         return;
       }

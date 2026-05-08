@@ -14,7 +14,6 @@ import {
 } from "@/lib/constants/garage-workflow";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import {
-import { formatError } from "@/lib/error-messages";
   Dialog,
   DialogContent,
   DialogDescription,
@@ -22,6 +21,7 @@ import { formatError } from "@/lib/error-messages";
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { formatError } from "@/lib/error-messages";
 
 type CapRow = {
   resource_name: string;

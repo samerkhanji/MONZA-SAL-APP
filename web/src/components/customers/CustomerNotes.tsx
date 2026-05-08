@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getProfileFullName } from "@/lib/supabase-profile";
+import { formatError } from "@/lib/error-messages";
 
 const NOTE_TYPES = [
   "general",
@@ -101,7 +102,7 @@ export function CustomerNotes({ customerId }: CustomerNotesProps) {
     setSubmitting(false);
 
     if (error) {
-      toast.error(`Failed to add note: ${error.message}`);
+      toast.error(`Failed to add note: ${formatError(error)}`);
       return;
     }
 

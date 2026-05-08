@@ -131,7 +131,7 @@ export default function SalesOrderDetailPage() {
       .eq("id", id)
       .single();
     if (error || !data) {
-      toast.error(error?.message ?? "Sales order not found");
+      toast.error(error ? formatError(error) : "Sales order not found");
       router.push("/sales-orders");
       return;
     }
