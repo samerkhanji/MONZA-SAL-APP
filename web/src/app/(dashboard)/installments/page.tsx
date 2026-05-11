@@ -54,7 +54,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ExportButton } from "@/components/ExportButton";
 import type { ExportColumn } from "@/lib/exportToExcel";
-import { createNotificationsForUsers, createNotification } from "@/lib/notifications";
+import { createNotificationsForUsers } from "@/lib/notifications";
 import { installmentDueDateIso } from "@/lib/installment-due-dates";
 import {
   Plus,
@@ -266,7 +266,12 @@ export default function InstallmentsPage() {
   const dueInstallments = useMemo(
     () =>
       installments
-        .filter((i) => i.status === "due" || i.status === "overdue")
+        .filter(
+          (i) =>
+            i.status === "due" ||
+            i.status === "overdue" ||
+            i.status === "partial"
+        )
         .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime()),
     [installments]
   );
@@ -579,22 +584,15 @@ export default function InstallmentsPage() {
 
     setMarkingPaid(true);
 
-    const { data: authData } = await supabase.auth.getUser();
-    const userId = authData?.user?.id || profile?.id || null;
-
-    const { error } = await supabase
-      .from("installment_payments")
-      .update({
-        status: "paid",
-        paid_at: new Date().toISOString(),
-        paid_amount: amount,
-        payment_method: paymentMethod,
-        receipt_url: receiptUrl || null,
-        note: note || null,
-        marked_paid_by: userId,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", selectedInstallment.id);
+    // The RPC enforces overpayment → customer_credits and underpayment → 'partial'
+    // status with an owner notification. It also handles plan completion server-side.
+    const { data, error } = await supabase.rpc("apply_installment_payment", {
+      p_installment_id: selectedInstallment.id,
+      p_amount: amount,
+      p_payment_method: paymentMethod,
+      p_receipt_url: receiptUrl || null,
+      p_note: note || null,
+    });
 
     if (error) {
       setMarkingPaid(false);
@@ -602,61 +600,26 @@ export default function InstallmentsPage() {
       return;
     }
 
-    const { data: remaining } = await supabase
-      .from("installment_payments")
-      .select("id, status")
-      .eq("plan_id", selectedInstallment.plan_id);
+    const result = (data ?? {}) as {
+      new_status?: string;
+      overage_to_credits?: number;
+      shortfall?: number;
+    };
+    const overage = Number(result.overage_to_credits ?? 0);
+    const shortfall = Number(result.shortfall ?? 0);
 
-    const allPaid =
-      remaining && remaining.length > 0
-        ? remaining.every((r) => r.status === "paid")
-        : false;
-
-    const planCustomer = selectedInstallment.plan?.customer ?? null;
-    const planCar = selectedInstallment.plan?.car ?? null;
-    const customerName = planCustomer ? formatName(planCustomer) : "Customer";
-    const carModel = planCar
-      ? `${planCar.model} (${planCar.vin})`
-      : "N/A";
-
-    if (allPaid) {
-      await supabase
-        .from("payment_plans")
-        .update({ status: "completed", updated_at: new Date().toISOString() })
-        .eq("id", selectedInstallment.plan_id);
-
-      const { data: ownersAndAssistants } = await supabase
-        .from("profiles")
-        .select("id, user_role")
-        .in("user_role", ["owner", "assistant"]);
-
-      if (ownersAndAssistants && ownersAndAssistants.length > 0) {
-        const ids = ownersAndAssistants.map((p) => p.id as string);
-        await createNotificationsForUsers(
-          ids,
-          "Payment plan completed",
-          `Payment plan for ${customerName} (${carModel}) is fully paid`,
-          "/installments"
-        );
-      }
-    }
-
-    const { data: owners } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("user_role", "owner");
-
-    if (owners && owners.length > 0) {
-      const ownerIds = owners.map((o) => o.id as string);
-      await createNotificationsForUsers(
-        ownerIds,
-        "Installment paid",
-        `${customerName} paid installment #${selectedInstallment.installment_no} for ${carModel}`,
-        "/installments"
+    if (result.new_status === "paid" && overage > 0) {
+      toast.success(
+        `Installment paid · ${overage.toLocaleString("en-US", { maximumFractionDigits: 2 })} credited to customer.`
       );
+    } else if (result.new_status === "partial") {
+      toast.warning(
+        `Partial payment recorded · ${shortfall.toLocaleString("en-US", { maximumFractionDigits: 2 })} still owed. Owner notified.`
+      );
+    } else {
+      toast.success("Installment marked as paid");
     }
 
-    toast.success("Installment marked as paid");
     setMarkingPaid(false);
     setMarkPaidOpen(false);
     setSelectedInstallment(null);
@@ -1688,6 +1651,37 @@ export default function InstallmentsPage() {
                   value={paidAmount}
                   onChange={(e) => setPaidAmount(e.target.value)}
                 />
+                {(() => {
+                  const amt = Number(paidAmount);
+                  if (!amt || !selectedInstallment) return null;
+                  const remaining =
+                    selectedInstallment.amount_due -
+                    (selectedInstallment.paid_amount ?? 0);
+                  if (amt > remaining) {
+                    const overage = amt - remaining;
+                    return (
+                      <p className="text-xs text-emerald-700 dark:text-emerald-400">
+                        Overpaid by{" "}
+                        {currencyFormatter.format(overage)} — the extra will be
+                        credited to the customer&apos;s account.
+                      </p>
+                    );
+                  }
+                  if (amt < remaining) {
+                    return (
+                      <p className="text-xs text-amber-700 dark:text-amber-400">
+                        Short by {currencyFormatter.format(remaining - amt)} —
+                        installment will be marked &ldquo;partial&rdquo; and the
+                        owner will be notified. Customer can complete it later.
+                      </p>
+                    );
+                  }
+                  return (
+                    <p className="text-xs text-muted-foreground">
+                      Exact match — installment will be marked paid.
+                    </p>
+                  );
+                })()}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="payment-method">Payment Method</Label>

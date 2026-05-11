@@ -560,7 +560,13 @@ export interface PaymentPlan {
   updated_at: string;
 }
 
-export type InstallmentStatus = "upcoming" | "due" | "overdue" | "paid";
+export type InstallmentStatus =
+  | "upcoming"
+  | "due"
+  | "overdue"
+  | "partial"
+  | "paid"
+  | "waived";
 
 export interface InstallmentPayment {
   id: string;
