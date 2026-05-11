@@ -54,7 +54,6 @@ interface SalesOrderFull {
   } | null;
   customers: {
     id: string;
-    full_name: string | null;
     first_name: string | null;
     last_name: string | null;
     phone_primary: string | null;
@@ -72,8 +71,8 @@ const STATUS_COLORS: Record<string, string> = {
 
 function customerName(so: SalesOrderFull): string {
   if (!so.customers) return "—";
-  const full = so.customers.full_name
-    ?? `${so.customers.first_name ?? ""} ${so.customers.last_name ?? ""}`.trim();
+  const full =
+    `${so.customers.first_name ?? ""} ${so.customers.last_name ?? ""}`.trim();
   return full || "—";
 }
 
@@ -111,7 +110,7 @@ export default function SalesOrdersPage() {
         `id, car_id, customer_id, status, selling_price, currency,
          sale_date, date_bought, delivery_date, reservation_date, reserved_by, created_at,
          cars:car_id (id, vin, brand, model, model_year, exterior_color, status),
-         customers:customer_id (id, full_name, first_name, last_name, phone_primary)`
+         customers:customer_id (id, first_name, last_name, phone_primary)`
       )
       .order("created_at", { ascending: false });
 
