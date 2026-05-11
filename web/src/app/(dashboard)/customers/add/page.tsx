@@ -76,14 +76,13 @@ export default function AddCustomerPage() {
     if (normalized) {
       const { data: existing } = await supabase
         .from("customers")
-        .select("id, first_name, last_name")
+        .select("id, first_name, last_name, phone_primary")
         .is("deleted_at", null)
         .ilike("phone_primary", `%${normalized.replace("+", "")}%`)
         .limit(20);
       const match = (existing ?? []).find(
-        (c: { phone_primary?: string | null }) =>
-          normalizePhone((c as { phone_primary?: string }).phone_primary) === normalized
-      ) as { id: string; first_name: string; last_name: string | null } | undefined;
+        (c) => normalizePhone(c.phone_primary) === normalized
+      );
       if (match) {
         const fullName = `${match.first_name}${match.last_name ? ` ${match.last_name}` : ""}`;
         setSubmitting(false);
