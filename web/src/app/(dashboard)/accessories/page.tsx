@@ -140,15 +140,28 @@ function matchesSearch(row: AccessoryInventoryRow, q: string): boolean {
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
-function rowToDb(r: AccessoryInventoryRow) {
-  return {
-    id: r.id,
+// Local seed/legacy-localStorage rows can have synthetic non-uuid ids
+// (e.g. "seed-plate-01"). Postgres rejects those when the column is uuid.
+// Only forward the id when it actually looks like a uuid; otherwise let
+// the DB generate one on insert.
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function rowToDbInsert(r: AccessoryInventoryRow) {
+  const base = {
     category: r.category,
     label: r.label,
     quantity: r.quantity,
     note: r.note,
     linked_plate: r.linked_plate,
   };
+  return UUID_RE.test(r.id) ? { id: r.id, ...base } : base;
+}
+
+function rowToDbUpsert(r: AccessoryInventoryRow) {
+  // Upsert needs an id to match on. If the in-memory row still has a
+  // synthetic seed id, fall through to plain insert (omit id).
+  return rowToDbInsert(r);
 }
 
 export default function AccessoriesPage() {
@@ -188,9 +201,10 @@ export default function AccessoriesPage() {
       // DB empty — bootstrap.
       const local = loadFromStorage();
       const bootstrap = local && local.length > 0 ? local : cloneSeed();
-      const { error: insertError } = await supabase
+      const { data: inserted, error: insertError } = await supabase
         .from("accessory_inventory")
-        .insert(bootstrap.map(rowToDb));
+        .insert(bootstrap.map(rowToDbInsert))
+        .select("*");
       if (cancelled) return;
       if (insertError) {
         toast.error(`Could not save accessories: ${formatError(insertError)}`);
@@ -205,7 +219,8 @@ export default function AccessoriesPage() {
             // ignore
           }
         }
-        setRows(bootstrap);
+        // Use server-assigned uuids so dirty tracking + later upserts match.
+        setRows((inserted as AccessoryInventoryRow[]) ?? bootstrap);
       }
       setHydrated(true);
     }
@@ -226,7 +241,7 @@ export default function AccessoriesPage() {
       setSaveState("saving");
       const { error } = await supabase
         .from("accessory_inventory")
-        .upsert(dirtyRows.map(rowToDb));
+        .upsert(dirtyRows.map(rowToDbUpsert));
       if (error) {
         setSaveState("error");
         toast.error(`Could not save changes: ${formatError(error)}`);
@@ -339,7 +354,7 @@ export default function AccessoriesPage() {
     }
     const { data, error: insError } = await supabase
       .from("accessory_inventory")
-      .insert(seed.map(rowToDb))
+      .insert(seed.map(rowToDbInsert))
       .select("*");
     if (insError) {
       toast.error(`Reset failed: ${formatError(insError)}`);
