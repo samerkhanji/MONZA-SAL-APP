@@ -476,6 +476,8 @@ export interface GarageJob {
   garage_bay_id?: string | null;
   is_battery_only?: boolean;
   work_checklist?: Array<{ id: string; label: string; done: boolean }>;
+  task_category_id?: string | null;
+  current_km?: number | null;
 }
 
 export interface JobPart {

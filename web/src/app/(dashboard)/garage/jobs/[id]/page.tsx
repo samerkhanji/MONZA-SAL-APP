@@ -48,6 +48,7 @@ import {
 import { ArrowLeft, Plus, Check, Trash2, ScanLine } from "lucide-react";
 import { JobDocuments } from "@/components/garage/JobDocuments";
 import { FinishJobDialog } from "@/components/garage/FinishJobDialog";
+import { SetJobCategoryDialog } from "@/components/garage/SetJobCategoryDialog";
 import { ScannerDialog } from "@/components/scanner/ScannerDialog";
 import { JobTimeEntryControls } from "@/components/garage/JobTimeEntryControls";
 import { JobBayTypeControls } from "@/components/garage/JobBayTypeControls";
@@ -100,6 +101,7 @@ export default function JobDetailPage() {
   const [scanPartOpen, setScanPartOpen] = useState(false);
   const [bays, setBays] = useState<GarageBay[]>([]);
   const [returnPartTarget, setReturnPartTarget] = useState<{ id: string; name: string } | null>(null);
+  const [setCategoryOpen, setSetCategoryOpen] = useState(false);
 
   const supabase = createClient();
 
@@ -363,6 +365,19 @@ export default function JobDetailPage() {
           {JOB_STATUS_LABELS[job.status]}
         </Badge>
       </div>
+      {canManageGarage && !job.task_category_id && (
+        <div className="flex flex-wrap items-center gap-3 rounded-md border border-amber-500/40 bg-amber-50/50 px-4 py-3 dark:bg-amber-950/20">
+          <div className="flex-1">
+            <p className="text-sm font-medium">This job needs an intake category.</p>
+            <p className="text-muted-foreground text-xs">
+              Pick a reason for visit — tasks will be created for the right people automatically.
+            </p>
+          </div>
+          <Button size="sm" onClick={() => setSetCategoryOpen(true)}>
+            Set category
+          </Button>
+        </div>
+      )}
 
       {job.is_battery_only && (
         <p className="text-sm text-yellow-600 dark:text-yellow-400">
@@ -798,6 +813,17 @@ export default function JobDetailPage() {
         onOpenChange={setFinishOpen}
         onSuccess={() => {
           setFinishOpen(false);
+          fetchJob();
+        }}
+      />
+
+      <SetJobCategoryDialog
+        open={setCategoryOpen}
+        onOpenChange={setSetCategoryOpen}
+        jobId={job?.id ?? null}
+        currentKm={job?.current_km ?? null}
+        onCategorized={() => {
+          setSetCategoryOpen(false);
           fetchJob();
         }}
       />
