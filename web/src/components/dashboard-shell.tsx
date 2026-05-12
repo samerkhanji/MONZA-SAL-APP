@@ -177,6 +177,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     isRequestAssistant,
     isOwner,
     appRole,
+    hasCapability,
   } = useUser();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
@@ -513,6 +514,14 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                   All notifications
                 </Link>
               </DropdownMenuItem>
+              {(appRole === "owner" || hasCapability("manage_team")) && (
+                <DropdownMenuItem asChild>
+                  <Link href="/settings/workflow-rules">
+                    <ClipboardList className="mr-2 size-4" />
+                    Workflow rules
+                  </Link>
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem onClick={() => setChangePasswordOpen(true)}>
                 <Lock className="mr-2 size-4" />
                 Change Password
