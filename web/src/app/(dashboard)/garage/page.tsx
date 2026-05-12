@@ -33,6 +33,7 @@ import type { ExportColumn } from "@/lib/exportToExcel";
 import { NewJobDialog } from "@/components/garage/NewJobDialog";
 import { FinishJobDialog } from "@/components/garage/FinishJobDialog";
 import { GarageBaySection } from "@/components/garage/GarageBaySection";
+import { SetJobCategoryDialog } from "@/components/garage/SetJobCategoryDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -102,6 +103,7 @@ export default function GarageJobsPage() {
   const [scanVinOpen, setScanVinOpen] = useState(false);
   const [finishJobOpen, setFinishJobOpen] = useState<JobWithCar | null>(null);
   const [cancelJobConfirm, setCancelJobConfirm] = useState<JobWithCar | null>(null);
+  const [setCategoryFor, setSetCategoryFor] = useState<JobWithCar | null>(null);
   const dueTodayNotifiedRef = useRef(false);
   const [preselectedCar, setPreselectedCar] = useState<{
     id: string;
@@ -607,6 +609,18 @@ export default function GarageJobsPage() {
                         {car.brand} {car.model} · VIN: {vinShort(car.vin)}
                       </Link>
                     )}
+                    {canEditJob && !job.task_category_id && (
+                      <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md border border-amber-500/40 bg-amber-50/50 px-3 py-2 text-sm dark:bg-amber-950/20">
+                        <span>Needs intake — pick a reason to fan out tasks.</span>
+                        <Button
+                          size="sm"
+                          className="h-7"
+                          onClick={() => setSetCategoryFor(job)}
+                        >
+                          Set category
+                        </Button>
+                      </div>
+                    )}
                     <div className="mt-3 flex flex-wrap gap-3 text-sm">
                       {job.assigned_to && (
                         <span className="text-muted-foreground">{job.assigned_to}</span>
@@ -734,6 +748,17 @@ export default function GarageJobsPage() {
         open={!!finishJobOpen}
         onOpenChange={(o) => !o && setFinishJobOpen(null)}
         onSuccess={fetchJobs}
+      />
+
+      <SetJobCategoryDialog
+        open={setCategoryFor !== null}
+        onOpenChange={(o) => !o && setSetCategoryFor(null)}
+        jobId={setCategoryFor?.id ?? null}
+        currentKm={setCategoryFor?.current_km ?? null}
+        onCategorized={() => {
+          setSetCategoryFor(null);
+          void fetchJobs();
+        }}
       />
 
       <AlertDialog
