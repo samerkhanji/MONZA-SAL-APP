@@ -111,11 +111,9 @@ const fmtD = (n: number | null | undefined) =>
   n == null ? "—" : `${n.toFixed(1)}d`;
 
 export default function ReportsPage() {
-  const { isOwner, capabilities } = useUser();
+  const { isOwner, hasCapability } = useUser();
   const allowed =
-    isOwner ||
-    capabilities?.includes("view_reports") ||
-    capabilities?.includes("manage_team");
+    isOwner || hasCapability("view_reports") || hasCapability("manage_team");
 
   if (!allowed) {
     return (
