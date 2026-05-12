@@ -25,6 +25,7 @@ import { formatError } from "@/lib/error-messages";
 
 const STATUS_LABEL: Record<RepairProposalStatus, string> = {
   draft: "Draft",
+  pending_owner_approval: "Pending owner",
   sent_to_customer_service: "Sent to CS",
   sent_to_customer: "With customer",
   partially_approved: "Partially approved",
@@ -59,6 +60,25 @@ export function RepairProposalPanel({
 
   const canGm = isGarageManager || isOwner;
   const canAsst = isAssistant || isOwner;
+
+  // Owner approval threshold for repair estimates. Loaded once; falls back to
+  // a high number so we never accidentally block a flow if the row's missing.
+  const [estimateOwnerFloor, setEstimateOwnerFloor] = useState<number>(
+    Number.POSITIVE_INFINITY
+  );
+
+  useEffect(() => {
+    void supabase
+      .from("approval_thresholds")
+      .select("owner_floor")
+      .eq("id", "estimate")
+      .eq("active", true)
+      .maybeSingle()
+      .then(({ data }) => {
+        const f = (data as { owner_floor?: number } | null)?.owner_floor;
+        if (typeof f === "number") setEstimateOwnerFloor(f);
+      });
+  }, [supabase]);
 
   const load = useCallback(async () => {
     const { data: p, error: pe } = await supabase
@@ -198,14 +218,25 @@ export function RepairProposalPanel({
 
   async function sendToCs() {
     if (!proposal) return;
+    // Gate: if total exceeds owner threshold, route through pending_owner_approval
+    // first. Otherwise straight to CS as before.
+    const needsOwner = originalTotal >= estimateOwnerFloor;
+    const nextStatus: RepairProposalStatus = needsOwner
+      ? "pending_owner_approval"
+      : "sent_to_customer_service";
     setBusy(true);
     const { error } = await supabase
       .from("repair_proposals")
-      .update({ status: "sent_to_customer_service", updated_at: new Date().toISOString() })
+      .update({ status: nextStatus, updated_at: new Date().toISOString() })
       .eq("id", proposal.id);
     setBusy(false);
     if (error) {
       toast.error(formatError(error));
+      return;
+    }
+    setProposal({ ...proposal, status: nextStatus });
+    if (needsOwner) {
+      toast.success("Sent up for owner approval");
       return;
     }
     const { getProfileIdsByRole } = await import("@/lib/user-lookup");
@@ -517,7 +548,9 @@ export function RepairProposalPanel({
                 Add line
               </Button>
               <Button type="button" size="sm" onClick={() => void sendToCs()} disabled={busy}>
-                Send to Customer Service
+                {originalTotal >= estimateOwnerFloor
+                  ? "Send for owner approval"
+                  : "Send to Customer Service"}
               </Button>
             </div>
           )}
@@ -531,6 +564,70 @@ export function RepairProposalPanel({
             >
               Submit customer decision
             </Button>
+          )}
+
+          {isOwner && proposal.status === "pending_owner_approval" && (
+            <div className="space-y-2 rounded-md border border-amber-500/40 bg-amber-50/40 p-3 print:hidden dark:bg-amber-950/20">
+              <p className="text-sm">
+                <strong>Total {originalTotal.toFixed(2)}</strong> is above the
+                owner approval threshold ({estimateOwnerFloor.toFixed(0)}). Approve
+                to send to Customer Service.
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={async () => {
+                    if (!proposal) return;
+                    setBusy(true);
+                    const { error } = await supabase
+                      .from("repair_proposals")
+                      .update({
+                        status: "sent_to_customer_service",
+                        approved_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString(),
+                      })
+                      .eq("id", proposal.id);
+                    setBusy(false);
+                    if (error) {
+                      toast.error(formatError(error));
+                      return;
+                    }
+                    setProposal({ ...proposal, status: "sent_to_customer_service" });
+                    toast.success("Approved — sent to Customer Service");
+                  }}
+                  disabled={busy}
+                >
+                  Approve & send to CS
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={async () => {
+                    if (!proposal) return;
+                    setBusy(true);
+                    const { error } = await supabase
+                      .from("repair_proposals")
+                      .update({
+                        status: "draft",
+                        updated_at: new Date().toISOString(),
+                      })
+                      .eq("id", proposal.id);
+                    setBusy(false);
+                    if (error) {
+                      toast.error(formatError(error));
+                      return;
+                    }
+                    setProposal({ ...proposal, status: "draft" });
+                    toast.success("Sent back to draft for revision");
+                  }}
+                  disabled={busy}
+                >
+                  Send back to draft
+                </Button>
+              </div>
+            </div>
           )}
 
           {(proposal.status === "partially_approved" ||

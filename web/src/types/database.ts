@@ -400,6 +400,7 @@ export interface JobTimeEntry {
 
 export type RepairProposalStatus =
   | "draft"
+  | "pending_owner_approval"
   | "sent_to_customer_service"
   | "sent_to_customer"
   | "partially_approved"
