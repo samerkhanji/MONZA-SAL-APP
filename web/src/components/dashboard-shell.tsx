@@ -90,6 +90,7 @@ const BASE_NAV_ITEMS: Array<{
   { href: "/data-health", label: "Data Health", icon: Activity, tourId: "nav-data-health" },
   { href: "/installments", label: "Installments", icon: CreditCard, tourId: "nav-installments" },
   { href: "/sales-orders", label: "Sales Orders", icon: ShoppingBag, tourId: "nav-sales-orders" },
+  { href: "/reports", label: "Reports", icon: BarChart3, tourId: "nav-reports", ownerOnly: true },
   {
     href: "/garage",
     label: "Garage",
@@ -501,9 +502,15 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                 </DropdownMenuItem>
               )}
               <DropdownMenuItem asChild>
-                <Link href="/settings?tab=notifications">
+                <Link href="/settings/notifications">
                   <Bell className="mr-2 size-4" />
                   Notification preferences
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/notifications">
+                  <Bell className="mr-2 size-4" />
+                  All notifications
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setChangePasswordOpen(true)}>
