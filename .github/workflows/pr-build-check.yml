@@ -1,0 +1,53 @@
+name: PR build check
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "web/**"
+      - ".github/workflows/pr-build-check.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: pr-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typecheck:
+    name: TypeScript + Next build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # The repository's whack-a-mole pattern (PR #36, #37, #46, #48): every
+      # TypeScript error was only caught at Vercel deploy time. tsc --noEmit
+      # here catches them on the PR instead.
+      - name: TypeScript check
+        run: npx tsc --noEmit -p tsconfig.json
+
+      # Optional: full Next.js build. Skipped on draft PRs to save runner
+      # minutes. Skips the sourcemap upload script that depends on env vars.
+      - name: Next.js production build
+        if: github.event.pull_request.draft == false
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+          # NEXT_PUBLIC_SUPABASE_URL / ANON_KEY are not required by `next build`
+          # since pages compile fine without runtime env. If a future page
+          # crashes at build-time on missing env, add dummies here.
+        run: npx next build
