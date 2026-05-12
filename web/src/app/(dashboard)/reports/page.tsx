@@ -34,6 +34,7 @@ type SalesMargin = {
   margin_pct: number | null;
   brand: string | null;
   model: string | null;
+  model_year: number | null;
   vin: string | null;
   customer_id: string | null;
 };
