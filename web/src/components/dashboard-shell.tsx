@@ -110,6 +110,12 @@ const BASE_NAV_ITEMS: Array<{
         tourId: "nav-parts",
       },
       {
+        href: "/garage/purchase-orders",
+        label: "Purchase Orders",
+        icon: ShoppingBag,
+        tourId: "nav-purchase-orders",
+      },
+      {
         href: "/garage/history",
         label: "Garage History",
         icon: History,
