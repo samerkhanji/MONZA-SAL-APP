@@ -148,7 +148,16 @@ export function JobTimeEntryControls({
       started_at: new Date().toISOString(),
     });
     if (insErr) {
-      toast.error(formatError(insErr));
+      // 23505 = unique_violation. With the uq_job_time_entries_one_open_per_user
+      // partial index in place, a concurrent click / second tab will land here.
+      // Show a clear message instead of the raw Postgres error and refresh so
+      // the user sees the already-running timer.
+      if (insErr.code === "23505") {
+        toast.error("A timer is already running for this job — pause it first.");
+        await load();
+      } else {
+        toast.error(formatError(insErr));
+      }
       setBusy(false);
       return;
     }
