@@ -29,6 +29,7 @@ import {
   Boxes,
   CarFront,
   ShoppingBag,
+  Wallet,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
@@ -89,6 +90,7 @@ const BASE_NAV_ITEMS: Array<{
   { href: "/customers", label: "Customers", icon: Users, tourId: "nav-customers" },
   { href: "/data-health", label: "Data Health", icon: Activity, tourId: "nav-data-health" },
   { href: "/installments", label: "Installments", icon: CreditCard, tourId: "nav-installments" },
+  { href: "/cash", label: "Cash register", icon: Wallet, tourId: "nav-cash" },
   { href: "/sales-orders", label: "Sales Orders", icon: ShoppingBag, tourId: "nav-sales-orders" },
   { href: "/reports", label: "Reports", icon: BarChart3, tourId: "nav-reports", ownerOnly: true },
   {
