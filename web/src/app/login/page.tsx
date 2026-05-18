@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { createClientForPasswordResetEmail } from "@/lib/supabase/password-reset-mail-client";
 import { getPasswordResetRedirectUrl } from "@/lib/auth-app-url";
-import { isConnectionError } from "@/lib/auth-utils";
+import { isConnectionError, safeRedirectTo } from "@/lib/auth-utils";
 import {
   clearAuthSessionMarkers,
   idleLogoutMinutesForDisplay,
@@ -30,7 +30,10 @@ import { useTheme } from "@/lib/contexts/ThemeContext";
 function LoginForm() {
   const searchParams = useSearchParams();
   const redirectParam = searchParams.get("redirectTo");
-  const redirectTo = redirectParam ?? "/dashboard";
+  // safeRedirectTo blocks `//evil.com`, `/\evil.com`, `/%2Fevil.com` etc.
+  // that would otherwise pass the old `startsWith("/")` check and let
+  // window.location.href escape the origin (open-redirect / phishing).
+  const redirectTo = safeRedirectTo(redirectParam, "/dashboard");
   const reason = searchParams.get("reason");
   const resetSuccess = searchParams.get("resetSuccess") === "1";
   const { theme } = useTheme();
@@ -78,10 +81,8 @@ function LoginForm() {
     // MFA gate: if the user has a verified TOTP factor, the session is at
     // AAL1 and we redirect to /mfa to escalate to AAL2 before sending them
     // anywhere sensitive. listFactors() works at AAL1.
-    let nextTarget: string | null = null;
-    if (redirectParam) {
-      nextTarget = redirectTo.startsWith("/") ? redirectTo : `/${redirectTo}`;
-    }
+    // `redirectTo` is already safeRedirectTo'd at the top of the component.
+    const nextTarget: string | null = redirectParam ? redirectTo : null;
 
     {
       const { data: factorsRes } = await supabase.auth.mfa.listFactors();

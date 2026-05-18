@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { createClientForPasswordResetEmail } from "@/lib/supabase/password-reset-mail-client";
 import { getPasswordResetRedirectUrl } from "@/lib/auth-app-url";
-import { isConnectionError } from "@/lib/auth-utils";
+import { isConnectionError, safeRedirectTo } from "@/lib/auth-utils";
 import {
   clearAuthSessionMarkers,
   idleLogoutMinutesForDisplay,
@@ -27,7 +27,13 @@ import {
 
 function HomePageContent() {
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get("redirectTo") ?? "/dashboard";
+  // safeRedirectTo blocks `//evil.com`, `/\evil.com`, `/%2Fevil.com` etc.
+  // that would otherwise pass the old `startsWith("/")` check and let
+  // window.location.href escape the origin (open-redirect / phishing).
+  const redirectTo = safeRedirectTo(
+    searchParams.get("redirectTo"),
+    "/dashboard"
+  );
   const reason = searchParams.get("reason");
 
   const [email, setEmail] = useState("");
@@ -72,7 +78,24 @@ function HomePageContent() {
     }
 
     markAuthSessionUnlocked();
-    window.location.href = redirectTo.startsWith("/") ? redirectTo : `/${redirectTo}`;
+
+    // MFA gate: if the user has a verified TOTP factor, the session is at
+    // AAL1 and we must redirect to /mfa to escalate to AAL2 before sending
+    // them anywhere sensitive. Without this, signing in at "/" (instead of
+    // "/login", which already had this gate) would bypass MFA entirely —
+    // the user reaches the dashboard at AAL1, never prompted for the code.
+    // listFactors() works at AAL1.
+    const { data: factorsRes } = await supabase.auth.mfa.listFactors();
+    const hasVerifiedTotp = (factorsRes?.totp ?? []).some(
+      (f) => f.status === "verified"
+    );
+    if (hasVerifiedTotp) {
+      window.location.href = `/mfa?redirectTo=${encodeURIComponent(redirectTo)}`;
+      return;
+    }
+
+    // redirectTo is already safeRedirectTo'd at the top of the component.
+    window.location.href = redirectTo;
   }
 
   async function handleForgotPassword(e: React.FormEvent) {
