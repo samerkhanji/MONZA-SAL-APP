@@ -109,6 +109,35 @@ export function parseAuthCallbackParams(): {
   return { next: pick("next"), type: pick("type") };
 }
 
+/**
+ * Validates a post-login `redirectTo` value to prevent open-redirect attacks.
+ *
+ * The previous `redirectTo.startsWith("/")` check accepted protocol-relative
+ * URLs like "//attacker.com/x" — `window.location.href = "//attacker.com/x"`
+ * navigates off-domain. A phishing link such as
+ *   /login?redirectTo=//attacker-fake-monza.com/relogin
+ * would land the freshly-authenticated user on an attacker page that can
+ * present a fake "session expired, sign in again" form and capture the
+ * password the user just successfully entered here.
+ *
+ * Returns a safe internal path, or `fallback` when the input is unsafe.
+ */
+export function safeRedirectTo(
+  raw: string | null | undefined,
+  fallback: string = "/dashboard"
+): string {
+  if (!raw || typeof raw !== "string") return fallback;
+  // Must start with a single forward slash.
+  if (raw[0] !== "/") return fallback;
+  // Reject protocol-relative ("//evil.com") and backslash-prefixed variants.
+  if (raw[1] === "/" || raw[1] === "\\") return fallback;
+  // Reject percent-encoded slash / backslash that some browsers normalize
+  // before the navigation lands ("/%2Fevil.com", "/%5Cevil.com").
+  const head = raw.slice(0, 4).toLowerCase();
+  if (head.startsWith("/%2f") || head.startsWith("/%5c")) return fallback;
+  return raw;
+}
+
 export function formatAuthApiErrorMessage(
   error: unknown,
   context?: { redirectTo?: string }
