@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
@@ -28,7 +28,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { AlertTriangle, ArrowLeft, Plus, Search } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Plus, Search, X } from "lucide-react";
 import { formatError } from "@/lib/error-messages";
 import { cn } from "@/lib/utils";
 
@@ -82,6 +82,8 @@ const fmt = (n: number, c = "USD") =>
 
 export default function PurchaseOrdersPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const supplierFilter = searchParams.get("supplier");
   const { isOwner, hasCapability } = useUser();
   const supabase = createClient();
   const allowed = isOwner || hasCapability("inventory") || hasCapability("cashier");
@@ -123,6 +125,10 @@ export default function PurchaseOrdersPage() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    if (supplierFilter) setNewSupplierId(supplierFilter);
+  }, [supplierFilter]);
+
   const supplierById = useMemo(() => {
     const m = new Map<string, Supplier>();
     suppliers.forEach((s) => m.set(s.id, s));
@@ -131,6 +137,9 @@ export default function PurchaseOrdersPage() {
 
   const filtered = useMemo(() => {
     let rows = pos;
+    if (supplierFilter) {
+      rows = rows.filter((p) => p.supplier_id === supplierFilter);
+    }
     if (bucket === "cancelled") {
       rows = rows.filter((p) => p.status === "cancelled" || p.status === "rejected");
     } else if (bucket !== "all") {
@@ -144,7 +153,7 @@ export default function PurchaseOrdersPage() {
       });
     }
     return rows;
-  }, [pos, bucket, query, supplierById]);
+  }, [pos, bucket, query, supplierById, supplierFilter]);
 
   const counts = useMemo(() => {
     const c: Record<string, number> = {};
@@ -214,6 +223,25 @@ export default function PurchaseOrdersPage() {
           <Plus className="mr-1.5 size-4" /> New PO
         </Button>
       </div>
+
+      {supplierFilter && (
+        <div className="flex items-center justify-between gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm dark:border-sky-900 dark:bg-sky-950">
+          <span className="text-sky-900 dark:text-sky-200">
+            Filtering by supplier:{" "}
+            <strong>
+              {supplierById.get(supplierFilter)?.name ?? "Unknown supplier"}
+            </strong>
+          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.replace("/garage/purchase-orders")}
+            className="h-7 px-2"
+          >
+            <X className="mr-1 size-3" /> Clear
+          </Button>
+        </div>
+      )}
 
       <Tabs value={bucket} onValueChange={(v) => setBucket(v as Bucket)}>
         <TabsList className="flex h-auto flex-wrap">
