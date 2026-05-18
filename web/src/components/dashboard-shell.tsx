@@ -30,6 +30,7 @@ import {
   CarFront,
   ShoppingBag,
   Wallet,
+  Truck,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
@@ -118,6 +119,12 @@ const BASE_NAV_ITEMS: Array<{
         tourId: "nav-purchase-orders",
       },
       {
+        href: "/garage/suppliers",
+        label: "Suppliers",
+        icon: Truck,
+        tourId: "nav-suppliers",
+      },
+      {
         href: "/garage/history",
         label: "Garage History",
         icon: History,
@@ -162,6 +169,8 @@ function getPageTitle(pathname: string): string {
   if (pathname.startsWith("/garage/inventory")) return "Parts Inventory";
   if (pathname.startsWith("/garage/history")) return "Garage History";
   if (pathname.startsWith("/garage/efficiency")) return "Garage Efficiency";
+  if (pathname.startsWith("/garage/suppliers")) return "Suppliers";
+  if (pathname.startsWith("/garage/purchase-orders")) return "Purchase Orders";
   if (pathname.startsWith("/garage")) return "Garage";
   if (pathname.startsWith("/settings")) return "Settings";
   return "Monza S.A.L.";
@@ -272,6 +281,14 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               return ["owner", "assistant", "garage_manager", "garage_staff"].includes(
                 appRole
               );
+            if (child.href === "/garage/suppliers")
+              return (
+                appRole === "owner" ||
+                hasCapability("inventory") ||
+                hasCapability("garage") ||
+                hasCapability("cashier") ||
+                hasCapability("manage_team")
+              );
             if (child.href === "/garage/settings")
               return (
                 appRole === "owner" ||
@@ -347,6 +364,14 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                         appRole ?? ""
                       );
                     if (child.href === "/garage/tasks") return canSeeGarageJobs;
+                    if (child.href === "/garage/suppliers")
+                      return (
+                        appRole === "owner" ||
+                        hasCapability("inventory") ||
+                        hasCapability("garage") ||
+                        hasCapability("cashier") ||
+                        hasCapability("manage_team")
+                      );
                     if (child.href === "/garage/settings")
                       return (
                         appRole === "owner" ||
