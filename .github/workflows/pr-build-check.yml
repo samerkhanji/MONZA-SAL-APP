@@ -47,7 +47,10 @@ jobs:
         if: github.event.pull_request.draft == false
         env:
           NEXT_TELEMETRY_DISABLED: "1"
-          # NEXT_PUBLIC_SUPABASE_URL / ANON_KEY are not required by `next build`
-          # since pages compile fine without runtime env. If a future page
-          # crashes at build-time on missing env, add dummies here.
+          # Dummies are required: pages like /change-password call
+          # createClient() at module eval during static prerender, which
+          # throws "Missing Supabase config" without these. The keys are
+          # not used at build time beyond being non-empty.
+          NEXT_PUBLIC_SUPABASE_URL: "https://ci-build.supabase.co"
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "ci-build-placeholder-key"
         run: npx next build
