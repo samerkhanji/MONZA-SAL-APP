@@ -31,6 +31,9 @@ import {
   ShoppingBag,
   Wallet,
   Truck,
+  ShieldCheck,
+  AlertCircle,
+  Undo2,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
@@ -125,6 +128,24 @@ const BASE_NAV_ITEMS: Array<{
         tourId: "nav-suppliers",
       },
       {
+        href: "/garage/warranty",
+        label: "Warranty cases",
+        icon: ShieldCheck,
+        tourId: "nav-warranty",
+      },
+      {
+        href: "/garage/recalls",
+        label: "Recalls",
+        icon: AlertCircle,
+        tourId: "nav-recalls",
+      },
+      {
+        href: "/garage/refunds",
+        label: "Refunds",
+        icon: Undo2,
+        tourId: "nav-refunds",
+      },
+      {
         href: "/garage/history",
         label: "Garage History",
         icon: History,
@@ -171,6 +192,9 @@ function getPageTitle(pathname: string): string {
   if (pathname.startsWith("/garage/efficiency")) return "Garage Efficiency";
   if (pathname.startsWith("/garage/suppliers")) return "Suppliers";
   if (pathname.startsWith("/garage/purchase-orders")) return "Purchase Orders";
+  if (pathname.startsWith("/garage/warranty")) return "Warranty cases";
+  if (pathname.startsWith("/garage/recalls")) return "Recalls";
+  if (pathname.startsWith("/garage/refunds")) return "Refunds";
   if (pathname.startsWith("/garage")) return "Garage";
   if (pathname.startsWith("/settings")) return "Settings";
   return "Monza S.A.L.";
@@ -289,6 +313,21 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                 hasCapability("cashier") ||
                 hasCapability("manage_team")
               );
+            if (child.href === "/garage/warranty" || child.href === "/garage/recalls")
+              return (
+                appRole === "owner" ||
+                hasCapability("garage") ||
+                hasCapability("view_reports") ||
+                hasCapability("manage_team")
+              );
+            if (child.href === "/garage/refunds")
+              return (
+                appRole === "owner" ||
+                hasCapability("garage") ||
+                hasCapability("cashier") ||
+                hasCapability("manage_team") ||
+                hasCapability("view_reports")
+              );
             if (child.href === "/garage/settings")
               return (
                 appRole === "owner" ||
@@ -371,6 +410,21 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                         hasCapability("garage") ||
                         hasCapability("cashier") ||
                         hasCapability("manage_team")
+                      );
+                    if (child.href === "/garage/warranty" || child.href === "/garage/recalls")
+                      return (
+                        appRole === "owner" ||
+                        hasCapability("garage") ||
+                        hasCapability("view_reports") ||
+                        hasCapability("manage_team")
+                      );
+                    if (child.href === "/garage/refunds")
+                      return (
+                        appRole === "owner" ||
+                        hasCapability("garage") ||
+                        hasCapability("cashier") ||
+                        hasCapability("manage_team") ||
+                        hasCapability("view_reports")
                       );
                     if (child.href === "/garage/settings")
                       return (
