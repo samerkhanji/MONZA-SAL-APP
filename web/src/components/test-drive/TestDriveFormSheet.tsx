@@ -61,6 +61,47 @@ function numOrNullDecimal(v: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+/**
+ * Returns the first validation error message, or null if all checks pass.
+ * Mirrors the DB CHECKs added in migration 105 so users see a clean toast
+ * before submitting instead of a raw 23514 from PostgREST.
+ */
+function validateTestDriveInputs(opts: {
+  odometerOut: number | null;
+  odometerIn: number | null;
+  batteryOut: number | null;
+  batteryIn: number | null;
+  fuelOut: number | null;
+  fuelIn: number | null;
+  testDriveStartAt: string;
+  actualReturnAt: string | null;
+}): string | null {
+  const pctRange = (n: number | null, label: string): string | null => {
+    if (n == null) return null;
+    if (n < 0 || n > 100) return `${label} must be between 0 and 100 (got ${n}).`;
+    return null;
+  };
+  const nonNeg = (n: number | null, label: string): string | null => {
+    if (n == null) return null;
+    if (n < 0) return `${label} cannot be negative (got ${n}).`;
+    return null;
+  };
+  return (
+    pctRange(opts.batteryOut, "Battery out") ??
+    pctRange(opts.batteryIn, "Battery in") ??
+    pctRange(opts.fuelOut, "Fuel out") ??
+    pctRange(opts.fuelIn, "Fuel in") ??
+    nonNeg(opts.odometerOut, "Odometer out") ??
+    nonNeg(opts.odometerIn, "Odometer in") ??
+    (opts.odometerOut != null && opts.odometerIn != null && opts.odometerIn < opts.odometerOut
+      ? `Return odometer (${opts.odometerIn}) cannot be less than start odometer (${opts.odometerOut}).`
+      : null) ??
+    (opts.actualReturnAt && new Date(opts.actualReturnAt) < new Date(opts.testDriveStartAt)
+      ? "Actual return time cannot be before the test drive start time."
+      : null)
+  );
+}
+
 interface TestDriveFormSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -184,6 +225,20 @@ export function TestDriveFormSheet({
       toast.error("Missing vehicle or profile.");
       return;
     }
+    const validationError = validateTestDriveInputs({
+      odometerOut: numOrNull(odometerOut),
+      odometerIn: null,
+      batteryOut: numOrNull(batteryOut),
+      batteryIn: null,
+      fuelOut: numOrNullDecimal(fuelOut),
+      fuelIn: null,
+      testDriveStartAt: new Date(testDriveStartAt).toISOString(),
+      actualReturnAt: null,
+    });
+    if (validationError) {
+      toast.error(validationError);
+      return;
+    }
     setSaving(true);
     const now = isoNow();
     const row = {
@@ -248,6 +303,20 @@ export function TestDriveFormSheet({
 
   async function handleUpdateDetails() {
     if (!existing?.id) return;
+    const validationError = validateTestDriveInputs({
+      odometerOut: numOrNull(odometerOut),
+      odometerIn: null,
+      batteryOut: numOrNull(batteryOut),
+      batteryIn: null,
+      fuelOut: numOrNullDecimal(fuelOut),
+      fuelIn: null,
+      testDriveStartAt: existing.test_drive_start_at,
+      actualReturnAt: null,
+    });
+    if (validationError) {
+      toast.error(validationError);
+      return;
+    }
     setSaving(true);
     const now = isoNow();
     const { error } = await supabase
@@ -282,11 +351,28 @@ export function TestDriveFormSheet({
 
   async function handleCompleteReturn() {
     if (!existing?.id || !carId) return;
-    setSaving(true);
-    const now = isoNow();
     const returnAt = actualReturnAt.trim()
       ? new Date(actualReturnAt).toISOString()
-      : now;
+      : isoNow();
+    // Carry odometer_out from `existing` so the direction check fires even
+    // if the user hasn't re-entered it in this dialog session.
+    const validationError = validateTestDriveInputs({
+      odometerOut:
+        numOrNull(odometerOut) ?? (existing.odometer_out ?? null),
+      odometerIn: numOrNull(odometerIn),
+      batteryOut: numOrNull(batteryOut),
+      batteryIn: numOrNull(batteryIn),
+      fuelOut: numOrNullDecimal(fuelOut),
+      fuelIn: numOrNullDecimal(fuelIn),
+      testDriveStartAt: existing.test_drive_start_at,
+      actualReturnAt: returnAt,
+    });
+    if (validationError) {
+      toast.error(validationError);
+      return;
+    }
+    setSaving(true);
+    const now = isoNow();
 
     const { error: uErr } = await supabase
       .from("test_drives")
