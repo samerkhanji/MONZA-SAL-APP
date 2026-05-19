@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { format, subMonths } from "date-fns";
+import { format, formatDistanceToNow, subMonths } from "date-fns";
 import {
   Bar,
   BarChart,
@@ -92,6 +92,8 @@ export type OwnerOverviewData = {
     activeSalesOrders: number;
     pendingRequests: number;
     warrantiesExpiringSoon: number;
+    activeGarageJobs: number;
+    openWarrantyCases: number;
   };
   carStatusChart: { name: string; count: number }[];
   activeGarageTasks: number;
@@ -109,14 +111,54 @@ export type OwnerOverviewData = {
     oe_number: string | null;
     quantity: number;
   }[];
+  salesMTD: {
+    units: number;
+    unitsLastMonth: number;
+    revenueByCurrency: Record<string, number>;
+  };
+  salesByStage: { stage: string; label: string; count: number }[];
+  topSalesRep: {
+    name: string;
+    dealsDelivered: number;
+    dealsInPipeline: number;
+    revenueTotal: number;
+    marginTotal: number;
+  } | null;
+  inventoryAging: { bucket: string; count: number }[];
+  reservationsExpiring: {
+    id: string;
+    vin: string;
+    brand: string;
+    model: string;
+    reservation_date: string | null;
+    reserved_by: string | null;
+  }[];
+  newArrivals: {
+    id: string;
+    vin: string;
+    brand: string;
+    model: string;
+    date_arrived: string | null;
+  }[];
+  cashState: {
+    isOpen: boolean;
+    openingBalance: number;
+    openedAt: string | null;
+    openedBy: string | null;
+    todayCashIn: Record<string, number>;
+    todayCashOut: Record<string, number>;
+  };
+  pendingRefunds: {
+    count: number;
+    amountByCurrency: Record<string, number>;
+  };
+  agedReceivables: {
+    count: number;
+    totalOutstanding: number;
+    oldestDays: number;
+  };
   errors: string[];
 };
-
-const currency = new Intl.NumberFormat(undefined, {
-  style: "currency",
-  currency: "USD",
-  maximumFractionDigits: 0,
-});
 
 const tooltipContentStyle = {
   borderRadius: 8,
@@ -124,28 +166,85 @@ const tooltipContentStyle = {
   background: "hsl(var(--card))",
 } as const;
 
+const USD_FORMATTER = new Intl.NumberFormat(undefined, {
+  style: "currency",
+  currency: "USD",
+  maximumFractionDigits: 0,
+});
+
+/** Currencies render priority: USD first, then EUR, then anything else alphabetically. */
+function orderedCurrencies(map: Record<string, number>): string[] {
+  const keys = Object.keys(map);
+  return keys.sort((a, b) => {
+    if (a === b) return 0;
+    if (a === "USD") return -1;
+    if (b === "USD") return 1;
+    if (a === "EUR") return -1;
+    if (b === "EUR") return 1;
+    return a.localeCompare(b);
+  });
+}
+
+function formatMoney(amount: number, currency: string): string {
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  } catch {
+    // Fallback for non-ISO currency codes
+    return `${currency} ${amount.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+  }
+}
+
+/** Render a `{USD: 5000, EUR: 1200}` map as a stacked list, USD first. */
+function MoneyStack({
+  map,
+  emptyLabel = "—",
+  className,
+}: {
+  map: Record<string, number>;
+  emptyLabel?: string;
+  className?: string;
+}) {
+  const keys = orderedCurrencies(map).filter((k) => map[k] !== 0);
+  if (keys.length === 0) {
+    return <span className={cn("text-muted-foreground", className)}>{emptyLabel}</span>;
+  }
+  return (
+    <div className={cn("flex flex-col gap-0.5", className)}>
+      {keys.map((c, i) => (
+        <span
+          key={c}
+          className={cn(
+            "tabular-nums",
+            i === 0 ? "font-semibold" : "text-muted-foreground text-xs"
+          )}
+        >
+          {formatMoney(map[c], c)}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function CarsByStatusChartCard({
   rows,
   totalVehicles,
   soldCarsCount,
 }: {
   rows: { name: string; count: number }[];
-  /** Same as Vehicles KPI — from one server fetch, not a second query. */
   totalVehicles: number;
-  /** Derived from `rows` (Sold label); kept explicit for chart copy / future series. */
   soldCarsCount: number;
 }) {
   const [chartType, setChartType] = useState<CarStatusChartType>("bar");
-
   const carsByStatusData = useMemo(() => rows.filter((d) => d.count > 0), [rows]);
-
   const pieData = carsByStatusData;
-
   const carsOverTime = useMemo(
     () => buildCarsOverTimeFromFleetTotal(totalVehicles),
     [totalVehicles]
   );
-
   const chartKey = `${chartType}-${rows.map((r) => `${r.name}:${r.count}`).join("|")}-${totalVehicles}`;
 
   return (
@@ -311,6 +410,277 @@ function CarsByStatusChartCard({
   );
 }
 
+function SalesRevenueCard({ data }: { data: OwnerOverviewData }) {
+  const usd = data.salesMTD.revenueByCurrency["USD"] ?? 0;
+  const otherCurrencyTotal = Object.entries(data.salesMTD.revenueByCurrency).reduce(
+    (sum, [c, v]) => (c === "USD" ? sum : sum + v),
+    0
+  );
+  const unitsDelta = data.salesMTD.units - data.salesMTD.unitsLastMonth;
+  const deltaLabel =
+    data.salesMTD.unitsLastMonth === 0
+      ? data.salesMTD.units > 0
+        ? "new vs last month"
+        : "same as last month"
+      : `${unitsDelta >= 0 ? "+" : ""}${unitsDelta} vs ${data.salesMTD.unitsLastMonth} last month`;
+
+  return (
+    <Card className="lg:col-span-2">
+      <CardHeader>
+        <CardTitle className="text-lg">Sales &amp; revenue (month-to-date)</CardTitle>
+        <CardDescription>Delivered sales orders this month, with comparisons.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div>
+            <p className="text-muted-foreground text-xs">Units delivered MTD</p>
+            <p className="mt-1 text-3xl font-semibold tabular-nums">{data.salesMTD.units}</p>
+            <p
+              className={cn(
+                "mt-1 text-xs",
+                unitsDelta >= 0 ? "text-green-600" : "text-amber-600"
+              )}
+            >
+              {deltaLabel}
+            </p>
+          </div>
+          <div>
+            <p className="text-muted-foreground text-xs">Revenue MTD</p>
+            <div className="mt-1">
+              <p className="text-2xl font-semibold tabular-nums">{USD_FORMATTER.format(usd)}</p>
+              {otherCurrencyTotal > 0 ? (
+                <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                  {orderedCurrencies(data.salesMTD.revenueByCurrency)
+                    .filter((c) => c !== "USD")
+                    .map((c) => (
+                      <span key={c} className="tabular-nums">
+                        {formatMoney(data.salesMTD.revenueByCurrency[c], c)}
+                      </span>
+                    ))}
+                </div>
+              ) : (
+                <p className="mt-0.5 text-xs text-muted-foreground">USD only this month</p>
+              )}
+            </div>
+          </div>
+          <div>
+            <p className="text-muted-foreground text-xs">Top sales rep</p>
+            {data.topSalesRep ? (
+              <>
+                <p className="mt-1 text-lg font-semibold truncate">{data.topSalesRep.name}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground tabular-nums">
+                  {data.topSalesRep.dealsDelivered} delivered ·{" "}
+                  {USD_FORMATTER.format(data.topSalesRep.revenueTotal)} revenue
+                </p>
+              </>
+            ) : (
+              <p className="mt-1 text-sm text-muted-foreground">No data yet</p>
+            )}
+          </div>
+        </div>
+
+        <div>
+          <p className="text-muted-foreground mb-2 text-xs uppercase tracking-wide">
+            Sales pipeline by stage (non-cancelled)
+          </p>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+            {data.salesByStage.map((s) => (
+              <div
+                key={s.stage}
+                className="rounded-md border border-border bg-muted/30 px-3 py-2"
+              >
+                <p className="text-xs text-muted-foreground">{s.label}</p>
+                <p className="mt-0.5 text-xl font-semibold tabular-nums">{s.count}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <Button variant="link" className="h-auto px-0" asChild>
+          <Link href="/sales-orders">Open sales orders</Link>
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+function FleetLogisticsCard({ data }: { data: OwnerOverviewData }) {
+  return (
+    <Card className="lg:col-span-2">
+      <CardHeader>
+        <CardTitle className="text-lg">Fleet logistics</CardTitle>
+        <CardDescription>Inventory aging, expiring reservations, and recent arrivals.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div>
+          <p className="text-muted-foreground mb-2 text-xs uppercase tracking-wide">
+            Days in stock (active inventory)
+          </p>
+          <div className="grid grid-cols-4 gap-2">
+            {data.inventoryAging.map((b) => {
+              const isAged = b.bucket === "90+";
+              return (
+                <div
+                  key={b.bucket}
+                  className={cn(
+                    "rounded-md border px-3 py-2",
+                    isAged ? "border-amber-500/50 bg-amber-500/10" : "border-border bg-muted/30"
+                  )}
+                >
+                  <p className="text-xs text-muted-foreground">{b.bucket} days</p>
+                  <p
+                    className={cn(
+                      "mt-0.5 text-xl font-semibold tabular-nums",
+                      isAged && b.count > 0 ? "text-amber-600" : ""
+                    )}
+                  >
+                    {b.count}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <p className="text-muted-foreground mb-2 text-xs uppercase tracking-wide">
+              Reservations (next out)
+            </p>
+            {data.reservationsExpiring.length === 0 ? (
+              <p className="text-muted-foreground text-sm">No active reservations.</p>
+            ) : (
+              <ul className="divide-y divide-border rounded-md border text-sm">
+                {data.reservationsExpiring.map((r) => (
+                  <li key={r.id} className="flex flex-col gap-0.5 px-3 py-2">
+                    <span className="font-medium">
+                      {[r.brand, r.model].filter(Boolean).join(" ") || r.vin || "Car"}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {r.reservation_date
+                        ? format(new Date(r.reservation_date + "T12:00:00"), "MMM d, yyyy")
+                        : "—"}
+                      {r.reserved_by ? ` · ${r.reserved_by}` : ""}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <div>
+            <p className="text-muted-foreground mb-2 text-xs uppercase tracking-wide">
+              New arrivals (last 7 days)
+            </p>
+            {data.newArrivals.length === 0 ? (
+              <p className="text-muted-foreground text-sm">No new arrivals.</p>
+            ) : (
+              <ul className="divide-y divide-border rounded-md border text-sm">
+                {data.newArrivals.map((c) => (
+                  <li key={c.id} className="flex flex-col gap-0.5 px-3 py-2">
+                    <span className="font-medium">
+                      {[c.brand, c.model].filter(Boolean).join(" ") || c.vin || "Car"}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {c.date_arrived
+                        ? format(new Date(c.date_arrived + "T12:00:00"), "MMM d, yyyy")
+                        : "—"}
+                      {c.vin ? ` · VIN ${c.vin}` : ""}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function CashReceivablesCard({ data }: { data: OwnerOverviewData }) {
+  const { cashState, pendingRefunds, agedReceivables } = data;
+  return (
+    <Card className="lg:col-span-2">
+      <CardHeader>
+        <CardTitle className="text-lg">Cash &amp; receivables</CardTitle>
+        <CardDescription>Drawer state, refunds awaiting approval, and overdue installments.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div className="space-y-1">
+            <p className="text-muted-foreground text-xs uppercase tracking-wide">Cash drawer</p>
+            {cashState.isOpen ? (
+              <>
+                <p className="text-2xl font-semibold tabular-nums">
+                  {USD_FORMATTER.format(cashState.openingBalance)}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Open
+                  {cashState.openedAt
+                    ? ` · ${formatDistanceToNow(new Date(cashState.openedAt), { addSuffix: true })}`
+                    : ""}
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-2xl font-semibold text-muted-foreground">Closed</p>
+                <p className="text-xs text-muted-foreground">No session open</p>
+              </>
+            )}
+          </div>
+          <div className="space-y-1">
+            <p className="text-muted-foreground text-xs uppercase tracking-wide">Today — cash in</p>
+            <MoneyStack map={cashState.todayCashIn} emptyLabel="No inflow today" className="text-base" />
+          </div>
+          <div className="space-y-1">
+            <p className="text-muted-foreground text-xs uppercase tracking-wide">Today — cash out</p>
+            <MoneyStack map={cashState.todayCashOut} emptyLabel="No outflow today" className="text-base" />
+          </div>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="rounded-md border border-border bg-muted/20 p-3">
+            <div className="flex items-baseline justify-between gap-2">
+              <p className="text-sm font-medium">Refunds pending approval</p>
+              <span className="text-2xl font-semibold tabular-nums">{pendingRefunds.count}</span>
+            </div>
+            <div className="mt-2">
+              <MoneyStack
+                map={pendingRefunds.amountByCurrency}
+                emptyLabel="No amount data"
+                className="text-sm"
+              />
+            </div>
+            <Button variant="link" className="mt-1 h-auto px-0 text-xs" asChild>
+              <Link href="/garage/refunds">Open refunds</Link>
+            </Button>
+          </div>
+          <div className="rounded-md border border-border bg-muted/20 p-3">
+            <div className="flex items-baseline justify-between gap-2">
+              <p className="text-sm font-medium">Aged receivables</p>
+              <span className="text-2xl font-semibold tabular-nums">{agedReceivables.count}</span>
+            </div>
+            <p className="mt-1 text-sm tabular-nums">
+              {agedReceivables.totalOutstanding > 0
+                ? USD_FORMATTER.format(agedReceivables.totalOutstanding)
+                : "—"}{" "}
+              outstanding
+            </p>
+            {agedReceivables.oldestDays > 0 ? (
+              <p className="text-xs text-amber-600">
+                Oldest is {agedReceivables.oldestDays} days overdue
+              </p>
+            ) : null}
+            <Button variant="link" className="mt-1 h-auto px-0 text-xs" asChild>
+              <Link href="/installments">Open installments</Link>
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export function OverviewDashboard({ data }: { data: OwnerOverviewData }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -318,6 +688,8 @@ export function OverviewDashboard({ data }: { data: OwnerOverviewData }) {
   const totalVehicles = data.summary.totalCars;
   const soldCarsCount =
     data.carStatusChart.find((r) => r.name === CAR_STATUS_LABELS.sold)?.count ?? 0;
+
+  const revenueMTDUSD = data.salesMTD.revenueByCurrency["USD"] ?? 0;
 
   function handleRefresh() {
     startTransition(async () => {
@@ -332,8 +704,7 @@ export function OverviewDashboard({ data }: { data: OwnerOverviewData }) {
         <div>
           <h1 className="text-xl font-semibold sm:text-2xl">Owner overview</h1>
           <p className="text-muted-foreground text-sm">
-            Central snapshot: inventory, customers, sales pipeline, warranties, garage, requests,
-            installments, and parts.
+            Live operating snapshot: sales, fleet, cash, garage, customers, and the queue.
           </p>
         </div>
         <Button
@@ -365,6 +736,7 @@ export function OverviewDashboard({ data }: { data: OwnerOverviewData }) {
         </Card>
       ) : null}
 
+      {/* High-level KPI strip (5 tiles) */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <Card>
           <CardHeader className="pb-2">
@@ -422,7 +794,67 @@ export function OverviewDashboard({ data }: { data: OwnerOverviewData }) {
         </Card>
       </div>
 
+      {/* Operational KPI strip (4 tiles) */}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Sold MTD</CardDescription>
+            <CardTitle className="text-2xl tabular-nums">{data.salesMTD.units}</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <p className="text-muted-foreground text-xs">
+              vs {data.salesMTD.unitsLastMonth} last month
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Revenue MTD (USD)</CardDescription>
+            <CardTitle className="text-2xl tabular-nums">
+              {USD_FORMATTER.format(revenueMTDUSD)}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <p className="text-muted-foreground text-xs">
+              {Object.keys(data.salesMTD.revenueByCurrency).filter((c) => c !== "USD").length > 0
+                ? "+ other currencies (see panel)"
+                : "USD only"}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Open garage jobs</CardDescription>
+            <CardTitle className="text-2xl tabular-nums">
+              {data.summary.activeGarageJobs}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <Button variant="link" className="h-auto px-0 text-xs" asChild>
+              <Link href="/garage">Jobs board</Link>
+            </Button>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Open warranty cases</CardDescription>
+            <CardTitle className="text-2xl tabular-nums">
+              {data.summary.openWarrantyCases}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <Button variant="link" className="h-auto px-0 text-xs" asChild>
+              <Link href="/garage/warranty">Warranty queue</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+
       <div className="grid gap-6 lg:grid-cols-2">
+        <SalesRevenueCard data={data} />
+        <CashReceivablesCard data={data} />
+        <FleetLogisticsCard data={data} />
+
         <CarsByStatusChartCard
           rows={data.carStatusChart}
           totalVehicles={totalVehicles}
@@ -508,7 +940,7 @@ export function OverviewDashboard({ data }: { data: OwnerOverviewData }) {
                         #{row.installment_no} — {row.summary}
                       </span>
                     </div>
-                    <span className="tabular-nums">{currency.format(Number(row.amount_due))}</span>
+                    <span className="tabular-nums">{USD_FORMATTER.format(Number(row.amount_due))}</span>
                   </li>
                 ))}
               </ul>
