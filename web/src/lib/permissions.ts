@@ -315,21 +315,35 @@ export function getCapabilitiesFromProfile(
   return (profile?.capabilities ?? []) as AppCapability[];
 }
 
-/** True if profile has the given capability. */
+/**
+ * True if profile has the given capability.
+ *
+ * Owners always return true regardless of their stored capabilities — this
+ * mirrors the DB-level `_require_any_capability()` short-circuit so that
+ * a UI button gated on `hasCapability('inventory')` (or any other cap)
+ * never hides itself from an owner. Migration 133 keeps the
+ * `profiles.capabilities` array in sync, but this helper guarantees the
+ * invariant even if the DB row is stale.
+ */
 export function hasCapability(
   profile: UserProfile | null,
   cap: AppCapability
 ): boolean {
   if (!profile) return false;
+  if (profile.user_role === "owner") return true;
   return getCapabilitiesFromProfile(profile).includes(cap);
 }
 
-/** True if profile has ANY of the given capabilities. */
+/**
+ * True if profile has ANY of the given capabilities.
+ * Owners always return true — see {@link hasCapability}.
+ */
 export function hasAnyCapability(
   profile: UserProfile | null,
   caps: AppCapability[]
 ): boolean {
   if (!profile || caps.length === 0) return false;
+  if (profile.user_role === "owner") return true;
   const userCaps = getCapabilitiesFromProfile(profile);
   return caps.some((cap) => userCaps.includes(cap));
 }
