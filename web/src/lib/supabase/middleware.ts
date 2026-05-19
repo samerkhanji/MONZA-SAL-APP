@@ -45,12 +45,29 @@ export async function updateSession(request: NextRequest) {
   const supabaseUrl = getSupabaseUrl();
   const supabaseKey = getSupabasePublicKey();
   if (!supabaseUrl || !supabaseKey) {
+    // In development: warn and pass through so local work isn't blocked.
+    // In production: REFUSE to serve. A silent pass-through with no auth
+    // check would let unauthenticated users reach protected routes
+    // (Feb 2025 audit §8.3, fixed by hotfix/middleware-env-hardfail).
     if (process.env.NODE_ENV === "development") {
       console.warn(
-        "[Supabase] Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY / NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY. Auth redirects disabled."
+        "[Supabase] Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY / NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY. Auth redirects disabled. (dev mode — production would 500.)"
       );
+      return response;
     }
-    return response;
+    console.error(
+      "[Supabase] FATAL: NEXT_PUBLIC_SUPABASE_URL or anon/publishable key is missing in production. Refusing to serve unauthenticated requests."
+    );
+    return new NextResponse(
+      "<!doctype html><meta charset=utf-8><title>Server misconfigured</title>" +
+        "<body style=\"font-family:system-ui,-apple-system,sans-serif;max-width:560px;margin:6rem auto;padding:0 1rem;\">" +
+        "<h1>Server misconfigured</h1>" +
+        "<p>The application can't reach its database. Required environment variables " +
+        "(<code>NEXT_PUBLIC_SUPABASE_URL</code> and the Supabase anon/publishable key) are not set on this deployment.</p>" +
+        "<p>If you're the operator: check Vercel → Project → Settings → Environment Variables and redeploy.</p>" +
+        "</body>",
+      { status: 500, headers: { "content-type": "text/html; charset=utf-8" } }
+    );
   }
 
   const supabase = createServerClient(
