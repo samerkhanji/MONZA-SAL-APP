@@ -76,7 +76,7 @@ export function PdiStatusDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent className="sm:max-w-sm" data-tour-id="pdi-status-dialog">
         <DialogHeader>
           <DialogTitle>PDI Status</DialogTitle>
           <DialogDescription>
