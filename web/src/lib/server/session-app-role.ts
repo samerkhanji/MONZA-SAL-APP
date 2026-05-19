@@ -16,7 +16,7 @@ export async function getSessionUserAndRole(): Promise<{
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, role, user_role, full_name")
+    .select("id, user_role, full_name")
     .eq("id", user.id)
     .maybeSingle();
 
