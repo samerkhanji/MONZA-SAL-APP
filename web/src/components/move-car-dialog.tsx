@@ -90,7 +90,7 @@ export function MoveCarDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md" data-tour-id="move-car-dialog">
         <DialogHeader>
           <DialogTitle>Move car</DialogTitle>
           <DialogDescription>
