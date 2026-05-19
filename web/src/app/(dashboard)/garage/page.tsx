@@ -147,7 +147,7 @@ export default function GarageJobsPage() {
     setLoading(true);
     const { data, error } = await supabase
       .from("garage_jobs")
-      .select("*, cars:car_id(id, vin, brand, model, model_year, exterior_color, car_status:status)")
+      .select("*, cars:car_id(id, vin, brand, model, model_year, exterior_color, car_status:status), assigned_profile:assigned_to(id, full_name)")
       .is("deleted_at", null)
       .order("created_at", { ascending: false });
 
@@ -251,7 +251,8 @@ export default function GarageJobsPage() {
         const brand = (car?.brand ?? "").toLowerCase();
         const model = (car?.model ?? "").toLowerCase();
         const title = (j.title ?? "").toLowerCase();
-        const assigned = (j.assigned_to ?? "").toLowerCase();
+        const assignedProfile = j.assigned_profile as { full_name?: string | null } | null | undefined;
+        const assigned = (assignedProfile?.full_name ?? j.external_assignee_name ?? "").toLowerCase();
         if (
           !vin.includes(q) &&
           !brand.includes(q) &&
@@ -622,9 +623,13 @@ export default function GarageJobsPage() {
                       </div>
                     )}
                     <div className="mt-3 flex flex-wrap gap-3 text-sm">
-                      {job.assigned_to && (
-                        <span className="text-muted-foreground">{job.assigned_to}</span>
-                      )}
+                      {(() => {
+                        const assignedProfile = job.assigned_profile as { full_name?: string | null } | null | undefined;
+                        const assigneeName = assignedProfile?.full_name ?? job.external_assignee_name ?? null;
+                        return assigneeName ? (
+                          <span className="text-muted-foreground">{assigneeName}</span>
+                        ) : null;
+                      })()}
                       <span className="text-muted-foreground">
                         Est: {job.estimated_hours ?? "—"}h / Act:{" "}
                         {job.actual_hours ?? "—"}h
