@@ -143,16 +143,10 @@ export default function WarrantyDetailPage() {
 
   async function changeStatus(next: string) {
     if (!wc) return;
-    const updates: Record<string, unknown> = { status: next };
-    if (next === "completed" || next === "rejected" || next === "cancelled") {
-      updates.closed_at = new Date().toISOString();
-      const { data: u } = await supabase.auth.getUser();
-      updates.closed_by = u?.user?.id ?? null;
-    } else if (next === "open" || next === "investigating" || next === "awaiting_parts" || next === "in_repair") {
-      updates.closed_at = null;
-      updates.closed_by = null;
-    }
-    const { error } = await supabase.from("warranty_cases").update(updates).eq("id", wc.id);
+    const { error } = await supabase.rpc("set_warranty_case_status", {
+      p_case_id: wc.id,
+      p_status: next,
+    });
     if (error) return toast.error(formatError(error));
     toast.success(`Status set to ${next.replace(/_/g, " ")}`);
     void load();
