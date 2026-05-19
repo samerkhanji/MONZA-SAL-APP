@@ -4,10 +4,12 @@ export type AppRole =
   | "owner"
   | "assistant"
   | "hybrid"
+  | "khalil_hybrid"
   | "it"
   | "garage_manager"
   | "garage_staff"
-  | "sales_ops";
+  | "sales_ops"
+  | "sales";
 
 export const PAGE_PERMISSIONS: Record<
   | "dashboard"
@@ -29,68 +31,112 @@ export const PAGE_PERMISSIONS: Record<
 > = {
   dashboard: ["owner"],
   dashboard_overview: ["owner"],
-  assistant_dashboard: ["owner", "assistant"],
+  assistant_dashboard: ["owner", "assistant", "hybrid", "khalil_hybrid"],
   requests: [
     "owner",
     "assistant",
     "hybrid",
+    "khalil_hybrid",
     "it",
     "garage_manager",
     "garage_staff",
     "sales_ops",
+    "sales",
   ],
-  cars: ["owner", "assistant", "hybrid", "it", "sales_ops"],
-  accessories: ["owner", "assistant", "hybrid", "it", "sales_ops"],
-  test_drive: ["owner", "assistant", "hybrid", "it", "sales_ops"],
-  installments: ["owner", "assistant", "sales_ops"],
+  cars: [
+    "owner",
+    "assistant",
+    "hybrid",
+    "khalil_hybrid",
+    "it",
+    "sales_ops",
+    "sales",
+  ],
+  accessories: [
+    "owner",
+    "assistant",
+    "hybrid",
+    "khalil_hybrid",
+    "it",
+    "sales_ops",
+    "sales",
+  ],
+  test_drive: [
+    "owner",
+    "assistant",
+    "hybrid",
+    "khalil_hybrid",
+    "it",
+    "sales_ops",
+    "sales",
+  ],
+  installments: ["owner", "assistant", "sales_ops", "sales"],
   parts: [
     "owner",
     "assistant",
     "hybrid",
+    "khalil_hybrid",
     "it",
     "garage_manager",
     "garage_staff",
   ],
-  customers: ["owner", "assistant", "sales_ops"],
+  customers: ["owner", "assistant", "sales_ops", "sales"],
   garage: ["owner", "assistant", "garage_manager", "garage_staff"],
-  garage_history: ["owner", "assistant", "garage_manager", "sales_ops"],
+  garage_history: [
+    "owner",
+    "assistant",
+    "garage_manager",
+    "sales_ops",
+    "sales",
+  ],
   documents: [
     "owner",
     "assistant",
     "hybrid",
+    "khalil_hybrid",
     "it",
     "garage_manager",
     "sales_ops",
+    "sales",
   ],
   settings: ["owner"],
-  garage_settings: ["owner", "garage_manager", "hybrid"],
+  garage_settings: ["owner", "garage_manager", "hybrid", "khalil_hybrid"],
 };
 
 export const CRUD_PERMISSIONS = {
   cars: {
-    create: ["owner", "sales_ops"] as AppRole[],
-    edit: ["owner", "sales_ops"] as AppRole[],
-    delete: ["owner"] as AppRole[],
-    view: ["owner", "assistant", "hybrid", "it", "sales_ops"] as AppRole[],
-  },
-  parts: {
-    create: ["owner", "garage_manager"] as AppRole[],
-    edit: ["owner", "hybrid", "garage_manager"] as AppRole[],
+    create: ["owner", "sales_ops", "sales"] as AppRole[],
+    edit: ["owner", "sales_ops", "sales"] as AppRole[],
     delete: ["owner"] as AppRole[],
     view: [
       "owner",
       "assistant",
       "hybrid",
+      "khalil_hybrid",
+      "it",
+      "sales_ops",
+      "sales",
+    ] as AppRole[],
+  },
+  parts: {
+    create: ["owner", "garage_manager"] as AppRole[],
+    edit: ["owner", "hybrid", "khalil_hybrid", "garage_manager"] as AppRole[],
+    delete: ["owner"] as AppRole[],
+    view: [
+      "owner",
+      "assistant",
+      "hybrid",
+      "khalil_hybrid",
       "it",
       "garage_manager",
       "garage_staff",
     ] as AppRole[],
   },
   customers: {
-    create: ["owner", "sales_ops"] as AppRole[],
-    edit: ["owner", "sales_ops"] as AppRole[],
+    create: ["owner", "sales_ops", "sales"] as AppRole[],
+    edit: ["owner", "sales_ops", "sales"] as AppRole[],
     delete: ["owner"] as AppRole[],
-    view: ["owner", "assistant", "sales_ops"] as AppRole[],
+    view: ["owner", "assistant", "sales_ops", "sales"] as AppRole[],
   },
   garage_jobs: {
     create: ["owner", "garage_manager"] as AppRole[],
@@ -99,21 +145,23 @@ export const CRUD_PERMISSIONS = {
     view: ["owner", "assistant", "garage_manager", "garage_staff"] as AppRole[],
   },
   installments: {
-    create: ["owner", "assistant", "sales_ops"] as AppRole[],
+    create: ["owner", "assistant", "sales_ops", "sales"] as AppRole[],
     edit: ["owner", "assistant"] as AppRole[],
     delete: ["owner"] as AppRole[],
-    view: ["owner", "assistant", "sales_ops"] as AppRole[],
-    mark_paid: ["owner", "assistant", "sales_ops"] as AppRole[],
+    view: ["owner", "assistant", "sales_ops", "sales"] as AppRole[],
+    mark_paid: ["owner", "assistant", "sales_ops", "sales"] as AppRole[],
   },
   requests: {
     create: [
       "owner",
       "assistant",
       "hybrid",
+      "khalil_hybrid",
       "it",
       "garage_manager",
       "garage_staff",
       "sales_ops",
+      "sales",
     ] as AppRole[],
     edit: ["owner", "assistant"] as AppRole[],
     delete: ["owner"] as AppRole[],
@@ -121,17 +169,43 @@ export const CRUD_PERMISSIONS = {
       "owner",
       "assistant",
       "hybrid",
+      "khalil_hybrid",
       "it",
       "garage_manager",
       "garage_staff",
       "sales_ops",
+      "sales",
     ] as AppRole[],
   },
   accessory_collections: {
-    create: ["owner", "assistant", "hybrid", "it", "sales_ops"] as AppRole[],
-    edit: ["owner", "assistant", "hybrid", "it", "sales_ops"] as AppRole[],
+    create: [
+      "owner",
+      "assistant",
+      "hybrid",
+      "khalil_hybrid",
+      "it",
+      "sales_ops",
+      "sales",
+    ] as AppRole[],
+    edit: [
+      "owner",
+      "assistant",
+      "hybrid",
+      "khalil_hybrid",
+      "it",
+      "sales_ops",
+      "sales",
+    ] as AppRole[],
     delete: ["owner"] as AppRole[],
-    view: ["owner", "assistant", "hybrid", "it", "sales_ops"] as AppRole[],
+    view: [
+      "owner",
+      "assistant",
+      "hybrid",
+      "khalil_hybrid",
+      "it",
+      "sales_ops",
+      "sales",
+    ] as AppRole[],
   },
 } as const;
 

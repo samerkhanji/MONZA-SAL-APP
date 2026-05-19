@@ -23,9 +23,14 @@ import {
 
 export type UserRole =
   | "owner"
+  | "hybrid"
+  | "khalil_hybrid"
   | "sales"
+  | "sales_ops"
   | "garage_manager"
-  | "assistant";
+  | "garage_staff"
+  | "assistant"
+  | "it";
 
 /**
  * Re-export from @/lib/permissions for components still importing the
@@ -75,6 +80,8 @@ export interface UserContextType {
   isMark: boolean;
   isKhalil: boolean;
   isOwner: boolean;
+  isHybrid: boolean;
+  canAssistantDashboard: boolean;
   appRole: AppRole | null;
   canSeeDashboard: boolean;
   canSeeCars: boolean;
@@ -118,6 +125,8 @@ const UserContext = createContext<UserContextType>({
   isMark: false,
   isKhalil: false,
   isOwner: false,
+  isHybrid: false,
+  canAssistantDashboard: false,
   appRole: null,
   canSeeDashboard: false,
   canSeeCars: false,
@@ -251,7 +260,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const appRole: AppRole | null = profile?.user_role ?? null;
 
   const isRequestAssistant = appRole === "assistant";
-  const canEditInventory = appRole === "owner" || appRole === "sales_ops";
+  const canEditInventory =
+    appRole === "owner" ||
+    appRole === "sales_ops" ||
+    appRole === "sales";
   const canDelete = appRole === "owner";
   const canSeeSettings = appRole === "owner";
   const canSeeProfileSettings = !!profile;
@@ -260,6 +272,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const canUploadDocuments =
     appRole === "owner" ||
     appRole === "sales_ops" ||
+    appRole === "sales" ||
     appRole === "garage_manager" ||
     capabilities.includes("garage");
   const canManageParts =
@@ -274,42 +287,65 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const isRequestManagement = appRole === "owner";
   const isSamer = false;
   const isKareem = false;
-  const isHoussam = false;
+  // Identifies Houssam (a specific approver). We avoid hard-coding a profile
+  // ID at build time -- prefer matching by full_name, with optional override
+  // via NEXT_PUBLIC_HOUSSAM_PROFILE_ID for environments where the display name
+  // changes. Returns false when neither identifier matches so the gated UI
+  // simply does not render.
+  const houssamProfileIdEnv =
+    typeof process !== "undefined"
+      ? process.env.NEXT_PUBLIC_HOUSSAM_PROFILE_ID
+      : undefined;
+  const isHoussam =
+    (!!houssamProfileIdEnv && profile?.id === houssamProfileIdEnv) ||
+    profile?.full_name === "Houssam";
   const isMark = appRole === "garage_manager";
-  const isKhalil = appRole === "hybrid";
+  const isKhalil = appRole === "hybrid" || appRole === "khalil_hybrid";
   const isOwner = appRole === "owner";
+  const isHybrid = appRole === "hybrid" || appRole === "khalil_hybrid";
+  const canAssistantDashboard = isRequestAssistant || isOwner || isHybrid;
 
   const canSeeDashboard = appRole === "owner";
   const canSeeCars =
     appRole === "owner" ||
     appRole === "assistant" ||
     appRole === "hybrid" ||
+    appRole === "khalil_hybrid" ||
     appRole === "it" ||
-    appRole === "sales_ops";
+    appRole === "sales_ops" ||
+    appRole === "sales";
   const canSeeDocuments =
     appRole === "owner" ||
     appRole === "assistant" ||
     appRole === "hybrid" ||
+    appRole === "khalil_hybrid" ||
     appRole === "it" ||
     appRole === "garage_manager" ||
-    appRole === "sales_ops";
+    appRole === "sales_ops" ||
+    appRole === "sales";
   const canSeePartsInventory =
     appRole === "owner" ||
     appRole === "assistant" ||
     appRole === "hybrid" ||
+    appRole === "khalil_hybrid" ||
     appRole === "it" ||
     appRole === "garage_manager" ||
     appRole === "garage_staff";
   const canSeeGarageJobs =
     appRole === "owner" ||
     appRole === "assistant" ||
+    appRole === "hybrid" ||
+    appRole === "khalil_hybrid" ||
     appRole === "garage_manager" ||
     appRole === "garage_staff";
   const canSeeGarageHistory =
     appRole === "owner" ||
     appRole === "assistant" ||
+    appRole === "hybrid" ||
+    appRole === "khalil_hybrid" ||
     appRole === "garage_manager" ||
-    appRole === "sales_ops";
+    appRole === "sales_ops" ||
+    appRole === "sales";
 
   const canEditMonzaWarrantyOnCarFlag = canEditMonzaWarrantyOnCar(
     appRole,
@@ -362,6 +398,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         isMark,
         isKhalil,
         isOwner,
+        isHybrid,
+        canAssistantDashboard,
         appRole,
         canSeeDashboard,
         canSeeCars,

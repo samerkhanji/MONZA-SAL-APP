@@ -96,7 +96,7 @@ const BASE_NAV_ITEMS: Array<{
   { href: "/installments", label: "Installments", icon: CreditCard, tourId: "nav-installments" },
   { href: "/cash", label: "Cash register", icon: Wallet, tourId: "nav-cash" },
   { href: "/sales-orders", label: "Sales Orders", icon: ShoppingBag, tourId: "nav-sales-orders" },
-  { href: "/reports", label: "Reports", icon: BarChart3, tourId: "nav-reports", ownerOnly: true },
+  { href: "/reports", label: "Reports", icon: BarChart3, tourId: "nav-reports" },
   {
     href: "/garage",
     label: "Garage",
@@ -240,7 +240,12 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           return appRole === "owner";
         }
         if (item.assistantDashboard) {
-          return appRole === "assistant" || appRole === "owner";
+          return (
+            appRole === "assistant" ||
+            appRole === "owner" ||
+            appRole === "hybrid" ||
+            appRole === "khalil_hybrid"
+          );
         }
         if (item.href === "/dashboard") {
           return appRole === "owner";
@@ -248,63 +253,120 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         if (item.href === "/data-health") {
           return appRole && ROLES_WITH_DATA_HEALTH_ACCESS.includes(appRole);
         }
+        if (item.href === "/reports") {
+          return (
+            appRole === "owner" ||
+            hasCapability("view_reports") ||
+            hasCapability("manage_team")
+          );
+        }
         if (item.href === "/requests")
           return [
             "owner",
             "assistant",
             "hybrid",
+            "khalil_hybrid",
             "it",
             "garage_manager",
             "garage_staff",
             "sales_ops",
+            "sales",
           ].includes(appRole);
         if (item.href === "/cars")
-          return ["owner", "assistant", "hybrid", "it", "sales_ops"].includes(
-            appRole
-          );
+          return [
+            "owner",
+            "assistant",
+            "hybrid",
+            "khalil_hybrid",
+            "it",
+            "sales_ops",
+            "sales",
+          ].includes(appRole);
         if (item.href === "/customers")
-          return ["owner", "assistant", "sales_ops"].includes(appRole);
+          return [
+            "owner",
+            "assistant",
+            "hybrid",
+            "khalil_hybrid",
+            "sales_ops",
+            "sales",
+          ].includes(appRole);
         if (item.href === "/installments")
-          return ["owner", "assistant", "sales_ops"].includes(appRole);
+          return [
+            "owner",
+            "assistant",
+            "hybrid",
+            "khalil_hybrid",
+            "sales_ops",
+            "sales",
+          ].includes(appRole);
         if (item.href === "/sales-orders")
-          return ["owner", "assistant", "sales_ops"].includes(appRole);
+          return [
+            "owner",
+            "assistant",
+            "sales_ops",
+            "sales",
+          ].includes(appRole);
         if (item.href === "/documents")
           return [
             "owner",
             "assistant",
             "hybrid",
+            "khalil_hybrid",
             "it",
             "garage_manager",
             "sales_ops",
+            "sales",
           ].includes(appRole);
         if (item.href === "/garage") {
           // Parent is shown if any child is visible
           const visibleChildren = item.children?.filter((child) => {
             if (child.href === "/garage")
-              return ["owner", "assistant", "garage_manager", "garage_staff"].includes(
-                appRole
-              );
+              return [
+                "owner",
+                "assistant",
+                "hybrid",
+                "khalil_hybrid",
+                "garage_manager",
+                "garage_staff",
+              ].includes(appRole);
             if (child.href === "/garage/inventory")
               return [
                 "owner",
                 "assistant",
                 "hybrid",
+                "khalil_hybrid",
                 "it",
                 "garage_manager",
                 "garage_staff",
               ].includes(appRole);
             if (child.href === "/garage/history")
-              return ["owner", "assistant", "garage_manager", "sales_ops"].includes(
-                appRole
-              );
+              return [
+                "owner",
+                "assistant",
+                "hybrid",
+                "khalil_hybrid",
+                "garage_manager",
+                "sales_ops",
+                "sales",
+              ].includes(appRole);
             if (child.href === "/garage/efficiency")
-              return ["owner", "assistant", "garage_manager", "hybrid"].includes(
-                appRole
-              );
+              return [
+                "owner",
+                "assistant",
+                "garage_manager",
+                "hybrid",
+                "khalil_hybrid",
+              ].includes(appRole);
             if (child.href === "/garage/tasks")
-              return ["owner", "assistant", "garage_manager", "garage_staff"].includes(
-                appRole
-              );
+              return [
+                "owner",
+                "assistant",
+                "hybrid",
+                "khalil_hybrid",
+                "garage_manager",
+                "garage_staff",
+              ].includes(appRole);
             if (child.href === "/garage/suppliers")
               return (
                 appRole === "owner" ||
@@ -332,7 +394,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               return (
                 appRole === "owner" ||
                 appRole === "garage_manager" ||
-                appRole === "hybrid"
+                appRole === "hybrid" ||
+                appRole === "khalil_hybrid"
               );
             return false;
           });
@@ -341,7 +404,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         if (item.href === "/settings") return appRole === "owner";
         return true;
       }),
-    [appRole]
+    [appRole, hasCapability]
   );
 
   async function handleSignOut() {
@@ -399,9 +462,13 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                     if (child.href === "/garage/inventory") return canSeePartsInventory;
                     if (child.href === "/garage/history") return canSeeGarageJobs;
                     if (child.href === "/garage/efficiency")
-                      return ["owner", "assistant", "garage_manager", "hybrid"].includes(
-                        appRole ?? ""
-                      );
+                      return [
+                        "owner",
+                        "assistant",
+                        "garage_manager",
+                        "hybrid",
+                        "khalil_hybrid",
+                      ].includes(appRole ?? "");
                     if (child.href === "/garage/tasks") return canSeeGarageJobs;
                     if (child.href === "/garage/suppliers")
                       return (
@@ -430,7 +497,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                       return (
                         appRole === "owner" ||
                         appRole === "garage_manager" ||
-                        appRole === "hybrid"
+                        appRole === "hybrid" ||
+                        appRole === "khalil_hybrid"
                       );
                     if (child.href === "/garage") return canSeeGarageJobs;
                     if (child.href === "/requests/pending") return canSeeSettings;

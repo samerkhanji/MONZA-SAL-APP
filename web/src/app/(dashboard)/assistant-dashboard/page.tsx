@@ -94,7 +94,7 @@ interface RepairProposalDashRow {
 
 export default function AssistantDashboardPage() {
   const router = useRouter();
-  const { profile, isRequestAssistant, isOwner, loading: profileLoading } = useUser();
+  const { profile, isRequestAssistant, isOwner, isHybrid, loading: profileLoading } = useUser();
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
@@ -149,7 +149,7 @@ export default function AssistantDashboardPage() {
     }
   }
 
-  const canAccess = isRequestAssistant || isOwner;
+  const canAccess = isRequestAssistant || isOwner || isHybrid;
 
   useEffect(() => {
     if (!profileLoading && !canAccess) {

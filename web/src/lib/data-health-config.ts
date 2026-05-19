@@ -53,16 +53,27 @@ export const DATA_HEALTH_SECTIONS_BY_ROLE: Record<AppRole, DataHealthSectionId[]
   garage_staff: ["garage_health"],
   it: ["software_health"],
   hybrid: ["parts_health", "requests_health"],
+  khalil_hybrid: ["parts_health", "requests_health"],
+  sales: [
+    "customers_missing_data",
+    "sales_orders_missing_data",
+    "broken_relationships",
+    "reservation_delivery_missing",
+    "installment_data_missing",
+    "warranty_data_missing",
+  ],
 };
 
 export const ROLES_WITH_DATA_HEALTH_ACCESS: AppRole[] = [
   "owner",
   "assistant",
   "sales_ops",
+  "sales",
   "garage_manager",
   "garage_staff",
   "it",
   "hybrid",
+  "khalil_hybrid",
 ];
 
 export const SECTION_LABELS: Record<DataHealthSectionId, string> = {

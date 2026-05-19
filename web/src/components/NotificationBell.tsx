@@ -340,6 +340,11 @@ function NotificationBellInner() {
                 n.metadata?.type === "page_access_request" &&
                 n.metadata?.page_access_request_id;
               const hasActions = isDeleteRequest || isDocAccess || isPageAccess;
+              // NOTE: isHoussam is a name/env-based check (see UserContext).
+              // The canonical approval surface for access requests is
+              // /requests/pending — these inline buttons are a convenience
+              // shortcut only and will fall back to a "View" link below
+              // when the current viewer cannot act on the request.
               const canAct =
                 (isDeleteRequest && isOwner) ||
                 (isDocAccess && isHoussam) ||
