@@ -35,9 +35,12 @@ import {
   AlertCircle,
   Undo2,
   Repeat,
+  HelpCircle,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
+import { OnboardingTour, dispatchTourReplay } from "@/components/onboarding-tour";
+import { getTourForRole } from "@/lib/tours/registry";
 import { USER_ROLE_LABELS } from "@/lib/constants/user";
 import { Button } from "@/components/ui/button";
 import {
@@ -226,6 +229,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const [dataHealthCount, setDataHealthCount] = useState<number | null>(null);
+  const hasTour = useMemo(() => getTourForRole(appRole) !== null, [appRole]);
 
   useEffect(() => {
     if (!appRole || !ROLES_WITH_DATA_HEALTH_ACCESS.includes(appRole)) return;
@@ -690,6 +694,12 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                   </Link>
                 </DropdownMenuItem>
               )}
+              {hasTour && (
+                <DropdownMenuItem onClick={() => dispatchTourReplay()}>
+                  <HelpCircle className="mr-2 size-4" />
+                  Take the tour
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem onClick={() => setChangePasswordOpen(true)}>
                 <Lock className="mr-2 size-4" />
                 Change Password
@@ -710,6 +720,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         open={changePasswordOpen}
         onOpenChange={setChangePasswordOpen}
       />
+
+      <OnboardingTour />
     </div>
   );
 }
