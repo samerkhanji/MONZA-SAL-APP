@@ -39,7 +39,16 @@ function statusBadgeVariant(s: string): "default" | "secondary" | "outline" | "d
 
 export default function TestDrivePage() {
   const supabase = createClient();
-  const { profile, loading: userLoading } = useUser();
+  const { profile, loading: userLoading, isOwner, hasCapability } = useUser();
+  // Test-drive RLS is broader than this UI gate, but garage_staff and
+  // similar roles have no business landing on this page from a direct URL.
+  // Keep the UI surface restricted to owner + sales/garage/manage_team
+  // capabilities.
+  const allowed =
+    isOwner ||
+    hasCapability("sales") ||
+    hasCapability("garage") ||
+    hasCapability("manage_team");
   const [scanOpen, setScanOpen] = useState(false);
   const [vinInput, setVinInput] = useState("");
   const [lookupLoading, setLookupLoading] = useState(false);
@@ -201,6 +210,18 @@ export default function TestDrivePage() {
     return (
       <div className="flex min-h-[40vh] items-center justify-center text-muted-foreground">
         <Loader2 className="size-6 animate-spin" />
+      </div>
+    );
+  }
+
+  if (!allowed) {
+    return (
+      <div className="mx-auto max-w-2xl space-y-3 p-6 text-center">
+        <h1 className="text-xl font-semibold">No access</h1>
+        <p className="text-muted-foreground text-sm">
+          Test drives are available to owner, sales, garage, and team leads. Ask
+          an owner if you think this is a mistake.
+        </p>
       </div>
     );
   }

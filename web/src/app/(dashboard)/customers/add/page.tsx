@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
+import { useUser } from "@/lib/contexts/UserContext";
 import { normalizePhone } from "@/lib/phone";
 import type { LeadStatus, LeadSource } from "@/types/database";
 import {
@@ -34,6 +35,16 @@ import { formatError } from "@/lib/error-messages";
 
 export default function AddCustomerPage() {
   const router = useRouter();
+  const { isOwner, hasCapability, appRole, loading: userLoading } = useUser();
+  // RLS allows sales_ops and assistant to write customer rows post-126;
+  // gate the UI to match so non-allowed roles get a clean message instead
+  // of a 403 toast on submit.
+  const canAddCustomer =
+    isOwner ||
+    hasCapability("sales") ||
+    appRole === "sales_ops" ||
+    appRole === "assistant";
+
   const [submitting, setSubmitting] = useState(false);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -133,6 +144,29 @@ export default function AddCustomerPage() {
 
     toast.success("Customer added successfully");
     router.push(`/customers/${data.id}`);
+  }
+
+  if (userLoading) {
+    return (
+      <div className="container mx-auto max-w-2xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
+        <p className="text-muted-foreground text-sm">Loading…</p>
+      </div>
+    );
+  }
+
+  if (!canAddCustomer) {
+    return (
+      <div className="container mx-auto max-w-2xl space-y-3 px-4 py-10 text-center sm:px-6">
+        <h1 className="text-xl font-semibold">No access</h1>
+        <p className="text-muted-foreground text-sm">
+          Adding customers is available to owner, sales, sales ops, and the
+          assistant. Ask an owner if you think this is a mistake.
+        </p>
+        <Button variant="outline" asChild>
+          <Link href="/customers">Back to customers</Link>
+        </Button>
+      </div>
+    );
   }
 
   return (

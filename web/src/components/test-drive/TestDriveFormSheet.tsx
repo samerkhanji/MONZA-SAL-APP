@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 import type { CarStatus } from "@/types/database";
@@ -59,6 +59,31 @@ function numOrNullDecimal(v: string): number | null {
   if (t === "") return null;
   const n = parseFloat(t);
   return Number.isFinite(n) ? n : null;
+}
+
+type CustomerOption = {
+  id: string;
+  full_name: string | null;
+  phone_primary: string | null;
+};
+
+/**
+ * Wraps raw 23514 check-constraint errors from PostgREST into clean
+ * human-readable strings. Falls back to formatError for anything else.
+ */
+function friendlyTestDriveError(
+  err: { code?: string | null; message?: string | null } | null | undefined
+): string | null {
+  if (!err) return null;
+  const code = err.code ?? "";
+  const msg = (err.message ?? "").toLowerCase();
+  if (code === "23514") {
+    if (msg.includes("battery")) return "Battery must be 0-100";
+    if (msg.includes("odometer")) return "Return odometer must be ≥ start odometer";
+    if (msg.includes("actual_return_at") || msg.includes("return time") || msg.includes("return_at"))
+      return "Return time must be after start time";
+  }
+  return null;
 }
 
 /**
@@ -134,6 +159,11 @@ export function TestDriveFormSheet({
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerId, setCustomerId] = useState<string | null>(null);
+  const [customerOptions, setCustomerOptions] = useState<CustomerOption[]>([]);
+  const [customerOptionsLoading, setCustomerOptionsLoading] = useState(false);
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [customerPickerOpen, setCustomerPickerOpen] = useState(false);
+  const customerWrapperRef = useRef<HTMLDivElement | null>(null);
   const [route, setRoute] = useState("");
   const [purpose, setPurpose] = useState("");
   const [companionEmployee, setCompanionEmployee] = useState("");
@@ -211,6 +241,73 @@ export function TestDriveFormSheet({
     }
   }, [open, existing, car]);
 
+  // Load customers once when the sheet opens so the picker has options.
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    (async () => {
+      setCustomerOptionsLoading(true);
+      const { data, error } = await supabase
+        .from("customers")
+        .select("id, first_name, last_name, phone_primary")
+        .is("deleted_at", null)
+        .order("first_name", { ascending: true })
+        .limit(500);
+      if (cancelled) return;
+      if (error) {
+        toast.error(formatError(error));
+        setCustomerOptions([]);
+      } else {
+        setCustomerOptions(
+          (data ?? []).map((r) => {
+            const fn = [r.first_name, r.last_name].filter(Boolean).join(" ").trim();
+            return {
+              id: r.id as string,
+              full_name: fn || null,
+              phone_primary: (r.phone_primary as string | null) ?? null,
+            };
+          })
+        );
+      }
+      setCustomerOptionsLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, supabase]);
+
+  // Close the typeahead dropdown when clicking outside.
+  useEffect(() => {
+    if (!customerPickerOpen) return;
+    function onClick(e: MouseEvent) {
+      if (
+        customerWrapperRef.current &&
+        !customerWrapperRef.current.contains(e.target as Node)
+      ) {
+        setCustomerPickerOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [customerPickerOpen]);
+
+  const selectedCustomer = useMemo(
+    () => customerOptions.find((c) => c.id === customerId) ?? null,
+    [customerOptions, customerId]
+  );
+
+  const filteredCustomers = useMemo(() => {
+    const q = customerSearch.trim().toLowerCase();
+    if (!q) return customerOptions.slice(0, 50);
+    return customerOptions
+      .filter((c) => {
+        const name = (c.full_name ?? "").toLowerCase();
+        const phone = (c.phone_primary ?? "").toLowerCase();
+        return name.includes(q) || phone.includes(q);
+      })
+      .slice(0, 50);
+  }, [customerOptions, customerSearch]);
+
   const title = useMemo(() => {
     if (existing?.id) {
       if (isOut) return "Test drive — vehicle out";
@@ -280,7 +377,7 @@ export function TestDriveFormSheet({
       ) {
         toast.error("This vehicle already has an active test drive.");
       } else {
-        toast.error(formatError(insErr));
+        toast.error(friendlyTestDriveError(insErr) ?? formatError(insErr));
       }
       setSaving(false);
       return;
@@ -340,7 +437,7 @@ export function TestDriveFormSheet({
       })
       .eq("id", existing.id);
 
-    if (error) toast.error(formatError(error));
+    if (error) toast.error(friendlyTestDriveError(error) ?? formatError(error));
     else toast.success("Test drive updated.");
     setSaving(false);
     if (!error) {
@@ -390,7 +487,7 @@ export function TestDriveFormSheet({
       .eq("id", existing.id);
 
     if (uErr) {
-      toast.error(formatError(uErr));
+      toast.error(friendlyTestDriveError(uErr) ?? formatError(uErr));
       setSaving(false);
       return;
     }
@@ -514,15 +611,96 @@ export function TestDriveFormSheet({
               </div>
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="td-cust-id">Customer ID (optional UUID)</Label>
-              <Input
-                id="td-cust-id"
-                value={customerId ?? ""}
-                onChange={(e) => setCustomerId(e.target.value.trim() || null)}
-                placeholder="Link existing customer"
-                disabled={readOnlyReturned}
-                className="font-mono text-xs"
-              />
+              <Label htmlFor="td-cust-picker">Link existing customer (optional)</Label>
+              <div className="relative" ref={customerWrapperRef}>
+                <Input
+                  id="td-cust-picker"
+                  value={
+                    customerPickerOpen
+                      ? customerSearch
+                      : selectedCustomer
+                      ? `${selectedCustomer.full_name ?? "(no name)"}${
+                          selectedCustomer.phone_primary
+                            ? ` (${selectedCustomer.phone_primary})`
+                            : ""
+                        }`
+                      : ""
+                  }
+                  onChange={(e) => {
+                    setCustomerSearch(e.target.value);
+                    if (!customerPickerOpen) setCustomerPickerOpen(true);
+                  }}
+                  onFocus={() => {
+                    setCustomerPickerOpen(true);
+                    setCustomerSearch("");
+                  }}
+                  placeholder={
+                    customerOptionsLoading
+                      ? "Loading customers…"
+                      : "Type a name or phone…"
+                  }
+                  disabled={readOnlyReturned || customerOptionsLoading}
+                  autoComplete="off"
+                />
+                {customerId && !readOnlyReturned && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCustomerId(null);
+                      setCustomerSearch("");
+                    }}
+                    className="text-muted-foreground hover:text-foreground absolute right-2 top-1/2 -translate-y-1/2 text-xs"
+                    aria-label="Clear customer"
+                  >
+                    Clear
+                  </button>
+                )}
+                {customerPickerOpen && !readOnlyReturned && (
+                  <div className="bg-popover absolute z-50 mt-1 max-h-64 w-full overflow-y-auto rounded-md border shadow-md">
+                    {filteredCustomers.length === 0 ? (
+                      <div className="text-muted-foreground px-3 py-2 text-sm">
+                        No customers match.
+                      </div>
+                    ) : (
+                      filteredCustomers.map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => {
+                            setCustomerId(c.id);
+                            // Auto-fill the name/phone fields if they're
+                            // empty so the record carries a denormalised
+                            // copy for at-a-glance display.
+                            if (!customerName.trim() && c.full_name) {
+                              setCustomerName(c.full_name);
+                            }
+                            if (!customerPhone.trim() && c.phone_primary) {
+                              setCustomerPhone(c.phone_primary);
+                            }
+                            setCustomerPickerOpen(false);
+                            setCustomerSearch("");
+                          }}
+                          className="hover:bg-accent flex w-full flex-col items-start gap-0 px-3 py-2 text-left text-sm"
+                        >
+                          <span className="font-medium">
+                            {c.full_name ?? "(no name)"}
+                          </span>
+                          {c.phone_primary && (
+                            <span className="text-muted-foreground text-xs">
+                              {c.phone_primary}
+                            </span>
+                          )}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+              {customerId && (
+                <p className="text-muted-foreground font-mono text-xs">
+                  Linked: {customerId}
+                </p>
+              )}
             </div>
 
             <hr className="border-border" />
