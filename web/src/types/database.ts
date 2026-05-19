@@ -459,6 +459,8 @@ export interface GarageJob {
   priority: JobPriority;
   status: JobStatus;
   assigned_to: string | null;
+  external_assignee_name: string | null;
+  assigned_profile?: { id: string; full_name: string | null } | null;
   diagnosis: string | null;
   work_done: string | null;
   estimated_hours: number | null;

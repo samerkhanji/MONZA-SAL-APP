@@ -30,6 +30,12 @@ interface CarOption {
   status: string;
 }
 
+interface InternalUserOption {
+  id: string;
+  full_name: string;
+  user_role: string;
+}
+
 interface PartToAdd {
   part_id: string;
   part_name: string;
@@ -45,8 +51,6 @@ interface NewJobDialogProps {
   preselectedCar?: CarOption | null;
 }
 
-const ASSIGN_OPTIONS = ["Mark", "External Mechanic"];
-
 export function NewJobDialog({
   open,
   onOpenChange,
@@ -59,7 +63,12 @@ export function NewJobDialog({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<JobPriority>("normal");
-  const [assignedTo, setAssignedTo] = useState("");
+  // C-6: assigned_to is a uuid FK; external assignees use a separate text
+  // column with a DB CHECK ensuring at most one is set.
+  const [assigneeMode, setAssigneeMode] = useState<"none" | "internal" | "external">("none");
+  const [internalAssigneeId, setInternalAssigneeId] = useState<string>("");
+  const [externalAssigneeName, setExternalAssigneeName] = useState<string>("");
+  const [internalUsers, setInternalUsers] = useState<InternalUserOption[]>([]);
   const [dueDate, setDueDate] = useState("");
   const [estimatedHours, setEstimatedHours] = useState("");
   const [notes, setNotes] = useState("");
@@ -87,11 +96,26 @@ export function NewJobDialog({
   }, [open, preselectedCar]);
 
   useEffect(() => {
+    if (!open) return;
+    void (async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("id, full_name, user_role")
+        .eq("is_active", true)
+        .in("user_role", ["garage_manager", "garage_staff", "hybrid", "owner"])
+        .order("full_name", { ascending: true });
+      setInternalUsers((data as InternalUserOption[]) ?? []);
+    })();
+  }, [open, supabase]);
+
+  useEffect(() => {
     if (!open) {
       setTitle("");
       setDescription("");
       setPriority("normal");
-      setAssignedTo("");
+      setAssigneeMode("none");
+      setInternalAssigneeId("");
+      setExternalAssigneeName("");
       setDueDate("");
       setEstimatedHours("");
       setNotes("");
@@ -192,6 +216,14 @@ export function NewJobDialog({
       return;
     }
 
+    // Resolve assignee fields — DB CHECK guarantees mutual exclusion.
+    const assignedTo =
+      assigneeMode === "internal" && internalAssigneeId ? internalAssigneeId : null;
+    const externalAssignee =
+      assigneeMode === "external" && externalAssigneeName.trim()
+        ? externalAssigneeName.trim()
+        : null;
+
     const { data: jobData, error: jobError } = await supabase
       .from("garage_jobs")
       .insert({
@@ -201,7 +233,8 @@ export function NewJobDialog({
         description: description.trim() || null,
         priority,
         status: "pending",
-        assigned_to: assignedTo.trim() || null,
+        assigned_to: assignedTo,
+        external_assignee_name: externalAssignee,
         due_date: dueDate || null,
         estimated_hours: estimatedHours ? parseFloat(estimatedHours) : null,
         notes: notes.trim() || null,
@@ -411,27 +444,58 @@ export function NewJobDialog({
           <div>
             <Label className="text-base">Assign To</Label>
             <div className="mt-2 flex flex-wrap gap-2">
-              {ASSIGN_OPTIONS.map((opt) => (
-                <button
-                  key={opt}
-                  type="button"
-                  onClick={() => setAssignedTo(assignedTo === opt ? "" : opt)}
-                  className={`rounded-lg border px-4 py-2 text-sm transition-colors hover:border-primary/50 ${
-                    assignedTo === opt ? "border-primary bg-primary/10" : "border-border"
-                  }`}
-                >
-                  {opt}
-                </button>
-              ))}
-              <Input
-                id="job-assigned-to"
-                name="job-assigned-to"
-                placeholder="Or type name..."
-                value={ASSIGN_OPTIONS.includes(assignedTo) ? "" : assignedTo}
-                onChange={(e) => setAssignedTo(e.target.value)}
-                className="h-9 w-36"
-              />
+              {internalUsers.map((u) => {
+                const active = assigneeMode === "internal" && internalAssigneeId === u.id;
+                return (
+                  <button
+                    key={u.id}
+                    type="button"
+                    onClick={() => {
+                      if (active) {
+                        setAssigneeMode("none");
+                        setInternalAssigneeId("");
+                      } else {
+                        setAssigneeMode("internal");
+                        setInternalAssigneeId(u.id);
+                        setExternalAssigneeName("");
+                      }
+                    }}
+                    className={`rounded-lg border px-4 py-2 text-sm transition-colors hover:border-primary/50 ${
+                      active ? "border-primary bg-primary/10" : "border-border"
+                    }`}
+                  >
+                    {u.full_name}
+                  </button>
+                );
+              })}
+              <button
+                type="button"
+                onClick={() => {
+                  if (assigneeMode === "external") {
+                    setAssigneeMode("none");
+                    setExternalAssigneeName("");
+                  } else {
+                    setAssigneeMode("external");
+                    setInternalAssigneeId("");
+                  }
+                }}
+                className={`rounded-lg border px-4 py-2 text-sm transition-colors hover:border-primary/50 ${
+                  assigneeMode === "external" ? "border-primary bg-primary/10" : "border-border"
+                }`}
+              >
+                External…
+              </button>
             </div>
+            {assigneeMode === "external" && (
+              <Input
+                id="job-external-assignee"
+                name="job-external-assignee"
+                placeholder="External mechanic name"
+                value={externalAssigneeName}
+                onChange={(e) => setExternalAssigneeName(e.target.value)}
+                className="mt-2 h-9 w-full"
+              />
+            )}
           </div>
 
           <div>

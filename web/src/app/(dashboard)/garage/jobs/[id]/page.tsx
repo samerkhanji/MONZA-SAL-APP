@@ -127,7 +127,7 @@ export default function JobDetailPage() {
     const { data, error } = await supabase
       .from("garage_jobs")
       .select(
-        "*, cars:car_id(id, vin, brand, model, model_year, exterior_color, status), garage_bays:garage_bay_id(id, name, bay_type)"
+        "*, cars:car_id(id, vin, brand, model, model_year, exterior_color, status), garage_bays:garage_bay_id(id, name, bay_type), assigned_profile:assigned_to(id, full_name)"
       )
       .eq("id", id)
       .is("deleted_at", null)
@@ -551,7 +551,12 @@ export default function JobDetailPage() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <Label>Assigned To</Label>
-              <p>{job.assigned_to ?? "—"}</p>
+              <p>
+                {(() => {
+                  const ap = job.assigned_profile as { full_name?: string | null } | null | undefined;
+                  return ap?.full_name ?? job.external_assignee_name ?? "—";
+                })()}
+              </p>
             </div>
             <div>
               <Label>Day to be Serviced</Label>

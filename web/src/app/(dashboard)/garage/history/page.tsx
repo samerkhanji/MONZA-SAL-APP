@@ -104,7 +104,7 @@ export default function GarageHistoryPage() {
     setLoading(true);
     const { data, error } = await supabase
       .from("garage_jobs")
-      .select("*, cars:car_id(id, vin, brand, model, model_year, exterior_color, status)")
+      .select("*, cars:car_id(id, vin, brand, model, model_year, exterior_color, status), assigned_profile:assigned_to(id, full_name)")
       .is("deleted_at", null)
       .in("status", ["done", "cancelled"])
       .order("completed_at", { ascending: false, nullsFirst: false })
@@ -153,7 +153,8 @@ export default function GarageHistoryPage() {
         const brand = (car?.brand ?? "").toLowerCase();
         const model = (car?.model ?? "").toLowerCase();
         const title = (j.title ?? "").toLowerCase();
-        const assigned = (j.assigned_to ?? "").toLowerCase();
+        const assignedProfile = j.assigned_profile as { full_name?: string | null } | null | undefined;
+        const assigned = (assignedProfile?.full_name ?? j.external_assignee_name ?? "").toLowerCase();
         if (
           !vin.includes(q) &&
           !brand.includes(q) &&
@@ -373,7 +374,10 @@ export default function GarageHistoryPage() {
                   <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                     <div>
                       <span className="text-muted-foreground">Assigned:</span>{" "}
-                      {job.assigned_to ?? "—"}
+                      {(() => {
+                        const ap = job.assigned_profile as { full_name?: string | null } | null | undefined;
+                        return ap?.full_name ?? job.external_assignee_name ?? "—";
+                      })()}
                     </div>
                     <div>
                       <span className="text-muted-foreground">Est/Act:</span>{" "}

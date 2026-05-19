@@ -183,7 +183,7 @@ export default function AssistantDashboardPage() {
     ] = await Promise.all([
       supabase
         .from("garage_jobs")
-        .select("*, cars:car_id(id, vin, brand, model)")
+        .select("*, cars:car_id(id, vin, brand, model), assigned_profile:assigned_to(id, full_name)")
         .is("deleted_at", null)
         .in("status", ["pending", "in_progress", "waiting_parts", "done", "delivered"])
         .order("created_at", { ascending: false }),
@@ -734,7 +734,10 @@ export default function AssistantDashboardPage() {
                   title: j.title,
                   status: JOB_STATUS_LABELS[j.status] ?? j.status,
                   due_date: j.due_date,
-                  assigned_to: j.assigned_to,
+                  assigned_to: (() => {
+                    const ap = (j as { assigned_profile?: { full_name?: string | null } | null }).assigned_profile;
+                    return ap?.full_name ?? (j as { external_assignee_name?: string | null }).external_assignee_name ?? null;
+                  })(),
                   estimated_hours: j.estimated_hours,
                 };
               })}
@@ -746,7 +749,10 @@ export default function AssistantDashboardPage() {
                   title: j.title,
                   status: JOB_STATUS_LABELS[j.status] ?? j.status,
                   due_date: j.due_date,
-                  assigned_to: j.assigned_to,
+                  assigned_to: (() => {
+                    const ap = (j as { assigned_profile?: { full_name?: string | null } | null }).assigned_profile;
+                    return ap?.full_name ?? (j as { external_assignee_name?: string | null }).external_assignee_name ?? null;
+                  })(),
                   estimated_hours: j.estimated_hours,
                 };
               })}
