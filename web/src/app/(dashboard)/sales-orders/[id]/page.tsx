@@ -27,7 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, FileText, CheckCircle2, Truck, Receipt, Loader2 } from "lucide-react";
+import { ArrowLeft, FileText, CheckCircle2, Truck, Receipt, Loader2, Repeat } from "lucide-react";
 import { formatError } from "@/lib/error-messages";
 
 type SaleStatus = "draft" | "reserved" | "confirmed" | "paid" | "delivered" | "cancelled";
@@ -83,6 +83,16 @@ interface SalesOrderDetail {
   } | null;
 }
 
+interface CommittedTradeIn {
+  id: string;
+  trade_in_number: string;
+  vehicle_make: string | null;
+  vehicle_model: string | null;
+  vehicle_year: number | null;
+  accepted_value: number | null;
+  currency: string | null;
+}
+
 const STATUS_COLORS: Record<SaleStatus, string> = {
   draft:     "bg-slate-100 text-slate-700 dark:bg-slate-900 dark:text-slate-300",
   reserved:  "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300",
@@ -116,6 +126,7 @@ export default function SalesOrderDetailPage() {
   const [order, setOrder] = useState<SalesOrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [committedTradeIns, setCommittedTradeIns] = useState<CommittedTradeIn[]>([]);
 
   // Editable form state for the lifecycle blocks. Currency is shared
   // across all amounts on a single order — the DB enforces this with
@@ -156,6 +167,21 @@ export default function SalesOrderDetailPage() {
     setDepositAmount(row.deposit_amount != null ? String(row.deposit_amount) : "");
     setDepositMethod(row.deposit_method ?? "");
     setContractUrl(row.signed_contract_url ?? "");
+
+    // Load any committed trade-ins linked to this sales order. We render
+    // these under the price card so the user can see what credit was
+    // applied. The "where status='committed'" filter is technically
+    // redundant (linked_sales_order_id is only set on commit), but it's
+    // an extra belt-and-suspenders.
+    const { data: tradeIns } = await supabase
+      .from("trade_ins")
+      .select(
+        "id, trade_in_number, vehicle_make, vehicle_model, vehicle_year, accepted_value, currency"
+      )
+      .eq("linked_sales_order_id", id)
+      .eq("status", "committed");
+    setCommittedTradeIns((tradeIns ?? []) as unknown as CommittedTradeIn[]);
+
     setLoading(false);
   }, [id, supabase, router]);
 
@@ -205,6 +231,13 @@ export default function SalesOrderDetailPage() {
     const amt = parseFloat(depositAmount);
     if (isNaN(amt) || amt <= 0) {
       toast.error("Enter a positive deposit amount");
+      return;
+    }
+    // Lifecycle guard: the DB now enforces a CHECK that
+    // deposit_paid_at requires quote_sent_at (migration 132). Show a
+    // friendlier toast here than the raw constraint violation.
+    if (!order?.quote_sent_at) {
+      toast.error("Quote must be sent first");
       return;
     }
     if (
@@ -297,6 +330,13 @@ export default function SalesOrderDetailPage() {
     // state. Route the user to the proper button.
     if (next === "delivered") {
       toast.error("Use the 'Mark delivered' button at the bottom — it runs the proper checks.");
+      return;
+    }
+    // Coming FROM 'delivered' is rejected by the DB trigger (migration 131)
+    // unless the caller is owner AND the change goes through the void path.
+    // Force users to the Void button so the audit trail is complete.
+    if (order?.status === "delivered") {
+      toast.error("Delivered sales can only be reversed via the 'Void sale' button.");
       return;
     }
     const ok = await patchOrder({ status: next });
@@ -418,11 +458,77 @@ export default function SalesOrderDetailPage() {
             <p className="text-2xl font-semibold tabular-nums">
               {fmtMoney(order.selling_price, order.currency)}
             </p>
+            {committedTradeIns.length > 0 && (() => {
+              const tradeInTotal = committedTradeIns.reduce(
+                (sum, t) => sum + (Number(t.accepted_value) || 0),
+                0
+              );
+              const net =
+                order.selling_price != null
+                  ? Number(order.selling_price) - tradeInTotal
+                  : null;
+              return (
+                <div className="mt-2 space-y-0.5 border-t pt-2">
+                  <p className="text-muted-foreground">
+                    Trade-in credit:{" "}
+                    <span className="font-medium text-foreground tabular-nums">
+                      −{fmtMoney(tradeInTotal, order.currency)}
+                    </span>
+                  </p>
+                  {net != null && (
+                    <p className="text-sm font-semibold tabular-nums">
+                      Net after trade-in: {fmtMoney(net, order.currency)}
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
             <p className="mt-2 text-muted-foreground">Sale date: {fmtDate(order.sale_date)}</p>
             <p className="text-muted-foreground">Planned delivery: {fmtDate(order.delivery_date)}</p>
           </CardContent>
         </Card>
       </div>
+
+      {/* Committed trade-ins — what credit is being applied to this sale. */}
+      {committedTradeIns.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Repeat className="size-4" /> Trade-ins applied
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {committedTradeIns.map((t) => {
+              const vehicle =
+                [t.vehicle_year, t.vehicle_make, t.vehicle_model]
+                  .filter(Boolean)
+                  .join(" ") || "—";
+              return (
+                <Link
+                  key={t.id}
+                  href={`/trade-ins/${t.id}`}
+                  className="flex items-center justify-between rounded-md border p-3 text-sm transition hover:bg-muted"
+                >
+                  <div>
+                    <div className="font-medium text-primary">
+                      {t.trade_in_number}
+                    </div>
+                    <div className="text-muted-foreground">{vehicle}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-semibold tabular-nums">
+                      {fmtMoney(t.accepted_value, t.currency)}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      Accepted value
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Quote */}
       <Card>
