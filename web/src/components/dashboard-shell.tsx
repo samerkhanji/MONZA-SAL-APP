@@ -40,6 +40,7 @@ import {
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
 import { OnboardingTour, dispatchTourReplay } from "@/components/onboarding-tour";
+import { AIChatWidget } from "@/components/ai-chat-widget";
 import { getTourForRole } from "@/lib/tours/registry";
 import { USER_ROLE_LABELS } from "@/lib/constants/user";
 import { Button } from "@/components/ui/button";
@@ -722,6 +723,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       />
 
       <OnboardingTour />
+      <AIChatWidget />
     </div>
   );
 }
