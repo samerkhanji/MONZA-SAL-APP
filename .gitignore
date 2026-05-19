@@ -26,6 +26,8 @@ web/.vercel
 
 # Claude Code per-machine settings (auto-generated, contains permission allowlists)
 .claude/settings.local.json
+# Claude Code parallel-agent worktrees (transient, never to be committed)
+.claude/worktrees/
 
 # Optional: keep .env.example so others know what vars to set
 !.env.example
