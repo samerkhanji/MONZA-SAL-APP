@@ -1,17 +1,22 @@
 import type { Tour } from "./types";
 
 /**
- * Owner tour — the most comprehensive. Walks through every major area of the
- * app as if explaining to someone who's never seen a CRM before.
+ * Owner welcome tour — the most comprehensive. Walks through every major area
+ * of the app as if explaining to someone who's never seen a CRM before.
  *
  * Tone: short sentences, plain English, no jargon. Imagine you're explaining
  * to a smart 12-year-old. No "leverage", "synergize", or "module" — just
  * "click this to see X" / "this is where X lives".
+ *
+ * In v2 this is the owner's "welcome" tour — the one auto-fired on first
+ * login. Per-page and workflow tours live in separate files.
  */
-export const ownerTour: Tour = {
+export const ownerWelcomeTour: Tour = {
   id: "owner-v1",
+  kind: "welcome",
   label: "Owner full tour",
   description: "Walks you through every section of the system, top to bottom.",
+  allowedRoles: ["owner"],
   steps: [
     {
       title: "Welcome to Monza CRM 👋",
