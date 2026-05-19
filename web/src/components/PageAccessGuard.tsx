@@ -2,11 +2,15 @@
 
 import { usePathname } from "next/navigation";
 import { useUser } from "@/lib/contexts/UserContext";
-import { canAccessPage } from "@/lib/permissions";
+import {
+  canAccessPage,
+  hasCapability,
+  type AppCapability,
+} from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 
-function getPageKeyFromPathname(pathname: string):
+type PageKey =
   | "dashboard"
   | "assistant_dashboard"
   | "requests"
@@ -21,8 +25,9 @@ function getPageKeyFromPathname(pathname: string):
   | "documents"
   | "settings"
   | "garage_settings"
-  | "dashboard_overview"
-  | null {
+  | "dashboard_overview";
+
+function getPageKeyFromPathname(pathname: string): PageKey | null {
   if (pathname.startsWith("/assistant-dashboard")) return "assistant_dashboard";
   if (pathname.startsWith("/dashboard/overview")) return "dashboard_overview";
   if (pathname === "/dashboard") return "dashboard";
@@ -46,14 +51,29 @@ function getPageKeyFromPathname(pathname: string):
   return null;
 }
 
+/**
+ * Capability fallback for pages that should also be reachable via a
+ * specific capability when the user's role alone doesn't grant access.
+ * Keeps the role-based PAGE_PERMISSIONS contract (and tests) intact while
+ * letting capability-flagged users (e.g. a hybrid with "cashier") in.
+ */
+const PAGE_CAPABILITY_FALLBACK: Partial<Record<PageKey, AppCapability>> = {
+  installments: "cashier",
+};
+
 export function PageAccessGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { appRole, loading } = useUser();
+  const { appRole, profile, loading } = useUser();
 
   if (loading) return null;
 
   const pageKey = getPageKeyFromPathname(pathname);
-  const hasAccess = pageKey ? canAccessPage(pageKey, appRole) : true;
+  const roleAccess = pageKey ? canAccessPage(pageKey, appRole) : true;
+  const capFallback =
+    pageKey && PAGE_CAPABILITY_FALLBACK[pageKey]
+      ? hasCapability(profile, PAGE_CAPABILITY_FALLBACK[pageKey] as AppCapability)
+      : false;
+  const hasAccess = roleAccess || capFallback;
 
   if (!hasAccess) {
     return (

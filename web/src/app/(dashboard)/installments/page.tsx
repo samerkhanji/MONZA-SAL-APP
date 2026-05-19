@@ -106,7 +106,7 @@ function carTitleAttr(car: Car | null | undefined): string | undefined {
 
 export default function InstallmentsPage() {
   const supabase = createClient();
-  const { appRole, profile } = useUser();
+  const { appRole, profile, hasCapability } = useUser();
   const searchParams = useSearchParams();
 
   const [loading, setLoading] = useState(true);
@@ -121,9 +121,19 @@ export default function InstallmentsPage() {
   const [note, setNote] = useState<string>("");
   const [markingPaid, setMarkingPaid] = useState(false);
 
-  const canMarkPaid = canPerform("installments", "mark_paid", appRole);
-  const canCreatePlan = canPerform("installments", "create", appRole);
   const isOwner = appRole === "owner";
+  // Page access: assistants, sales_ops, and anyone with the cashier capability
+  // can see the page. Owners always can.
+  const canAccess =
+    isOwner ||
+    appRole === "assistant" ||
+    appRole === "sales_ops" ||
+    hasCapability("cashier");
+  // mark-paid is now capability-gated (matches the DB-side check in
+  // apply_installment_payment which requires is_owner OR has_capability('cashier')).
+  // We keep canPerform() for the rest of the CRUD actions on installments.
+  const canMarkPaid = isOwner || hasCapability("cashier");
+  const canCreatePlan = canPerform("installments", "create", appRole);
 
   const [recoverPlanId, setRecoverPlanId] = useState<string | null>(null);
   const [recoverReason, setRecoverReason] = useState("");
@@ -644,6 +654,17 @@ export default function InstallmentsPage() {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
         <p className="text-muted-foreground">Loading installments...</p>
+      </div>
+    );
+  }
+
+  if (!canAccess) {
+    return (
+      <div className="flex min-h-[40vh] flex-col items-center justify-center gap-2 p-8">
+        <h1 className="text-xl font-semibold">Access Denied</h1>
+        <p className="text-muted-foreground text-center">
+          You do not have permission to view installments.
+        </p>
       </div>
     );
   }
