@@ -20,6 +20,7 @@ import {
   PowerOff,
   Bell,
   User,
+  SlidersHorizontal,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -118,7 +119,9 @@ export default function SettingsPage() {
     profile,
     refreshProfile,
     isOwner,
+    hasCapability,
   } = useUser();
+  const canEditApprovalThresholds = isOwner || hasCapability("manage_team");
   const tabFromUrl = searchParams.get("tab") as TabId | null;
   const defaultTab: TabId = canSeeSettings ? "team" : "profile";
   const [activeTab, setActiveTab] = useState<TabId>(tabFromUrl && ALL_TABS.some((t) => t.id === tabFromUrl) ? tabFromUrl : defaultTab);
@@ -540,6 +543,18 @@ export default function SettingsPage() {
             {tab.label}
           </button>
         ))}
+        {canEditApprovalThresholds && (
+          <Link
+            href="/settings/approval-thresholds"
+            className={cn(
+              "flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition-colors min-h-[44px]",
+              "text-muted-foreground hover:bg-muted hover:text-foreground"
+            )}
+          >
+            <SlidersHorizontal className="size-4 shrink-0" />
+            Approval thresholds
+          </Link>
+        )}
       </nav>
 
       {/* Content */}
