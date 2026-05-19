@@ -378,11 +378,13 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                 "garage_manager",
                 "garage_staff",
               ].includes(appRole);
-            if (child.href === "/garage/suppliers")
+            if (
+              child.href === "/garage/suppliers" ||
+              child.href === "/garage/purchase-orders"
+            )
               return (
                 appRole === "owner" ||
                 hasCapability("inventory") ||
-                hasCapability("garage") ||
                 hasCapability("cashier") ||
                 hasCapability("manage_team")
               );

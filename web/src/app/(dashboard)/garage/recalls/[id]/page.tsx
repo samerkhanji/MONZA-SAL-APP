@@ -139,13 +139,10 @@ export default function RecallDetailPage() {
 
   async function changeRecallStatus(next: string) {
     if (!recall) return;
-    const updates: Record<string, unknown> = { status: next };
-    if (next === "closed" || next === "cancelled") {
-      updates.closed_at = new Date().toISOString();
-    } else {
-      updates.closed_at = null;
-    }
-    const { error } = await supabase.from("recalls").update(updates).eq("id", recall.id);
+    const { error } = await supabase.rpc("set_recall_status", {
+      p_recall_id: recall.id,
+      p_status: next,
+    });
     if (error) return toast.error(formatError(error));
     toast.success(`Recall ${next}`);
     void load();
