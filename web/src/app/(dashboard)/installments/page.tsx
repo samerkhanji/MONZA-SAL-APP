@@ -164,6 +164,7 @@ export default function InstallmentsPage() {
   const [newPlanStartDate, setNewPlanStartDate] = useState("");
   const [newPlanDueDay, setNewPlanDueDay] = useState("");
   const [newPlanInterestRate, setNewPlanInterestRate] = useState("");
+  const [newPlanDownPaymentMethod, setNewPlanDownPaymentMethod] = useState("cash");
   const [savingNewPlan, setSavingNewPlan] = useState(false);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [cars, setCars] = useState<Car[]>([]);
@@ -2375,6 +2376,24 @@ export default function InstallmentsPage() {
                     />
                   </div>
                   <div className="space-y-2">
+                    <Label>Down Payment Method</Label>
+                    <Select
+                      value={newPlanDownPaymentMethod}
+                      onValueChange={setNewPlanDownPaymentMethod}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="cash">Cash</SelectItem>
+                        <SelectItem value="bank_transfer">Bank transfer</SelectItem>
+                        <SelectItem value="card">Card</SelectItem>
+                        <SelectItem value="check">Check</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
                     <Label>Number of Months *</Label>
                     <Input
                       value={newPlanMonths}
@@ -2525,66 +2544,44 @@ export default function InstallmentsPage() {
                       const interestRate =
                         Number.isFinite(interestPct) && interestPct >= 0 ? interestPct : 0;
 
-                      const { data: planData, error: planError } = await supabase
-                        .from("payment_plans")
-                        .insert({
-                          customer_id: newPlanCustomerId,
-                          car_id: newPlanCarId || null,
-                          status: "active",
-                          total_amount: totalNum,
-                          down_payment: downNum,
-                          monthly_amount: monthlyNum,
-                          months: monthsNum,
-                          start_date: newPlanStartDate,
-                          due_day: dueDayNum,
-                          interest_rate: interestRate,
-                          created_by: creatorId,
-                        })
-                        .select("id")
-                        .single();
+                      // C-9: build the monthly due-date array client-side so the
+                      // server doesn't need to re-implement the day-clamp logic.
+                      const dueDates: string[] = [];
+                      for (let i = 0; i < monthsNum; i += 1) {
+                        dueDates.push(installmentDueDateIso(newPlanStartDate, i, dueDayNum));
+                      }
 
-                      if (planError || !planData?.id) {
+                      // Single RPC: creates plan + installments + applies the
+                      // down payment via apply_installment_payment so the cash
+                      // trigger / credits ledger / audit all fire correctly.
+                      const { data: rpcData, error: planError } = await supabase.rpc(
+                        "create_payment_plan",
+                        {
+                          p_customer_id: newPlanCustomerId,
+                          p_car_id: newPlanCarId || null,
+                          p_total_amount: totalNum,
+                          p_down_payment: downNum,
+                          p_monthly_amount: monthlyNum,
+                          p_months: monthsNum,
+                          p_start_date: newPlanStartDate,
+                          p_due_day: dueDayNum,
+                          p_due_dates: dueDates,
+                          p_interest_rate: interestRate,
+                          p_down_payment_method: downNum > 0 ? newPlanDownPaymentMethod : null,
+                          p_down_payment_note: null,
+                        }
+                      );
+
+                      if (planError) {
                         setSavingNewPlan(false);
-                        toast.error(
-                          `Failed to create plan: ${planError ? formatError(planError) : "Unknown error"}`
-                        );
+                        toast.error(`Failed to create plan: ${formatError(planError)}`);
                         return;
                       }
 
-                      const installmentsPayload: Record<string, unknown>[] = [];
-                      const planStartYmd = newPlanStartDate;
-
-                      if (downNum > 0) {
-                        installmentsPayload.push({
-                          plan_id: planData.id,
-                          installment_no: 0,
-                          due_date: newPlanStartDate,
-                          amount_due: downNum,
-                          status: "paid",
-                          paid_at: new Date().toISOString(),
-                          paid_amount: downNum,
-                          payment_method: "Down Payment",
-                        });
-                      }
-
-                      for (let i = 0; i < monthsNum; i += 1) {
-                        const dueDateStr = installmentDueDateIso(planStartYmd, i, dueDayNum);
-                        installmentsPayload.push({
-                          plan_id: planData.id,
-                          installment_no: i + 1,
-                          due_date: dueDateStr,
-                          amount_due: monthlyNum,
-                          status: "upcoming",
-                        });
-                      }
-
-                      const { error: instError } = await supabase
-                        .from("installment_payments")
-                        .insert(installmentsPayload);
-
-                      if (instError) {
+                      const planData = { id: (rpcData as { plan_id?: string } | null)?.plan_id ?? "" };
+                      if (!planData.id) {
                         setSavingNewPlan(false);
-                        toast.error(`Plan created but failed to create installments: ${formatError(instError)}`);
+                        toast.error("Plan created but server returned no id");
                         return;
                       }
 
