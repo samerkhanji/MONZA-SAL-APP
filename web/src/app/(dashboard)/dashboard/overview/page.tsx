@@ -1,5 +1,14 @@
 import { redirect } from "next/navigation";
-import { addDays, format, isWithinInterval, parseISO, startOfDay } from "date-fns";
+import {
+  addDays,
+  endOfMonth,
+  format,
+  isWithinInterval,
+  parseISO,
+  startOfDay,
+  startOfMonth,
+  subMonths,
+} from "date-fns";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionUserAndRole } from "@/lib/server/session-app-role";
 import { CAR_STATUS_EDITABLE, CAR_STATUS_LABELS } from "@/types/database";
@@ -22,6 +31,23 @@ const PRIORITY_LABELS: Record<string, string> = {
   normal: "Normal",
   low: "Low",
 };
+
+const SALE_STAGE_ORDER = [
+  "draft",
+  "reserved",
+  "confirmed",
+  "paid",
+  "delivered",
+] as const;
+const SALE_STAGE_LABELS: Record<string, string> = {
+  draft: "Draft",
+  reserved: "Reserved",
+  confirmed: "Confirmed",
+  paid: "Paid",
+  delivered: "Delivered",
+};
+
+const INVENTORY_AGE_ORDER = ["0-30", "31-60", "61-90", "90+"] as const;
 
 type DashboardSupabase = Awaited<ReturnType<typeof createClient>>;
 
@@ -67,8 +93,15 @@ async function fetchAllCarsDisplayForOverview(
 async function fetchOverviewData(supabase: DashboardSupabase): Promise<OwnerOverviewData> {
   const errors: string[] = [];
 
-  const today = format(new Date(), "yyyy-MM-dd");
-  const weekEnd = format(addDays(new Date(), 7), "yyyy-MM-dd");
+  const now = new Date();
+  const today = format(now, "yyyy-MM-dd");
+  const weekEnd = format(addDays(now, 7), "yyyy-MM-dd");
+  const weekStart = format(addDays(now, -7), "yyyy-MM-dd");
+  const monthStart = format(startOfMonth(now), "yyyy-MM-dd");
+  const lastMonthStart = format(startOfMonth(subMonths(now, 1)), "yyyy-MM-dd");
+  const lastMonthEnd = format(endOfMonth(subMonths(now, 1)), "yyyy-MM-dd");
+  const todayStartIso = `${today}T00:00:00Z`;
+  const todayEndIso = `${today}T23:59:59Z`;
 
   const [
     carsCountRes,
@@ -83,6 +116,20 @@ async function fetchOverviewData(supabase: DashboardSupabase): Promise<OwnerOver
     partsRes,
     customersCountRes,
     salesOrdersCountRes,
+    // Phase 1 additions:
+    salesMTDRes,
+    salesLastMonthCountRes,
+    salesByStageRes,
+    topSalesRepRes,
+    inventoryAgingRes,
+    reservationsExpiringRes,
+    newArrivalsRes,
+    cashSessionRes,
+    todayCashRes,
+    pendingRefundsRes,
+    agedReceivablesRes,
+    activeGarageJobsCountRes,
+    openWarrantyCountRes,
   ] = await Promise.all([
     supabase
       .from("cars_display")
@@ -147,6 +194,89 @@ async function fetchOverviewData(supabase: DashboardSupabase): Promise<OwnerOver
       .from("sales_orders")
       .select("id", { count: "exact", head: true })
       .neq("status", "cancelled"),
+    // ---- Phase 1 ----
+    // Delivered this month: rows whose delivery_date is in the current month and not cancelled.
+    supabase
+      .from("sales_orders")
+      .select("currency, selling_price")
+      .gte("delivery_date", monthStart)
+      .lte("delivery_date", today)
+      .neq("status", "cancelled"),
+    // Delivered last month — count only, for MoM comparison.
+    supabase
+      .from("sales_orders")
+      .select("id", { count: "exact", head: true })
+      .gte("delivery_date", lastMonthStart)
+      .lte("delivery_date", lastMonthEnd)
+      .neq("status", "cancelled"),
+    // Sales pipeline by stage (non-cancelled).
+    supabase
+      .from("sales_orders")
+      .select("status")
+      .neq("status", "cancelled"),
+    // Top sales rep by revenue (view is SECURITY DEFINER so bypasses RLS).
+    supabase
+      .from("report_sales_rep_performance")
+      .select(
+        "sales_rep_id, sales_rep_name, deals_in_pipeline, deals_delivered, revenue_total, margin_total"
+      )
+      .order("revenue_total", { ascending: false, nullsFirst: false })
+      .limit(1),
+    // Inventory aging buckets.
+    supabase.from("report_inventory_aging").select("age_bucket"),
+    // Reservations expiring (next 14d, or any reserved car for context).
+    supabase
+      .from("cars_display")
+      .select("id, vin, brand, model, reservation_date, reserved_by")
+      .eq("status", "reserved")
+      .is("deleted_at", null)
+      .not("reservation_date", "is", null)
+      .order("reservation_date", { ascending: true })
+      .limit(8),
+    // New arrivals (last 7d).
+    supabase
+      .from("cars_display")
+      .select("id, vin, brand, model, date_arrived")
+      .gte("date_arrived", weekStart)
+      .lte("date_arrived", today)
+      .is("deleted_at", null)
+      .order("date_arrived", { ascending: false })
+      .limit(8),
+    // Open cash session (closed_at IS NULL).
+    supabase
+      .from("cash_sessions")
+      .select("id, opening_balance, opened_at, opened_by")
+      .is("closed_at", null)
+      .order("opened_at", { ascending: false })
+      .limit(1),
+    // Today's cash movements.
+    supabase
+      .from("cash_movements")
+      .select("direction, amount, currency")
+      .gte("created_at", todayStartIso)
+      .lte("created_at", todayEndIso),
+    // Pending refunds (requested but not approved/rejected/paid).
+    supabase
+      .from("refunds")
+      .select("amount, currency, status")
+      .eq("status", "requested")
+      .is("deleted_at", null),
+    // Aged receivables (overdue installments).
+    supabase
+      .from("report_aged_receivables")
+      .select("amount_outstanding, days_overdue")
+      .gt("days_overdue", 0),
+    // Open garage jobs (not finished/cancelled).
+    supabase
+      .from("garage_jobs")
+      .select("id", { count: "exact", head: true })
+      .not("status", "in", "(finished,cancelled,delivered)")
+      .is("deleted_at", null),
+    // Open warranty cases.
+    supabase
+      .from("warranty_cases")
+      .select("id", { count: "exact", head: true })
+      .not("status", "in", "(closed,rejected,cancelled)"),
   ]);
 
   if (carsCountRes.error) errors.push(`Cars count: ${carsCountRes.error.message}`);
@@ -169,10 +299,27 @@ async function fetchOverviewData(supabase: DashboardSupabase): Promise<OwnerOver
   if (partsRes.error) errors.push(`Parts: ${partsRes.error.message}`);
   if (customersCountRes.error) errors.push(`Customers: ${customersCountRes.error.message}`);
   if (salesOrdersCountRes.error) errors.push(`Sales orders: ${salesOrdersCountRes.error.message}`);
+  if (salesMTDRes.error) errors.push(`Sales MTD: ${salesMTDRes.error.message}`);
+  if (salesLastMonthCountRes.error) errors.push(`Sales LM: ${salesLastMonthCountRes.error.message}`);
+  if (salesByStageRes.error) errors.push(`Sales pipeline: ${salesByStageRes.error.message}`);
+  if (topSalesRepRes.error) errors.push(`Top sales rep: ${topSalesRepRes.error.message}`);
+  if (inventoryAgingRes.error) errors.push(`Inventory aging: ${inventoryAgingRes.error.message}`);
+  if (reservationsExpiringRes.error) errors.push(`Reservations: ${reservationsExpiringRes.error.message}`);
+  if (newArrivalsRes.error) errors.push(`New arrivals: ${newArrivalsRes.error.message}`);
+  if (cashSessionRes.error) errors.push(`Cash session: ${cashSessionRes.error.message}`);
+  if (todayCashRes.error) errors.push(`Today cash: ${todayCashRes.error.message}`);
+  if (pendingRefundsRes.error) errors.push(`Pending refunds: ${pendingRefundsRes.error.message}`);
+  if (agedReceivablesRes.error) errors.push(`Aged receivables: ${agedReceivablesRes.error.message}`);
+  if (activeGarageJobsCountRes.error) {
+    errors.push(`Active garage jobs: ${activeGarageJobsCountRes.error.message}`);
+  }
+  if (openWarrantyCountRes.error) {
+    errors.push(`Open warranty cases: ${openWarrantyCountRes.error.message}`);
+  }
 
   const warrantyWindow = {
-    start: startOfDay(new Date()),
-    end: startOfDay(addDays(new Date(), 90)),
+    start: startOfDay(now),
+    end: startOfDay(addDays(now, 90)),
   };
 
   function expiryInWindow(iso: string | null | undefined): boolean {
@@ -271,6 +418,172 @@ async function fetchOverviewData(supabase: DashboardSupabase): Promise<OwnerOver
       quantity: number;
     }[]) ?? [];
 
+  // ---- Phase 1: aggregate the new query results ----
+
+  // Sales MTD: sum revenue per currency, total units.
+  const salesMTDRows = (salesMTDRes.data ?? []) as {
+    currency: string | null;
+    selling_price: number | null;
+  }[];
+  const revenueByCurrency: Record<string, number> = {};
+  for (const r of salesMTDRows) {
+    const c = (r.currency ?? "USD").toUpperCase();
+    revenueByCurrency[c] = (revenueByCurrency[c] ?? 0) + Number(r.selling_price ?? 0);
+  }
+  const salesMTD = {
+    units: salesMTDRows.length,
+    revenueByCurrency,
+    unitsLastMonth: salesLastMonthCountRes.count ?? 0,
+  };
+
+  // Sales by stage.
+  const stageCounts: Record<string, number> = {};
+  for (const row of salesByStageRes.data ?? []) {
+    const s = String((row as { status: string }).status ?? "");
+    if (!s) continue;
+    stageCounts[s] = (stageCounts[s] ?? 0) + 1;
+  }
+  const salesByStage = SALE_STAGE_ORDER.map((s) => ({
+    stage: s,
+    label: SALE_STAGE_LABELS[s],
+    count: stageCounts[s] ?? 0,
+  }));
+
+  // Top sales rep.
+  const topRepRow = (topSalesRepRes.data ?? [])[0] as
+    | {
+        sales_rep_name: string | null;
+        deals_in_pipeline: number | null;
+        deals_delivered: number | null;
+        revenue_total: number | null;
+        margin_total: number | null;
+      }
+    | undefined;
+  const topSalesRep = topRepRow
+    ? {
+        name: topRepRow.sales_rep_name ?? "Unknown",
+        dealsDelivered: Number(topRepRow.deals_delivered ?? 0),
+        dealsInPipeline: Number(topRepRow.deals_in_pipeline ?? 0),
+        revenueTotal: Number(topRepRow.revenue_total ?? 0),
+        marginTotal: Number(topRepRow.margin_total ?? 0),
+      }
+    : null;
+
+  // Inventory aging buckets.
+  const agingCounts: Record<string, number> = {};
+  for (const row of inventoryAgingRes.data ?? []) {
+    const b = String((row as { age_bucket: string | null }).age_bucket ?? "");
+    if (!b) continue;
+    agingCounts[b] = (agingCounts[b] ?? 0) + 1;
+  }
+  const inventoryAging = INVENTORY_AGE_ORDER.map((bucket) => ({
+    bucket,
+    count: agingCounts[bucket] ?? 0,
+  }));
+
+  const reservationsExpiring = (reservationsExpiringRes.data ?? []).map((raw) => {
+    const r = raw as {
+      id: string;
+      vin: string | null;
+      brand: string | null;
+      model: string | null;
+      reservation_date: string | null;
+      reserved_by: string | null;
+    };
+    return {
+      id: r.id,
+      vin: r.vin ?? "",
+      brand: r.brand ?? "",
+      model: r.model ?? "",
+      reservation_date: r.reservation_date,
+      reserved_by: r.reserved_by,
+    };
+  });
+
+  const newArrivals = (newArrivalsRes.data ?? []).map((raw) => {
+    const r = raw as {
+      id: string;
+      vin: string | null;
+      brand: string | null;
+      model: string | null;
+      date_arrived: string | null;
+    };
+    return {
+      id: r.id,
+      vin: r.vin ?? "",
+      brand: r.brand ?? "",
+      model: r.model ?? "",
+      date_arrived: r.date_arrived,
+    };
+  });
+
+  // Cash drawer state.
+  const cashSessionRow = (cashSessionRes.data ?? [])[0] as
+    | {
+        id: string;
+        opening_balance: number | null;
+        opened_at: string | null;
+        opened_by: string | null;
+      }
+    | undefined;
+
+  const todayCashRows = (todayCashRes.data ?? []) as {
+    direction: string | null;
+    amount: number | null;
+    currency: string | null;
+  }[];
+  const todayCashIn: Record<string, number> = {};
+  const todayCashOut: Record<string, number> = {};
+  for (const m of todayCashRows) {
+    const c = (m.currency ?? "USD").toUpperCase();
+    const amt = Number(m.amount ?? 0);
+    if (m.direction === "in") todayCashIn[c] = (todayCashIn[c] ?? 0) + amt;
+    else if (m.direction === "out") todayCashOut[c] = (todayCashOut[c] ?? 0) + amt;
+  }
+
+  const cashState = {
+    isOpen: !!cashSessionRow,
+    openingBalance: Number(cashSessionRow?.opening_balance ?? 0),
+    openedAt: cashSessionRow?.opened_at ?? null,
+    openedBy: cashSessionRow?.opened_by ?? null,
+    todayCashIn,
+    todayCashOut,
+  };
+
+  // Pending refunds.
+  const refundRows = (pendingRefundsRes.data ?? []) as {
+    amount: number | null;
+    currency: string | null;
+    status: string | null;
+  }[];
+  const pendingRefundsByCurrency: Record<string, number> = {};
+  for (const r of refundRows) {
+    const c = (r.currency ?? "USD").toUpperCase();
+    pendingRefundsByCurrency[c] = (pendingRefundsByCurrency[c] ?? 0) + Number(r.amount ?? 0);
+  }
+  const pendingRefunds = {
+    count: refundRows.length,
+    amountByCurrency: pendingRefundsByCurrency,
+  };
+
+  // Aged receivables.
+  const receivableRows = (agedReceivablesRes.data ?? []) as {
+    amount_outstanding: number | null;
+    days_overdue: number | null;
+  }[];
+  let agedTotal = 0;
+  let oldestDays = 0;
+  for (const r of receivableRows) {
+    agedTotal += Number(r.amount_outstanding ?? 0);
+    const d = Number(r.days_overdue ?? 0);
+    if (d > oldestDays) oldestDays = d;
+  }
+  const agedReceivables = {
+    count: receivableRows.length,
+    totalOutstanding: agedTotal,
+    oldestDays,
+  };
+
   return {
     summary: {
       totalCars,
@@ -278,12 +591,24 @@ async function fetchOverviewData(supabase: DashboardSupabase): Promise<OwnerOver
       activeSalesOrders: salesOrdersCountRes.count ?? 0,
       pendingRequests: pendingQueueTotal,
       warrantiesExpiringSoon,
+      activeGarageJobs: activeGarageJobsCountRes.count ?? 0,
+      openWarrantyCases: openWarrantyCountRes.count ?? 0,
     },
     carStatusChart,
     activeGarageTasks: tasksRes.count ?? 0,
     requestPriorityChart,
     installmentsDueSoon,
     lowStockParts,
+    // Phase 1
+    salesMTD,
+    salesByStage,
+    topSalesRep,
+    inventoryAging,
+    reservationsExpiring,
+    newArrivals,
+    cashState,
+    pendingRefunds,
+    agedReceivables,
     errors,
   };
 }
