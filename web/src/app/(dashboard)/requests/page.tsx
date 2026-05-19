@@ -503,7 +503,10 @@ export default function RequestCenterPage() {
     const { data: { user } } = await supabase.auth.getUser();
 
     setActionSubmitting(true);
-    const isAssistant = appRole === "assistant";
+    const isAssistant =
+      appRole === "assistant" ||
+      appRole === "hybrid" ||
+      appRole === "khalil_hybrid";
     const updatePayload: Record<string, unknown> = {
       status: "approved",
       management_comments: (isAssistant ? assistantNotes : managementComments).trim() || null,
@@ -548,7 +551,10 @@ export default function RequestCenterPage() {
     const { data: { user } } = await supabase.auth.getUser();
 
     setActionSubmitting(true);
-    const isAssistant = appRole === "assistant";
+    const isAssistant =
+      appRole === "assistant" ||
+      appRole === "hybrid" ||
+      appRole === "khalil_hybrid";
     const updatePayload: Record<string, unknown> = {
       status: "rejected",
       management_comments: (isAssistant ? assistantNotes : managementComments).trim() || null,
@@ -724,7 +730,9 @@ export default function RequestCenterPage() {
             <SelectItem value="low">🟢 Low</SelectItem>
             <SelectItem value="normal">🟡 Medium</SelectItem>
             <SelectItem value="urgent">🔴 Urgent</SelectItem>
-            {appRole === "assistant" && (
+            {(appRole === "assistant" ||
+              appRole === "hybrid" ||
+              appRole === "khalil_hybrid") && (
               <SelectItem value="unlabeled">Unlabeled</SelectItem>
             )}
           </SelectContent>
@@ -1115,7 +1123,9 @@ export default function RequestCenterPage() {
                   </div>
                 )}
 
-              {appRole === "assistant" &&
+              {(appRole === "assistant" ||
+                appRole === "hybrid" ||
+                appRole === "khalil_hybrid") &&
                 (detailOpen.status === "submitted" || detailOpen.status === "awaiting_approval") && (
                   <div className="space-y-4 border-t pt-4">
                     <h4 className="font-medium">Assistant Actions</h4>
