@@ -249,8 +249,12 @@ export default function CustomerDetailPage() {
       return;
     }
 
+    // `client_name` / `client_phone` live on the cars_display view, not the
+    // base cars table. Embedding sales_orders from a view isn't reliable in
+    // PostgREST, so we fetch matching cars and the customer's orders
+    // separately, then filter out cars that already have a sales order.
     const { data, error } = await supabase
-      .from("cars")
+      .from("cars_display")
       .select(
         `
         id,
@@ -261,8 +265,7 @@ export default function CustomerDetailPage() {
         exterior_color,
         status,
         client_name,
-        client_phone,
-        sales_orders:car_id ( id )
+        client_phone
       `
       )
       .eq("client_name", fullName)
@@ -283,12 +286,21 @@ export default function CustomerDetailPage() {
       status: string;
       client_name: string | null;
       client_phone: string | null;
-      sales_orders?: { id: string }[] | null;
     }[];
 
-    const unlinked = rows.filter(
-      (row) => !row.sales_orders || row.sales_orders.length === 0
-    );
+    const carIds = rows.map((r) => r.id);
+    const linkedCarIds = new Set<string>();
+    if (carIds.length > 0) {
+      const { data: linkedOrders } = await supabase
+        .from("sales_orders")
+        .select("car_id")
+        .in("car_id", carIds);
+      for (const o of (linkedOrders ?? []) as { car_id: string | null }[]) {
+        if (o.car_id) linkedCarIds.add(o.car_id);
+      }
+    }
+
+    const unlinked = rows.filter((row) => !linkedCarIds.has(row.id));
 
     setLegacyVehicles(
       unlinked.map((row) => ({

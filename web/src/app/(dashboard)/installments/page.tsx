@@ -506,7 +506,7 @@ export default function InstallmentsPage() {
     let query = supabase
       .from("cars")
       .select(
-        "id, vin, brand, model, model_year, exterior_color, interior_color, status, client_name"
+        "id, vin, brand, model, model_year, exterior_color, interior_color, status"
       )
       .in("status", ["inventory", "available", "reserved", "sold"])
       .order("model_year", { ascending: false })
