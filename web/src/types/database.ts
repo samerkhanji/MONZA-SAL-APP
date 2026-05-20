@@ -93,6 +93,9 @@ export interface Car {
   bl_issue_date?: string | null;
   registration_date?: string | null;
   customs_notes?: string | null;
+  /** Incoming car shipment tracking (Ordered Cars page). */
+  incoming_eta?: string | null;
+  shipment_code?: string | null;
   /** Recall Center: set when a car is recalled to the manufacturer (Voyah). */
   recalled_at?: string | null;
   recall_reason?: "shipping" | "issue" | null;
