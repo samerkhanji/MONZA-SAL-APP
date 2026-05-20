@@ -57,7 +57,6 @@ interface RequestWithProfiles extends Request {
   assignee?: { full_name: string | null } | null;
   reviewer?: { full_name: string | null } | null;
   send_to_user?: { full_name: string | null } | null;
-  recipient_user?: { full_name: string | null } | null;
 }
 
 function PriorityBadge({ priority }: { priority: string }) {
@@ -84,7 +83,7 @@ const OWNER_SEND_TO_MAP: Record<string, string> = {
 };
 
 function getSendToLabel(r: RequestWithProfiles): string {
-  if (r.recipient_user?.full_name) return r.recipient_user.full_name;
+  if (r.send_to_user?.full_name) return r.send_to_user.full_name;
   if (r.send_to && OWNER_SEND_TO_MAP[r.send_to]) {
     const names: Record<string, string> = { houssam: "Houssam", kareem: "Kareem", samer: "Samer" };
     return names[r.send_to] ?? r.send_to;
@@ -159,7 +158,6 @@ export default function RequestCenterPage() {
       if (r.assigned_to) userIds.add(r.assigned_to);
       if (r.reviewed_by) userIds.add(r.reviewed_by);
       if (r.send_to_user_id) userIds.add(r.send_to_user_id);
-      if (r.recipient_user_id) userIds.add(r.recipient_user_id);
     });
 
     let profilesMap: Record<string, { full_name: string | null }> = {};
@@ -182,7 +180,6 @@ export default function RequestCenterPage() {
       assignee: r.assigned_to ? (profilesMap[r.assigned_to] ?? null) : null,
       reviewer: r.reviewed_by ? (profilesMap[r.reviewed_by] ?? null) : null,
       send_to_user: r.send_to_user_id ? (profilesMap[r.send_to_user_id] ?? null) : null,
-      recipient_user: r.recipient_user_id ? (profilesMap[r.recipient_user_id] ?? null) : null,
     }));
 
     setRequests(withProfiles);
