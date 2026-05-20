@@ -926,7 +926,7 @@ export default function DataHealthPage() {
       </div>
 
       {/* Global Critical / Warning indicator */}
-      <div className="flex flex-wrap gap-4">
+      <div className="flex flex-wrap gap-4" data-tour-id="data-health-severity-totals">
         <div className="flex items-center gap-2 rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-2">
           <AlertCircle className="size-5 text-destructive" />
           <span className="text-sm font-medium">Critical Issues:</span>
@@ -945,6 +945,7 @@ export default function DataHealthPage() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
+              data-tour-id="data-health-search-input"
               placeholder="Search by VIN, customer name, phone..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -956,7 +957,7 @@ export default function DataHealthPage() {
         <div className="flex items-center gap-2">
           <Filter className="size-4 text-muted-foreground" />
           <Select value={sectionFilter} onValueChange={setSectionFilter}>
-            <SelectTrigger className="w-[200px]">
+            <SelectTrigger data-tour-id="data-health-filter-section" className="w-[200px]">
               <SelectValue placeholder="Section" />
             </SelectTrigger>
             <SelectContent>
@@ -969,7 +970,7 @@ export default function DataHealthPage() {
             </SelectContent>
           </Select>
           <Select value={severityFilter} onValueChange={(v) => setSeverityFilter(v as "all" | "critical" | "warning")}>
-            <SelectTrigger className="w-[140px]">
+            <SelectTrigger data-tour-id="data-health-filter-severity" className="w-[140px]">
               <SelectValue placeholder="Severity" />
             </SelectTrigger>
             <SelectContent>
@@ -992,7 +993,7 @@ export default function DataHealthPage() {
       </div>
 
       {/* Role-specific summary cards */}
-      <Card className="border-primary/20 bg-primary/5">
+      <Card className="border-primary/20 bg-primary/5" data-tour-id="data-health-summary-panel">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Activity className="size-5" />
