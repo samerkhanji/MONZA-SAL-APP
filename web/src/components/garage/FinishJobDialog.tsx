@@ -203,7 +203,7 @@ export function FinishJobDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md" data-tour-id="finish-job-dialog">
         <DialogHeader>
           <DialogTitle>Complete Job</DialogTitle>
         </DialogHeader>

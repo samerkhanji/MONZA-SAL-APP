@@ -370,12 +370,12 @@ export default function CustomersPage() {
                   >
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="size-7">
+                        <Button variant="ghost" size="icon" className="size-7" data-tour-id="customers-list-row-actions-trigger">
                           <MoreHorizontal className="size-3.5" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => router.push(`/customers/${customer.id}`)}>
+                        <DropdownMenuItem onClick={() => router.push(`/customers/${customer.id}`)} data-tour-id="customers-list-row-actions-view">
                           View
                         </DropdownMenuItem>
                         {canEditCustomer && (
@@ -384,6 +384,7 @@ export default function CustomersPage() {
                               setEditCustomer(customer);
                               setEditOpen(true);
                             }}
+                            data-tour-id="customers-list-row-actions-edit"
                           >
                             Edit
                           </DropdownMenuItem>
@@ -395,6 +396,7 @@ export default function CustomersPage() {
                               setDeleteCustomer(customer);
                               setDeleteOpen(true);
                             }}
+                            data-tour-id="customers-list-row-actions-delete"
                           >
                             Delete
                           </DropdownMenuItem>
@@ -433,16 +435,16 @@ export default function CustomersPage() {
             disabled={loading}
           />
           {canCreateCustomer && (
-            <Button asChild>
+            <Button asChild data-tour-id="customers-list-add-button">
               <Link href="/customers/add">Add Customer</Link>
             </Button>
           )}
         </div>
       </div>
 
-      <Tabs defaultValue="all">
+      <Tabs defaultValue="all" data-tour-id="customers-list-tabs">
         <TabsList>
-          <TabsTrigger value="all">
+          <TabsTrigger value="all" data-tour-id="customers-list-tab-all">
             All Customers
             {!loading && (
               <Badge variant="secondary" className="ml-2">
@@ -450,7 +452,7 @@ export default function CustomersPage() {
               </Badge>
             )}
           </TabsTrigger>
-          <TabsTrigger value="sold">
+          <TabsTrigger value="sold" data-tour-id="customers-list-tab-sold">
             Sold Cars
             {!soldLoading && (
               <Badge variant="secondary" className="ml-2">
@@ -458,7 +460,7 @@ export default function CustomersPage() {
               </Badge>
             )}
           </TabsTrigger>
-          <TabsTrigger value="leads">
+          <TabsTrigger value="leads" data-tour-id="customers-list-tab-leads">
             Leads
             {!loading && (
               <Badge variant="secondary" className="ml-2">
@@ -469,7 +471,7 @@ export default function CustomersPage() {
         </TabsList>
 
         <TabsContent value="all" className="space-y-4 mt-4">
-          <Card>
+          <Card data-tour-id="customers-list-filters-panel">
             <CardHeader>
               <CardTitle>Filters</CardTitle>
               <CardDescription>
@@ -484,9 +486,10 @@ export default function CustomersPage() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="min-h-11 w-full text-base sm:max-w-xs sm:text-sm"
+                data-tour-id="customers-list-search-input"
               />
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger id="customer-status-filter" className="w-[160px]">
+                <SelectTrigger id="customer-status-filter" className="w-[160px]" data-tour-id="customers-list-filter-status">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -501,7 +504,7 @@ export default function CustomersPage() {
                 </SelectContent>
               </Select>
               <Select value={sourceFilter} onValueChange={setSourceFilter}>
-                <SelectTrigger id="customer-source-filter" className="w-[160px]">
+                <SelectTrigger id="customer-source-filter" className="w-[160px]" data-tour-id="customers-list-filter-source">
                   <SelectValue placeholder="Source" />
                 </SelectTrigger>
                 <SelectContent>
@@ -518,7 +521,7 @@ export default function CustomersPage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card data-tour-id="customers-list-table-panel">
             <CardHeader>
               <CardTitle>Customers</CardTitle>
               <CardDescription>
@@ -773,7 +776,7 @@ export default function CustomersPage() {
       />
 
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent data-tour-id="customers-list-delete-dialog">
           <AlertDialogHeader>
             <AlertDialogTitle>Remove customer?</AlertDialogTitle>
             <AlertDialogDescription>
@@ -782,8 +785,8 @@ export default function CustomersPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <Button variant="destructive" onClick={handleDelete}>
+            <AlertDialogCancel data-tour-id="customers-list-delete-cancel">Cancel</AlertDialogCancel>
+            <Button variant="destructive" onClick={handleDelete} data-tour-id="customers-list-delete-confirm">
               Delete
             </Button>
           </AlertDialogFooter>

@@ -113,7 +113,7 @@ export function SetJobCategoryDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto" data-tour-id="set-job-category-dialog">
         <DialogHeader>
           <DialogTitle>Set intake category</DialogTitle>
           <DialogDescription>

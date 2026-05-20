@@ -1191,17 +1191,18 @@ export default function CarProfilePage() {
           </div>
           <div className="flex flex-wrap justify-end gap-2">
             {canOpenCarEditDialog && (
-              <Button variant="outline" onClick={() => setEditOpen(true)}>
+              <Button variant="outline" onClick={() => setEditOpen(true)} data-tour-id="cars-detail-edit-button">
                 Edit
               </Button>
             )}
-            <Button variant="outline" onClick={() => setMoveOpen(true)}>
+            <Button variant="outline" onClick={() => setMoveOpen(true)} data-tour-id="cars-detail-move-button">
               Move location
             </Button>
             {canDeleteCar && (
               <Button
                 variant="destructive"
                 onClick={() => setDeleteOpen(true)}
+                data-tour-id="cars-detail-scrap-button"
               >
                 Scrap vehicle
               </Button>
@@ -1564,7 +1565,7 @@ export default function CarProfilePage() {
         </DialogContent>
       </Dialog>
 
-      <Tabs defaultValue="overview">
+      <Tabs defaultValue="overview" data-tour-id="cars-detail-tabs">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="documents">Documents</TabsTrigger>

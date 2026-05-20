@@ -311,7 +311,7 @@ export function NewJobDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[95vh] max-w-[500px] overflow-y-auto">
+      <DialogContent className="max-h-[95vh] max-w-[500px] overflow-y-auto" data-tour-id="new-job-dialog">
         <DialogHeader>
           <DialogTitle className="text-xl">New Garage Job</DialogTitle>
         </DialogHeader>
@@ -675,10 +675,11 @@ export function NewJobDialog({
               variant="outline"
               onClick={() => onOpenChange(false)}
               className="h-11"
+              data-tour-id="new-job-dialog-cancel"
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={submitting} className="h-11 px-6">
+            <Button type="submit" disabled={submitting} className="h-11 px-6" data-tour-id="new-job-dialog-submit">
               {submitting ? "Creating..." : "Create Job"}
             </Button>
           </DialogFooter>

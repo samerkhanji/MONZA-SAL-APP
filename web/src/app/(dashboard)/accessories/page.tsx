@@ -431,7 +431,7 @@ export default function AccessoriesPage() {
           />
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-1.5">
+              <Button variant="outline" size="sm" className="gap-1.5" data-tour-id="accessories-reset-button">
                 <RotateCcw className="size-4" />
                 Reset to seed
               </Button>
@@ -461,6 +461,7 @@ export default function AccessoriesPage() {
           onChange={(e) => setSearch(e.target.value)}
           className="bg-background/80 border-border/80 h-11 pl-10 shadow-sm backdrop-blur-sm"
           aria-label="Search accessories"
+          data-tour-id="accessories-search-input"
         />
       </div>
 
@@ -514,7 +515,7 @@ export default function AccessoriesPage() {
                       : ""}
                   </CardDescription>
                 </div>
-                <Button type="button" variant="secondary" size="sm" className="gap-1.5" onClick={() => addRow(cat.id)}>
+                <Button type="button" variant="secondary" size="sm" className="gap-1.5" onClick={() => addRow(cat.id)} data-tour-id="accessories-add-line-button">
                   <Plus className="size-4" />
                   Add line
                 </Button>

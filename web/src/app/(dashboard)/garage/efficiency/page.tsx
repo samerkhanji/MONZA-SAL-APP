@@ -98,7 +98,7 @@ export default function GarageEfficiencyPage() {
         </p>
       </div>
 
-      <Card>
+      <Card data-tour-id="garage-efficiency-jobs-panel">
         <CardHeader>
           <CardTitle>Job efficiency (estimated vs actual hours)</CardTitle>
         </CardHeader>
@@ -170,7 +170,7 @@ export default function GarageEfficiencyPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card data-tour-id="garage-efficiency-bays-panel">
         <CardHeader>
           <CardTitle>Bay utilization (30d)</CardTitle>
         </CardHeader>
@@ -212,7 +212,7 @@ export default function GarageEfficiencyPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card data-tour-id="garage-efficiency-technicians-panel">
         <CardHeader>
           <CardTitle>Technician efficiency (30d)</CardTitle>
         </CardHeader>

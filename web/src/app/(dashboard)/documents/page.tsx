@@ -156,7 +156,7 @@ export default function DocumentsPage() {
 
   return (
     <div className="container mx-auto space-y-6 px-4 py-6 sm:px-6 sm:py-8">
-      <Card>
+      <Card data-tour-id="documents-search-panel">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <FileText className="size-5" />
@@ -181,6 +181,7 @@ export default function DocumentsPage() {
                   className="pl-9 font-mono"
                   maxLength={17}
                   disabled={loading}
+                  data-tour-id="documents-vin-search-input"
                 />
               </div>
               <Button
@@ -191,11 +192,12 @@ export default function DocumentsPage() {
                 title="Scan VIN"
                 disabled={loading}
                 className="shrink-0"
+                data-tour-id="documents-scan-vin-button"
               >
                 <ScanLine className="size-4" />
               </Button>
             </div>
-            <Button type="submit" disabled={loading || !vinSearch.trim()}>
+            <Button type="submit" disabled={loading || !vinSearch.trim()} data-tour-id="documents-search-button">
               {loading ? "Searching..." : "Search"}
             </Button>
           </form>

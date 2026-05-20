@@ -457,6 +457,7 @@ export default function DashboardPage() {
       {/* KPI Cards */}
       <div
         className={`grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-2 ${showPendingRequestsCard ? "lg:grid-cols-5" : "lg:grid-cols-4"}`}
+        data-tour-id="dashboard-kpi-cards"
       >
         {kpiCards.map((card) => (
           <Link key={card.label} href={card.href}>
@@ -481,7 +482,7 @@ export default function DashboardPage() {
       {/* Middle Row: Cars by Status + Low Stock + Garage Overview */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Cars by Status */}
-        <Card>
+        <Card data-tour-id="dashboard-cars-by-status-panel">
           <CardHeader>
             <CardTitle>Cars by Status</CardTitle>
           </CardHeader>
@@ -520,7 +521,7 @@ export default function DashboardPage() {
         </Card>
 
         {/* Low Stock Alerts */}
-        <Card>
+        <Card data-tour-id="dashboard-low-stock-panel">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <AlertCircle className="size-5 text-amber-500" />
@@ -574,7 +575,7 @@ export default function DashboardPage() {
         </Card>
 
         {/* Garage Overview */}
-        <Card>
+        <Card data-tour-id="dashboard-garage-overview-panel">
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <CardTitle className="flex items-center gap-2">
               <Wrench className="size-5" />

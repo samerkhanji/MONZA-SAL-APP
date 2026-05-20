@@ -343,7 +343,7 @@ export default function AddCarPage() {
   return (
     <div className="container mx-auto max-w-2xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" asChild>
+        <Button variant="ghost" size="sm" asChild data-tour-id="cars-add-back-button">
           <Link href="/cars">← Back</Link>
         </Button>
         <div>
@@ -352,9 +352,9 @@ export default function AddCarPage() {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-6" data-tour-id="cars-add-form">
         {/* Section 1: Vehicle Information */}
-        <Card>
+        <Card data-tour-id="cars-add-vehicle-info-panel">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Car className="size-5" />
@@ -376,6 +376,7 @@ export default function AddCarPage() {
                     maxLength={17}
                     required
                     className="font-mono"
+                    data-tour-id="cars-add-vin-input"
                   />
                   <Button
                     type="button"
@@ -383,6 +384,7 @@ export default function AddCarPage() {
                     size="icon"
                     onClick={() => setScanVinOpen(true)}
                     title="Scan VIN"
+                    data-tour-id="cars-add-scan-vin-button"
                   >
                     <ScanLine className="size-4" />
                   </Button>
@@ -398,7 +400,7 @@ export default function AddCarPage() {
                   onValueChange={(v) => setBrand(v as Brand)}
                   required
                 >
-                  <SelectTrigger id="car-brand">
+                  <SelectTrigger id="car-brand" data-tour-id="cars-add-brand-select">
                     <SelectValue placeholder="Select brand" />
                   </SelectTrigger>
                   <SelectContent>
@@ -422,6 +424,7 @@ export default function AddCarPage() {
                   onChange={(e) => setModel(e.target.value)}
                   placeholder="Model name"
                   required
+                  data-tour-id="cars-add-model-input"
                 />
               </div>
               <div className="space-y-2">
@@ -491,7 +494,7 @@ export default function AddCarPage() {
                 value={locationType}
                 onValueChange={(v) => setLocationType(v as LocationType)}
               >
-                <SelectTrigger id="car-location">
+                <SelectTrigger id="car-location" data-tour-id="cars-add-location-select">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -515,7 +518,7 @@ export default function AddCarPage() {
                     if (s === "sold") setSoldMarker(true);
                   }}
                 >
-                  <SelectTrigger id="car-status">
+                  <SelectTrigger id="car-status" data-tour-id="cars-add-status-select">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -599,7 +602,7 @@ export default function AddCarPage() {
                   value={customsStatus}
                   onValueChange={(v) => setCustomsStatus(v as CustomsStatus)}
                 >
-                  <SelectTrigger id="car-customs-status">
+                  <SelectTrigger id="car-customs-status" data-tour-id="cars-add-customs-status-select">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -650,7 +653,7 @@ export default function AddCarPage() {
         </Card>
 
         {/* Section 2: Technical Details */}
-        <Card>
+        <Card data-tour-id="cars-add-technical-panel">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Zap className="size-5" />
@@ -792,7 +795,7 @@ export default function AddCarPage() {
         {/* Section 3: Customer & Sale Details (only when sold/reserved) */}
         {showCustomerSection && (
           <>
-            <Card>
+            <Card data-tour-id="cars-add-customer-panel">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Users className="size-5" />
@@ -813,6 +816,7 @@ export default function AddCarPage() {
                       onChange={(e) => setClientFirstName(e.target.value)}
                       placeholder="Required"
                       required={showCustomerSection}
+                      data-tour-id="cars-add-client-first-name-input"
                     />
                   </div>
                   <div className="space-y-2">
@@ -838,6 +842,7 @@ export default function AddCarPage() {
                       onChange={(e) => setClientPhone(e.target.value)}
                       placeholder="Required"
                       required={showCustomerSection}
+                      data-tour-id="cars-add-client-phone-input"
                     />
                   </div>
                   <div className="space-y-2">
@@ -887,7 +892,7 @@ export default function AddCarPage() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card data-tour-id="cars-add-sale-panel">
               <CardHeader>
                 <CardTitle>Sale Details (Optional)</CardTitle>
                 <CardDescription>
@@ -988,10 +993,10 @@ export default function AddCarPage() {
         )}
 
         <div className="flex gap-3">
-          <Button type="submit" disabled={submitting}>
+          <Button type="submit" disabled={submitting} data-tour-id="cars-add-submit-button">
             {submitting ? "Adding..." : "Add Car"}
           </Button>
-          <Button type="button" variant="outline" asChild>
+          <Button type="button" variant="outline" asChild data-tour-id="cars-add-cancel-button">
             <Link href="/cars">Cancel</Link>
           </Button>
         </div>

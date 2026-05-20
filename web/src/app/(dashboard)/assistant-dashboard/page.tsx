@@ -562,7 +562,7 @@ export default function AssistantDashboardPage() {
 
       {/* Repair proposals (Customer Service) */}
       <div ref={repairProposalsRef}>
-        <Card>
+        <Card data-tour-id="assistant-dashboard-repair-proposals-panel">
           <CardHeader>
             <CardTitle>Repair proposals</CardTitle>
             <CardDescription>
@@ -620,7 +620,7 @@ export default function AssistantDashboardPage() {
 
       {/* Section 1: Pending Requests */}
       <div ref={pendingRequestsRef}>
-        <Card>
+        <Card data-tour-id="assistant-dashboard-pending-requests-panel">
           <CardHeader className="flex flex-row items-start justify-between gap-4">
             <div>
               <CardTitle>Pending Requests</CardTitle>
@@ -719,7 +719,7 @@ export default function AssistantDashboardPage() {
 
       {/* Section 2: Workshop Status */}
       <div ref={workshopRef}>
-        <Card>
+        <Card data-tour-id="assistant-dashboard-workshop-panel">
           <CardHeader className="flex flex-row items-start justify-between gap-4">
             <div>
               <CardTitle>Workshop Status</CardTitle>
@@ -930,7 +930,7 @@ export default function AssistantDashboardPage() {
 
       {/* Section 3: Upcoming Pickups */}
       <div ref={carsReadyRef}>
-        <Card>
+        <Card data-tour-id="assistant-dashboard-pickups-panel">
           <CardHeader className="flex flex-row items-start justify-between gap-4">
             <div>
               <CardTitle>Upcoming Pickups / Delivery Schedule</CardTitle>

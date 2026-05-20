@@ -248,7 +248,7 @@ function CarsByStatusChartCard({
   const chartKey = `${chartType}-${rows.map((r) => `${r.name}:${r.count}`).join("|")}-${totalVehicles}`;
 
   return (
-    <Card className="lg:col-span-2">
+    <Card className="lg:col-span-2" data-tour-id="overview-cars-by-status-panel">
       <CardHeader className="space-y-2">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0 flex-1 space-y-1.5">
@@ -425,7 +425,7 @@ function SalesRevenueCard({ data }: { data: OwnerOverviewData }) {
       : `${unitsDelta >= 0 ? "+" : ""}${unitsDelta} vs ${data.salesMTD.unitsLastMonth} last month`;
 
   return (
-    <Card className="lg:col-span-2">
+    <Card className="lg:col-span-2" data-tour-id="overview-sales-revenue-panel">
       <CardHeader>
         <CardTitle className="text-lg">Sales &amp; revenue (month-to-date)</CardTitle>
         <CardDescription>Delivered sales orders this month, with comparisons.</CardDescription>
@@ -506,7 +506,7 @@ function SalesRevenueCard({ data }: { data: OwnerOverviewData }) {
 
 function FleetLogisticsCard({ data }: { data: OwnerOverviewData }) {
   return (
-    <Card className="lg:col-span-2">
+    <Card className="lg:col-span-2" data-tour-id="overview-fleet-logistics-panel">
       <CardHeader>
         <CardTitle className="text-lg">Fleet logistics</CardTitle>
         <CardDescription>Inventory aging, expiring reservations, and recent arrivals.</CardDescription>
@@ -600,7 +600,7 @@ function FleetLogisticsCard({ data }: { data: OwnerOverviewData }) {
 function CashReceivablesCard({ data }: { data: OwnerOverviewData }) {
   const { cashState, pendingRefunds, agedReceivables } = data;
   return (
-    <Card className="lg:col-span-2">
+    <Card className="lg:col-span-2" data-tour-id="overview-cash-receivables-panel">
       <CardHeader>
         <CardTitle className="text-lg">Cash &amp; receivables</CardTitle>
         <CardDescription>Drawer state, refunds awaiting approval, and overdue installments.</CardDescription>
@@ -714,6 +714,7 @@ export function OverviewDashboard({ data }: { data: OwnerOverviewData }) {
           className="gap-2 shrink-0"
           disabled={pending}
           onClick={handleRefresh}
+          data-tour-id="overview-refresh-button"
         >
           <RefreshCw className={`size-4 ${pending ? "animate-spin" : ""}`} />
           Refresh
@@ -737,7 +738,7 @@ export function OverviewDashboard({ data }: { data: OwnerOverviewData }) {
       ) : null}
 
       {/* High-level KPI strip (5 tiles) */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5" data-tour-id="overview-kpi-strip">
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>Vehicles</CardDescription>

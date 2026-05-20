@@ -446,12 +446,12 @@ export default function CustomerDetailPage() {
         </div>
         <div className="flex gap-2">
           {canEditCustomer && (
-            <Button variant="outline" onClick={() => setEditOpen(true)}>
+            <Button variant="outline" onClick={() => setEditOpen(true)} data-tour-id="customers-detail-edit-button">
               Edit
             </Button>
           )}
           {canDeleteCustomer && (
-            <Button variant="destructive" onClick={() => setDeleteOpen(true)}>
+            <Button variant="destructive" onClick={() => setDeleteOpen(true)} data-tour-id="customers-detail-delete-button">
               Delete
             </Button>
           )}
@@ -486,7 +486,7 @@ export default function CustomerDetailPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <Tabs defaultValue="profile" className="space-y-4">
+      <Tabs defaultValue="profile" className="space-y-4" data-tour-id="customers-detail-tabs">
         <TabsList>
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="vehicles">

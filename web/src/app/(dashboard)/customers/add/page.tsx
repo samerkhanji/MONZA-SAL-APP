@@ -172,14 +172,14 @@ export default function AddCustomerPage() {
   return (
     <div className="container mx-auto max-w-2xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" asChild>
+        <Button variant="ghost" size="sm" asChild data-tour-id="customers-add-back-button">
           <Link href="/customers">← Customers</Link>
         </Button>
         <h1 className="text-2xl font-semibold">Add Customer</h1>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <Card>
+      <form onSubmit={handleSubmit} className="space-y-6" data-tour-id="customers-add-form">
+        <Card data-tour-id="customers-add-personal-panel">
           <CardHeader>
             <CardTitle>Personal Information</CardTitle>
             <CardDescription>Basic contact details</CardDescription>
@@ -194,6 +194,7 @@ export default function AddCustomerPage() {
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
                   required
+                  data-tour-id="customers-add-first-name-input"
                 />
               </div>
               <div className="space-y-2">
@@ -218,6 +219,7 @@ export default function AddCustomerPage() {
                   value={phonePrimary}
                   onChange={(e) => setPhonePrimary(e.target.value)}
                   required
+                  data-tour-id="customers-add-phone-input"
                 />
               </div>
               <div className="space-y-2">
@@ -242,6 +244,7 @@ export default function AddCustomerPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
+                data-tour-id="customers-add-email-input"
               />
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -277,7 +280,7 @@ export default function AddCustomerPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card data-tour-id="customers-add-lead-panel">
           <CardHeader>
             <CardTitle>Lead Information</CardTitle>
             <CardDescription>Lead status and source</CardDescription>
@@ -290,7 +293,7 @@ export default function AddCustomerPage() {
                   value={leadStatus}
                   onValueChange={(v) => setLeadStatus(v as LeadStatus)}
                 >
-                  <SelectTrigger id="leadStatus">
+                  <SelectTrigger id="leadStatus" data-tour-id="customers-add-lead-status-select">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -308,7 +311,7 @@ export default function AddCustomerPage() {
                   value={leadSource || "_"}
                   onValueChange={(v) => setLeadSource(v === "_" ? "" : v)}
                 >
-                  <SelectTrigger id="leadSource">
+                  <SelectTrigger id="leadSource" data-tour-id="customers-add-lead-source-select">
                     <SelectValue placeholder="Select" />
                   </SelectTrigger>
                   <SelectContent>
@@ -335,7 +338,7 @@ export default function AddCustomerPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card data-tour-id="customers-add-notes-panel">
           <CardHeader>
             <CardTitle>Notes</CardTitle>
             <CardDescription>Optional notes about this customer</CardDescription>
@@ -353,10 +356,10 @@ export default function AddCustomerPage() {
         </Card>
 
         <div className="flex gap-2">
-          <Button type="submit" disabled={submitting}>
+          <Button type="submit" disabled={submitting} data-tour-id="customers-add-submit-button">
             {submitting ? "Adding..." : "Add Customer"}
           </Button>
-          <Button type="button" variant="outline" asChild>
+          <Button type="button" variant="outline" asChild data-tour-id="customers-add-cancel-button">
             <Link href="/customers">Cancel</Link>
           </Button>
         </div>

@@ -118,7 +118,7 @@ export function EditPartDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto max-w-lg">
+      <DialogContent className="max-h-[90vh] overflow-y-auto max-w-lg" data-tour-id="edit-part-dialog">
         <DialogHeader>
           <DialogTitle>Edit Part</DialogTitle>
         </DialogHeader>

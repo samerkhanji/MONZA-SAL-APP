@@ -95,7 +95,7 @@ export function CustomsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent className="sm:max-w-sm" data-tour-id="customs-dialog">
         <DialogHeader>
           <DialogTitle>Customs</DialogTitle>
           <DialogDescription>
