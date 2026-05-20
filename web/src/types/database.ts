@@ -63,7 +63,7 @@ export interface Car {
   location_slot: string | null;
   location_floor: string | null;
   battery_percent: number | null;
-  ev_range_km: number | null;
+  km_range: number | null;
   motor: string | null;
   is_erev?: boolean;
   ev_km?: number | null;

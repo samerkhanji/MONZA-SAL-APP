@@ -2135,7 +2135,7 @@ export default function CarProfilePage() {
               </div>
               <div className="space-y-1">
                 <p className="text-muted-foreground text-sm">EV Range (km)</p>
-                <p>{car.ev_range_km != null ? `${car.ev_range_km} km` : "—"}</p>
+                <p>{car.km_range != null ? `${car.km_range} km` : "—"}</p>
               </div>
               <div className="space-y-1">
                 <p className="text-muted-foreground text-sm">Current KM</p>

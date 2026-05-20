@@ -90,8 +90,6 @@ export function ManageBaysDialog({
       bay_number: nextNum,
       name,
       bay_type: type,
-      capacity: type === "normal" ? 4 : 1,
-      description: null,
       is_active: true,
       sort_order: nextNum,
     });

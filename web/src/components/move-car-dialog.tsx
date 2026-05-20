@@ -58,7 +58,6 @@ export function MoveCarDialog({
       p_car_id: carId,
       p_new_location_type: locationType,
       p_new_location_slot: null,
-      p_new_location_floor: null,
       p_new_status: status || null,
       p_note: note.trim() || null,
       p_user_id: user?.id ?? null,
