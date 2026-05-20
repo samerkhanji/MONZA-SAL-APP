@@ -73,7 +73,7 @@ type CarRow = {
   location_slot: string | null;
   warranty_vehicle_expiry: string | null;
   warranty_battery_expiry: string | null;
-  warranty_per_dms: string | null;
+  warranty_vehicle_dms: string | null;
   battery_percent: number | null;
   date_arrived: string | null;
   reservation_date: string | null;
@@ -346,7 +346,7 @@ export default function DataHealthPage() {
 
     async function fetch() {
       setLoading(true);
-      const carSelect = "id, vin, brand, model, model_year, status, exterior_color, interior_color, engine_number, location_type, location_slot, warranty_vehicle_expiry, warranty_battery_expiry, warranty_per_dms, battery_percent, date_arrived, reservation_date, reserved_by, delivery_date, deleted_at, software_version, software_update, dongle, issue, created_at, updated_at";
+      const carSelect = "id, vin, brand, model, model_year, status, exterior_color, interior_color, engine_number, location_type, location_slot, warranty_vehicle_expiry, warranty_battery_expiry, warranty_vehicle_dms, battery_percent, date_arrived, reservation_date, reserved_by, delivery_date, deleted_at, software_version, software_update, dongle, issue, created_at, updated_at";
 
       let jobsQuery = supabase.from("garage_jobs").select("id, car_id, title, status, assigned_to, notes, diagnosis, work_done, created_at, updated_at").is("deleted_at", null);
       if (appRole === "garage_staff" && profile?.id) {
@@ -463,7 +463,7 @@ export default function DataHealthPage() {
   const carsWarrantyMissing = useMemo(() => {
     return cars.filter((c) => {
       return (
-        empty(c.warranty_per_dms) &&
+        empty(c.warranty_vehicle_dms) &&
         empty(c.warranty_vehicle_expiry) &&
         empty(c.warranty_battery_expiry)
       );
@@ -733,7 +733,7 @@ export default function DataHealthPage() {
   const carFields = ["vin", "model", "exterior_color", "interior_color", "engine_number", "location_type", "warranty_vehicle_expiry", "warranty_battery_expiry", "date_arrived"];
   const custFields = ["first_name", "last_name", "phone_primary", "email", "address"];
   const soFields = ["car_id", "customer_id", "selling_price", "currency", "sale_date"];
-  const warrantyFields = ["warranty_per_dms", "warranty_vehicle_expiry", "warranty_battery_expiry"];
+  const warrantyFields = ["warranty_vehicle_dms", "warranty_vehicle_expiry", "warranty_battery_expiry"];
 
   const carsScore = useMemo(() => {
     if (cars.length === 0) return 100;
@@ -1416,7 +1416,7 @@ export default function DataHealthPage() {
             description={
               appRole === "sales_ops"
                 ? "Sold or reserved cars where all warranty fields are missing"
-                : "Cars where all warranty fields (warranty_per_dms, warranty_vehicle_expiry, warranty_battery_expiry) are NULL"
+                : "Cars where all warranty fields (warranty_vehicle_dms, warranty_vehicle_expiry, warranty_battery_expiry) are NULL"
             }
             count={(appRole === "sales_ops" ? carsWarrantyMissingSoldReservedDelivered : carsWarrantyMissing).filter(
               (c) => rowMatchesSearch("warranty_data_missing", c, searchQuery) && filterRowBySeverity("warranty_data_missing", c)

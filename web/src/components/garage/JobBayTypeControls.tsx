@@ -3,7 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
-import type { GarageBayType, GarageJobBayContext } from "@/types/database";
+import type {
+  GarageBayType,
+  GarageJobBayContext,
+  GarageJobBayContextData,
+} from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,17 +21,21 @@ import {
 import { formatLiveDuration } from "@/lib/garage-bays";
 import { formatError } from "@/lib/error-messages";
 
-function paintActive(ctx: GarageJobBayContext | null) {
-  return !!(ctx?.paint_started_at && !ctx?.paint_ended_at);
+// Per-bay-type working data lives in the `context` jsonb column of
+// garage_job_bay_context — there are no flat paint_*/oven_*/etc. columns.
+type Ctx = GarageJobBayContextData;
+
+function paintActive(ctx: Ctx) {
+  return !!(ctx.paint_started_at && !ctx.paint_ended_at);
 }
-function ovenActive(ctx: GarageJobBayContext | null) {
-  return !!(ctx?.oven_started_at && !ctx?.oven_ended_at);
+function ovenActive(ctx: Ctx) {
+  return !!(ctx.oven_started_at && !ctx.oven_ended_at);
 }
-function washActive(ctx: GarageJobBayContext | null) {
-  return !!(ctx?.wash_started_at && !ctx?.wash_ended_at);
+function washActive(ctx: Ctx) {
+  return !!(ctx.wash_started_at && !ctx.wash_ended_at);
 }
-function polishActive(ctx: GarageJobBayContext | null) {
-  return !!(ctx?.polish_started_at && !ctx?.polish_ended_at);
+function polishActive(ctx: Ctx) {
+  return !!(ctx.polish_started_at && !ctx.polish_ended_at);
 }
 
 export function JobBayTypeControls({
@@ -40,7 +48,10 @@ export function JobBayTypeControls({
   canEdit: boolean;
 }) {
   const supabase = createClient();
-  const [ctx, setCtx] = useState<GarageJobBayContext | null>(null);
+  // `ctx` holds the parsed jsonb context; `rowExists` tracks whether a
+  // garage_job_bay_context row has already been created for this job.
+  const [ctx, setCtx] = useState<Ctx>({});
+  const [rowExists, setRowExists] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [, setTick] = useState(0);
@@ -48,14 +59,19 @@ export function JobBayTypeControls({
   const load = useCallback(async () => {
     const { data, error } = await supabase
       .from("garage_job_bay_context")
-      .select("*")
+      .select("context")
       .eq("job_id", jobId)
       .maybeSingle();
     if (error) {
       toast.error(formatError(error));
-      setCtx(null);
+      setCtx({});
+      setRowExists(false);
+    } else if (data) {
+      setCtx(((data as { context: Ctx | null }).context as Ctx) ?? {});
+      setRowExists(true);
     } else {
-      setCtx((data as GarageJobBayContext) ?? null);
+      setCtx({});
+      setRowExists(false);
     }
     setLoading(false);
   }, [jobId, supabase]);
@@ -76,57 +92,50 @@ export function JobBayTypeControls({
   }, [bayType]);
 
   useEffect(() => {
-    if (loading || !canEdit || ctx !== null || !bayType) return;
+    if (loading || !canEdit || rowExists || !bayType) return;
     if (!["paint", "oven", "car_wash", "polish", "battery_lab"].includes(bayType)) return;
     let cancelled = false;
     (async () => {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from("garage_job_bay_context")
-        .insert({ job_id: jobId })
-        .select("*")
-        .single();
+        .insert({ job_id: jobId, bay_type: bayType, context: {} });
       if (cancelled) return;
       if (error) {
         void load();
         return;
       }
-      setCtx(data as GarageJobBayContext);
+      setRowExists(true);
+      setCtx({});
     })();
     return () => {
       cancelled = true;
     };
-  }, [loading, canEdit, ctx, bayType, jobId, supabase, load]);
+  }, [loading, canEdit, rowExists, bayType, jobId, supabase, load]);
 
-  async function patch(partial: Partial<GarageJobBayContext>) {
+  // Merge `partial` into the jsonb context and persist. Upserts the row if it
+  // does not yet exist (bay_type is NOT NULL, so it must always be supplied).
+  async function patch(partial: Ctx) {
+    if (!bayType) return;
     setBusy(true);
-    let { data: row } = await supabase
-      .from("garage_job_bay_context")
-      .select("*")
-      .eq("job_id", jobId)
-      .maybeSingle();
-    if (!row) {
-      const ins = await supabase
-        .from("garage_job_bay_context")
-        .insert({ job_id: jobId })
-        .select("*")
-        .single();
-      if (ins.error) {
-        toast.error(formatError(ins.error));
-        setBusy(false);
-        return;
-      }
-      row = ins.data as GarageJobBayContext;
-      setCtx(row);
-    }
+    const next: Ctx = { ...ctx, ...partial };
     const { error } = await supabase
       .from("garage_job_bay_context")
-      .update({ ...partial, updated_at: new Date().toISOString() })
-      .eq("job_id", jobId);
+      .upsert(
+        {
+          job_id: jobId,
+          bay_type: bayType,
+          context: next,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "job_id,bay_type" }
+      );
     setBusy(false);
-    if (error) toast.error(formatError(error));
-    else {
-      await load();
+    if (error) {
+      toast.error(formatError(error));
+      return;
     }
+    setRowExists(true);
+    await load();
   }
 
   if (!bayType || ["normal", "pit", "ev", "body_work"].includes(bayType)) {
@@ -148,15 +157,12 @@ export function JobBayTypeControls({
         <div>
           <Label>Paint color</Label>
           <Input
-            value={ctx?.paint_color ?? ""}
+            value={ctx.paint_color ?? ""}
             onChange={(e) =>
-              setCtx((c) =>
-                c ? { ...c, paint_color: e.target.value } : c
-              )
+              setCtx((c) => ({ ...c, paint_color: e.target.value }))
             }
             onBlur={() => {
-              if (ctx?.paint_color != null)
-                void patch({ paint_color: ctx.paint_color || null });
+              void patch({ paint_color: ctx.paint_color || null });
             }}
             placeholder="Color code / name"
             disabled={!canEdit}
@@ -189,7 +195,7 @@ export function JobBayTypeControls({
             </Button>
           )}
         </div>
-        {paintActive(ctx) && ctx?.paint_started_at && (
+        {paintActive(ctx) && ctx.paint_started_at && (
           <p className="font-mono text-xs text-primary">
             Duration: {formatLiveDuration(ctx.paint_started_at)}
           </p>
@@ -207,17 +213,16 @@ export function JobBayTypeControls({
           <Input
             type="number"
             inputMode="decimal"
-            value={ctx?.oven_temp_c ?? ""}
+            value={ctx.oven_temp_c ?? ""}
             onChange={(e) => {
               const v = e.target.value;
-              setCtx((c) =>
-                c
-                  ? { ...c, oven_temp_c: v === "" ? null : parseFloat(v) }
-                  : c
-              );
+              setCtx((c) => ({
+                ...c,
+                oven_temp_c: v === "" ? null : parseFloat(v),
+              }));
             }}
             onBlur={() => {
-              if (ctx) void patch({ oven_temp_c: ctx.oven_temp_c });
+              void patch({ oven_temp_c: ctx.oven_temp_c ?? null });
             }}
             disabled={!canEdit}
             className="mt-1"
@@ -247,7 +252,7 @@ export function JobBayTypeControls({
             </Button>
           )}
         </div>
-        {ovenActive(ctx) && ctx?.oven_started_at && (
+        {ovenActive(ctx) && ctx.oven_started_at && (
           <p className="font-mono text-xs text-primary">
             Run time: {formatLiveDuration(ctx.oven_started_at)}
           </p>
@@ -263,11 +268,11 @@ export function JobBayTypeControls({
         <div>
           <Label>Wash type</Label>
           <Select
-            value={ctx?.wash_type ?? "__unset__"}
+            value={ctx.wash_type ?? "__unset__"}
             onValueChange={(v) => {
               const wt =
-                v === "__unset__" ? null : (v as NonNullable<GarageJobBayContext["wash_type"]>);
-              setCtx((c) => (c ? { ...c, wash_type: wt } : c));
+                v === "__unset__" ? null : (v as NonNullable<Ctx["wash_type"]>);
+              setCtx((c) => ({ ...c, wash_type: wt }));
               void patch({ wash_type: wt });
             }}
             disabled={!canEdit || busy}
@@ -308,7 +313,7 @@ export function JobBayTypeControls({
             </Button>
           )}
         </div>
-        {washActive(ctx) && ctx?.wash_started_at && (
+        {washActive(ctx) && ctx.wash_started_at && (
           <p className="font-mono text-xs text-primary">
             Duration: {formatLiveDuration(ctx.wash_started_at)}
           </p>
@@ -324,12 +329,12 @@ export function JobBayTypeControls({
         <div>
           <Label>Polish type</Label>
           <Input
-            value={ctx?.polish_type ?? ""}
+            value={ctx.polish_type ?? ""}
             onChange={(e) =>
-              setCtx((c) => (c ? { ...c, polish_type: e.target.value } : c))
+              setCtx((c) => ({ ...c, polish_type: e.target.value }))
             }
             onBlur={() => {
-              if (ctx) void patch({ polish_type: ctx.polish_type || null });
+              void patch({ polish_type: ctx.polish_type || null });
             }}
             placeholder="e.g. Cut & compound"
             disabled={!canEdit}
@@ -365,7 +370,7 @@ export function JobBayTypeControls({
             </Button>
           )}
         </div>
-        {polishActive(ctx) && ctx?.polish_started_at && (
+        {polishActive(ctx) && ctx.polish_started_at && (
           <p className="font-mono text-xs text-primary">
             Duration: {formatLiveDuration(ctx.polish_started_at)}
           </p>
@@ -386,17 +391,16 @@ export function JobBayTypeControls({
             type="number"
             inputMode="decimal"
             step="0.1"
-            value={ctx?.battery_health_pct ?? ""}
+            value={ctx.battery_health_pct ?? ""}
             onChange={(e) => {
               const v = e.target.value;
-              setCtx((c) =>
-                c
-                  ? { ...c, battery_health_pct: v === "" ? null : parseFloat(v) }
-                  : c
-              );
+              setCtx((c) => ({
+                ...c,
+                battery_health_pct: v === "" ? null : parseFloat(v),
+              }));
             }}
             onBlur={() => {
-              if (ctx) void patch({ battery_health_pct: ctx.battery_health_pct });
+              void patch({ battery_health_pct: ctx.battery_health_pct ?? null });
             }}
             disabled={!canEdit}
             className="mt-1"
@@ -405,12 +409,12 @@ export function JobBayTypeControls({
         <div>
           <Label>Test notes</Label>
           <Input
-            value={ctx?.battery_test_notes ?? ""}
+            value={ctx.battery_test_notes ?? ""}
             onChange={(e) =>
-              setCtx((c) => (c ? { ...c, battery_test_notes: e.target.value } : c))
+              setCtx((c) => ({ ...c, battery_test_notes: e.target.value }))
             }
             onBlur={() => {
-              if (ctx) void patch({ battery_test_notes: ctx.battery_test_notes || null });
+              void patch({ battery_test_notes: ctx.battery_test_notes || null });
             }}
             disabled={!canEdit}
             className="mt-1"

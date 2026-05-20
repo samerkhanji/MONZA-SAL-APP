@@ -33,7 +33,7 @@ export async function GET() {
   const sections = DATA_HEALTH_SECTIONS_BY_ROLE[appRole] ?? [];
 
   const carSelect =
-    "id, vin, status, location_type, engine_number, date_arrived, warranty_per_dms, warranty_vehicle_expiry, warranty_battery_expiry, reservation_date, reserved_by, delivery_date, software_version, software_update, dongle, issue";
+    "id, vin, status, location_type, engine_number, date_arrived, warranty_vehicle_dms, warranty_vehicle_expiry, warranty_battery_expiry, reservation_date, reserved_by, delivery_date, software_version, software_update, dongle, issue";
   let jobsQuery = supabase.from("garage_jobs").select("id, status, notes, assigned_to, diagnosis").is("deleted_at", null);
   if (appRole === "garage_staff" && profile?.id) {
     jobsQuery = jobsQuery.eq("assigned_to", profile.id);
@@ -83,7 +83,7 @@ export async function GET() {
   const carsMissingData = carsList.filter((c) => empty(c.vin) || empty(c.model) || empty(c.engine_number) || empty(c.date_arrived));
   const soMissingData = soList.filter((s) => empty(s.car_id) || empty(s.customer_id) || s.selling_price == null || empty(s.currency) || empty(s.sale_date));
   const customersMissingData = custList.filter((c) => empty(c.first_name) || empty(c.last_name) || empty(c.phone_primary) || empty(c.email) || empty(c.address));
-  const carsWarrantyMissing = carsList.filter((c) => empty(c.warranty_per_dms) && empty(c.warranty_vehicle_expiry) && empty(c.warranty_battery_expiry));
+  const carsWarrantyMissing = carsList.filter((c) => empty(c.warranty_vehicle_dms) && empty(c.warranty_vehicle_expiry) && empty(c.warranty_battery_expiry));
   const carsWarrantyMissingSold = carsWarrantyMissing.filter((c) => ["sold", "reserved", "delivered"].includes(String(c.status)));
   const reservedNoDate = carsList.filter((c) => c.status === "reserved" && empty(c.reservation_date));
   const reservedNoBy = carsList.filter((c) => c.status === "reserved" && empty(c.reserved_by));
