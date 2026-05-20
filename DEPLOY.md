@@ -65,6 +65,30 @@ PR #3 — AGENTS.md for Cursor Cloud (close, we use Claude Code; or merge as ine
 
 Close at https://github.com/samerkhanji/MONZA-CRM/pulls.
 
+### 5. Configure the AI assistant (Monza Assistant)
+
+The in-app assistant (`POST /api/chat`) needs an Anthropic API key.
+Without it the chat returns "AI assistant is not configured.
+ANTHROPIC_API_KEY environment variable is missing." It is **not** a code
+bug — the assistant already works for every signed-in user (owner and
+staff) the moment the key is set. No redeploy of code, just the env var.
+
+1. **Get a key** — https://console.anthropic.com → **Settings → API keys**
+   → **Create Key**. The Anthropic account must have billing / credits
+   set up (Plans & Billing) or calls fail with a credit error.
+2. **Add it to Vercel** — https://vercel.com/samers-projects-222dab7d/web
+   → **Settings → Environment Variables → Add New**:
+   - Key (name): `ANTHROPIC_API_KEY` — exact, case-sensitive.
+   - Value: the key (starts `sk-ant-`).
+   - Environments: **Production** (and Preview). Tick **Sensitive**.
+3. **Redeploy** — env-var changes only take effect on a new build:
+   `cd web && vercel deploy --prod --yes`
+4. **Verify** — open the app, click the chat bubble (bottom-right),
+   ask a question. It should stream a reply.
+
+Rotate this key like any other secret (revoke in the Anthropic console,
+create a new one, update Vercel, redeploy).
+
 ---
 
 ## Deploy flow
