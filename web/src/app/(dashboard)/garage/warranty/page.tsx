@@ -109,7 +109,7 @@ export default function WarrantyPage() {
         .order("opened_at", { ascending: false })
         .limit(500),
       supabase.from("cars").select("id, vin, model, model_year").limit(5000),
-      supabase.from("customers").select("id, full_name, name").limit(5000),
+      supabase.from("customers_display").select("id, full_name").limit(5000),
     ]);
     if (w.error) toast.error(formatError(w.error));
     else setRows((w.data as Row[]) ?? []);
@@ -319,7 +319,7 @@ function CreateCaseDialog({
     void (async () => {
       const [c, cu] = await Promise.all([
         supabase.from("cars").select("id, vin, model, model_year").limit(5000),
-        supabase.from("customers").select("id, full_name, name").limit(5000),
+        supabase.from("customers_display").select("id, full_name").limit(5000),
       ]);
       setCars(((c.data as CarLite[]) ?? []).sort((a, b) => (a.vin ?? "").localeCompare(b.vin ?? "")));
       setCustomers(((cu.data as CustomerLite[]) ?? []).sort((a, b) => (a.full_name ?? a.name ?? "").localeCompare(b.full_name ?? b.name ?? "")));

@@ -108,7 +108,7 @@ export default function TradeInsPage() {
         .is("deleted_at", null)
         .order("created_at", { ascending: false })
         .limit(500),
-      supabase.from("customers").select("id, full_name, name").limit(5000),
+      supabase.from("customers_display").select("id, full_name").limit(5000),
     ]);
     if (r.error) toast.error(formatError(r.error));
     else setRows((r.data as TradeInRow[]) ?? []);
@@ -316,7 +316,7 @@ function RequestTradeInDialog({
     setCurrency("USD");
     setNotes("");
     void (async () => {
-      const { data } = await supabase.from("customers").select("id, full_name, name").limit(5000);
+      const { data } = await supabase.from("customers_display").select("id, full_name").limit(5000);
       setCustomers(((data as CustomerLite[]) ?? []).sort((a, b) =>
         (a.full_name ?? a.name ?? "").localeCompare(b.full_name ?? b.name ?? "")
       ));
