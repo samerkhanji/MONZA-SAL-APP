@@ -1,3 +1,4 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { CarDisplay } from "@/types/database";
 import { createClient } from "@/lib/supabase";
 
@@ -41,10 +42,14 @@ export function shouldFallbackFromCarsDisplayError(error: unknown): boolean {
 /**
  * Read-only inventory list: try cars_display first, then public.cars with the same shape.
  * Do not use for mutating reservation/delivery dates; those belong on public.sales_orders.
+ *
+ * Accepts an explicit Supabase client so it works both in the browser
+ * (getCarsDisplay) and in a Server Component with the cookie-bound server
+ * client — letting the cars page render with data already in the HTML.
  */
-export async function getCarsDisplay(): Promise<CarsDisplayResult> {
-  const supabase = createClient();
-
+export async function getCarsDisplayWith(
+  supabase: SupabaseClient
+): Promise<CarsDisplayResult> {
   const abortedFrom = (error: unknown) =>
     !!error &&
     typeof error === "object" &&
@@ -106,5 +111,10 @@ export async function getCarsDisplay(): Promise<CarsDisplayResult> {
     aborted: false,
     usedFallback: true,
   };
+}
+
+/** Browser-side inventory list fetch. */
+export async function getCarsDisplay(): Promise<CarsDisplayResult> {
+  return getCarsDisplayWith(createClient());
 }
 
