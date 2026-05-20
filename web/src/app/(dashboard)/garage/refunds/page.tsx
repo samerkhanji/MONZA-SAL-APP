@@ -113,7 +113,7 @@ export default function RefundsPage() {
         .is("deleted_at", null)
         .order("requested_at", { ascending: false })
         .limit(500),
-      supabase.from("customers").select("id, full_name, name").limit(2000),
+      supabase.from("customers_display").select("id, full_name").limit(2000),
     ]);
     if (r.error) toast.error(formatError(r.error));
     else setRows((r.data as RefundRow[]) ?? []);
@@ -320,8 +320,8 @@ function CreateRefundDialog({
     setJobId("");
     void (async () => {
       const [c, p] = await Promise.all([
-        supabase.from("customers").select("id, full_name, name").limit(2000),
-        supabase.from("parts").select("id, name").limit(2000),
+        supabase.from("customers_display").select("id, full_name").limit(2000),
+        supabase.from("parts").select("id, name:part_name").limit(2000),
       ]);
       setCustomers(((c.data as CustomerLite[]) ?? []).sort((a, b) => (a.full_name ?? a.name ?? "").localeCompare(b.full_name ?? b.name ?? "")));
       setParts(((p.data as PartLite[]) ?? []).sort((a, b) => a.name.localeCompare(b.name)));

@@ -103,8 +103,8 @@ export default function RefundDetailPage() {
     setRefund(data as Refund);
     if ((data as Refund).customer_id) {
       const { data: c } = await supabase
-        .from("customers")
-        .select("id, full_name, name")
+        .from("customers_display")
+        .select("id, full_name")
         .eq("id", (data as Refund).customer_id)
         .single();
       setCustomer((c as { id: string; full_name?: string | null; name?: string | null } | null) ?? null);

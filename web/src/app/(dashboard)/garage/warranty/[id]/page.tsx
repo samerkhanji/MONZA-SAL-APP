@@ -115,7 +115,7 @@ export default function WarrantyDetailPage() {
       supabase.from("warranty_cases").select("*").eq("id", id).single(),
       supabase.from("warranty_case_parts").select("*").eq("case_id", id).order("created_at"),
       supabase.from("warranty_case_documents").select("*").eq("case_id", id).order("created_at", { ascending: false }),
-      supabase.from("parts").select("id, name").limit(2000),
+      supabase.from("parts").select("id, name:part_name").limit(2000),
     ]);
     if (w.error) {
       toast.error(formatError(w.error));
@@ -130,7 +130,7 @@ export default function WarrantyDetailPage() {
       setCar((car as CarLite | null) ?? null);
     }
     if (c.customer_id) {
-      const { data: cu } = await supabase.from("customers").select("id, full_name, name").eq("id", c.customer_id).single();
+      const { data: cu } = await supabase.from("customers_display").select("id, full_name").eq("id", c.customer_id).single();
       setCustomer((cu as CustomerLite | null) ?? null);
     }
     setCaseParts((p.data as CasePart[]) ?? []);

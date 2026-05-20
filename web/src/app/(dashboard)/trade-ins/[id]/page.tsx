@@ -137,7 +137,7 @@ export default function TradeInDetailPage() {
     const ti = w.data as TradeIn;
     setT(ti);
     if (ti.customer_id) {
-      const { data: c } = await supabase.from("customers").select("id, full_name, name").eq("id", ti.customer_id).single();
+      const { data: c } = await supabase.from("customers_display").select("id, full_name").eq("id", ti.customer_id).single();
       setCustomer((c as CustomerLite | null) ?? null);
     }
     setIssues((i.data as Issue[]) ?? []);
