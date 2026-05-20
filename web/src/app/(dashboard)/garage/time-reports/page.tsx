@@ -133,7 +133,7 @@ export default function GarageTimeReportsPage() {
   return (
     <div className="container mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
       <div className="flex flex-wrap items-center gap-4">
-        <Button variant="ghost" size="sm" asChild>
+        <Button data-tour-id="time-reports-back" variant="ghost" size="sm" asChild>
           <Link href="/garage">
             <ArrowLeft className="mr-2 size-4" />
             Garage Jobs
@@ -148,7 +148,7 @@ export default function GarageTimeReportsPage() {
         where you&apos;re viewing from.
       </p>
 
-      <Card>
+      <Card data-tour-id="time-reports-table">
         <CardHeader>
           <CardTitle>By employee</CardTitle>
         </CardHeader>
