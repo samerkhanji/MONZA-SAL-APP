@@ -259,7 +259,12 @@ export default function GarageTasksBoardPage() {
           </p>
         </div>
         {canManage ? (
-          <Button type="button" className="gap-2" onClick={() => setTemplateOpen(true)}>
+          <Button
+            data-tour-id="tasks-create-checklist"
+            type="button"
+            className="gap-2"
+            onClick={() => setTemplateOpen(true)}
+          >
             <ClipboardList className="size-4" />
             Create checklist from template
           </Button>
@@ -267,7 +272,7 @@ export default function GarageTasksBoardPage() {
       </div>
 
       <Dialog open={templateOpen} onOpenChange={setTemplateOpen}>
-        <DialogContent>
+        <DialogContent data-tour-id="tasks-checklist-dialog">
           <DialogHeader>
             <DialogTitle>Create checklist from template</DialogTitle>
             <DialogDescription>
@@ -326,7 +331,7 @@ export default function GarageTasksBoardPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-6">
+        <div data-tour-id="tasks-board" className="space-y-6">
           {[...byCar.entries()].map(([carId, list]) => {
             const car = list[0]?.cars;
             const title = car
@@ -344,6 +349,7 @@ export default function GarageTasksBoardPage() {
                     return (
                       <div
                         key={t.id}
+                        data-tour-id="tasks-task-row"
                         className="flex flex-col gap-3 rounded-lg border border-border/80 bg-muted/20 p-4 sm:flex-row sm:flex-wrap sm:items-center"
                       >
                         <div className="min-w-0 flex-1 space-y-1">
@@ -357,7 +363,7 @@ export default function GarageTasksBoardPage() {
                             ) : null}
                           </div>
                         </div>
-                        <div className="flex flex-col gap-2 sm:w-48">
+                        <div data-tour-id="tasks-task-status" className="flex flex-col gap-2 sm:w-48">
                           <Label className="text-xs">Status</Label>
                           <Select
                             value={t.status}
@@ -375,7 +381,7 @@ export default function GarageTasksBoardPage() {
                             </SelectContent>
                           </Select>
                         </div>
-                        <div className="flex flex-col gap-2 sm:w-52">
+                        <div data-tour-id="tasks-task-assigned" className="flex flex-col gap-2 sm:w-52">
                           <Label className="text-xs">Assigned</Label>
                           <Select
                             value={t.assigned_to ?? "__none__"}
@@ -398,7 +404,7 @@ export default function GarageTasksBoardPage() {
                             </SelectContent>
                           </Select>
                         </div>
-                        <div className="flex flex-col gap-2 sm:w-44">
+                        <div data-tour-id="tasks-task-resource" className="flex flex-col gap-2 sm:w-44">
                           <Label className="text-xs">Resource</Label>
                           <Select
                             value={t.resource_type ?? "__none__"}
@@ -421,7 +427,7 @@ export default function GarageTasksBoardPage() {
                             </SelectContent>
                           </Select>
                         </div>
-                        <div className="flex flex-wrap gap-2">
+                        <div data-tour-id="tasks-task-timer" className="flex flex-wrap gap-2">
                           {mine ? (
                             <Button type="button" size="sm" variant="secondary" onClick={() => void stopTimer(t.id)}>
                               <Square className="mr-1 size-3.5" />
