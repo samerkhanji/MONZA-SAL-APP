@@ -264,20 +264,22 @@ export default function GarageHistoryPage() {
             All completed and cancelled jobs
           </p>
         </div>
-        <ExportButton
-          data={jobExportData(sortedJobs)}
-          allData={jobExportData(jobs)}
-          columns={jobExportColumns}
-          filename="Garage_History"
-          options={{
-            pageName: "Garage History",
-            summary: `Total Jobs: ${sortedJobs.length} | Completed: ${stats.done} | Cancelled: ${stats.cancelled}`,
-          }}
-          disabled={loading}
-        />
+        <span data-tour-id="history-export">
+          <ExportButton
+            data={jobExportData(sortedJobs)}
+            allData={jobExportData(jobs)}
+            columns={jobExportColumns}
+            filename="Garage_History"
+            options={{
+              pageName: "Garage History",
+              summary: `Total Jobs: ${sortedJobs.length} | Completed: ${stats.done} | Cancelled: ${stats.cancelled}`,
+            }}
+            disabled={loading}
+          />
+        </span>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+      <div data-tour-id="history-stats" className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         <div className="rounded-lg border bg-card p-4">
           <p className="text-muted-foreground text-sm">✅ Completed</p>
           <p className="text-2xl font-bold">{stats.done}</p>
@@ -293,7 +295,7 @@ export default function GarageHistoryPage() {
       </div>
 
       <div className="flex flex-wrap gap-3">
-        <div className="flex flex-wrap gap-2">
+        <div data-tour-id="history-status-filter" className="flex flex-wrap gap-2">
           {["all", "done", "cancelled"].map((s) => (
             <button
               key={s}
@@ -311,6 +313,7 @@ export default function GarageHistoryPage() {
         </div>
         <div className="flex items-center gap-1">
           <Input
+            data-tour-id="history-search"
             id="garage-history-search"
             name="garage-history-search"
             placeholder="Search VIN, title, assigned to..."
@@ -318,7 +321,9 @@ export default function GarageHistoryPage() {
             onChange={(e) => setSearch(e.target.value)}
             className="h-10 w-64"
           />
-          <VinScanButton onScan={(vin) => setSearch(vin)} />
+          <span data-tour-id="history-vin-scan">
+            <VinScanButton onScan={(vin) => setSearch(vin)} />
+          </span>
         </div>
       </div>
 
@@ -332,7 +337,7 @@ export default function GarageHistoryPage() {
           </Button>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div data-tour-id="history-list" className="space-y-4">
           {sortedJobs.map((job) => {
             const car = job.cars;
             const borderClass =
