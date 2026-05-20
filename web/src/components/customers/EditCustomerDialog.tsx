@@ -10,6 +10,7 @@ import {
   LANGUAGE_LABELS,
 } from "@/lib/constants/customers";
 import { Button } from "@/components/ui/button";
+import { FieldHint } from "@/components/ui/field-hint";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -237,7 +238,10 @@ export function EditCustomerDialog({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-lang">Preferred Language</Label>
+              <Label htmlFor="edit-lang">
+                Preferred Language
+                <FieldHint text="The language this customer is most comfortable speaking with." />
+              </Label>
               <Select
                 value={preferredLanguage}
                 onValueChange={setPreferredLanguage}
@@ -257,7 +261,10 @@ export function EditCustomerDialog({
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="edit-status">Lead Status</Label>
+              <Label htmlFor="edit-status">
+                Lead Status
+                <FieldHint text="How far along this person is toward buying — from a brand-new lead to a closed sale." />
+              </Label>
               <Select
                 value={leadStatus}
                 onValueChange={(v) => setLeadStatus(v as LeadStatus)}
@@ -275,7 +282,10 @@ export function EditCustomerDialog({
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-source">Lead Source</Label>
+              <Label htmlFor="edit-source">
+                Lead Source
+                <FieldHint text="Where this customer first heard about you — a referral, a social media ad, a walk-in, and so on." />
+              </Label>
               <Select
                 value={leadSource || "_"}
                 onValueChange={(v) => setLeadSource(v === "_" ? "" : v)}

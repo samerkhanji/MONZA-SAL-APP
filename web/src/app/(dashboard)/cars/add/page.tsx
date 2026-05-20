@@ -14,6 +14,7 @@ import {
   CUSTOMS_STATUS_LABELS,
 } from "@/types/database";
 import { Button } from "@/components/ui/button";
+import { FieldHint } from "@/components/ui/field-hint";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -365,7 +366,10 @@ export default function AddCarPage() {
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="car-vin">VIN *</Label>
+                <Label htmlFor="car-vin">
+                  VIN *
+                  <FieldHint text="The car's unique 17-character Vehicle Identification Number — found on the dashboard or door frame." />
+                </Label>
                 <div className="flex gap-2">
                   <Input
                     id="car-vin"
@@ -467,7 +471,10 @@ export default function AddCarPage() {
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="car-suffix">Suffix</Label>
+                <Label htmlFor="car-suffix">
+                  Suffix
+                  <FieldHint text="The trim or spec code that comes after the model name, like 'GCC REV' or 'H97c'." />
+                </Label>
                 <Input
                   id="car-suffix"
                   name="car-suffix"
@@ -477,7 +484,10 @@ export default function AddCarPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="car-engine-number">Engine Number</Label>
+                <Label htmlFor="car-engine-number">
+                  Engine Number
+                  <FieldHint text="The serial number stamped on the engine block — different from the VIN." />
+                </Label>
                 <Input
                   id="car-engine-number"
                   name="car-engine-number"
@@ -489,7 +499,10 @@ export default function AddCarPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="car-location">Location</Label>
+              <Label htmlFor="car-location">
+                Location
+                <FieldHint text="Where the car physically sits right now — showroom floor, storage lot, or the garage." />
+              </Label>
               <Select
                 value={locationType}
                 onValueChange={(v) => setLocationType(v as LocationType)}
@@ -509,7 +522,10 @@ export default function AddCarPage() {
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="car-status">Status</Label>
+                <Label htmlFor="car-status">
+                  Status
+                  <FieldHint text="Where the car is in its life with you — in inventory, reserved, sold, or in the garage." />
+                </Label>
                 <Select
                   value={status}
                   onValueChange={(v) => {
@@ -554,7 +570,10 @@ export default function AddCarPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="car-warranty-dms">Warranty DMS</Label>
+                <Label htmlFor="car-warranty-dms">
+                  Warranty DMS
+                  <FieldHint text="The warranty start date as recorded in the manufacturer's Dealer Management System." />
+                </Label>
                 <Input
                   id="car-warranty-dms"
                   name="car-warranty-dms"
@@ -564,7 +583,10 @@ export default function AddCarPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="car-warranty-vehicle">Warranty on Vehicle (Expiry)</Label>
+                <Label htmlFor="car-warranty-vehicle">
+                  Warranty on Vehicle (Expiry)
+                  <FieldHint text="The date the vehicle's general warranty runs out." />
+                </Label>
                 <Input
                   id="car-warranty-vehicle"
                   name="car-warranty-vehicle"
@@ -574,7 +596,10 @@ export default function AddCarPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="car-warranty-battery">Warranty on Battery (Expiry)</Label>
+                <Label htmlFor="car-warranty-battery">
+                  Warranty on Battery (Expiry)
+                  <FieldHint text="The date the separate battery warranty runs out — EV batteries are usually covered longer than the vehicle." />
+                </Label>
                 <Input
                   id="car-warranty-battery"
                   name="car-warranty-battery"
@@ -584,7 +609,10 @@ export default function AddCarPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="car-warranty-monza">Warranty as per Monza</Label>
+                <Label htmlFor="car-warranty-monza">
+                  Warranty as per Monza
+                  <FieldHint text="The warranty start date your dealership honours, which may differ from the manufacturer's date." />
+                </Label>
                 <Input
                   id="car-warranty-monza"
                   name="car-warranty-monza"
@@ -597,7 +625,10 @@ export default function AddCarPage() {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="car-customs-status">Customs Status</Label>
+                <Label htmlFor="car-customs-status">
+                  Customs Status
+                  <FieldHint text="Whether the car has cleared import customs and its duties are paid." />
+                </Label>
                 <Select
                   value={customsStatus}
                   onValueChange={(v) => setCustomsStatus(v as CustomsStatus)}
@@ -617,7 +648,10 @@ export default function AddCarPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="car-issue">Issue</Label>
+              <Label htmlFor="car-issue">
+                Issue
+                <FieldHint text="Any known problem with the car right now, like missing parts or a pending fix." />
+              </Label>
               <Input
                 id="car-issue"
                 name="car-issue"
@@ -671,6 +705,7 @@ export default function AddCarPage() {
                 />
                 <Label htmlFor="car-software-update" className="font-normal">
                   Software update done
+                  <FieldHint text="Tick this once the car has been updated to the latest software at the dealership." />
                 </Label>
               </div>
               <div className="flex items-center space-x-2">
@@ -681,6 +716,7 @@ export default function AddCarPage() {
                 />
                 <Label htmlFor="car-dongle" className="font-normal">
                   Dongle
+                  <FieldHint text="Tick this if the car comes with its diagnostic dongle accessory." />
                 </Label>
               </div>
             </div>
@@ -713,7 +749,10 @@ export default function AddCarPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="car-software-version">Software Version</Label>
+              <Label htmlFor="car-software-version">
+                Software Version
+                <FieldHint text="The exact version number of the software currently installed on the car." />
+              </Label>
               <Input
                 id="car-software-version"
                 name="car-software-version"
@@ -724,7 +763,10 @@ export default function AddCarPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>PDI Status</Label>
+              <Label>
+                PDI Status
+                <FieldHint text="Pre-Delivery Inspection — the safety and quality check done before a car can be handed to a customer." />
+              </Label>
               <p className="flex items-center gap-2 text-sm">
                 <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-800 dark:text-gray-300">
                   Pending
@@ -746,6 +788,7 @@ export default function AddCarPage() {
                 className="cursor-pointer text-sm font-normal"
               >
                 Is EREV (Extended Range Electric Vehicle)
+                <FieldHint text="Tick this for hybrids that have a small petrol engine to recharge the battery on the go." />
               </Label>
             </div>
 
@@ -763,7 +806,10 @@ export default function AddCarPage() {
                 </div>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="car-ev-km">EV KM</Label>
+                    <Label htmlFor="car-ev-km">
+                      EV KM
+                      <FieldHint text="Distance the car has driven on battery power alone." />
+                    </Label>
                     <Input
                       id="car-ev-km"
                       name="car-ev-km"
@@ -775,7 +821,10 @@ export default function AddCarPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="car-motor-km">Motor KM</Label>
+                    <Label htmlFor="car-motor-km">
+                      Motor KM
+                      <FieldHint text="Distance the car has driven using its petrol motor." />
+                    </Label>
                     <Input
                       id="car-motor-km"
                       name="car-motor-km"
@@ -926,7 +975,10 @@ export default function AddCarPage() {
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="reserved-by">Reserved By</Label>
+                    <Label htmlFor="reserved-by">
+                      Reserved By
+                      <FieldHint text="The staff member who took this reservation for the customer." />
+                    </Label>
                     <Input
                       id="reserved-by"
                       name="reserved-by"
@@ -950,7 +1002,10 @@ export default function AddCarPage() {
                 {status === "reserved" && (
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
-                      <Label htmlFor="sale-deposit-amount">Deposit Amount (USD)</Label>
+                      <Label htmlFor="sale-deposit-amount">
+                        Deposit Amount (USD)
+                        <FieldHint text="The upfront money the customer paid to hold this car." />
+                      </Label>
                       <Input
                         id="sale-deposit-amount"
                         name="sale-deposit-amount"
@@ -963,7 +1018,10 @@ export default function AddCarPage() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="sale-reserved-until">Reserved Until</Label>
+                      <Label htmlFor="sale-reserved-until">
+                        Reserved Until
+                        <FieldHint text="The date the hold expires — after this the car can be sold to someone else." />
+                      </Label>
                       <Input
                         id="sale-reserved-until"
                         name="sale-reserved-until"

@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 import type { JobPriority } from "@/types/database";
 import { Button } from "@/components/ui/button";
+import { FieldHint } from "@/components/ui/field-hint";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -333,6 +334,7 @@ export function NewJobDialog({
             <div>
               <Label htmlFor="job-battery-only" className="cursor-pointer text-base">
                 Battery lab job (no vehicle)
+                <FieldHint text="Tick this for work on a battery unit by itself, when no whole car is involved." />
               </Label>
               <p className="text-muted-foreground mt-1 text-xs">
                 Use for battery-unit work only. No car is linked and no car status is changed.
@@ -395,7 +397,10 @@ export function NewJobDialog({
           </div>
 
           <div>
-            <Label htmlFor="job-reason-of-visit" className="text-base">Reason of Visit *</Label>
+            <Label htmlFor="job-reason-of-visit" className="text-base">
+              Reason of Visit *
+              <FieldHint text="A short title for the job — the main thing the car came in for, like 'Brake pad replacement'." />
+            </Label>
             <Input
               id="job-reason-of-visit"
               name="job-reason-of-visit"
@@ -422,7 +427,10 @@ export function NewJobDialog({
           </div>
 
           <div>
-            <Label className="text-base">Priority</Label>
+            <Label className="text-base">
+              Priority
+              <FieldHint text="How urgent the job is — urgent jobs jump ahead of others in the queue." />
+            </Label>
             <div className="mt-2 flex gap-2">
               {(["low", "normal", "urgent"] as const).map((p) => (
                 <button
@@ -442,7 +450,10 @@ export function NewJobDialog({
           </div>
 
           <div>
-            <Label className="text-base">Assign To</Label>
+            <Label className="text-base">
+              Assign To
+              <FieldHint text="Pick the technician who will do the work, or choose External for an outside mechanic." />
+            </Label>
             <div className="mt-2 flex flex-wrap gap-2">
               {internalUsers.map((u) => {
                 const active = assigneeMode === "internal" && internalAssigneeId === u.id;
@@ -499,7 +510,10 @@ export function NewJobDialog({
           </div>
 
           <div>
-            <Label htmlFor="job-day-to-be-serviced" className="text-base">Day to be Serviced</Label>
+            <Label htmlFor="job-day-to-be-serviced" className="text-base">
+              Day to be Serviced
+              <FieldHint text="The date the job is scheduled to be worked on." />
+            </Label>
             <Input
               id="job-day-to-be-serviced"
               name="job-day-to-be-serviced"
@@ -511,7 +525,10 @@ export function NewJobDialog({
           </div>
 
           <div>
-            <Label htmlFor="job-estimated-hours" className="text-base">Estimated Hours</Label>
+            <Label htmlFor="job-estimated-hours" className="text-base">
+              Estimated Hours
+              <FieldHint text="Your best guess of how many work hours the job will take." />
+            </Label>
             <Input
               id="job-estimated-hours"
               name="job-estimated-hours"
@@ -527,7 +544,10 @@ export function NewJobDialog({
           </div>
 
           <div>
-            <Label className="text-base">Part Numbers Used</Label>
+            <Label className="text-base">
+              Part Numbers Used
+              <FieldHint text="The parts taken from inventory for this job — adding them here updates stock counts." />
+            </Label>
             <p className="mt-1 text-muted-foreground text-sm">
               Search by part number, scan barcode, or click parts below.
             </p>
