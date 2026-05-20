@@ -3,94 +3,124 @@ import type { Tour } from "./types";
 /**
  * Workflow tour: "Add your first car".
  *
- * STATUS: skeleton — the structure is real (navigateTo + waitFor wired up)
- * but the copy is placeholder. Phase-2 content agent: rewrite the title /
- * description fields in plain English, like the owner welcome tour.
+ * Cross-page, hands-on. In interactive mode the user actually clicks the
+ * buttons and types into the fields — the tour just points and waits.
  *
- * Designed to exercise every interactive-mode feature:
- *   - `navigateTo` on multiple steps (router pushes between pages)
- *   - `waitFor: "click"`  — user has to actually click the highlighted button
- *   - `waitFor: "input"`  — user has to actually type into a field
- *   - `waitFor: "navigation"` — user has to navigate (e.g. submit a form)
+ * Tone: short sentences, plain English, like explaining to a beginner.
  */
 export const addCarWorkflowTour: Tour = {
   id: "workflow-add-car-v1",
   kind: "workflow",
-  label: "Add your first car",
-  description: "Hands-on. I'll walk you through the whole flow.",
+  label: "Add a car to inventory",
+  description: "Hands-on. I'll walk you through adding a new car, start to finish.",
   estimatedMinutes: 5,
-  // Allow everyone who can add a car. Leave empty to let the launcher decide.
   allowedRoles: ["owner", "sales_ops", "sales", "hybrid", "khalil_hybrid"],
   steps: [
     {
-      // Step 1 — kickoff modal, no element.
-      title: "Let's add your first car",
+      title: "Let's add a car",
       description:
-        "PLACEHOLDER: I'll guide you through every step. In interactive mode, " +
-        "you'll actually do the work — I just point. Ready?",
+        "A new vehicle arrived? Great. I'll walk you through putting it into the system. " +
+        "I'll point at each button — you do the clicking. Hit 'Next' when you're ready.",
     },
     {
-      // Step 2 — go to Inventory.
       navigateTo: "/cars",
       element: '[data-tour-id="nav-cars"]',
-      title: "Go to Inventory",
-      description: "PLACEHOLDER: This is where every car lives.",
+      title: "Open Inventory",
+      description:
+        "First we go to Inventory. This is the list of every car you own. " +
+        "I've opened it for you — that highlighted item in the menu is how you get here yourself next time.",
       side: "right",
       align: "start",
     },
     {
-      // Step 3 — click "Add Car".
-      element: '[data-tour-id="cars-add-button"]',
+      element: '[data-tour-id="cars-list-add-button"]',
       title: "Click 'Add Car'",
-      description: "PLACEHOLDER: Tap the Add Car button.",
+      description:
+        "This button starts a blank car record. Click it now to open the form.",
       side: "bottom",
+      align: "end",
+      waitFor: "click",
+    },
+    {
+      navigateTo: "/cars/add",
+      element: '[data-tour-id="cars-add-vehicle-info-panel"]',
+      title: "The car form",
+      description:
+        "This is where you describe the car. We'll fill in the important bits together. " +
+        "Don't worry — you can always edit a car later.",
+      side: "top",
+      align: "start",
+    },
+    {
+      element: '[data-tour-id="cars-add-vin-input"]',
+      title: "Type the VIN",
+      description:
+        "The VIN is the car's unique 17-character code. You'll find it on the windshield " +
+        "or the sticker inside the driver's door. Type it in now.",
+      side: "right",
+      align: "start",
+      waitFor: "input",
+    },
+    {
+      element: '[data-tour-id="cars-add-brand-select"]',
+      title: "Pick the brand",
+      description:
+        "Click here and choose the make — Toyota, BMW, Mercedes, and so on.",
+      side: "right",
       align: "start",
       waitFor: "click",
     },
     {
-      // Step 4 — fills VIN.
-      navigateTo: "/cars/add",
-      element: '[data-tour-id="car-form-vin"]',
-      title: "Enter the VIN",
+      element: '[data-tour-id="cars-add-model-input"]',
+      title: "Type the model",
+      description: "Now the model name — Corolla, X5, C-Class. Type it in.",
+      side: "right",
+      align: "start",
+      waitFor: "input",
+    },
+    {
+      element: '[data-tour-id="cars-add-location-select"]',
+      title: "Where is the car?",
       description:
-        "PLACEHOLDER: 17 characters, on the windshield or driver's door jamb.",
+        "Pick where the car physically sits right now — the showroom, the yard, in transit. " +
+        "This helps everyone find it later.",
       side: "right",
       align: "start",
-      waitFor: "input",
+      waitFor: "click",
     },
     {
-      // Step 5 — type the make.
-      element: '[data-tour-id="car-form-make"]',
-      title: "Make",
-      description: "PLACEHOLDER: Toyota, BMW, etc.",
-      side: "right",
-      align: "start",
-      waitFor: "input",
-    },
-    {
-      // Step 6 — model.
-      element: '[data-tour-id="car-form-model"]',
-      title: "Model",
-      description: "PLACEHOLDER: Corolla, X5, etc.",
-      side: "right",
-      align: "start",
-      waitFor: "input",
-    },
-    {
-      // Step 7 — submit.
-      element: '[data-tour-id="car-form-submit"]',
-      title: "Save it",
+      element: '[data-tour-id="cars-add-status-select"]',
+      title: "Set the status",
       description:
-        "PLACEHOLDER: Hit Save. We'll land back on the inventory list once it's in.",
+        "The status says where the car is in its life: arriving, available for sale, reserved, sold. " +
+        "For a fresh arrival, leave it as the default or pick 'available'.",
+      side: "right",
+      align: "start",
+      waitFor: "click",
+    },
+    {
+      element: '[data-tour-id="cars-add-technical-panel"]',
+      title: "Technical details",
+      description:
+        "Mileage, battery health, and other specs go here. Fill in what you know — " +
+        "you can skip anything you don't have yet.",
+      side: "top",
+      align: "start",
+    },
+    {
+      element: '[data-tour-id="cars-add-submit-button"]',
+      title: "Save the car",
+      description:
+        "All set? Click 'Add Car'. The system saves it and takes you back to the inventory list.",
       side: "top",
       align: "end",
       waitFor: "navigation",
     },
     {
-      // Step 8 — done modal.
-      title: "Nice — you added a car!",
+      title: "Done — the car is in!",
       description:
-        "PLACEHOLDER: That's it. Any time a new vehicle arrives, repeat these steps.",
+        "That's it. Your new car is now in inventory and everyone on the team can see it. " +
+        "Each time a vehicle arrives, just repeat these steps.",
     },
   ],
 };
