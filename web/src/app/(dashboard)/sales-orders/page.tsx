@@ -203,6 +203,7 @@ export default function SalesOrdersPage() {
             variant="outline"
             onClick={() => fetchOrders()}
             disabled={loading}
+            data-tour-id="sales-orders-list-refresh-button"
           >
             <RefreshCw className={`mr-2 size-4 ${loading ? "animate-spin" : ""}`} />
             Refresh
@@ -211,7 +212,7 @@ export default function SalesOrdersPage() {
       </div>
 
       {/* KPI bar */}
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-3" data-tour-id="sales-orders-list-kpi-bar">
         <Card>
           <CardContent className="pt-4">
             <p className="text-muted-foreground text-sm">Total orders</p>
@@ -241,7 +242,7 @@ export default function SalesOrdersPage() {
         </Card>
       </div>
 
-      <Card>
+      <Card data-tour-id="sales-orders-list-table-panel">
         <CardHeader>
           <CardTitle>All orders</CardTitle>
           <CardDescription>
@@ -256,9 +257,10 @@ export default function SalesOrdersPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="min-h-11 max-w-xs text-base sm:text-sm"
+              data-tour-id="sales-orders-list-search-input"
             />
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[160px]">
+              <SelectTrigger className="w-[160px]" data-tour-id="sales-orders-list-filter-status">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
