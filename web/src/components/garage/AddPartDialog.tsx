@@ -128,7 +128,7 @@ export function AddPartDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[min(90vh,92dvh)] overflow-y-auto max-w-lg">
+      <DialogContent className="max-h-[min(90vh,92dvh)] overflow-y-auto max-w-lg" data-tour-id="add-part-dialog">
         <DialogHeader>
           <DialogTitle>Add New Part</DialogTitle>
         </DialogHeader>
