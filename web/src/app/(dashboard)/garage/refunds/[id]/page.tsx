@@ -196,7 +196,7 @@ export default function RefundDetailPage() {
     <div className="container space-y-6 py-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <Link href="/garage/refunds" className="text-muted-foreground inline-flex items-center text-xs hover:underline">
+          <Link data-tour-id="refund-detail-back" href="/garage/refunds" className="text-muted-foreground inline-flex items-center text-xs hover:underline">
             <ArrowLeft className="mr-1 size-3" /> Refunds
           </Link>
           <h1 className="mt-1 font-mono text-2xl font-semibold">{refund.refund_number}</h1>
@@ -211,7 +211,7 @@ export default function RefundDetailPage() {
         </div>
       </div>
 
-      <Card>
+      <Card data-tour-id="refund-detail-summary">
         <CardContent className="grid gap-4 p-4 sm:grid-cols-2">
           <div>
             <Label className="text-muted-foreground text-xs uppercase">Customer</Label>
@@ -293,24 +293,24 @@ export default function RefundDetailPage() {
         </Card>
       )}
 
-      <div className="flex flex-wrap gap-2">
+      <div data-tour-id="refund-detail-actions" className="flex flex-wrap gap-2">
         {canActOnApproval && (
           <>
-            <Button onClick={() => void approve()} disabled={acting}>
+            <Button data-tour-id="refund-detail-approve" onClick={() => void approve()} disabled={acting}>
               <Check className="mr-1.5 size-4" /> Approve
             </Button>
-            <Button variant="outline" onClick={() => setRejectOpen(true)} disabled={acting}>
+            <Button data-tour-id="refund-detail-reject" variant="outline" onClick={() => setRejectOpen(true)} disabled={acting}>
               <X className="mr-1.5 size-4" /> Reject
             </Button>
           </>
         )}
         {isApproved && canPay && (
-          <Button onClick={() => setPayOpen(true)} disabled={acting}>
+          <Button data-tour-id="refund-detail-pay" onClick={() => setPayOpen(true)} disabled={acting}>
             Mark as paid
           </Button>
         )}
         {isPending && (isOwner || requesterIsMe) && (
-          <Button variant="outline" onClick={() => void cancel()} disabled={acting}>
+          <Button data-tour-id="refund-detail-cancel" variant="outline" onClick={() => void cancel()} disabled={acting}>
             Cancel request
           </Button>
         )}

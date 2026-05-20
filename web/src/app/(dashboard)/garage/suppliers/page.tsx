@@ -186,7 +186,7 @@ function Body() {
           </p>
         </div>
         {canWrite && (
-          <Button onClick={() => setAddOpen(true)}>
+          <Button data-tour-id="suppliers-new" onClick={() => setAddOpen(true)}>
             <Plus className="mr-1.5 size-4" /> New supplier
           </Button>
         )}
@@ -195,6 +195,7 @@ function Body() {
       <div className="relative">
         <Search className="text-muted-foreground pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2" />
         <Input
+          data-tour-id="suppliers-search"
           placeholder="Search by name, contact, email, phone, kind…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -202,7 +203,7 @@ function Body() {
         />
       </div>
 
-      <Card>
+      <Card data-tour-id="suppliers-table">
         <CardContent className="p-0">
           {loading ? (
             <div className="space-y-2 p-4">
@@ -280,6 +281,7 @@ function Body() {
                         <td className="px-3 py-2">
                           <div className="flex items-center justify-end gap-1">
                             <Button
+                              data-tour-id="suppliers-view-pos"
                               variant="ghost"
                               size="icon-xs"
                               asChild
@@ -293,6 +295,7 @@ function Body() {
                             </Button>
                             {canWrite && (
                               <Button
+                                data-tour-id="suppliers-edit"
                                 variant="ghost"
                                 size="icon-xs"
                                 onClick={() => setEditing(s)}
@@ -303,6 +306,7 @@ function Body() {
                             )}
                             {isOwner && (
                               <Button
+                                data-tour-id="suppliers-delete"
                                 variant="ghost"
                                 size="icon-xs"
                                 className="text-muted-foreground hover:text-destructive"
@@ -377,7 +381,7 @@ function Body() {
       </AlertDialog>
 
       <div className="text-muted-foreground flex items-center justify-between pt-2 text-xs">
-        <Button variant="link" size="sm" asChild>
+        <Button data-tour-id="suppliers-purchase-orders-link" variant="link" size="sm" asChild>
           <Link href="/garage/purchase-orders">
             <ArrowLeft className="mr-1 size-3" /> Purchase orders
           </Link>
@@ -469,7 +473,7 @@ function SupplierDialog({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-md">
+      <DialogContent data-tour-id="suppliers-dialog" className="max-w-md">
         <DialogHeader>
           <DialogTitle>{editing ? "Edit supplier" : "New supplier"}</DialogTitle>
           <DialogDescription>

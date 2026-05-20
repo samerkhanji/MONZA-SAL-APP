@@ -444,25 +444,34 @@ export default function GarageJobsPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-xl font-semibold sm:text-2xl">Garage Jobs</h1>
         <div className="flex flex-wrap gap-2">
-          <ExportButton
-            data={jobExportData(sortedJobs)}
-            allData={jobExportData(jobs)}
-            columns={jobExportColumns}
-            filename="Garage_Jobs"
-            options={{
-              pageName: "Garage Jobs",
-              summary: `Total Jobs: ${sortedJobs.length} | Completed: ${doneCount} | In Progress: ${inProgressCount}`,
-            }}
-            disabled={loading}
-          />
+          <span data-tour-id="garage-export">
+            <ExportButton
+              data={jobExportData(sortedJobs)}
+              allData={jobExportData(jobs)}
+              columns={jobExportColumns}
+              filename="Garage_Jobs"
+              options={{
+                pageName: "Garage Jobs",
+                summary: `Total Jobs: ${sortedJobs.length} | Completed: ${doneCount} | In Progress: ${inProgressCount}`,
+              }}
+              disabled={loading}
+            />
+          </span>
           {canManageGarage && (
-            <Button size="lg" variant="outline" className="h-12 px-6 text-base" asChild>
+            <Button
+              data-tour-id="garage-time-reports-link"
+              size="lg"
+              variant="outline"
+              className="h-12 px-6 text-base"
+              asChild
+            >
               <Link href="/garage/time-reports">Time reports</Link>
             </Button>
           )}
           {canCreateJob && (
             <>
               <Button
+                data-tour-id="garage-scan-vin"
                 size="lg"
                 variant="outline"
                 className="h-12 px-6 text-base"
@@ -472,6 +481,7 @@ export default function GarageJobsPage() {
                 Scan VIN
               </Button>
               <Button
+                data-tour-id="garage-new-job"
                 size="lg"
                 className="h-12 px-6 text-base"
                 onClick={() => {
@@ -487,9 +497,11 @@ export default function GarageJobsPage() {
         </div>
       </div>
 
-      <GarageBaySection onRefreshJobs={fetchJobs} />
+      <div data-tour-id="garage-bays-section">
+        <GarageBaySection onRefreshJobs={fetchJobs} />
+      </div>
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div data-tour-id="garage-stats" className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <div className="rounded-lg border bg-card p-4">
           <p className="text-muted-foreground text-sm">Urgent</p>
           <p className="text-2xl font-bold">{stats.urgent}</p>
@@ -509,7 +521,7 @@ export default function GarageJobsPage() {
       </div>
 
       <div className="flex flex-wrap gap-3 max-md:overflow-x-auto max-md:pb-2 max-md:-mx-4 max-md:px-4 max-md:scrollbar-none">
-        <div className="flex flex-wrap gap-2 min-w-max">
+        <div data-tour-id="garage-status-filter" className="flex flex-wrap gap-2 min-w-max">
           {["all", "pending", "in_progress", "waiting_parts", "done", "delivered", "cancelled"].map(
             (s) => (
               <button
@@ -527,7 +539,7 @@ export default function GarageJobsPage() {
             )
           )}
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div data-tour-id="garage-priority-filter" className="flex flex-wrap gap-2">
           {["all", "urgent", "normal", "low"].map((p) => (
             <button
               key={p}
@@ -544,6 +556,7 @@ export default function GarageJobsPage() {
           ))}
         </div>
         <Input
+          data-tour-id="garage-search"
           id="garage-job-search"
           name="garage-job-search"
           placeholder="Search VIN, reason of visit, assigned to..."
@@ -572,7 +585,7 @@ export default function GarageJobsPage() {
           )}
         </div>
       ) : (
-        <div className="space-y-4">
+        <div data-tour-id="garage-jobs-list" className="space-y-4">
           {sortedJobs.map((job) => {
             const car = job.cars;
             const borderClass =

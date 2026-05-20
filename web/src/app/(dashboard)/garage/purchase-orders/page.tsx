@@ -219,7 +219,7 @@ export default function PurchaseOrdersPage() {
             receipt (GRN) is logged.
           </p>
         </div>
-        <Button onClick={() => setCreateOpen(true)}>
+        <Button data-tour-id="purchase-orders-new" onClick={() => setCreateOpen(true)}>
           <Plus className="mr-1.5 size-4" /> New PO
         </Button>
       </div>
@@ -244,7 +244,7 @@ export default function PurchaseOrdersPage() {
       )}
 
       <Tabs value={bucket} onValueChange={(v) => setBucket(v as Bucket)}>
-        <TabsList className="flex h-auto flex-wrap">
+        <TabsList data-tour-id="purchase-orders-status-tabs" className="flex h-auto flex-wrap">
           {STATUS_BUCKETS.map((b) => (
             <TabsTrigger key={b.id} value={b.id} className="text-xs">
               {b.label}
@@ -261,6 +261,7 @@ export default function PurchaseOrdersPage() {
       <div className="relative">
         <Search className="text-muted-foreground pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2" />
         <Input
+          data-tour-id="purchase-orders-search"
           placeholder="Search by PO number or supplier…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -268,7 +269,7 @@ export default function PurchaseOrdersPage() {
         />
       </div>
 
-      <Card>
+      <Card data-tour-id="purchase-orders-table">
         <CardContent className="p-0">
           {loading ? (
             <div className="space-y-2 p-4">
@@ -334,7 +335,7 @@ export default function PurchaseOrdersPage() {
       </Card>
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent data-tour-id="purchase-orders-new-dialog" className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>New purchase order</DialogTitle>
             <DialogDescription>
@@ -389,7 +390,7 @@ export default function PurchaseOrdersPage() {
       </Dialog>
 
       <div className="text-muted-foreground flex items-center justify-between pt-2 text-xs">
-        <Button variant="link" size="sm" asChild>
+        <Button data-tour-id="purchase-orders-inventory-link" variant="link" size="sm" asChild>
           <Link href="/garage/inventory">
             <ArrowLeft className="mr-1 size-3" /> Parts inventory
           </Link>

@@ -246,7 +246,7 @@ export default function PurchaseOrderDetailPage() {
     <div className="container space-y-6 py-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <Button variant="ghost" size="sm" asChild className="-ml-2 mb-1">
+          <Button data-tour-id="po-detail-back" variant="ghost" size="sm" asChild className="-ml-2 mb-1">
             <Link href="/garage/purchase-orders">
               <ArrowLeft className="mr-1 size-3" /> All purchase orders
             </Link>
@@ -281,7 +281,7 @@ export default function PurchaseOrderDetailPage() {
       )}
 
       {/* Lines */}
-      <Card>
+      <Card data-tour-id="po-detail-lines">
         <CardHeader>
           <CardTitle className="text-base">Line items</CardTitle>
           <CardDescription>
@@ -350,7 +350,7 @@ export default function PurchaseOrderDetailPage() {
       </Card>
 
       {/* Actions */}
-      <Card>
+      <Card data-tour-id="po-detail-actions">
         <CardHeader>
           <CardTitle className="text-base">Actions</CardTitle>
         </CardHeader>
@@ -421,7 +421,7 @@ export default function PurchaseOrderDetailPage() {
           )}
 
           {canReceive && canManage && (
-            <Button variant="secondary" onClick={() => setReceiptOpen(true)} disabled={busy}>
+            <Button data-tour-id="po-detail-log-grn" variant="secondary" onClick={() => setReceiptOpen(true)} disabled={busy}>
               Log GRN (receipt)
             </Button>
           )}
@@ -493,7 +493,7 @@ export default function PurchaseOrderDetailPage() {
 
       {/* Invoices + Payments */}
       {(invoices.length > 0 || payments.length > 0) && (
-        <Card>
+        <Card data-tour-id="po-detail-money">
           <CardHeader>
             <CardTitle className="text-base">Money</CardTitle>
             <CardDescription>

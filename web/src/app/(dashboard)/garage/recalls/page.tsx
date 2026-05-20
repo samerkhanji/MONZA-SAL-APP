@@ -150,14 +150,14 @@ export default function RecallsPage() {
           </p>
         </div>
         {canWrite && (
-          <Button onClick={() => setCreateOpen(true)}>
+          <Button data-tour-id="recalls-new" onClick={() => setCreateOpen(true)}>
             <Plus className="mr-1.5 size-4" /> New recall
           </Button>
         )}
       </div>
 
       <Tabs value={bucket} onValueChange={(v) => setBucket(v as Bucket)}>
-        <TabsList className="flex h-auto flex-wrap">
+        <TabsList data-tour-id="recalls-status-tabs" className="flex h-auto flex-wrap">
           {STATUS_BUCKETS.map((b) => (
             <TabsTrigger key={b.id} value={b.id} className="text-xs">
               {b.label}
@@ -174,6 +174,7 @@ export default function RecallsPage() {
       <div className="relative">
         <Search className="text-muted-foreground pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2" />
         <Input
+          data-tour-id="recalls-search"
           placeholder="Search by recall number, title, model…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -181,7 +182,7 @@ export default function RecallsPage() {
         />
       </div>
 
-      <Card>
+      <Card data-tour-id="recalls-table">
         <CardContent className="p-0">
           {loading ? (
             <div className="space-y-2 p-4">
@@ -328,7 +329,7 @@ function CreateRecallDialog({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-md">
+      <DialogContent data-tour-id="recalls-new-dialog" className="max-w-md">
         <DialogHeader>
           <DialogTitle>New recall</DialogTitle>
           <DialogDescription>

@@ -254,7 +254,7 @@ export default function WarrantyDetailPage() {
           </Badge>
           {canWrite && (
             <Select value={wc.status} onValueChange={(v) => void changeStatus(v)}>
-              <SelectTrigger className="h-8 w-44 text-xs"><SelectValue /></SelectTrigger>
+              <SelectTrigger data-tour-id="warranty-detail-status" className="h-8 w-44 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {STATUS_OPTS.map((s) => (
                   <SelectItem key={s} value={s}>{s.replace(/_/g, " ")}</SelectItem>
@@ -265,7 +265,7 @@ export default function WarrantyDetailPage() {
         </div>
       </div>
 
-      <Card>
+      <Card data-tour-id="warranty-detail-summary">
         <CardContent className="grid gap-4 p-4 sm:grid-cols-2">
           <div>
             <Label className="text-muted-foreground text-xs uppercase">VIN / vehicle</Label>
@@ -305,7 +305,7 @@ export default function WarrantyDetailPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card data-tour-id="warranty-detail-parts">
         <CardContent className="space-y-3 p-4">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold">Parts used / claimed</h2>
@@ -372,7 +372,7 @@ export default function WarrantyDetailPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card data-tour-id="warranty-detail-documents">
         <CardContent className="space-y-3 p-4">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold">Photos &amp; documents</h2>
@@ -402,7 +402,7 @@ export default function WarrantyDetailPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card data-tour-id="warranty-detail-resolution">
         <CardContent className="space-y-3 p-4">
           <h2 className="text-sm font-semibold">Resolution</h2>
           <Textarea

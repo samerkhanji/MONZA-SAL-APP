@@ -175,14 +175,14 @@ export default function WarrantyPage() {
           </p>
         </div>
         {canWrite && (
-          <Button onClick={() => setCreateOpen(true)}>
+          <Button data-tour-id="warranty-new-case" onClick={() => setCreateOpen(true)}>
             <Plus className="mr-1.5 size-4" /> New case
           </Button>
         )}
       </div>
 
       <Tabs value={bucket} onValueChange={(v) => setBucket(v as Bucket)}>
-        <TabsList className="flex h-auto flex-wrap">
+        <TabsList data-tour-id="warranty-status-tabs" className="flex h-auto flex-wrap">
           {STATUS_BUCKETS.map((b) => (
             <TabsTrigger key={b.id} value={b.id} className="text-xs">
               {b.label}
@@ -199,6 +199,7 @@ export default function WarrantyPage() {
       <div className="relative">
         <Search className="text-muted-foreground pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2" />
         <Input
+          data-tour-id="warranty-search"
           placeholder="Search by case number, VIN, customer, summary…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -206,7 +207,7 @@ export default function WarrantyPage() {
         />
       </div>
 
-      <Card>
+      <Card data-tour-id="warranty-table">
         <CardContent className="p-0">
           {loading ? (
             <div className="space-y-2 p-4">
@@ -367,7 +368,7 @@ function CreateCaseDialog({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-md">
+      <DialogContent data-tour-id="warranty-new-dialog" className="max-w-md">
         <DialogHeader>
           <DialogTitle>Open warranty case</DialogTitle>
           <DialogDescription>

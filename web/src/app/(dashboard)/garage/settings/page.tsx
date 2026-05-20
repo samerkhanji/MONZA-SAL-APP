@@ -242,7 +242,7 @@ export default function GarageWorkflowSettingsPage() {
         <p className="text-muted-foreground text-sm">Capacities and task templates (RLS applies)</p>
       </div>
 
-      <Card>
+      <Card data-tour-id="settings-capacities-panel">
         <CardHeader>
           <CardTitle>Resource capacities</CardTitle>
           <CardDescription>Usage = tasks in pending or in_progress with this resource_type</CardDescription>
@@ -253,7 +253,7 @@ export default function GarageWorkflowSettingsPage() {
             const gmIncrementOnly = isGm && isGarageGmIncrementOnlyResource(c.resource_name);
 
             return (
-              <div key={c.resource_name} className="flex flex-col gap-2 sm:flex-row sm:items-end">
+              <div key={c.resource_name} data-tour-id="settings-capacity-row" className="flex flex-col gap-2 sm:flex-row sm:items-end">
                 <div className="min-w-0 flex-1 space-y-1">
                   <Label>{GARAGE_RESOURCE_LABELS[c.resource_name] ?? c.resource_name}</Label>
                   <p className="text-muted-foreground text-xs">
@@ -322,20 +322,20 @@ export default function GarageWorkflowSettingsPage() {
       </Card>
 
       {canManageTemplates ? (
-      <Card>
+      <Card data-tour-id="settings-templates-panel">
         <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
           <div>
             <CardTitle>Task templates</CardTitle>
             <CardDescription>Checklist models used on the task board</CardDescription>
           </div>
-          <Button type="button" size="sm" className="gap-1" onClick={() => setNewTplOpen(true)}>
+          <Button data-tour-id="settings-new-template" type="button" size="sm" className="gap-1" onClick={() => setNewTplOpen(true)}>
             <Plus className="size-4" />
             New template
           </Button>
         </CardHeader>
         <CardContent className="space-y-6">
           <Dialog open={newTplOpen} onOpenChange={setNewTplOpen}>
-            <DialogContent>
+            <DialogContent data-tour-id="settings-new-template-dialog">
               <DialogHeader>
                 <DialogTitle>New template</DialogTitle>
                 <DialogDescription>Name only; add lines below after creating.</DialogDescription>
@@ -351,7 +351,7 @@ export default function GarageWorkflowSettingsPage() {
           </Dialog>
 
           {templates.map((t) => (
-            <div key={t.id} className="rounded-lg border border-border/80 p-4">
+            <div key={t.id} data-tour-id="settings-template-card" className="rounded-lg border border-border/80 p-4">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <p className="font-medium">
@@ -382,7 +382,7 @@ export default function GarageWorkflowSettingsPage() {
                   </li>
                 ))}
               </ul>
-              <div className="flex flex-col gap-2 sm:flex-row">
+              <div data-tour-id="settings-template-add-line" className="flex flex-col gap-2 sm:flex-row">
                 <Input
                   placeholder="New line description"
                   value={newItemTplId === t.id ? newItemDesc : ""}
