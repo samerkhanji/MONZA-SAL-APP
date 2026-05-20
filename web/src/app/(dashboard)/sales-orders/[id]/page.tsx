@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
 import { Button } from "@/components/ui/button";
+import { FieldHint } from "@/components/ui/field-hint";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -548,7 +549,10 @@ export default function SalesOrderDetailPage() {
               />
             </div>
             <div>
-              <Label htmlFor="quote-currency">Currency</Label>
+              <Label htmlFor="quote-currency">
+                Currency
+                <FieldHint text="The currency for this whole order — picking it here applies to the quote, deposit, and contract." />
+              </Label>
               <Select value={orderCurrency} onValueChange={setOrderCurrency} disabled={!canEdit}>
                 <SelectTrigger id="quote-currency"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -601,7 +605,10 @@ export default function SalesOrderDetailPage() {
               </Select>
             </div>
             <div>
-              <Label htmlFor="deposit-method">Method</Label>
+              <Label htmlFor="deposit-method">
+                Method
+                <FieldHint text="How the customer paid the deposit — cash, bank wire, or card." />
+              </Label>
               <Input
                 id="deposit-method" placeholder="cash / wire / card"
                 value={depositMethod} onChange={(e) => setDepositMethod(e.target.value)}
@@ -630,7 +637,10 @@ export default function SalesOrderDetailPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           <div>
-            <Label htmlFor="contract-url">Contract URL</Label>
+            <Label htmlFor="contract-url">
+              Contract URL
+              <FieldHint text="A link to the scanned, signed contract document — stored online so anyone can open it." />
+            </Label>
             <Input
               id="contract-url"
               type="url"
