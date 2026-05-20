@@ -13,6 +13,7 @@ import {
   LOCATION_LABELS,
 } from "@/types/database";
 import { Button } from "@/components/ui/button";
+import { FieldHint } from "@/components/ui/field-hint";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -375,7 +376,10 @@ export function EditCarDialog({
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="status">Status</Label>
+              <Label htmlFor="status">
+                Status
+                <FieldHint text="Where the car is in its life with you — in inventory, reserved, sold, or in the garage." />
+              </Label>
               <Select
                 value={status}
                 onValueChange={(v) => setStatus(v as CarStatus)}
@@ -417,7 +421,10 @@ export function EditCarDialog({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="suffix">Suffix</Label>
+              <Label htmlFor="suffix">
+                Suffix
+                <FieldHint text="The trim or spec code that comes after the model name, like 'GCC REV' or 'H97c'." />
+              </Label>
               <Input
                 id="suffix"
                 value={suffix}
@@ -430,7 +437,10 @@ export function EditCarDialog({
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="engineNumber">Engine number</Label>
+              <Label htmlFor="engineNumber">
+                Engine number
+                <FieldHint text="The serial number stamped on the engine block — different from the VIN." />
+              </Label>
               <Input
                 id="engineNumber"
                 value={engineNumber}
@@ -440,7 +450,10 @@ export function EditCarDialog({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="dongle">Dongle</Label>
+              <Label htmlFor="dongle">
+                Dongle
+                <FieldHint text="Whether the car comes with its diagnostic dongle accessory." />
+              </Label>
               <Input
                 id="dongle"
                 value={dongle}
@@ -453,7 +466,10 @@ export function EditCarDialog({
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="locationType">Location type</Label>
+              <Label htmlFor="locationType">
+                Location type
+                <FieldHint text="Where the car physically sits right now — showroom floor, storage lot, or the garage." />
+              </Label>
               <Select
                 value={locationType}
                 onValueChange={(v) => setLocationType(v as LocationType)}
@@ -485,7 +501,10 @@ export function EditCarDialog({
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="pdi">PDI status</Label>
+              <Label htmlFor="pdi">
+                PDI status
+                <FieldHint text="Pre-Delivery Inspection — the safety and quality check done before a car can be handed to a customer." />
+              </Label>
               <Select
                 value={pdiStatus}
                 onValueChange={(v) => setPdiStatus(v as PdiStatus)}
@@ -527,7 +546,10 @@ export function EditCarDialog({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="software">Software version</Label>
+              <Label htmlFor="software">
+                Software version
+                <FieldHint text="The exact version number of the software currently installed on the car." />
+              </Label>
               <Input
                 id="software"
                 value={softwareVersion}
@@ -593,6 +615,7 @@ export function EditCarDialog({
             />
             <Label htmlFor="isErev" className="cursor-pointer text-sm font-normal">
               Is EREV
+              <FieldHint text="Tick this for hybrids that have a small petrol engine to recharge the battery on the go." />
             </Label>
           </div>
 
@@ -609,7 +632,10 @@ export function EditCarDialog({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="evKm">EV KM</Label>
+                <Label htmlFor="evKm">
+                  EV KM
+                  <FieldHint text="Distance the car has driven on battery power alone." />
+                </Label>
                 <Input
                   id="evKm"
                   type="number"
@@ -622,7 +648,10 @@ export function EditCarDialog({
                 />
               </div>
               <div className="space-y-2 sm:col-span-2">
-                <Label htmlFor="motorKm">Motor KM</Label>
+                <Label htmlFor="motorKm">
+                  Motor KM
+                  <FieldHint text="Distance the car has driven using its petrol motor." />
+                </Label>
                 <Input
                   id="motorKm"
                   type="number"
@@ -670,7 +699,10 @@ export function EditCarDialog({
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Customs</Label>
+              <Label>
+                Customs
+                <FieldHint text="Whether the car has cleared import customs and its duties are paid." />
+              </Label>
               <Select
                 value={customsStatus}
                 onValueChange={(v) => setCustomsStatus(v as CustomsStatus)}
@@ -692,7 +724,10 @@ export function EditCarDialog({
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="carTrim">Trim / variant</Label>
+              <Label htmlFor="carTrim">
+                Trim / variant
+                <FieldHint text="The equipment level or edition of this model, such as 'Luxury' or 'Premium'." />
+              </Label>
               <Input
                 id="carTrim"
                 value={trim}
@@ -716,7 +751,10 @@ export function EditCarDialog({
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="blIssue">B/L issue date</Label>
+              <Label htmlFor="blIssue">
+                B/L issue date
+                <FieldHint text="The date the Bill of Lading — the shipping document for the car's import — was issued." />
+              </Label>
               <Input
                 id="blIssue"
                 type="date"
@@ -738,7 +776,10 @@ export function EditCarDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="customsNotes">Customs notes</Label>
+            <Label htmlFor="customsNotes">
+              Customs notes
+              <FieldHint text="Notes specific to import or customs clearance — kept separate from general notes." />
+            </Label>
             <Textarea
               id="customsNotes"
               value={customsNotes}
@@ -756,7 +797,10 @@ export function EditCarDialog({
               </p>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="editWarrantyDms">Warranty vehicle DMS</Label>
+                  <Label htmlFor="editWarrantyDms">
+                    Warranty vehicle DMS
+                    <FieldHint text="The vehicle warranty start date as recorded in the manufacturer's Dealer Management System." />
+                  </Label>
                   <Input
                     id="editWarrantyDms"
                     type="date"
@@ -766,7 +810,10 @@ export function EditCarDialog({
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="editWarrantyBatteryDms">Warranty battery DMS</Label>
+                  <Label htmlFor="editWarrantyBatteryDms">
+                    Warranty battery DMS
+                    <FieldHint text="The battery warranty start date as recorded in the manufacturer's Dealer Management System." />
+                  </Label>
                   <Input
                     id="editWarrantyBatteryDms"
                     type="date"
@@ -783,7 +830,10 @@ export function EditCarDialog({
               </p>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <div className="space-y-2">
-                  <Label htmlFor="editWarrantyVehicle">Warranty on Vehicle (Expiry)</Label>
+                  <Label htmlFor="editWarrantyVehicle">
+                    Warranty on Vehicle (Expiry)
+                    <FieldHint text="The date the vehicle's general warranty runs out." />
+                  </Label>
                   <Input
                     id="editWarrantyVehicle"
                     type="date"
@@ -793,7 +843,10 @@ export function EditCarDialog({
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="editWarrantyBattery">Warranty on Battery (Expiry)</Label>
+                  <Label htmlFor="editWarrantyBattery">
+                    Warranty on Battery (Expiry)
+                    <FieldHint text="The date the separate battery warranty runs out — EV batteries are usually covered longer than the vehicle." />
+                  </Label>
                   <Input
                     id="editWarrantyBattery"
                     type="date"
@@ -803,7 +856,10 @@ export function EditCarDialog({
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="editWarrantyMonza">Warranty Monza Start Date</Label>
+                  <Label htmlFor="editWarrantyMonza">
+                    Warranty Monza Start Date
+                    <FieldHint text="The warranty start date your dealership honours, which may differ from the manufacturer's date." />
+                  </Label>
                   <Input
                     id="editWarrantyMonza"
                     type="date"
