@@ -8,6 +8,7 @@ import type { CarDisplay, CarStatus } from "@/types/database";
 import { formatCarStatusLabel } from "@/types/database";
 import { installmentDueDateIso } from "@/lib/installment-due-dates";
 import { Button } from "@/components/ui/button";
+import { FieldHint } from "@/components/ui/field-hint";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -1019,7 +1020,10 @@ export function StatusCustomerDialog({
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label>Currency</Label>
+                          <Label>
+                            Currency
+                            <FieldHint text="The currency used for this sale's price and payments." />
+                          </Label>
                           <Select value={currency} onValueChange={setCurrency}>
                             <SelectTrigger>
                               <SelectValue />
@@ -1037,7 +1041,10 @@ export function StatusCustomerDialog({
                           <p className="text-sm font-medium">Payment Type</p>
                           <div className="grid gap-4 sm:grid-cols-2">
                             <div className="space-y-2">
-                              <Label>Payment type</Label>
+                              <Label>
+                                Payment type
+                                <FieldHint text="Whether the customer pays the whole amount at once or spreads it over monthly installments." />
+                              </Label>
                               <Select
                                 value={paymentType}
                                 onValueChange={(v) =>
@@ -1059,7 +1066,10 @@ export function StatusCustomerDialog({
                           {paymentType === "installments" && (
                             <div className="grid gap-4 sm:grid-cols-2">
                               <div className="space-y-2">
-                                <Label>Total amount *</Label>
+                                <Label>
+                                  Total amount *
+                                  <FieldHint text="The full price to be paid across the whole installment plan." />
+                                </Label>
                                 <Input
                                   value={planTotalAmount}
                                   onChange={(e) => setPlanTotalAmount(e.target.value)}
@@ -1071,7 +1081,10 @@ export function StatusCustomerDialog({
                                 />
                               </div>
                               <div className="space-y-2">
-                                <Label>Down payment</Label>
+                                <Label>
+                                  Down payment
+                                  <FieldHint text="The amount the customer pays upfront — the rest is split into monthly installments." />
+                                </Label>
                                 <Input
                                   value={planDownPayment}
                                   onChange={(e) => setPlanDownPayment(e.target.value)}
@@ -1083,7 +1096,10 @@ export function StatusCustomerDialog({
                                 />
                               </div>
                               <div className="space-y-2">
-                                <Label>Number of months *</Label>
+                                <Label>
+                                  Number of months *
+                                  <FieldHint text="How many monthly payments the plan is split into." />
+                                </Label>
                                 <Input
                                   value={planMonths}
                                   onChange={(e) => setPlanMonths(e.target.value)}
@@ -1094,7 +1110,10 @@ export function StatusCustomerDialog({
                                 />
                               </div>
                               <div className="space-y-2">
-                                <Label>Monthly amount *</Label>
+                                <Label>
+                                  Monthly amount *
+                                  <FieldHint text="How much the customer pays each month." />
+                                </Label>
                                 <Input
                                   value={planMonthlyAmount}
                                   onChange={(e) => setPlanMonthlyAmount(e.target.value)}
@@ -1113,7 +1132,10 @@ export function StatusCustomerDialog({
                                 />
                               </div>
                               <div className="space-y-2">
-                                <Label>Due day (1–28) *</Label>
+                                <Label>
+                                  Due day (1–28) *
+                                  <FieldHint text="The day of each month the payment is due — kept at 28 or below so it works in every month." />
+                                </Label>
                                 <Input
                                   value={planDueDay}
                                   onChange={(e) => setPlanDueDay(e.target.value)}
