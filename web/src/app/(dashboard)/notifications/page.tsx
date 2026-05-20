@@ -269,6 +269,7 @@ export default function NotificationsPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button
+            data-tour-id="notifications-mark-all-read"
             variant="outline"
             size="sm"
             onClick={() => void markAllRead()}
@@ -277,6 +278,7 @@ export default function NotificationsPage() {
             Mark all read
           </Button>
           <Link
+            data-tour-id="notifications-preferences-link"
             href="/settings/notifications"
             className="text-muted-foreground hover:text-foreground text-sm underline-offset-4 hover:underline"
           >
@@ -286,7 +288,7 @@ export default function NotificationsPage() {
       </div>
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as TabId)}>
-        <TabsList className="flex h-auto flex-wrap">
+        <TabsList className="flex h-auto flex-wrap" data-tour-id="notifications-tabs">
           {TABS.map((t) => (
             <TabsTrigger key={t.id} value={t.id} className="text-xs">
               {t.label}
@@ -303,6 +305,7 @@ export default function NotificationsPage() {
       <div className="relative">
         <Search className="text-muted-foreground pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2" />
         <Input
+          data-tour-id="notifications-search-input"
           placeholder="Search notifications…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -311,11 +314,15 @@ export default function NotificationsPage() {
       </div>
 
       {selectedIds.size > 0 && (
-        <div className="bg-muted/50 flex flex-wrap items-center gap-2 rounded-md border p-2">
+        <div
+          className="bg-muted/50 flex flex-wrap items-center gap-2 rounded-md border p-2"
+          data-tour-id="notifications-bulk-actions"
+        >
           <span className="text-sm font-medium">
             {selectedIds.size} selected
           </span>
           <Button
+            data-tour-id="notifications-bulk-mark-read"
             variant="outline"
             size="sm"
             onClick={() => void markRead(Array.from(selectedIds))}
@@ -324,6 +331,7 @@ export default function NotificationsPage() {
             <Check className="mr-1.5 size-3.5" /> Mark read
           </Button>
           <Button
+            data-tour-id="notifications-bulk-dismiss"
             variant="outline"
             size="sm"
             onClick={() => void dismissBulk(Array.from(selectedIds))}
@@ -358,7 +366,10 @@ export default function NotificationsPage() {
         </div>
       ) : (
         <div className="space-y-2">
-          <label className="text-muted-foreground flex cursor-pointer items-center gap-2 px-1 text-xs">
+          <label
+            className="text-muted-foreground flex cursor-pointer items-center gap-2 px-1 text-xs"
+            data-tour-id="notifications-select-all"
+          >
             <input
               type="checkbox"
               checked={allSelected}
@@ -367,7 +378,7 @@ export default function NotificationsPage() {
             />
             Select all visible
           </label>
-          <ul className="divide-border bg-card divide-y rounded-md border">
+          <ul className="divide-border bg-card divide-y rounded-md border" data-tour-id="notifications-list">
             {filtered.map((n) => {
               const sev: Severity = (n.severity ?? "info") as Severity;
               const Icon = SEVERITY_ICON[sev];
