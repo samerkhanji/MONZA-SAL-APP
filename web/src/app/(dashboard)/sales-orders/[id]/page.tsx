@@ -241,13 +241,12 @@ export default function SalesOrderDetailPage() {
       toast.error("Quote must be sent first");
       return;
     }
-    if (
-      order?.selling_price != null &&
-      Number.isFinite(order.selling_price) &&
-      amt > order.selling_price
-    ) {
+    // The quote lifecycle fills quote_amount; selling_price stays null until
+    // the order is finalised. Cap the deposit against whichever price is set.
+    const priceCap = order?.selling_price ?? order?.quote_amount ?? null;
+    if (priceCap != null && Number.isFinite(priceCap) && amt > priceCap) {
       toast.error(
-        `Deposit (${amt.toLocaleString()}) cannot exceed the selling price (${order.selling_price.toLocaleString()}).`
+        `Deposit (${amt.toLocaleString()}) cannot exceed the price (${priceCap.toLocaleString()}).`
       );
       return;
     }

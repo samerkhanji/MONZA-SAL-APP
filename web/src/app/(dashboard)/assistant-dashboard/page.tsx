@@ -68,6 +68,7 @@ interface JobWithCar {
   actual_hours: number | null;
   started_at: string | null;
   assigned_to: string | null;
+  assigned_profile?: { id: string; full_name: string | null } | null;
   created_at: string;
   cars?: { vin: string; brand: string; model: string } | null;
 }
@@ -835,7 +836,7 @@ export default function AssistantDashboardPage() {
                               : "—"}
                           </p>
                           <p>Est. hrs: {job.estimated_hours ?? "—"}</p>
-                          <p>Assigned: {job.assigned_to ?? "—"}</p>
+                          <p>Assigned: {job.assigned_profile?.full_name ?? "—"}</p>
                         </div>
                         <Button className="mt-3 w-full touch-manipulation" size="sm" variant="outline" asChild>
                           <Link href={`/garage/jobs/${job.id}`}>
@@ -908,7 +909,7 @@ export default function AssistantDashboardPage() {
                                 : "—"}
                             </td>
                             <td className="px-4 py-3">{job.estimated_hours ?? "—"}</td>
-                            <td className="px-4 py-3">{job.assigned_to ?? "—"}</td>
+                            <td className="px-4 py-3">{job.assigned_profile?.full_name ?? "—"}</td>
                             <td className="px-4 py-3 text-right">
                               <Button size="sm" variant="ghost" asChild>
                                 <Link href={`/garage/jobs/${job.id}`}>
