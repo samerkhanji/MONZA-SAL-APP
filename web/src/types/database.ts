@@ -63,7 +63,7 @@ export interface Car {
   location_slot: string | null;
   location_floor: string | null;
   battery_percent: number | null;
-  ev_range_km: number | null;
+  km_range: number | null;
   motor: string | null;
   is_erev?: boolean;
   ev_km?: number | null;
@@ -93,6 +93,13 @@ export interface Car {
   bl_issue_date?: string | null;
   registration_date?: string | null;
   customs_notes?: string | null;
+  /** Incoming car shipment tracking (Ordered Cars page). */
+  incoming_eta?: string | null;
+  shipment_code?: string | null;
+  /** Recall Center: set when a car is recalled to the manufacturer (Voyah). */
+  recalled_at?: string | null;
+  recall_reason?: "shipping" | "issue" | null;
+  recall_notes?: string | null;
   deleted_at: string | null;
   notes: string | null;
   created_at: string;
@@ -112,17 +119,24 @@ export interface CarDisplay extends Car {
   customs_display?: string;
 }
 
-export type CarDocumentType = "pdi" | "job_card";
+export type CarDocumentType = string;
 
 export interface CarDocument {
   id: string;
   car_id: string;
   document_type: CarDocumentType;
   file_name: string;
-  storage_path: string;
-  file_size_bytes: number | null;
-  uploaded_at: string;
+  file_path: string | null;
+  file_size: number | null;
+  mime_type: string | null;
+  notes: string | null;
   uploaded_by: string | null;
+  created_at: string;
+  /** Legacy columns retained on the table for backward compatibility. */
+  storage_path?: string | null;
+  file_size_bytes?: number | null;
+  uploaded_at?: string;
+  event_date?: string | null;
 }
 
 export interface CarEvent {
@@ -548,8 +562,8 @@ export interface Request {
   send_to: string | null;
   send_to_user_id: string | null;
   reviewed_by: string | null;
-   reviewed_at: string | null;
-   decision_reason: string | null;
+  reviewed_at: string | null;
+  decision_reason: string | null;
   forwarded_at: string | null;
   resolved_at: string | null;
   created_at: string;

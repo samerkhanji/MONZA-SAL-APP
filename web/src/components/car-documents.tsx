@@ -29,6 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Upload, Trash2, Download, Eye } from "lucide-react";
@@ -123,6 +124,17 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+/** Use the user's custom name when provided, preserving the file extension. */
+function applyCustomName(customName: string, originalName: string): string {
+  const trimmed = customName.trim();
+  if (!trimmed) return originalName;
+  const dot = originalName.lastIndexOf(".");
+  const ext = dot > 0 ? originalName.slice(dot) : "";
+  return ext && !trimmed.toLowerCase().endsWith(ext.toLowerCase())
+    ? trimmed + ext
+    : trimmed;
+}
+
 function getDocPath(doc: CarDocumentRow): string {
   return doc.file_path ?? doc.storage_path ?? "";
 }
@@ -161,6 +173,7 @@ export function CarDocuments({ carId, carVin }: CarDocumentsProps) {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [uploadType, setUploadType] = useState<string>("pdi_report");
   const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadName, setUploadName] = useState("");
   const [uploadNotes, setUploadNotes] = useState("");
   const [uploading, setUploading] = useState(false);
   const [typeFilter, setTypeFilter] = useState<string>("all");
@@ -279,9 +292,6 @@ export function CarDocuments({ carId, carVin }: CarDocumentsProps) {
     const timestamp = Date.now();
     const filePath = `${carId}/${uploadType}/${timestamp}_${uploadFile.name}`;
 
-    // Map to legacy enum if needed (pdi_report -> pdi)
-    const legacyType = uploadType === "pdi_report" ? "pdi" : uploadType;
-
     const { error: uploadError } = await supabase.storage
       .from("car-documents")
       .upload(filePath, uploadFile, {
@@ -295,33 +305,16 @@ export function CarDocuments({ carId, carVin }: CarDocumentsProps) {
       return;
     }
 
-    // Try new schema first (file_path, file_size, mime_type, notes, created_at)
-    let metaError = (
-      await supabase.from("car_documents").insert({
-        car_id: carId,
-        document_type: uploadType,
-        file_name: uploadFile.name,
-        file_path: filePath,
-        file_size: uploadFile.size,
-        mime_type: uploadFile.type,
-        notes: uploadNotes.trim() || null,
-        uploaded_by: user.id,
-      })
-    ).error;
-
-    // Fallback: legacy schema (storage_path, file_size_bytes, document_type enum)
-    if (metaError && (uploadType === "pdi_report" || uploadType === "job_card")) {
-      metaError = (
-        await supabase.from("car_documents").insert({
-          car_id: carId,
-          document_type: legacyType,
-          file_name: uploadFile.name,
-          storage_path: filePath,
-          file_size_bytes: uploadFile.size,
-          uploaded_by: user.id,
-        })
-      ).error;
-    }
+    const { error: metaError } = await supabase.from("car_documents").insert({
+      car_id: carId,
+      document_type: uploadType,
+      file_name: applyCustomName(uploadName, uploadFile.name),
+      file_path: filePath,
+      file_size: uploadFile.size,
+      mime_type: uploadFile.type,
+      notes: uploadNotes.trim() || null,
+      uploaded_by: user.id,
+    });
 
     setUploading(false);
 
@@ -334,6 +327,7 @@ export function CarDocuments({ carId, carVin }: CarDocumentsProps) {
     toast.success("Document uploaded successfully");
     setUploadOpen(false);
     setUploadFile(null);
+    setUploadName("");
     setUploadNotes("");
     if (fileInputRef.current) fileInputRef.current.value = "";
     fetchDocuments();
@@ -478,6 +472,7 @@ export function CarDocuments({ carId, carVin }: CarDocumentsProps) {
           setUploadOpen(open);
           if (!open) {
             setUploadFile(null);
+            setUploadName("");
             setUploadNotes("");
             if (fileInputRef.current) fileInputRef.current.value = "";
           }
@@ -508,6 +503,15 @@ export function CarDocuments({ carId, carVin }: CarDocumentsProps) {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="car-doc-name">Document name (optional)</Label>
+              <Input
+                id="car-doc-name"
+                value={uploadName}
+                onChange={(e) => setUploadName(e.target.value)}
+                placeholder="Leave blank to use the file name"
+              />
             </div>
             <div className="space-y-2">
               <Label>File *</Label>
@@ -551,6 +555,7 @@ export function CarDocuments({ carId, carVin }: CarDocumentsProps) {
               onClick={() => {
                 setUploadOpen(false);
                 setUploadFile(null);
+                setUploadName("");
                 setUploadNotes("");
                 if (fileInputRef.current) fileInputRef.current.value = "";
               }}

@@ -36,6 +36,9 @@ import {
   Undo2,
   Repeat,
   HelpCircle,
+  Siren,
+  Ship,
+  PackageSearch,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
@@ -94,6 +97,8 @@ const BASE_NAV_ITEMS: Array<{
     ],
   },
   { href: "/cars", label: "Inventory", icon: Car, tourId: "nav-cars" },
+  { href: "/recall-center", label: "Recall Center", icon: Siren, tourId: "nav-recall-center" },
+  { href: "/ordered-cars", label: "Ordered Cars", icon: Ship, tourId: "nav-ordered-cars" },
   { href: "/test-drive", label: "Test Drive", icon: CarFront, tourId: "nav-test-drive" },
   { href: "/accessories", label: "Accessories", icon: Boxes, tourId: "nav-accessories" },
   { href: "/documents", label: "Documents", icon: FileText, tourId: "nav-documents" },
@@ -127,6 +132,12 @@ const BASE_NAV_ITEMS: Array<{
         label: "Purchase Orders",
         icon: ShoppingBag,
         tourId: "nav-purchase-orders",
+      },
+      {
+        href: "/ordered-parts",
+        label: "Ordered Parts",
+        icon: PackageSearch,
+        tourId: "nav-ordered-parts",
       },
       {
         href: "/garage/suppliers",
@@ -182,6 +193,9 @@ function getPageTitle(pathname: string): string {
   if (pathname.startsWith("/cars/add")) return "Add Car";
   if (pathname.startsWith("/cars/") && pathname !== "/cars") return "Car Details";
   if (pathname.startsWith("/cars")) return "Car Inventory";
+  if (pathname.startsWith("/recall-center")) return "Recall Center";
+  if (pathname.startsWith("/ordered-cars")) return "Ordered Cars";
+  if (pathname.startsWith("/ordered-parts")) return "Ordered Parts";
   if (pathname.startsWith("/accessories")) return "Accessories";
   if (pathname.startsWith("/test-drive")) return "Test Drive";
   if (pathname.startsWith("/documents")) return "Documents";
@@ -281,7 +295,11 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             "sales_ops",
             "sales",
           ].includes(appRole);
-        if (item.href === "/cars")
+        if (
+          item.href === "/cars" ||
+          item.href === "/recall-center" ||
+          item.href === "/ordered-cars"
+        )
           return [
             "owner",
             "assistant",

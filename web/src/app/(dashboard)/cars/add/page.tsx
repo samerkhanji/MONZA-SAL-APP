@@ -225,7 +225,6 @@ export default function AddCarPage() {
       sold_marker: string;
       suffix: string;
       engine_number: string;
-      reserved_by: string;
       reservation_date: string;
     }> = {};
 
@@ -238,7 +237,6 @@ export default function AddCarPage() {
     if (softwareUpdate.trim()) extraFields.software_update = softwareUpdate.trim();
     if (dongle.trim()) extraFields.dongle = dongle.trim();
     extraFields.sold_marker = soldMarker ? "X" : "";
-    if (reservedBy.trim()) extraFields.reserved_by = reservedBy.trim();
     if (reservationDate) extraFields.reservation_date = reservationDate;
 
     if (warrantyPerDms) extraFields.warranty_per_dms = warrantyPerDms;
@@ -315,6 +313,7 @@ export default function AddCarPage() {
         }
         if (deliveryDate) saleFields.delivery_date = deliveryDate;
         if (saleNotes.trim()) saleFields.notes = saleNotes.trim();
+        if (reservedBy.trim()) saleFields.reserved_by = reservedBy.trim();
 
         if (status === "reserved") {
           const depositNum = depositAmount ? parseFloat(depositAmount) : undefined;

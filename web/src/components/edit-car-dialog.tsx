@@ -109,7 +109,7 @@ export function EditCarDialog({
         car.battery_percent != null ? String(car.battery_percent) : ""
       );
       setEvRangeKm(
-        car.ev_range_km != null ? String(car.ev_range_km) : ""
+        car.km_range != null ? String(car.km_range) : ""
       );
       setCurrentKm(car.current_km != null ? String(car.current_km) : "");
       setSoftwareVersion(car.software_version ?? "");
@@ -264,7 +264,7 @@ export function EditCarDialog({
       }
       const evRangeNum = evRangeKm ? parseInt(evRangeKm, 10) : null;
       if (evRangeNum !== null && !Number.isNaN(evRangeNum)) {
-        updates.ev_range_km = evRangeNum;
+        updates.km_range = evRangeNum;
       }
       const currentKmNum = currentKm ? parseInt(currentKm, 10) : null;
       if (currentKmNum !== null && !Number.isNaN(currentKmNum)) {

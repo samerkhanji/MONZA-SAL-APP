@@ -29,6 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Upload, Trash2, Download, Eye } from "lucide-react";
@@ -83,6 +84,17 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+/** Use the user's custom name when provided, preserving the file extension. */
+function applyCustomName(customName: string, originalName: string): string {
+  const trimmed = customName.trim();
+  if (!trimmed) return originalName;
+  const dot = originalName.lastIndexOf(".");
+  const ext = dot > 0 ? originalName.slice(dot) : "";
+  return ext && !trimmed.toLowerCase().endsWith(ext.toLowerCase())
+    ? trimmed + ext
+    : trimmed;
+}
+
 export function CustomerDocuments({ customerId }: CustomerDocumentsProps) {
   const { canEditInventory, appRole } = useUser();
   const canUpload = canPerform("customers", "edit", appRole ?? null);
@@ -94,6 +106,7 @@ export function CustomerDocuments({ customerId }: CustomerDocumentsProps) {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [uploadType, setUploadType] = useState<string>("id_passport");
   const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadName, setUploadName] = useState("");
   const [uploadNotes, setUploadNotes] = useState("");
   const [uploading, setUploading] = useState(false);
   const [typeFilter, setTypeFilter] = useState<string>("all");
@@ -218,7 +231,7 @@ export function CustomerDocuments({ customerId }: CustomerDocumentsProps) {
       .insert({
         customer_id: customerId,
         document_type: uploadType,
-        file_name: uploadFile.name,
+        file_name: applyCustomName(uploadName, uploadFile.name),
         file_path: filePath,
         file_size: uploadFile.size,
         mime_type: uploadFile.type,
@@ -237,6 +250,7 @@ export function CustomerDocuments({ customerId }: CustomerDocumentsProps) {
     toast.success("Document uploaded successfully");
     setUploadOpen(false);
     setUploadFile(null);
+    setUploadName("");
     setUploadNotes("");
     if (fileInputRef.current) fileInputRef.current.value = "";
     fetchDocuments();
@@ -365,6 +379,7 @@ export function CustomerDocuments({ customerId }: CustomerDocumentsProps) {
           setUploadOpen(open);
           if (!open) {
             setUploadFile(null);
+            setUploadName("");
             setUploadNotes("");
             if (fileInputRef.current) fileInputRef.current.value = "";
           }
@@ -392,6 +407,15 @@ export function CustomerDocuments({ customerId }: CustomerDocumentsProps) {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="customer-doc-name">Document name (optional)</Label>
+              <Input
+                id="customer-doc-name"
+                value={uploadName}
+                onChange={(e) => setUploadName(e.target.value)}
+                placeholder="Leave blank to use the file name"
+              />
             </div>
             <div className="space-y-2">
               <Label>File *</Label>
@@ -435,6 +459,7 @@ export function CustomerDocuments({ customerId }: CustomerDocumentsProps) {
               onClick={() => {
                 setUploadOpen(false);
                 setUploadFile(null);
+                setUploadName("");
                 setUploadNotes("");
                 if (fileInputRef.current) fileInputRef.current.value = "";
               }}
