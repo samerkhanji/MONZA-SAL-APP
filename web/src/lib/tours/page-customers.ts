@@ -3,12 +3,9 @@ import type { Tour } from "./types";
 /**
  * Page tour: /customers.
  *
- * STATUS: stub — placeholder copy. Phase-2 content agent: rewrite the
- * `title` + `description` of each step in plain English, like the owner
- * welcome tour does.
- *
- * The CSS selectors reference `data-tour-id` attributes that another agent
- * will add to the `/customers` page in parallel — keep the IDs stable.
+ * Walks through every button on the customer list — adding people, switching
+ * between All / Sold / Leads, searching, filtering, and the per-row menu.
+ * Tone matches the owner welcome tour: short, plain English, no jargon.
  */
 export const customersPageTour: Tour = {
   id: "page-customers-v1",
@@ -18,44 +15,116 @@ export const customersPageTour: Tour = {
   page: "/customers",
   steps: [
     {
-      element: '[data-tour-id="customers-add-button"]',
-      title: "Add Customer",
+      element: '[data-tour-id="customers-list-add-button"]',
+      title: "Add a customer",
       description:
-        "PLACEHOLDER: New lead just walked in? Add them here.",
+        "New lead just walked in or called? Click here to add them, so you can keep track of every conversation.",
+      side: "bottom",
+      align: "end",
+    },
+    {
+      element: '[data-tour-id="customers-list-tabs"]',
+      title: "Customer tabs",
+      description:
+        "Three views of the same people. Use these tabs to flip between all customers, the ones who bought, and the leads.",
       side: "bottom",
       align: "start",
     },
     {
-      element: '[data-tour-id="customers-search"]',
-      title: "Search",
+      element: '[data-tour-id="customers-list-tab-all"]',
+      title: "All customers",
       description:
-        "PLACEHOLDER: Find a customer by name, phone, or email.",
+        "Everyone in the system — leads and buyers together. This is the full list.",
       side: "bottom",
       align: "start",
     },
     {
-      element: '[data-tour-id="customers-table"]',
-      title: "Customer list",
+      element: '[data-tour-id="customers-list-tab-sold"]',
+      title: "Sold cars",
       description:
-        "PLACEHOLDER: Everyone who's ever talked to you about a car. Click a row to see their history.",
+        "Customers who actually bought a car. Open this when you want your real buyer list.",
+      side: "bottom",
+      align: "start",
+    },
+    {
+      element: '[data-tour-id="customers-list-tab-leads"]',
+      title: "Leads",
+      description:
+        "People who showed interest but haven't bought yet. These are the ones to follow up with.",
+      side: "bottom",
+      align: "start",
+    },
+    {
+      element: '[data-tour-id="customers-list-filters-panel"]',
+      title: "Filters",
+      description:
+        "This box has all the tools to narrow down the list — handy once you have lots of customers.",
+      side: "bottom",
+      align: "start",
+    },
+    {
+      element: '[data-tour-id="customers-list-search-input"]',
+      title: "Search box",
+      description:
+        "Type a name, phone number, or email to find one person fast. The list shrinks as you type.",
+      side: "bottom",
+      align: "start",
+    },
+    {
+      element: '[data-tour-id="customers-list-filter-status"]',
+      title: "Filter by status",
+      description:
+        "Show only customers at a certain stage — new, interested, converted, and so on.",
+      side: "bottom",
+      align: "start",
+    },
+    {
+      element: '[data-tour-id="customers-list-filter-source"]',
+      title: "Filter by source",
+      description:
+        "See where customers came from — walk-in, phone, website, referral. Useful for spotting which channels work best.",
+      side: "bottom",
+      align: "start",
+    },
+    {
+      element: '[data-tour-id="customers-list-table-panel"]',
+      title: "The customer list",
+      description:
+        "Everyone who has talked to you, one per row. Click a row to open that person's full history — what they looked at, bought, and owe.",
       side: "top",
       align: "start",
     },
     {
-      element: '[data-tour-id="customers-segment-tabs"]',
-      title: "Segments",
+      element: '[data-tour-id="customers-list-row-actions-trigger"]',
+      title: "Row actions menu",
       description:
-        "PLACEHOLDER: Switch between Leads / Buyers / Inactive.",
-      side: "bottom",
+        "The three-dots button on each row. Click it for quick actions on that customer.",
+      side: "left",
       align: "start",
     },
     {
-      element: '[data-tour-id="customers-import"]',
-      title: "Import",
+      element: '[data-tour-id="customers-list-row-actions-view"]',
+      title: "View customer",
       description:
-        "PLACEHOLDER: Bulk-load customers from a CSV.",
-      side: "bottom",
-      align: "end",
+        "Opens the customer's full page — contact details, vehicles, notes, and every interaction.",
+      side: "left",
+      align: "start",
+    },
+    {
+      element: '[data-tour-id="customers-list-row-actions-edit"]',
+      title: "Edit the customer",
+      description:
+        "Update a phone number, fix a name, or change their lead status without leaving the list.",
+      side: "left",
+      align: "start",
+    },
+    {
+      element: '[data-tour-id="customers-list-row-actions-delete"]',
+      title: "Delete the customer",
+      description:
+        "Removes the customer for good. The system asks you to confirm first, so you don't delete someone by accident.",
+      side: "left",
+      align: "start",
     },
   ],
 };
