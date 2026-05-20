@@ -380,8 +380,8 @@ export interface GarageBay {
   bay_number: number;
   name: string;
   bay_type: GarageBayType;
-  capacity: number;
-  description: string | null;
+  current_job_id: string | null;
+  status: string;
   is_active: boolean;
   sort_order: number;
   created_at: string;
@@ -432,22 +432,35 @@ export interface RepairProposalItem {
   created_at: string;
 }
 
+/**
+ * Per-bay-type working data. Stored in the `context` jsonb column of the
+ * `garage_job_bay_context` table — these are NOT flat table columns.
+ */
+export interface GarageJobBayContextData {
+  paint_color?: string | null;
+  paint_started_at?: string | null;
+  paint_ended_at?: string | null;
+  oven_temp_c?: number | null;
+  oven_started_at?: string | null;
+  oven_ended_at?: string | null;
+  wash_type?: "exterior" | "interior" | "full" | "detail" | null;
+  wash_started_at?: string | null;
+  wash_ended_at?: string | null;
+  polish_type?: string | null;
+  polish_started_at?: string | null;
+  polish_ended_at?: string | null;
+  battery_health_pct?: number | null;
+  battery_test_notes?: string | null;
+}
+
+/** A row of the `garage_job_bay_context` table. */
 export interface GarageJobBayContext {
+  id: string;
   job_id: string;
-  paint_color: string | null;
-  paint_started_at: string | null;
-  paint_ended_at: string | null;
-  oven_temp_c: number | null;
-  oven_started_at: string | null;
-  oven_ended_at: string | null;
-  wash_type: "exterior" | "interior" | "full" | "detail" | null;
-  wash_started_at: string | null;
-  wash_ended_at: string | null;
-  polish_type: string | null;
-  polish_started_at: string | null;
-  polish_ended_at: string | null;
-  battery_health_pct: number | null;
-  battery_test_notes: string | null;
+  bay_type: string;
+  context: GarageJobBayContextData;
+  created_by: string | null;
+  created_at: string;
   updated_at: string;
 }
 
