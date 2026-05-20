@@ -178,14 +178,14 @@ export default function RefundsPage() {
           </p>
         </div>
         {canRequest && (
-          <Button onClick={() => setCreateOpen(true)}>
+          <Button data-tour-id="refunds-request" onClick={() => setCreateOpen(true)}>
             <Plus className="mr-1.5 size-4" /> Request refund
           </Button>
         )}
       </div>
 
       <Tabs value={bucket} onValueChange={(v) => setBucket(v as Bucket)}>
-        <TabsList className="flex h-auto flex-wrap">
+        <TabsList data-tour-id="refunds-status-tabs" className="flex h-auto flex-wrap">
           {STATUS_BUCKETS.map((b) => (
             <TabsTrigger key={b.id} value={b.id} className="text-xs">
               {b.label}
@@ -202,6 +202,7 @@ export default function RefundsPage() {
       <div className="relative">
         <Search className="text-muted-foreground pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2" />
         <Input
+          data-tour-id="refunds-search"
           placeholder="Search by number, customer, reason…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -209,7 +210,7 @@ export default function RefundsPage() {
         />
       </div>
 
-      <Card>
+      <Card data-tour-id="refunds-table">
         <CardContent className="p-0">
           {loading ? (
             <div className="space-y-2 p-4">
@@ -356,7 +357,7 @@ function CreateRefundDialog({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-md">
+      <DialogContent data-tour-id="refunds-request-dialog" className="max-w-md">
         <DialogHeader>
           <DialogTitle>Request a refund</DialogTitle>
           <DialogDescription>
