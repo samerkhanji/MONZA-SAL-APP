@@ -698,7 +698,7 @@ export default function RequestCenterPage() {
             }}
             disabled={loading}
           />
-          <Button onClick={() => setNewOpen(true)}>
+          <Button data-tour-id="requests-new-button" onClick={() => setNewOpen(true)}>
             <Plus className="mr-2 size-5" />
             New Request
           </Button>
@@ -707,7 +707,7 @@ export default function RequestCenterPage() {
 
       <div className="flex flex-wrap gap-3">
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger id="request-status-filter" className="h-10 w-[180px]">
+          <SelectTrigger id="request-status-filter" data-tour-id="requests-filter-status" className="h-10 w-[180px]">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
@@ -722,7 +722,7 @@ export default function RequestCenterPage() {
           </SelectContent>
         </Select>
         <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-          <SelectTrigger id="request-priority-filter" className="h-10 w-[160px]">
+          <SelectTrigger id="request-priority-filter" data-tour-id="requests-filter-priority" className="h-10 w-[160px]">
             <SelectValue placeholder="Priority" />
           </SelectTrigger>
           <SelectContent>
@@ -795,6 +795,7 @@ export default function RequestCenterPage() {
         <Input
           id="request-search"
           name="request-search"
+          data-tour-id="requests-search-input"
           placeholder="Search subject, description, submitted by..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -812,7 +813,7 @@ export default function RequestCenterPage() {
           </Button>
         </div>
       ) : (
-        <div className="rounded-lg border">
+        <div className="rounded-lg border" data-tour-id="requests-table">
           <Table>
             <TableHeader>
               <TableRow>
@@ -863,7 +864,7 @@ export default function RequestCenterPage() {
       )}
 
       <Dialog open={newOpen} onOpenChange={setNewOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md" data-tour-id="requests-new-dialog">
           <DialogHeader>
             <DialogTitle>New Request</DialogTitle>
           </DialogHeader>
@@ -1019,7 +1020,10 @@ export default function RequestCenterPage() {
         open={!!detailOpen}
         onOpenChange={(o) => !o && setDetailOpen(null)}
       >
-        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+        <DialogContent
+          className="max-h-[90vh] max-w-2xl overflow-y-auto"
+          data-tour-id="requests-detail-dialog"
+        >
           <DialogHeader>
             <DialogTitle>{detailOpen?.subject}</DialogTitle>
           </DialogHeader>
