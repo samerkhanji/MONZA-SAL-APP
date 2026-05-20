@@ -399,7 +399,7 @@ export default function SalesOrderDetailPage() {
       </div>
 
       {/* Lifecycle stepper */}
-      <Card>
+      <Card data-tour-id="sales-order-detail-stepper">
         <CardContent className="pt-6">
           <div className="flex flex-wrap items-center gap-2">
             {steps.map((s, i) => (
@@ -557,7 +557,7 @@ export default function SalesOrderDetailPage() {
               </Select>
             </div>
             <div className="flex items-end gap-2">
-              <Button onClick={saveQuote} disabled={!canEdit || saving} className="flex-1">
+              <Button onClick={saveQuote} disabled={!canEdit || saving} className="flex-1" data-tour-id="sales-order-detail-save-quote">
                 {saving && <Loader2 className="mr-2 size-4 animate-spin" aria-hidden />}
                 {saving ? "Saving…" : order.quote_sent_at ? "Update quote" : "Send quote"}
               </Button>
@@ -609,7 +609,7 @@ export default function SalesOrderDetailPage() {
               />
             </div>
             <div className="flex items-end">
-              <Button onClick={saveDeposit} disabled={!canEdit || saving} className="w-full">
+              <Button onClick={saveDeposit} disabled={!canEdit || saving} className="w-full" data-tour-id="sales-order-detail-save-deposit">
                 {saving && <Loader2 className="mr-2 size-4 animate-spin" aria-hidden />}
                 {saving ? "Saving…" : order.deposit_paid_at ? "Update deposit" : "Mark paid"}
               </Button>
@@ -735,7 +735,7 @@ export default function SalesOrderDetailPage() {
               Owner-only. Cancels the sale, returns the car to inventory, and
               reverts the customer&apos;s lead status if they were auto-converted.
             </p>
-            <Button variant="destructive" onClick={() => setVoidOpen(true)} disabled={saving}>
+            <Button variant="destructive" onClick={() => setVoidOpen(true)} disabled={saving} data-tour-id="sales-order-detail-void-button">
               Void sale…
             </Button>
           </CardContent>
