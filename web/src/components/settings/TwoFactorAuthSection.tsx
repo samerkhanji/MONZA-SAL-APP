@@ -66,14 +66,17 @@ export function TwoFactorAuthSection() {
       toast.error(formatError(error));
       setFactors([]);
     } else {
-      const all: Factor[] = [
-        ...(data?.totp ?? []).map((f) => ({
+      // Read data.all, not data.totp — listFactors()'s `totp` array only
+      // includes VERIFIED factors, so a dangling unverified factor would be
+      // invisible here and silently block re-enrollment.
+      const all: Factor[] = (data?.all ?? [])
+        .filter((f) => f.factor_type === "totp")
+        .map((f) => ({
           id: f.id,
           factor_type: "totp" as const,
           status: f.status as "verified" | "unverified",
           friendly_name: f.friendly_name ?? undefined,
-        })),
-      ];
+        }));
       setFactors(all);
     }
     setLoading(false);
@@ -85,11 +88,16 @@ export function TwoFactorAuthSection() {
 
   async function startEnroll() {
     setEnrolling(true);
-    // Drop any pre-existing unverified factor first (Supabase rejects a
-    // 2nd enroll while one is pending).
-    const pending = factors.find((f) => f.status === "unverified");
-    if (pending) {
-      await supabase.auth.mfa.unenroll({ factorId: pending.id });
+    // Drop any pre-existing unverified factor first — Supabase rejects a
+    // 2nd enroll with the same friendly_name ("That record already exists").
+    // Re-list live instead of trusting React state (which may be stale), and
+    // read data.all since data.totp hides unverified factors.
+    const { data: live } = await supabase.auth.mfa.listFactors();
+    const stale = (live?.all ?? []).filter(
+      (f) => f.factor_type === "totp" && f.status === "unverified"
+    );
+    for (const f of stale) {
+      await supabase.auth.mfa.unenroll({ factorId: f.id });
     }
     const { data, error } = await supabase.auth.mfa.enroll({
       factorType: "totp",
@@ -218,6 +226,11 @@ export function TwoFactorAuthSection() {
               <Button
                 variant="ghost"
                 onClick={() => {
+                  // Clean up the pending unverified factor so it doesn't
+                  // block the next enroll attempt.
+                  if (enrollment) {
+                    void supabase.auth.mfa.unenroll({ factorId: enrollment.id });
+                  }
                   setEnrollment(null);
                   setCode("");
                 }}
