@@ -156,7 +156,6 @@ Pre-existing tour IDs (not in this index, but already present in the app):
 
 ## /accessories
 
-- `accessories-reset-button` — "Reset to seed" button (opens AlertDialog)
 - `accessories-search-input` — Master search input across categories
 - `accessories-add-line-button` — "Add line" button in each category header (multiple — first match in DOM order)
 

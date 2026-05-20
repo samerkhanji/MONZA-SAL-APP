@@ -3,10 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
-import { ACCESSORY_SEED_ROWS } from "@/lib/data/accessory-seed";
 import {
   ACCESSORY_CATEGORIES,
-  type AccessoryCategory,
   type AccessoryCategoryId,
   type AccessoryInventoryRow,
 } from "@/types/accessories";
@@ -30,101 +28,13 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Plus, RotateCcw, Search, Trash2 } from "lucide-react";
+import { Plus, Search, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CustomAccessoryCollections } from "@/components/accessories/CustomAccessoryCollections";
 import { ExportButton } from "@/components/ExportButton";
 import type { ExportColumn } from "@/lib/exportToExcel";
 import { formatError } from "@/lib/error-messages";
-
-const STORAGE_KEY = "monza-crm-accessories-inventory-v2";
-const LEGACY_STORAGE_KEY = "monza-crm-accessories-inventory-v1";
-
-function cloneSeed(): AccessoryInventoryRow[] {
-  return ACCESSORY_SEED_ROWS.map((r) => ({ ...r }));
-}
-
-const CATEGORY_SET = new Set<string>(ACCESSORY_CATEGORIES.map((c) => c.id));
-
-function isValidStoredRow(x: unknown): x is AccessoryInventoryRow {
-  if (typeof x !== "object" || x === null) return false;
-  const o = x as Record<string, unknown>;
-  const linkedOk = o.linked_plate === null || typeof o.linked_plate === "string";
-  return (
-    typeof o.id === "string" &&
-    typeof o.label === "string" &&
-    typeof o.quantity === "number" &&
-    Number.isFinite(o.quantity) &&
-    typeof o.note === "string" &&
-    linkedOk &&
-    typeof o.created_at === "string" &&
-    typeof o.updated_at === "string" &&
-    typeof o.category === "string" &&
-    CATEGORY_SET.has(o.category)
-  );
-}
-
-/** Migrate rows saved with the previous shape (name, notes, linked_plate_or_car, sort_order). */
-function migrateLegacyRow(o: unknown): AccessoryInventoryRow | null {
-  if (typeof o !== "object" || o === null) return null;
-  const r = o as Record<string, unknown>;
-  if (typeof r.id !== "string" || typeof r.category !== "string" || !CATEGORY_SET.has(r.category)) {
-    return null;
-  }
-  if (typeof r.name !== "string" || typeof r.quantity !== "number" || !Number.isFinite(r.quantity)) {
-    return null;
-  }
-  const now = new Date().toISOString();
-  const category = r.category as AccessoryCategory;
-  const notes = typeof r.notes === "string" ? r.notes : "";
-  let linked: string | null =
-    typeof r.linked_plate_or_car === "string" && r.linked_plate_or_car.trim()
-      ? r.linked_plate_or_car.trim()
-      : null;
-  if (category === "plates") {
-    linked = r.name.trim() || null;
-  }
-  return {
-    id: r.id,
-    category,
-    label: r.name,
-    quantity: r.quantity,
-    note: notes,
-    linked_plate: linked,
-    created_at: now,
-    updated_at: now,
-  };
-}
-
-function loadFromStorage(): AccessoryInventoryRow[] | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw) as unknown;
-      if (Array.isArray(parsed) && parsed.length > 0 && parsed.every(isValidStoredRow)) {
-        return parsed;
-      }
-    }
-
-    const legacyRaw = localStorage.getItem(LEGACY_STORAGE_KEY);
-    if (legacyRaw) {
-      const parsed = JSON.parse(legacyRaw) as unknown;
-      if (!Array.isArray(parsed) || parsed.length === 0) return null;
-      const migrated = parsed.map(migrateLegacyRow).filter((x): x is AccessoryInventoryRow => x !== null);
-      if (migrated.length === parsed.length) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
-        localStorage.removeItem(LEGACY_STORAGE_KEY);
-        return migrated;
-      }
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
 
 function matchesSearch(row: AccessoryInventoryRow, q: string): boolean {
   const s = q.trim().toLowerCase();
@@ -140,28 +50,16 @@ function matchesSearch(row: AccessoryInventoryRow, q: string): boolean {
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
-// Local seed/legacy-localStorage rows can have synthetic non-uuid ids
-// (e.g. "seed-plate-01"). Postgres rejects those when the column is uuid.
-// Only forward the id when it actually looks like a uuid; otherwise let
-// the DB generate one on insert.
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-function rowToDbInsert(r: AccessoryInventoryRow) {
-  const base = {
+/** Editable fields pushed back to public.accessory_inventory on save. */
+function rowToUpsert(r: AccessoryInventoryRow) {
+  return {
+    id: r.id,
     category: r.category,
     label: r.label,
     quantity: r.quantity,
     note: r.note,
     linked_plate: r.linked_plate,
   };
-  return UUID_RE.test(r.id) ? { id: r.id, ...base } : base;
-}
-
-function rowToDbUpsert(r: AccessoryInventoryRow) {
-  // Upsert needs an id to match on. If the in-memory row still has a
-  // synthetic seed id, fall through to plain insert (omit id).
-  return rowToDbInsert(r);
 }
 
 export default function AccessoriesPage() {
@@ -173,8 +71,8 @@ export default function AccessoriesPage() {
   const [pendingDelete, setPendingDelete] = useState<AccessoryInventoryRow | null>(null);
   const dirtyIdsRef = useRef<Set<string>>(new Set());
 
-  // Load from Supabase. If empty + we have localStorage data from a prior
-  // version of this page, migrate it once. Otherwise insert the seed list.
+  // The public.accessory_inventory table is the single source of truth.
+  // No localStorage, no in-app seed — the page only ever reflects the DB.
   useEffect(() => {
     let cancelled = false;
     async function init() {
@@ -182,45 +80,11 @@ export default function AccessoriesPage() {
         .from("accessory_inventory")
         .select("*");
       if (cancelled) return;
-
       if (error) {
         toast.error(`Could not load accessories: ${formatError(error)}`);
-        const local = loadFromStorage();
-        setRows(local ?? cloneSeed());
-        setHydrated(true);
-        return;
-      }
-
-      const dbRows = (data ?? []) as AccessoryInventoryRow[];
-      if (dbRows.length > 0) {
-        setRows(dbRows);
-        setHydrated(true);
-        return;
-      }
-
-      // DB empty — bootstrap.
-      const local = loadFromStorage();
-      const bootstrap = local && local.length > 0 ? local : cloneSeed();
-      const { data: inserted, error: insertError } = await supabase
-        .from("accessory_inventory")
-        .insert(bootstrap.map(rowToDbInsert))
-        .select("*");
-      if (cancelled) return;
-      if (insertError) {
-        toast.error(`Could not save accessories: ${formatError(insertError)}`);
-        setRows(bootstrap);
+        setRows([]);
       } else {
-        if (local && local.length > 0) {
-          toast.success("Migrated this device's accessories to the server");
-          try {
-            localStorage.removeItem(STORAGE_KEY);
-            localStorage.removeItem(LEGACY_STORAGE_KEY);
-          } catch {
-            // ignore
-          }
-        }
-        // Use server-assigned uuids so dirty tracking + later upserts match.
-        setRows((inserted as AccessoryInventoryRow[]) ?? bootstrap);
+        setRows((data as AccessoryInventoryRow[]) ?? []);
       }
       setHydrated(true);
     }
@@ -241,7 +105,7 @@ export default function AccessoriesPage() {
       setSaveState("saving");
       const { error } = await supabase
         .from("accessory_inventory")
-        .upsert(dirtyRows.map(rowToDbUpsert));
+        .upsert(dirtyRows.map(rowToUpsert));
       if (error) {
         setSaveState("error");
         toast.error(`Could not save changes: ${formatError(error)}`);
@@ -340,31 +204,6 @@ export default function AccessoriesPage() {
     [supabase]
   );
 
-  const resetToSeed = useCallback(async () => {
-    const seed = cloneSeed();
-    // Wipe and re-insert in two steps. Use a never-matching uuid filter to
-    // satisfy Supabase's "DELETE without filter" guard.
-    const { error: delError } = await supabase
-      .from("accessory_inventory")
-      .delete()
-      .gte("created_at", "1970-01-01");
-    if (delError) {
-      toast.error(`Reset failed: ${formatError(delError)}`);
-      return;
-    }
-    const { data, error: insError } = await supabase
-      .from("accessory_inventory")
-      .insert(seed.map(rowToDbInsert))
-      .select("*");
-    if (insError) {
-      toast.error(`Reset failed: ${formatError(insError)}`);
-      return;
-    }
-    setRows((data ?? []) as AccessoryInventoryRow[]);
-    dirtyIdsRef.current = new Set();
-    toast.success("Reset to seed data");
-  }, [supabase]);
-
   if (!hydrated) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center text-muted-foreground">
@@ -379,8 +218,8 @@ export default function AccessoriesPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Accessories</h1>
           <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
-            Standard lists below are saved to the server — every device sees the same data.
-            Changes save automatically about a second after you stop typing.{" "}
+            Every list here is stored on the server — all devices see the same data,
+            and changes save automatically about a second after you stop typing.{" "}
             <strong>Custom collections</strong> at the bottom are also synced; staff can
             create them and edit lines; only owners can rename or delete a collection.
           </p>
@@ -429,27 +268,6 @@ export default function AccessoriesPage() {
             options={{ pageName: "Accessories", summary: `Total quantity: ${grandTotalQty}` }}
             disabled={!hydrated}
           />
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-1.5" data-tour-id="accessories-reset-button">
-                <RotateCcw className="size-4" />
-                Reset to seed
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Reset all accessories?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This replaces your current table with the original seed list. Local changes in this
-                  browser will be lost.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={resetToSeed}>Reset</AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
         </div>
       </div>
 
