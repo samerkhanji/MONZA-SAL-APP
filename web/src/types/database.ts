@@ -112,17 +112,24 @@ export interface CarDisplay extends Car {
   customs_display?: string;
 }
 
-export type CarDocumentType = "pdi" | "job_card";
+export type CarDocumentType = string;
 
 export interface CarDocument {
   id: string;
   car_id: string;
   document_type: CarDocumentType;
   file_name: string;
-  storage_path: string;
-  file_size_bytes: number | null;
-  uploaded_at: string;
+  file_path: string | null;
+  file_size: number | null;
+  mime_type: string | null;
+  notes: string | null;
   uploaded_by: string | null;
+  created_at: string;
+  /** Legacy columns retained on the table for backward compatibility. */
+  storage_path?: string | null;
+  file_size_bytes?: number | null;
+  uploaded_at?: string;
+  event_date?: string | null;
 }
 
 export interface CarEvent {

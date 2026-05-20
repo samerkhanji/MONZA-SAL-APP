@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CarDocuments } from "@/components/car-documents";
-import { Search, FileText, ScanLine } from "lucide-react";
+import { CustomerDocuments } from "@/components/customers/CustomerDocuments";
+import { Search, FileText, ScanLine, User } from "lucide-react";
 import { ScannerDialog } from "@/components/scanner/ScannerDialog";
 import { createNotificationsForUsers } from "@/lib/notifications";
 import { getOwnerIds } from "@/lib/user-lookup";
@@ -27,22 +28,42 @@ interface DocumentAccessRequest {
   created_at: string;
 }
 
+interface CustomerSearchResult {
+  id: string;
+  full_name: string | null;
+  phone_primary: string | null;
+  phone_secondary: string | null;
+}
+
+type SearchMode = "vin" | "customer";
+
 export default function DocumentsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const vinFromUrl = searchParams.get("vin") ?? "";
   const { profile, isOwner } = useUser();
   const supabase = createClient();
+
+  const [mode, setMode] = useState<SearchMode>("vin");
+
+  // ─── VIN mode state ───
   const [vinSearch, setVinSearch] = useState(vinFromUrl);
   const [car, setCar] = useState<CarDisplay | null>(null);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [scanVinOpen, setScanVinOpen] = useState(false);
   const [accessRequests, setAccessRequests] = useState<DocumentAccessRequest[]>([]);
-  const [approvedQuery, setApprovedQuery] = useState<string | null>(null);
+
+  // ─── Customer mode state ───
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [customerResults, setCustomerResults] = useState<CustomerSearchResult[]>([]);
+  const [customerLoading, setCustomerLoading] = useState(false);
+  const [customerSearched, setCustomerSearched] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<CustomerSearchResult | null>(null);
 
   useEffect(() => {
     if (vinFromUrl && isValidVin(vinFromUrl)) {
+      setMode("vin");
       setVinSearch(vinFromUrl.toUpperCase());
       setSearched(false);
       if (isOwner) {
@@ -141,8 +162,8 @@ export default function DocumentsPage() {
   }
 
   async function handleViewApproved(vin: string) {
+    setMode("vin");
     setVinSearch(vin);
-    setApprovedQuery(vin);
     setLoading(true);
     setSearched(true);
     const { data, error } = await supabase
@@ -154,150 +175,316 @@ export default function DocumentsPage() {
     setCar(error || !data ? null : (data as CarDisplay));
   }
 
+  async function handleCustomerSearch(e?: React.FormEvent) {
+    e?.preventDefault();
+    // Strip characters that break the PostgREST or() filter syntax.
+    const term = customerSearch.replace(/[,()]/g, " ").trim();
+    if (!term) return;
+
+    setCustomerLoading(true);
+    setCustomerSearched(true);
+    setSelectedCustomer(null);
+
+    const like = `%${term}%`;
+    const { data, error } = await supabase
+      .from("customers_display")
+      .select("id, full_name, first_name, last_name, phone_primary, phone_secondary")
+      .is("deleted_at", null)
+      .or(
+        `full_name.ilike.${like},first_name.ilike.${like},last_name.ilike.${like},phone_primary.ilike.${like},phone_secondary.ilike.${like}`
+      )
+      .order("full_name", { ascending: true })
+      .limit(25);
+
+    setCustomerLoading(false);
+    setCustomerResults(error || !data ? [] : (data as CustomerSearchResult[]));
+  }
+
   return (
     <div className="container mx-auto space-y-6 px-4 py-6 sm:px-6 sm:py-8">
-      <Card data-tour-id="documents-search-panel">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="size-5" />
-            Documents by VIN
-          </CardTitle>
-          <CardDescription>
-            Search by VIN to view and manage PDFs and documents for a specific car
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSearch} className="flex flex-col gap-4 sm:flex-row sm:items-center">
-            <div className="relative flex flex-1 gap-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  id="document-vin-search"
-                  name="document-vin-search"
-                  placeholder="Enter VIN (17 characters)"
-                  value={vinSearch}
-                  onChange={(e) => setVinSearch(e.target.value.toUpperCase())}
-                  onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                  className="pl-9 font-mono"
-                  maxLength={17}
-                  disabled={loading}
-                  data-tour-id="documents-vin-search-input"
-                />
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                onClick={() => setScanVinOpen(true)}
-                title="Scan VIN"
-                disabled={loading}
-                className="shrink-0"
-                data-tour-id="documents-scan-vin-button"
-              >
-                <ScanLine className="size-4" />
-              </Button>
-            </div>
-            <Button type="submit" disabled={loading || !vinSearch.trim()} data-tour-id="documents-search-button">
-              {loading ? "Searching..." : "Search"}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+      <div className="flex flex-wrap gap-2">
+        <Button
+          variant={mode === "vin" ? "default" : "outline"}
+          onClick={() => setMode("vin")}
+        >
+          <FileText className="mr-2 size-4" />
+          By VIN
+        </Button>
+        <Button
+          variant={mode === "customer" ? "default" : "outline"}
+          onClick={() => setMode("customer")}
+        >
+          <User className="mr-2 size-4" />
+          By Customer / Phone
+        </Button>
+      </div>
 
-      {!isOwner && accessRequests.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Pending Requests</CardTitle>
-            <CardDescription>
-              Your document search requests and their status
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {accessRequests.map((req) => (
-                <div
-                  key={req.id}
-                  className="flex items-center justify-between rounded-lg border p-3"
-                >
-                  <div>
-                    <p className="font-mono text-sm">{req.search_query}</p>
-                    <p className="text-muted-foreground text-xs">
-                      {req.status === "pending"
-                        ? "Pending approval"
-                        : req.status === "approved"
-                          ? "Approved"
-                          : "Denied"}
-                    </p>
-                  </div>
-                  {req.status === "approved" && (
-                    <Button
-                      size="sm"
-                      onClick={() => handleViewApproved(req.search_query)}
-                    >
-                      View Results
-                    </Button>
-                  )}
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {searched && (
+      {mode === "vin" && (
         <>
-          {loading ? (
-            <p className="text-muted-foreground">Loading...</p>
-          ) : !isOwner && !car ? (
-            <Card>
-              <CardContent className="py-12 text-center">
-                <p className="text-muted-foreground">
-                  {vinSearch.trim() && !isValidVin(vinSearch)
-                    ? "Please enter a valid 17-character VIN."
-                    : "Your search request has been sent to management for approval. You will be notified when access is granted."}
-                </p>
-              </CardContent>
-            </Card>
-          ) : !car ? (
-            <Card>
-              <CardContent className="py-12 text-center">
-                <p className="text-muted-foreground">
-                  {vinSearch.trim() && !isValidVin(vinSearch)
-                    ? "Please enter a valid 17-character VIN."
-                    : "No car found for this VIN."}
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-muted-foreground">
-                  Documents for{" "}
-                  <span className="font-mono font-medium text-foreground">
-                    {car.vin}
-                  </span>
-                  {" — "}
-                  {car.brand} {car.model}
-                  {car.model_year ? ` (${car.model_year})` : ""}
-                </p>
-                <Button variant="outline" size="sm" onClick={() => router.push(`/cars/${encodeURIComponent(car.vin)}`)}>
-                  Open full profile →
+          <Card data-tour-id="documents-search-panel">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="size-5" />
+                Documents by VIN
+              </CardTitle>
+              <CardDescription>
+                Search by VIN to view and manage PDFs and documents for a specific car
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSearch} className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                <div className="relative flex flex-1 gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id="document-vin-search"
+                      name="document-vin-search"
+                      placeholder="Enter VIN (17 characters)"
+                      value={vinSearch}
+                      onChange={(e) => setVinSearch(e.target.value.toUpperCase())}
+                      onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                      className="pl-9 font-mono"
+                      maxLength={17}
+                      disabled={loading}
+                      data-tour-id="documents-vin-search-input"
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setScanVinOpen(true)}
+                    title="Scan VIN"
+                    disabled={loading}
+                    className="shrink-0"
+                    data-tour-id="documents-scan-vin-button"
+                  >
+                    <ScanLine className="size-4" />
+                  </Button>
+                </div>
+                <Button type="submit" disabled={loading || !vinSearch.trim()} data-tour-id="documents-search-button">
+                  {loading ? "Searching..." : "Search"}
                 </Button>
-              </div>
-              <CarDocuments carId={car.id} carVin={car.vin} />
-            </div>
+              </form>
+            </CardContent>
+          </Card>
+
+          {!isOwner && accessRequests.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Pending Requests</CardTitle>
+                <CardDescription>
+                  Your document search requests and their status
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {accessRequests.map((req) => (
+                    <div
+                      key={req.id}
+                      className="flex items-center justify-between rounded-lg border p-3"
+                    >
+                      <div>
+                        <p className="font-mono text-sm">{req.search_query}</p>
+                        <p className="text-muted-foreground text-xs">
+                          {req.status === "pending"
+                            ? "Pending approval"
+                            : req.status === "approved"
+                              ? "Approved"
+                              : "Denied"}
+                        </p>
+                      </div>
+                      {req.status === "approved" && (
+                        <Button
+                          size="sm"
+                          onClick={() => handleViewApproved(req.search_query)}
+                        >
+                          View Results
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {searched && (
+            <>
+              {loading ? (
+                <p className="text-muted-foreground">Loading...</p>
+              ) : !isOwner && !car ? (
+                <Card>
+                  <CardContent className="py-12 text-center">
+                    <p className="text-muted-foreground">
+                      {vinSearch.trim() && !isValidVin(vinSearch)
+                        ? "Please enter a valid 17-character VIN."
+                        : "Your search request has been sent to management for approval. You will be notified when access is granted."}
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : !car ? (
+                <Card>
+                  <CardContent className="py-12 text-center">
+                    <p className="text-muted-foreground">
+                      {vinSearch.trim() && !isValidVin(vinSearch)
+                        ? "Please enter a valid 17-character VIN."
+                        : "No car found for this VIN."}
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-muted-foreground">
+                      Documents for{" "}
+                      <span className="font-mono font-medium text-foreground">
+                        {car.vin}
+                      </span>
+                      {" — "}
+                      {car.brand} {car.model}
+                      {car.model_year ? ` (${car.model_year})` : ""}
+                    </p>
+                    <Button variant="outline" size="sm" onClick={() => router.push(`/cars/${encodeURIComponent(car.vin)}`)}>
+                      Open full profile →
+                    </Button>
+                  </div>
+                  <CarDocuments carId={car.id} carVin={car.vin} />
+                </div>
+              )}
+            </>
+          )}
+
+          {!searched && (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <p className="text-muted-foreground">
+                  Enter a VIN above to view documents for that vehicle.
+                </p>
+              </CardContent>
+            </Card>
           )}
         </>
       )}
 
-      {!searched && (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground">
-              Enter a VIN above to view documents for that vehicle.
-            </p>
-          </CardContent>
-        </Card>
+      {mode === "customer" && (
+        <>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <User className="size-5" />
+                Documents by Customer
+              </CardTitle>
+              <CardDescription>
+                Search by client name or phone number to view and manage their documents
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleCustomerSearch} className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="document-customer-search"
+                    name="document-customer-search"
+                    placeholder="Client name or phone number"
+                    value={customerSearch}
+                    onChange={(e) => setCustomerSearch(e.target.value)}
+                    className="pl-9"
+                    disabled={customerLoading}
+                  />
+                </div>
+                <Button type="submit" disabled={customerLoading || !customerSearch.trim()}>
+                  {customerLoading ? "Searching..." : "Search"}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+
+          {selectedCustomer ? (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">
+                  Documents for{" "}
+                  <span className="font-medium text-foreground">
+                    {selectedCustomer.full_name ?? "Unnamed customer"}
+                  </span>
+                  {selectedCustomer.phone_primary
+                    ? ` — ${selectedCustomer.phone_primary}`
+                    : ""}
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSelectedCustomer(null)}
+                  >
+                    ← Back to results
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => router.push(`/customers/${selectedCustomer.id}`)}
+                  >
+                    Open full profile →
+                  </Button>
+                </div>
+              </div>
+              <CustomerDocuments customerId={selectedCustomer.id} />
+            </div>
+          ) : customerSearched ? (
+            customerLoading ? (
+              <p className="text-muted-foreground">Loading...</p>
+            ) : customerResults.length === 0 ? (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <p className="text-muted-foreground">
+                    No customers found for that name or phone number.
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Matching Customers</CardTitle>
+                  <CardDescription>
+                    Select a customer to view and manage their documents
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {customerResults.map((c) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => setSelectedCustomer(c)}
+                        className="flex w-full items-center justify-between rounded-lg border p-3 text-left transition-colors hover:bg-muted/50"
+                      >
+                        <div>
+                          <p className="font-medium">
+                            {c.full_name ?? "Unnamed customer"}
+                          </p>
+                          <p className="text-muted-foreground text-sm">
+                            {c.phone_primary ?? "No phone"}
+                            {c.phone_secondary ? ` · ${c.phone_secondary}` : ""}
+                          </p>
+                        </div>
+                        <span className="text-muted-foreground text-sm">View →</span>
+                      </button>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          ) : (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <p className="text-muted-foreground">
+                  Search by client name or phone number above to view their documents.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </>
       )}
 
       <ScannerDialog
