@@ -526,7 +526,10 @@ export default function SettingsPage() {
   return (
     <div className="container mx-auto flex flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8 md:px-6 lg:flex-row">
       {/* Tabs sidebar - horizontally scrollable on mobile, vertical on desktop */}
-      <nav className="flex shrink-0 flex-row flex-nowrap gap-2 overflow-x-auto border-b pb-4 lg:flex-col lg:overflow-visible lg:border-b-0 lg:border-r lg:pb-0 lg:pr-6 max-md:-mx-4 max-md:px-4 max-md:scrollbar-hide">
+      <nav
+        className="flex shrink-0 flex-row flex-nowrap gap-2 overflow-x-auto border-b pb-4 lg:flex-col lg:overflow-visible lg:border-b-0 lg:border-r lg:pb-0 lg:pr-6 max-md:-mx-4 max-md:px-4 max-md:scrollbar-hide"
+        data-tour-id="settings-tabs"
+      >
         {TABS.map((tab) => (
           <button
             key={tab.id}
@@ -545,6 +548,7 @@ export default function SettingsPage() {
         ))}
         {canEditApprovalThresholds && (
           <Link
+            data-tour-id="settings-approval-thresholds-link"
             href="/settings/approval-thresholds"
             className={cn(
               "flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition-colors min-h-[44px]",
@@ -560,7 +564,7 @@ export default function SettingsPage() {
       {/* Content */}
       <div className="min-w-0 flex-1">
         {activeTab === "profile" && (
-          <Card>
+          <Card data-tour-id="settings-profile-panel">
             <CardHeader>
               <CardTitle>Profile Settings</CardTitle>
               <CardDescription>
@@ -582,7 +586,7 @@ export default function SettingsPage() {
                     Change your password to keep your account secure
                   </p>
                 </div>
-                <Button variant="outline" onClick={() => setChangePasswordOpen(true)} className="w-full min-h-[44px] sm:w-auto">
+                <Button data-tour-id="settings-change-password-button" variant="outline" onClick={() => setChangePasswordOpen(true)} className="w-full min-h-[44px] sm:w-auto">
                   Change Password
                 </Button>
               </div>
@@ -660,7 +664,7 @@ export default function SettingsPage() {
         )}
 
         {activeTab === "team" && (
-          <Card>
+          <Card data-tour-id="settings-team-panel">
             <CardHeader>
               <CardTitle>Team Members</CardTitle>
               <CardDescription>
@@ -679,7 +683,7 @@ export default function SettingsPage() {
                     <SelectItem value="all">All</SelectItem>
                   </SelectContent>
                 </Select>
-                <Button onClick={() => setAddOpen(true)}>
+                <Button data-tour-id="settings-add-employee-button" onClick={() => setAddOpen(true)}>
                   <UserPlus className="mr-2 size-4" />
                   Add Employee
                 </Button>
@@ -880,7 +884,7 @@ export default function SettingsPage() {
         )}
 
         {activeTab === "company" && (
-          <Card>
+          <Card data-tour-id="settings-company-panel">
             <CardHeader>
               <CardTitle>Company Information</CardTitle>
               <CardDescription>Monza S.A.L. details</CardDescription>
@@ -956,7 +960,7 @@ export default function SettingsPage() {
 
         {activeTab === "prefs" && (
           <div className="space-y-6">
-            <Card>
+            <Card data-tour-id="settings-prefs-panel">
               <CardHeader>
                 <CardTitle>System Preferences</CardTitle>
                 <CardDescription>Default settings for the system</CardDescription>
@@ -1010,7 +1014,7 @@ export default function SettingsPage() {
         )}
 
         {activeTab === "notifications" && (
-          <Card>
+          <Card data-tour-id="settings-notifications-panel">
             <CardHeader>
               <CardTitle>Push Notifications</CardTitle>
               <CardDescription>
@@ -1026,6 +1030,7 @@ export default function SettingsPage() {
                   </p>
                 </div>
                 <Button
+                  data-tour-id="settings-push-toggle"
                   variant={pushEnabled ? "outline" : "default"}
                   onClick={() => handleTogglePush(!pushEnabled)}
                   disabled={pushLoading || pushStatus === "denied"}
@@ -1057,7 +1062,7 @@ export default function SettingsPage() {
         )}
 
         {activeTab === "audit" && (
-          <Card>
+          <Card data-tour-id="settings-audit-panel">
             <CardHeader>
               <CardTitle>Audit Log</CardTitle>
               <CardDescription>Track all system activity</CardDescription>
