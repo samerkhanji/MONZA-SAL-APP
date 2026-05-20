@@ -213,16 +213,16 @@ function Body() {
         </div>
         <div className="flex gap-2">
           {!openSession && canWrite && (
-            <Button onClick={() => setOpenDialogOpen(true)}>
+            <Button onClick={() => setOpenDialogOpen(true)} data-tour-id="cash-open-session-button">
               <Plus className="mr-1.5 size-4" /> Open today&apos;s session
             </Button>
           )}
           {openSession && canWrite && (
             <>
-              <Button variant="outline" onClick={() => setMovementDialogOpen(true)}>
+              <Button variant="outline" onClick={() => setMovementDialogOpen(true)} data-tour-id="cash-add-movement-button">
                 Add movement
               </Button>
-              <Button variant="destructive" onClick={() => setCloseDialogOpen(true)}>
+              <Button variant="destructive" onClick={() => setCloseDialogOpen(true)} data-tour-id="cash-close-session-button">
                 Close session
               </Button>
             </>
@@ -244,7 +244,7 @@ function Body() {
           </CardContent>
         </Card>
       ) : (
-        <Card>
+        <Card data-tour-id="cash-today-session-panel">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               Today&apos;s session
@@ -337,7 +337,7 @@ function Body() {
       )}
 
       {/* History */}
-      <Card>
+      <Card data-tour-id="cash-history-panel">
         <CardHeader>
           <CardTitle className="text-base">Recent sessions</CardTitle>
           <CardDescription>Last 30 closed or flagged sessions.</CardDescription>
@@ -518,7 +518,7 @@ function OpenSessionDialog({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md" data-tour-id="cash-open-session-dialog">
         <DialogHeader>
           <DialogTitle>Open today&apos;s session</DialogTitle>
           <DialogDescription>
@@ -554,6 +554,7 @@ function OpenSessionDialog({
               value={opening}
               onChange={(e) => setOpening(e.target.value)}
               placeholder="0.00"
+              data-tour-id="cash-open-session-opening-input"
             />
           </div>
           <div className="space-y-1">
@@ -566,10 +567,10 @@ function OpenSessionDialog({
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={submitting}>
+          <Button variant="outline" onClick={onClose} disabled={submitting} data-tour-id="cash-open-session-cancel">
             Cancel
           </Button>
-          <Button onClick={() => void submit()} disabled={submitting || !opening}>
+          <Button onClick={() => void submit()} disabled={submitting || !opening} data-tour-id="cash-open-session-submit">
             {submitting ? "Opening…" : "Open session"}
           </Button>
         </DialogFooter>
@@ -644,7 +645,7 @@ function CloseSessionDialog({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md" data-tour-id="cash-close-session-dialog">
         <DialogHeader>
           <DialogTitle>Close session</DialogTitle>
           <DialogDescription>
@@ -692,6 +693,7 @@ function CloseSessionDialog({
               min={0}
               value={actual}
               onChange={(e) => setActual(e.target.value)}
+              data-tour-id="cash-close-actual-input"
             />
           </div>
           <div className="space-y-1">
@@ -715,12 +717,13 @@ function CloseSessionDialog({
           )}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={submitting}>
+          <Button variant="outline" onClick={onClose} disabled={submitting} data-tour-id="cash-close-cancel">
             Cancel
           </Button>
           <Button
             onClick={() => void submit()}
             disabled={submitting || !actual || (overThreshold && !varianceNote.trim())}
+            data-tour-id="cash-close-submit"
           >
             {submitting ? "Closing…" : "Close session"}
           </Button>
@@ -786,7 +789,7 @@ function ManualMovementDialog({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md" data-tour-id="cash-movement-dialog">
         <DialogHeader>
           <DialogTitle>Record a manual cash movement</DialogTitle>
           <DialogDescription>
@@ -831,6 +834,7 @@ function ManualMovementDialog({
               min={0}
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
+              data-tour-id="cash-movement-amount-input"
             />
           </div>
           <div className="space-y-1 sm:col-span-2">
@@ -843,10 +847,10 @@ function ManualMovementDialog({
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={submitting}>
+          <Button variant="outline" onClick={onClose} disabled={submitting} data-tour-id="cash-movement-cancel">
             Cancel
           </Button>
-          <Button onClick={() => void submit()} disabled={submitting || !amount}>
+          <Button onClick={() => void submit()} disabled={submitting || !amount} data-tour-id="cash-movement-submit">
             {submitting ? "Recording…" : "Record"}
           </Button>
         </DialogFooter>
