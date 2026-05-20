@@ -106,7 +106,7 @@ export function RepairProposalPanel({
       .from("repair_proposal_items")
       .select("*")
       .eq("proposal_id", prop.id)
-      .order("sort_order", { ascending: true });
+      .order("created_at", { ascending: true });
     if (ie) {
       toast.error(formatError(ie));
       setItems([]);
@@ -121,14 +121,14 @@ export function RepairProposalPanel({
   }, [load]);
 
   const originalTotal = useMemo(
-    () => items.reduce((s, i) => s + Number(i.line_total || 0), 0),
+    () => items.reduce((s, i) => s + Number(i.total_price || 0), 0),
     [items]
   );
   const approvedTotal = useMemo(
     () =>
       items
         .filter((i) => i.customer_decision === "approved")
-        .reduce((s, i) => s + Number(i.line_total || 0), 0),
+        .reduce((s, i) => s + Number(i.total_price || 0), 0),
     [items]
   );
 
@@ -164,8 +164,6 @@ export function RepairProposalPanel({
   async function addItemDraft() {
     if (!proposal || proposal.status !== "draft") return;
     setBusy(true);
-    const nextOrder =
-      items.length === 0 ? 0 : Math.max(...items.map((i) => i.sort_order)) + 1;
     const { data, error } = await supabase
       .from("repair_proposal_items")
       .insert({
@@ -174,8 +172,7 @@ export function RepairProposalPanel({
         name: "New line",
         quantity: 1,
         unit_price: 0,
-        line_total: 0,
-        sort_order: nextOrder,
+        total_price: 0,
       })
       .select("*")
       .single();
@@ -212,7 +209,7 @@ export function RepairProposalPanel({
       part_number: it.part_number,
       quantity: qty,
       unit_price: unit,
-      line_total: lineTotal,
+      total_price: lineTotal,
     });
   }
 
@@ -505,7 +502,7 @@ export function RepairProposalPanel({
                       </p>
                       <p>
                         {it.quantity} × {Number(it.unit_price).toFixed(2)} ={" "}
-                        <span className="font-mono">{Number(it.line_total).toFixed(2)}</span>
+                        <span className="font-mono">{Number(it.total_price).toFixed(2)}</span>
                       </p>
                       {canAsst && proposal.status === "sent_to_customer" && (
                         <div className="sm:col-span-2">

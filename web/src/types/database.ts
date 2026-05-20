@@ -440,9 +440,8 @@ export interface RepairProposalItem {
   part_number: string | null;
   quantity: number;
   unit_price: number;
-  line_total: number;
+  total_price: number;
   customer_decision: ProposalItemDecision;
-  sort_order: number;
   created_at: string;
 }
 

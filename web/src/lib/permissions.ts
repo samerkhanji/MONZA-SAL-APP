@@ -70,7 +70,7 @@ export const PAGE_PERMISSIONS: Record<
     "sales_ops",
     "sales",
   ],
-  installments: ["owner", "assistant", "sales_ops", "sales"],
+  installments: ["owner", "assistant", "hybrid", "khalil_hybrid", "sales_ops", "sales"],
   parts: [
     "owner",
     "assistant",
@@ -80,7 +80,7 @@ export const PAGE_PERMISSIONS: Record<
     "garage_manager",
     "garage_staff",
   ],
-  customers: ["owner", "assistant", "sales_ops", "sales"],
+  customers: ["owner", "assistant", "hybrid", "khalil_hybrid", "sales_ops", "sales"],
   garage: ["owner", "assistant", "garage_manager", "garage_staff"],
   garage_history: [
     "owner",
@@ -133,10 +133,10 @@ export const CRUD_PERMISSIONS = {
     ] as AppRole[],
   },
   customers: {
-    create: ["owner", "sales_ops", "sales"] as AppRole[],
-    edit: ["owner", "sales_ops", "sales"] as AppRole[],
+    create: ["owner", "hybrid", "khalil_hybrid", "sales_ops", "sales"] as AppRole[],
+    edit: ["owner", "hybrid", "khalil_hybrid", "sales_ops", "sales"] as AppRole[],
     delete: ["owner"] as AppRole[],
-    view: ["owner", "assistant", "sales_ops", "sales"] as AppRole[],
+    view: ["owner", "assistant", "hybrid", "khalil_hybrid", "sales_ops", "sales"] as AppRole[],
   },
   garage_jobs: {
     create: ["owner", "garage_manager"] as AppRole[],
@@ -145,11 +145,11 @@ export const CRUD_PERMISSIONS = {
     view: ["owner", "assistant", "garage_manager", "garage_staff"] as AppRole[],
   },
   installments: {
-    create: ["owner", "assistant", "sales_ops", "sales"] as AppRole[],
+    create: ["owner", "assistant", "hybrid", "khalil_hybrid", "sales_ops", "sales"] as AppRole[],
     edit: ["owner", "assistant"] as AppRole[],
     delete: ["owner"] as AppRole[],
-    view: ["owner", "assistant", "sales_ops", "sales"] as AppRole[],
-    mark_paid: ["owner", "assistant", "sales_ops", "sales"] as AppRole[],
+    view: ["owner", "assistant", "hybrid", "khalil_hybrid", "sales_ops", "sales"] as AppRole[],
+    mark_paid: ["owner", "assistant", "hybrid", "khalil_hybrid", "sales_ops", "sales"] as AppRole[],
   },
   requests: {
     create: [
