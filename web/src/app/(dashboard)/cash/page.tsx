@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { FieldHint } from "@/components/ui/field-hint";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -529,7 +530,10 @@ function OpenSessionDialog({
         <div className="space-y-3">
           {drawers.length > 1 && (
             <div className="space-y-1">
-              <Label>Drawer</Label>
+              <Label>
+                Drawer
+                <FieldHint text="Which cash register or till this session is for, if you have more than one." />
+              </Label>
               <Select value={drawerId} onValueChange={setDrawerId}>
                 <SelectTrigger>
                   <SelectValue placeholder="Pick a drawer" />
@@ -545,7 +549,10 @@ function OpenSessionDialog({
             </div>
           )}
           <div className="space-y-1">
-            <Label>Counted opening balance *</Label>
+            <Label>
+              Counted opening balance *
+              <FieldHint text="The exact amount of cash physically in the drawer right now, before any sales today." />
+            </Label>
             <Input
               type="number"
               inputMode="decimal"
@@ -685,7 +692,10 @@ function CloseSessionDialog({
             </div>
           )}
           <div className="space-y-1">
-            <Label>Counted closing *</Label>
+            <Label>
+              Counted closing *
+              <FieldHint text="The exact amount of cash you physically count in the drawer now, at end of day." />
+            </Label>
             <Input
               type="number"
               inputMode="decimal"
@@ -706,7 +716,10 @@ function CloseSessionDialog({
           </div>
           {overThreshold && (
             <div className="space-y-1">
-              <Label>Variance note *</Label>
+              <Label>
+                Variance note *
+                <FieldHint text="Explain why the counted cash doesn't match the expected amount." />
+              </Label>
               <Textarea
                 value={varianceNote}
                 onChange={(e) => setVarianceNote(e.target.value)}
@@ -799,7 +812,10 @@ function ManualMovementDialog({
         </DialogHeader>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1">
-            <Label>Kind *</Label>
+            <Label>
+              Kind *
+              <FieldHint text="The type of cash movement — an expense, a refund, or a payment received." />
+            </Label>
             <Select value={kind} onValueChange={setKind}>
               <SelectTrigger>
                 <SelectValue />
@@ -814,7 +830,10 @@ function ManualMovementDialog({
             </Select>
           </div>
           <div className="space-y-1">
-            <Label>Direction *</Label>
+            <Label>
+              Direction *
+              <FieldHint text="Whether cash is coming into the drawer or going out of it." />
+            </Label>
             <Select value={direction} onValueChange={(v) => setDirection(v as "in" | "out")}>
               <SelectTrigger>
                 <SelectValue />
