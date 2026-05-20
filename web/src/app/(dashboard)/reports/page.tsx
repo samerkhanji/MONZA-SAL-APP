@@ -235,7 +235,7 @@ function ReportsBody() {
       </div>
 
       {/* Top-of-page summary tiles */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" data-tour-id="reports-summary-tiles">
         <SummaryTile
           icon={DollarSign}
           label="Margin (delivered)"
@@ -276,7 +276,7 @@ function ReportsBody() {
       </div>
 
       {/* 1. Profit margin per sale */}
-      <Card>
+      <Card data-tour-id="reports-margin-panel">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <DollarSign className="size-4" /> Profit margin per delivered sale
@@ -359,7 +359,7 @@ function ReportsBody() {
       </Card>
 
       {/* 2. Sales rep performance */}
-      <Card>
+      <Card data-tour-id="reports-sales-rep-panel">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <Users className="size-4" /> Sales rep performance
@@ -413,7 +413,7 @@ function ReportsBody() {
       </Card>
 
       {/* 3. Inventory aging */}
-      <Card>
+      <Card data-tour-id="reports-inventory-aging-panel">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <Package className="size-4" /> Inventory aging
@@ -501,7 +501,7 @@ function ReportsBody() {
       </Card>
 
       {/* 4. Aged receivables */}
-      <Card>
+      <Card data-tour-id="reports-aged-receivables-panel">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <TrendingUp className="size-4" /> Aged receivables
@@ -585,7 +585,7 @@ function ReportsBody() {
       </Card>
 
       {/* 5. Time-in-state */}
-      <Card>
+      <Card data-tour-id="reports-time-state-panel">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <Clock className="size-4" /> Garage time-in-state
