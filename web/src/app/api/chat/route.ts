@@ -6,11 +6,18 @@ import {
   buildCallerContextBlock,
   type CallerContext,
 } from "@/lib/ai/system-prompt";
+import { MONZA_ASSISTANT_TOOLS, runAssistantTool } from "@/lib/ai/tools";
 
 /**
  * POST /api/chat
  *
  * Streams a Claude Opus 4.7 response for the in-app AI assistant widget.
+ *
+ * The assistant has a set of read-only data tools (see lib/ai/tools.ts).
+ * When the model asks for one, the server runs it through the caller's
+ * Supabase client — so Row-Level Security scopes every result to what
+ * that user is already allowed to see — and feeds the result back. The
+ * loop continues until the model produces a final text answer.
  *
  * Request body:
  *   {
@@ -24,13 +31,15 @@ import {
  * `content_block_delta` events with `text_delta` to render incrementally.
  */
 
-// Anthropic streaming responses can run longer than the default Vercel
-// 10s edge timeout; bump to 30s for the chat route.
-export const maxDuration = 30;
+// Anthropic streaming + tool rounds can run longer than the default Vercel
+// 10s edge timeout; bump to 60s for the chat route.
+export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
 const MODEL_ID = "claude-opus-4-7";
 const MAX_TOKENS = 1024;
+// How many tool rounds the model may take before it must produce an answer.
+const MAX_TOOL_ROUNDS = 5;
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
@@ -134,14 +143,14 @@ export async function POST(req: Request) {
     );
   }
 
-  // 5. Stream from Anthropic.
+  // 5. Stream from Anthropic, running the read-only data tools whenever the
+  //    model asks for them.
   const client = new Anthropic({ apiKey });
 
   // System prompt has two pieces:
   //   - the large frozen knowledge base (cached via cache_control)
   //   - the small per-request caller-context block (not cached)
-  // The cached block is placed first so the prefix stays stable across requests
-  // (see prompt-caching docs: any change in the prefix invalidates the cache).
+  // The cached block is placed first so the prefix stays stable across requests.
   const systemBlocks: Anthropic.TextBlockParam[] = [
     {
       type: "text",
@@ -154,65 +163,102 @@ export async function POST(req: Request) {
     },
   ];
 
-  try {
-    const stream = client.messages.stream({
-      model: MODEL_ID,
-      max_tokens: MAX_TOKENS,
-      system: systemBlocks,
-      messages: messages.map((m) => ({ role: m.role, content: m.content })),
-    });
+  // Conversation transcript — grows as the tool-use loop runs.
+  const convo: Anthropic.MessageParam[] = messages.map((m) => ({
+    role: m.role,
+    content: m.content,
+  }));
 
-    // Forward the raw SSE stream from the SDK as-is so the client can parse
-    // the standard Anthropic event types (`content_block_delta`, etc.).
-    const encoder = new TextEncoder();
-    const readable = new ReadableStream<Uint8Array>({
-      async start(controller) {
-        try {
+  const encoder = new TextEncoder();
+  const readable = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const send = (type: string, payload: unknown) => {
+        controller.enqueue(
+          encoder.encode(`event: ${type}\ndata: ${JSON.stringify(payload)}\n\n`)
+        );
+      };
+
+      try {
+        for (let round = 0; ; round++) {
+          // On the final allowed round, drop the tools so the model is
+          // forced to answer with text instead of requesting more data.
+          const allowTools = round < MAX_TOOL_ROUNDS;
+
+          const stream = client.messages.stream({
+            model: MODEL_ID,
+            max_tokens: MAX_TOKENS,
+            system: systemBlocks,
+            messages: convo,
+            ...(allowTools ? { tools: MONZA_ASSISTANT_TOOLS } : {}),
+          });
+
+          let turnHadText = false;
           for await (const event of stream) {
-            const line = `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`;
-            controller.enqueue(encoder.encode(line));
+            if (
+              event.type === "content_block_delta" &&
+              event.delta.type === "text_delta"
+            ) {
+              turnHadText = true;
+              send(event.type, event);
+            }
           }
-          controller.close();
-        } catch (err) {
-          const message =
-            err instanceof Error ? err.message : "stream error";
-          const errLine = `event: error\ndata: ${JSON.stringify({
-            type: "error",
-            error: { type: "api_error", message },
-          })}\n\n`;
-          controller.enqueue(encoder.encode(errLine));
-          controller.close();
-        }
-      },
-    });
 
-    return new Response(readable, {
-      headers: {
-        "Content-Type": "text/event-stream; charset=utf-8",
-        "Cache-Control": "no-cache, no-transform",
-        Connection: "keep-alive",
-      },
-    });
-  } catch (err) {
-    if (err instanceof Anthropic.AuthenticationError) {
-      return NextResponse.json(
-        { error: "AI assistant API key is invalid." },
-        { status: 503 }
-      );
-    }
-    if (err instanceof Anthropic.RateLimitError) {
-      return NextResponse.json(
-        { error: "AI assistant is rate-limited. Try again shortly." },
-        { status: 429 }
-      );
-    }
-    if (err instanceof Anthropic.APIError) {
-      return NextResponse.json(
-        { error: `AI assistant error: ${err.message}` },
-        { status: err.status ?? 500 }
-      );
-    }
-    const message = err instanceof Error ? err.message : "Unknown error";
-    return NextResponse.json({ error: message }, { status: 500 });
-  }
+          const finalMessage = await stream.finalMessage();
+          convo.push({
+            role: "assistant",
+            content: finalMessage.content,
+          });
+
+          if (finalMessage.stop_reason !== "tool_use") break;
+
+          // Run every tool the model requested and feed the results back.
+          const toolResults: Anthropic.ToolResultBlockParam[] = [];
+          for (const block of finalMessage.content) {
+            if (block.type === "tool_use") {
+              const result = await runAssistantTool(
+                block.name,
+                block.input,
+                supabase
+              );
+              toolResults.push({
+                type: "tool_result",
+                tool_use_id: block.id,
+                content: result,
+              });
+            }
+          }
+          convo.push({ role: "user", content: toolResults });
+
+          // Separate any pre-tool narration from the upcoming answer.
+          if (turnHadText) {
+            send("content_block_delta", {
+              type: "content_block_delta",
+              delta: { type: "text_delta", text: "\n\n" },
+            });
+          }
+        }
+        controller.close();
+      } catch (err) {
+        let message = err instanceof Error ? err.message : "stream error";
+        if (err instanceof Anthropic.AuthenticationError) {
+          message = "AI assistant API key is invalid.";
+        } else if (err instanceof Anthropic.RateLimitError) {
+          message = "AI assistant is rate-limited. Try again shortly.";
+        }
+        send("error", {
+          type: "error",
+          error: { type: "api_error", message },
+        });
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(readable, {
+    headers: {
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+    },
+  });
 }
