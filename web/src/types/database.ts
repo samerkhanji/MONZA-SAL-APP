@@ -535,10 +535,8 @@ export interface Request {
   send_to: string | null;
   send_to_user_id: string | null;
   reviewed_by: string | null;
-   recipient_user_id: string | null;
-   recipient_role: string | null;
-   reviewed_at: string | null;
-   decision_reason: string | null;
+  reviewed_at: string | null;
+  decision_reason: string | null;
   forwarded_at: string | null;
   resolved_at: string | null;
   created_at: string;
