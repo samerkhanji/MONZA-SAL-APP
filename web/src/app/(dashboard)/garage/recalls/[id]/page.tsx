@@ -183,7 +183,7 @@ export default function RecallDetailPage() {
           <Badge variant="outline" className="h-6 px-2 text-[11px] uppercase">{recall.status}</Badge>
           {canWrite && (
             <Select value={recall.status} onValueChange={(v) => void changeRecallStatus(v)}>
-              <SelectTrigger className="h-8 w-32 text-xs"><SelectValue /></SelectTrigger>
+              <SelectTrigger data-tour-id="recall-detail-status" className="h-8 w-32 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="open">Open</SelectItem>
                 <SelectItem value="active">Active</SelectItem>
@@ -195,7 +195,7 @@ export default function RecallDetailPage() {
         </div>
       </div>
 
-      <Card>
+      <Card data-tour-id="recall-detail-summary">
         <CardContent className="grid gap-4 p-4 sm:grid-cols-2">
           <div>
             <Label className="text-muted-foreground text-xs uppercase">Manufacturer</Label>
@@ -226,7 +226,7 @@ export default function RecallDetailPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card data-tour-id="recall-detail-vehicles">
         <CardContent className="space-y-3 p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-sm font-semibold">
@@ -236,7 +236,7 @@ export default function RecallDetailPage() {
               </span>
             </h2>
             {canWrite && (
-              <Button size="sm" onClick={() => setAssignOpen(true)}>
+              <Button data-tour-id="recall-detail-assign" size="sm" onClick={() => setAssignOpen(true)}>
                 Assign vehicles
               </Button>
             )}
@@ -391,7 +391,7 @@ function AssignVehiclesDialog({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent data-tour-id="recall-detail-assign-dialog" className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Assign vehicles to this recall</DialogTitle>
           <DialogDescription>
