@@ -221,7 +221,7 @@ export default function PendingRequestsPage() {
 
   return (
     <div className="container mx-auto space-y-6 px-4 py-6 sm:px-6 lg:px-8">
-      <Card>
+      <Card data-tour-id="requests-pending-panel">
         <CardHeader>
           <CardTitle>Pending Requests</CardTitle>
           <CardDescription>
@@ -236,7 +236,7 @@ export default function PendingRequestsPage() {
               No pending requests
             </p>
           ) : (
-            <div className="overflow-x-auto rounded-lg border">
+            <div className="overflow-x-auto rounded-lg border" data-tour-id="requests-pending-table">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b bg-muted/50">

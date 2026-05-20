@@ -93,7 +93,7 @@ function Body() {
   return (
     <div className="container space-y-6 py-6">
       <div className="flex flex-wrap items-end justify-between gap-2">
-        <div>
+        <div data-tour-id="settings-approval-thresholds-intro">
           <h1 className="text-2xl font-semibold">Approval thresholds</h1>
           <p className="text-muted-foreground text-sm">
             Set the money limits that decide who needs to sign off. Below the
@@ -197,7 +197,7 @@ function ThresholdCard({
   }
 
   return (
-    <Card>
+    <Card data-tour-id="settings-approval-threshold-card">
       <CardHeader>
         <CardTitle className="text-base">{row.label_en}</CardTitle>
         <CardDescription className="flex flex-wrap items-center gap-2">
@@ -220,6 +220,7 @@ function ThresholdCard({
             </Label>
             <Input
               id={`manager-${row.id}`}
+              data-tour-id="settings-approval-threshold-manager-input"
               type="number"
               inputMode="decimal"
               min={0}
@@ -238,6 +239,7 @@ function ThresholdCard({
             </Label>
             <Input
               id={`owner-${row.id}`}
+              data-tour-id="settings-approval-threshold-owner-input"
               type="number"
               inputMode="decimal"
               min={0}
@@ -260,6 +262,7 @@ function ThresholdCard({
 
         <div className="flex justify-end">
           <Button
+            data-tour-id="settings-approval-threshold-save"
             size="sm"
             onClick={() => void handleSave()}
             disabled={!canSave}
