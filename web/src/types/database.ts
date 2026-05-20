@@ -93,6 +93,10 @@ export interface Car {
   bl_issue_date?: string | null;
   registration_date?: string | null;
   customs_notes?: string | null;
+  /** Recall Center: set when a car is recalled to the manufacturer (Voyah). */
+  recalled_at?: string | null;
+  recall_reason?: "shipping" | "issue" | null;
+  recall_notes?: string | null;
   deleted_at: string | null;
   notes: string | null;
   created_at: string;

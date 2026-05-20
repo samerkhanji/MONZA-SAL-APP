@@ -48,6 +48,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { MoveCarDialog } from "@/components/move-car-dialog";
 import { EditCarDialog } from "@/components/edit-car-dialog";
+import { RecallCarDialog } from "@/components/cars/RecallCarDialog";
 import { PdiStatusDialog } from "@/components/pdi-status-dialog";
 import { CarDocuments } from "@/components/car-documents";
 import { DayDetailDialog } from "@/components/car-day-detail-dialog";
@@ -337,6 +338,9 @@ type LegacyCarFields = {
   reservation_date: string | null;
   delivery_date: string | null;
   reserved_by: string | null;
+  recalled_at: string | null;
+  recall_reason: string | null;
+  recall_notes: string | null;
 };
 
 type SalesOrderDetail = {
@@ -421,6 +425,7 @@ export default function CarProfilePage() {
   const [editOpen, setEditOpen] = useState(false);
   const [pdiOpen, setPdiOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [recallOpen, setRecallOpen] = useState(false);
   const [addNoteOpen, setAddNoteOpen] = useState(false);
   const [noteText, setNoteText] = useState("");
   const [noteSubmitting, setNoteSubmitting] = useState(false);
@@ -455,7 +460,7 @@ export default function CarProfilePage() {
     const { data, error } = await supabase
       .from("cars")
       .select(
-        "customer_id, client_name, client_phone, reservation_date, delivery_date, reserved_by"
+        "customer_id, client_name, client_phone, reservation_date, delivery_date, reserved_by, recalled_at, recall_reason, recall_notes"
       )
       .eq("id", carId)
       .maybeSingle();
@@ -933,6 +938,13 @@ export default function CarProfilePage() {
     fetchEvents();
   }
 
+  function onRecalled() {
+    setRecallOpen(false);
+    fetchCar();
+    fetchEvents();
+    if (car?.id) void fetchLegacyCarSnapshot(car.id);
+  }
+
   function onLinkCustomerSuccess() {
     setLinkCustomerOpen(false);
     void fetchCar();
@@ -1198,6 +1210,15 @@ export default function CarProfilePage() {
             <Button variant="outline" onClick={() => setMoveOpen(true)} data-tour-id="cars-detail-move-button">
               Move location
             </Button>
+            {canEditInventory && (
+              <Button
+                variant="outline"
+                onClick={() => setRecallOpen(true)}
+                data-tour-id="cars-detail-recall-button"
+              >
+                {legacyCarSnapshot?.recalled_at ? "Manage recall" : "Recall to Voyah"}
+              </Button>
+            )}
             {canDeleteCar && (
               <Button
                 variant="destructive"
@@ -1239,6 +1260,27 @@ export default function CarProfilePage() {
         </div>
       )}
 
+      {legacyCarSnapshot?.recalled_at && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-orange-500/50 bg-orange-500/10 px-4 py-3 text-sm">
+          <p className="text-orange-950 dark:text-orange-100">
+            <strong>Recalled to Voyah</strong>
+            {legacyCarSnapshot.recall_reason
+              ? ` — ${legacyCarSnapshot.recall_reason === "shipping" ? "Shipping" : "Issue with the car"}`
+              : ""}
+            {" · "}
+            {new Date(legacyCarSnapshot.recalled_at).toLocaleDateString()}
+            {legacyCarSnapshot.recall_notes
+              ? ` · ${legacyCarSnapshot.recall_notes}`
+              : ""}
+          </p>
+          {canEditInventory && (
+            <Button size="sm" variant="secondary" onClick={() => setRecallOpen(true)}>
+              Manage
+            </Button>
+          )}
+        </div>
+      )}
+
       <MoveCarDialog
         carId={car.id}
         currentLocationType={car.location_type}
@@ -1246,6 +1288,26 @@ export default function CarProfilePage() {
         open={moveOpen}
         onOpenChange={setMoveOpen}
         onSuccess={onMoved}
+      />
+
+      <RecallCarDialog
+        carId={car.id}
+        carVin={car.vin}
+        hasCustomer={
+          !!legacyCarSnapshot?.customer_id || !!salesOrder?.customer_id
+        }
+        current={
+          legacyCarSnapshot
+            ? {
+                recalled_at: legacyCarSnapshot.recalled_at,
+                recall_reason: legacyCarSnapshot.recall_reason,
+                recall_notes: legacyCarSnapshot.recall_notes,
+              }
+            : null
+        }
+        open={recallOpen}
+        onOpenChange={setRecallOpen}
+        onSuccess={onRecalled}
       />
 
       <EditCarDialog
