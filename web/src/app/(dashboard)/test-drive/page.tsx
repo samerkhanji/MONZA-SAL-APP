@@ -236,7 +236,7 @@ export default function TestDrivePage() {
         </p>
       </div>
 
-      <Card>
+      <Card data-tour-id="test-drive-vin-panel">
         <CardHeader className="pb-3">
           <CardTitle className="text-lg">Scan or enter VIN</CardTitle>
           <CardDescription>17-character VIN — keyboard or camera</CardDescription>
@@ -253,21 +253,22 @@ export default function TestDrivePage() {
                 if (e.key === "Enter") void handleVinLookup(vinInput);
               }}
               aria-label="VIN"
+              data-tour-id="test-drive-vin-input"
             />
           </div>
           <div className="flex gap-2">
-            <Button type="button" variant="secondary" className="gap-2" onClick={() => setScanOpen(true)}>
+            <Button type="button" variant="secondary" className="gap-2" onClick={() => setScanOpen(true)} data-tour-id="test-drive-scan-button">
               <ScanLine className="size-4" />
               Scan
             </Button>
-            <Button type="button" disabled={lookupLoading} onClick={() => void handleVinLookup(vinInput)}>
+            <Button type="button" disabled={lookupLoading} onClick={() => void handleVinLookup(vinInput)} data-tour-id="test-drive-lookup-button">
               {lookupLoading ? <Loader2 className="size-4 animate-spin" /> : "Look up"}
             </Button>
           </div>
         </CardContent>
       </Card>
 
-      <Card>
+      <Card data-tour-id="test-drive-active-panel">
         <CardHeader>
           <CardTitle>Active test drives</CardTitle>
           <CardDescription>Vehicles currently out</CardDescription>
@@ -305,7 +306,7 @@ export default function TestDrivePage() {
                         {new Date(td.test_drive_start_at).toLocaleString()}
                       </TableCell>
                       <TableCell className="pr-6 text-right">
-                        <Button size="sm" variant="outline" onClick={() => openRow(td)}>
+                        <Button size="sm" variant="outline" onClick={() => openRow(td)} data-tour-id="test-drive-active-open-button">
                           Open
                         </Button>
                       </TableCell>
@@ -318,7 +319,7 @@ export default function TestDrivePage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card data-tour-id="test-drive-returns-panel">
         <CardHeader>
           <CardTitle>Recent returns</CardTitle>
           <CardDescription>Last completed test drives</CardDescription>
@@ -360,7 +361,7 @@ export default function TestDrivePage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="pr-6 text-right">
-                        <Button size="sm" variant="ghost" onClick={() => openRow(td)}>
+                        <Button size="sm" variant="ghost" onClick={() => openRow(td)} data-tour-id="test-drive-returns-view-button">
                           View
                         </Button>
                       </TableCell>
