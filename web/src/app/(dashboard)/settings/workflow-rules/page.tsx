@@ -248,9 +248,13 @@ function Body() {
       </div>
 
       <Tabs defaultValue="routing">
-        <TabsList>
-          <TabsTrigger value="routing">Task routing</TabsTrigger>
-          <TabsTrigger value="events">Notification events</TabsTrigger>
+        <TabsList data-tour-id="workflow-rules-tabs">
+          <TabsTrigger value="routing" data-tour-id="workflow-rules-tab-routing">
+            Task routing
+          </TabsTrigger>
+          <TabsTrigger value="events" data-tour-id="workflow-rules-tab-events">
+            Notification events
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="routing" className="space-y-4">
@@ -349,7 +353,7 @@ function RoutingPane({
   const cat = categories.find((c) => c.id === selectedCat);
 
   return (
-    <Card>
+    <Card data-tour-id="workflow-rules-routing-panel">
       <CardHeader>
         <CardTitle className="text-base">Who gets the task</CardTitle>
         <CardDescription>
@@ -622,7 +626,7 @@ function EventsPane({
   );
 
   return (
-    <Card>
+    <Card data-tour-id="workflow-rules-events-panel">
       <CardHeader>
         <CardTitle className="text-base">Who hears about it</CardTitle>
         <CardDescription>
