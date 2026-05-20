@@ -183,7 +183,7 @@ export default function NotificationPreferencesPage() {
         )}
       </div>
 
-      <Card>
+      <Card data-tour-id="settings-notifications-channels-panel">
         <CardHeader>
           <CardTitle className="text-base">Delivery channels</CardTitle>
           <CardDescription>
@@ -227,7 +227,7 @@ export default function NotificationPreferencesPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card data-tour-id="settings-notifications-quiet-hours-panel">
         <CardHeader>
           <CardTitle className="text-base">Quiet hours</CardTitle>
           <CardDescription>
@@ -262,7 +262,7 @@ export default function NotificationPreferencesPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card data-tour-id="settings-notifications-digest-panel">
         <CardHeader>
           <CardTitle className="text-base">Daily digest</CardTitle>
           <CardDescription>
@@ -289,7 +289,7 @@ export default function NotificationPreferencesPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card data-tour-id="settings-notifications-mutes-panel">
         <CardHeader>
           <CardTitle className="text-base">Muted entities</CardTitle>
           <CardDescription>
@@ -301,6 +301,7 @@ export default function NotificationPreferencesPage() {
         <CardContent className="space-y-3">
           <div className="flex gap-2">
             <Input
+              data-tour-id="settings-notifications-mute-input"
               placeholder="entity_type:uuid"
               value={muteInput}
               onChange={(e) => setMuteInput(e.target.value)}
@@ -311,7 +312,12 @@ export default function NotificationPreferencesPage() {
                 }
               }}
             />
-            <Button type="button" onClick={addMute} disabled={!muteInput.trim()}>
+            <Button
+              data-tour-id="settings-notifications-mute-button"
+              type="button"
+              onClick={addMute}
+              disabled={!muteInput.trim()}
+            >
               Mute
             </Button>
           </div>
