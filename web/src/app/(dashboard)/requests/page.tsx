@@ -394,8 +394,6 @@ export default function RequestCenterPage() {
         assigned_to: assignedTo,
         send_to: effectiveSendTo,
         send_to_user_id: newSendToUserId,
-        recipient_user_id: newSendToUserId,
-        recipient_role: isDirectToOwner || isToHoussam ? "owner" : null,
       });
 
     setNewSubmitting(false);

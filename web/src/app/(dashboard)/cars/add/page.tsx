@@ -177,7 +177,6 @@ export default function AddCarPage() {
       p_interior_color: interiorColor.trim() || null,
       p_location_type: locationType,
       p_location_slot: null,
-      p_location_floor: null,
       p_status: status,
       p_user_id: user.id,
     });
