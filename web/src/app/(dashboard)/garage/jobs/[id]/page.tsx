@@ -351,7 +351,7 @@ export default function JobDetailPage() {
   return (
     <div className="container mx-auto max-w-4xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
       <div className="flex flex-wrap items-center gap-4">
-        <Button variant="ghost" size="sm" asChild>
+        <Button data-tour-id="job-detail-back" variant="ghost" size="sm" asChild>
           <Link href="/garage">
             <ArrowLeft className="mr-2 size-4" />
             Garage Jobs
@@ -396,9 +396,9 @@ export default function JobDetailPage() {
       )}
 
       {/* Sticky timer + actions bar so a mechanic can always see clock state */}
-      <div className="sticky top-0 z-30 -mx-4 border-b border-border bg-background/95 px-4 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:-mx-6 sm:px-6">
+      <div data-tour-id="job-detail-toolbar" className="sticky top-0 z-30 -mx-4 border-b border-border bg-background/95 px-4 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:-mx-6 sm:px-6">
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex-1 min-w-[260px]">
+          <div data-tour-id="job-detail-timer" className="flex-1 min-w-[260px]">
             <JobTimeEntryControls
               jobId={job.id}
               jobStatus={job.status}
@@ -420,7 +420,7 @@ export default function JobDetailPage() {
             {(canEditJob || canGarageStaffEditLimited) && (
               <>
                 {job.status !== "done" && job.status !== "cancelled" && (
-                  <Button size="sm" onClick={() => setFinishOpen(true)}>
+                  <Button data-tour-id="job-detail-complete" size="sm" onClick={() => setFinishOpen(true)}>
                     <Check className="mr-2 size-4" />
                     Complete
                   </Button>
@@ -429,6 +429,7 @@ export default function JobDetailPage() {
             )}
             {canDeleteJob && (
               <Button
+                data-tour-id="job-detail-delete"
                 size="sm"
                 variant="destructive"
                 onClick={() => setDeleteOpen(true)}
@@ -587,7 +588,7 @@ export default function JobDetailPage() {
       </Card>
 
       {/* Section 2: Diagnosis & Work */}
-      <Card>
+      <Card data-tour-id="job-detail-diagnosis">
         <CardHeader>
           <CardTitle>Diagnosis & Work</CardTitle>
         </CardHeader>
@@ -626,17 +627,18 @@ export default function JobDetailPage() {
       </Card>
 
       {/* Section 3: Parts Used */}
-      <Card>
+      <Card data-tour-id="job-detail-parts">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Parts Used</CardTitle>
             {canManageGarage && (
               <div className="flex gap-2">
-                <Button size="sm" onClick={() => setAddPartOpen(true)}>
+                <Button data-tour-id="job-detail-add-part" size="sm" onClick={() => setAddPartOpen(true)}>
                   <Plus className="mr-2 size-4" />
                   Add Part
                 </Button>
                 <Button
+                  data-tour-id="job-detail-scan-part"
                   size="sm"
                   variant="outline"
                   onClick={() => setScanPartOpen(true)}
@@ -706,7 +708,7 @@ export default function JobDetailPage() {
       </Card>
 
       {/* Section 4: Documents */}
-      <Card>
+      <Card data-tour-id="job-detail-documents">
         <CardHeader>
           <CardTitle>Documents</CardTitle>
         </CardHeader>
