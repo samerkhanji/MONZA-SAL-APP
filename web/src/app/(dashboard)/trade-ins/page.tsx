@@ -168,14 +168,14 @@ export default function TradeInsPage() {
           </p>
         </div>
         {canRequest && (
-          <Button onClick={() => setCreateOpen(true)}>
+          <Button onClick={() => setCreateOpen(true)} data-tour-id="trade-ins-list-request-button">
             <Plus className="mr-1.5 size-4" /> Request trade-in
           </Button>
         )}
       </div>
 
       <Tabs value={bucket} onValueChange={(v) => setBucket(v as Bucket)}>
-        <TabsList className="flex h-auto flex-wrap">
+        <TabsList className="flex h-auto flex-wrap" data-tour-id="trade-ins-list-status-tabs">
           {STATUS_BUCKETS.map((b) => (
             <TabsTrigger key={b.id} value={b.id} className="text-xs">
               {b.label}
@@ -196,6 +196,7 @@ export default function TradeInsPage() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           className="h-10 pl-10"
+          data-tour-id="trade-ins-list-search-input"
         />
       </div>
 
@@ -350,7 +351,7 @@ function RequestTradeInDialog({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg" data-tour-id="trade-ins-list-request-dialog">
         <DialogHeader>
           <DialogTitle>Request a trade-in</DialogTitle>
           <DialogDescription>
@@ -362,7 +363,7 @@ function RequestTradeInDialog({
           <div className="space-y-1 sm:col-span-2">
             <Label>Customer *</Label>
             <Select value={customerId} onValueChange={setCustomerId}>
-              <SelectTrigger><SelectValue placeholder="Pick a customer" /></SelectTrigger>
+              <SelectTrigger data-tour-id="trade-ins-request-customer-select"><SelectValue placeholder="Pick a customer" /></SelectTrigger>
               <SelectContent>
                 {customers.map((c) => (
                   <SelectItem key={c.id} value={c.id}>{c.full_name ?? c.name ?? c.id}</SelectItem>
@@ -372,11 +373,11 @@ function RequestTradeInDialog({
           </div>
           <div className="space-y-1">
             <Label>Make *</Label>
-            <Input value={make} onChange={(e) => setMake(e.target.value)} placeholder="Toyota" />
+            <Input value={make} onChange={(e) => setMake(e.target.value)} placeholder="Toyota" data-tour-id="trade-ins-request-make-input" />
           </div>
           <div className="space-y-1">
             <Label>Model *</Label>
-            <Input value={model} onChange={(e) => setModel(e.target.value)} placeholder="Camry" />
+            <Input value={model} onChange={(e) => setModel(e.target.value)} placeholder="Camry" data-tour-id="trade-ins-request-model-input" />
           </div>
           <div className="space-y-1">
             <Label>Year</Label>
@@ -404,7 +405,7 @@ function RequestTradeInDialog({
           </div>
           <div className="space-y-1">
             <Label>Provisional value *</Label>
-            <Input type="number" min="0" step="0.01" value={provisional} onChange={(e) => setProvisional(e.target.value)} />
+            <Input type="number" min="0" step="0.01" value={provisional} onChange={(e) => setProvisional(e.target.value)} data-tour-id="trade-ins-request-provisional-input" />
           </div>
           <div className="space-y-1">
             <Label>Currency</Label>
@@ -423,8 +424,8 @@ function RequestTradeInDialog({
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={submitting}>Cancel</Button>
-          <Button onClick={() => void submit()} disabled={submitting}>
+          <Button variant="outline" onClick={onClose} disabled={submitting} data-tour-id="trade-ins-request-cancel">Cancel</Button>
+          <Button onClick={() => void submit()} disabled={submitting} data-tour-id="trade-ins-request-submit">
             {submitting ? "Creating…" : "Submit request"}
           </Button>
         </DialogFooter>
