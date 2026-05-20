@@ -241,6 +241,7 @@ export default function GarageInventoryPage() {
 
       {lowStockCount > 0 && (
         <button
+          data-tour-id="inventory-low-stock-banner"
           type="button"
           onClick={showLowStockOnly}
           className="flex w-full items-center gap-2 rounded-lg border border-amber-500/50 bg-amber-50 px-4 py-3 text-left text-amber-800 transition-colors hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-200 dark:hover:bg-amber-900"
@@ -264,11 +265,12 @@ export default function GarageInventoryPage() {
             <div className="flex flex-wrap gap-2">
               {canCreatePart && (
                 <>
-                  <Button size="sm" onClick={() => setAddOpen(true)}>
+                  <Button data-tour-id="inventory-add-part" size="sm" onClick={() => setAddOpen(true)}>
                     <Plus className="mr-2 size-4" />
                     Add New Part
                   </Button>
                   <Button
+                    data-tour-id="inventory-import"
                     size="sm"
                     variant="outline"
                     onClick={() => setImportOpen(true)}
@@ -280,18 +282,21 @@ export default function GarageInventoryPage() {
                   </Button>
                 </>
               )}
-              <ExportButton
-                data={partExportData(filteredParts)}
-                allData={partExportData(parts)}
-                columns={partExportColumns}
-                filename="Parts_Inventory"
-                options={{
-                  pageName: "Parts Inventory",
-                  summary: `Total Parts: ${filteredParts.length} | Total Quantity: ${totalQty}`,
-                }}
-                disabled={loading}
-              />
+              <span data-tour-id="inventory-export">
+                <ExportButton
+                  data={partExportData(filteredParts)}
+                  allData={partExportData(parts)}
+                  columns={partExportColumns}
+                  filename="Parts_Inventory"
+                  options={{
+                    pageName: "Parts Inventory",
+                    summary: `Total Parts: ${filteredParts.length} | Total Quantity: ${totalQty}`,
+                  }}
+                  disabled={loading}
+                />
+              </span>
               <Button
+                data-tour-id="inventory-refresh"
                 size="sm"
                 variant="outline"
                 onClick={() => fetchParts()}
@@ -309,6 +314,7 @@ export default function GarageInventoryPage() {
           <div className="flex flex-wrap gap-4">
             <div className="flex w-full gap-2 sm:w-auto sm:max-w-xs">
               <Input
+                data-tour-id="inventory-search"
                 id="parts-search"
                 name="parts-search"
                 placeholder="Search part name, OE number..."
@@ -317,6 +323,7 @@ export default function GarageInventoryPage() {
                 className="min-h-11 flex-1 text-base sm:text-sm"
               />
               <Button
+                data-tour-id="inventory-scan-part"
                 variant="outline"
                 size="icon"
                 className="size-11 min-h-11 min-w-11 shrink-0"
@@ -330,7 +337,7 @@ export default function GarageInventoryPage() {
               value={supplierFilter}
               onValueChange={setSupplierFilter}
             >
-              <SelectTrigger id="parts-supplier-filter" className="w-[180px]">
+              <SelectTrigger data-tour-id="inventory-supplier-filter" id="parts-supplier-filter" className="w-[180px]">
                 <SelectValue placeholder="Supplier" />
               </SelectTrigger>
               <SelectContent>
@@ -340,7 +347,7 @@ export default function GarageInventoryPage() {
               </SelectContent>
             </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger id="parts-status-filter" className="w-[160px]">
+              <SelectTrigger data-tour-id="inventory-status-filter" id="parts-status-filter" className="w-[160px]">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
@@ -509,7 +516,7 @@ export default function GarageInventoryPage() {
               </div>
 
               {/* Tablet/Desktop: table */}
-              <div className="scrollbar-thick hidden overflow-x-auto rounded-lg border border-border/50 md:block">
+              <div data-tour-id="inventory-table" className="scrollbar-thick hidden overflow-x-auto rounded-lg border border-border/50 md:block">
               <Table className="min-w-[900px] w-full">
                 <TableHeader>
                   <TableRow>
@@ -574,7 +581,7 @@ export default function GarageInventoryPage() {
                       <TableCell>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
+                            <Button data-tour-id="inventory-row-actions" variant="ghost" size="icon">
                               <MoreHorizontal className="size-4" />
                             </Button>
                           </DropdownMenuTrigger>
