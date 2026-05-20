@@ -301,7 +301,7 @@ function InventorySortTh({
         <span className="min-w-0 flex-1 truncate">{children}</span>
         {active ? (
           <span className="shrink-0 tabular-nums" aria-hidden>
-            {sortDir === "asc" ? "\u2191" : "\u2193"}
+            {sortDir === "asc" ? "↑" : "↓"}
           </span>
         ) : null}
       </button>
@@ -614,20 +614,20 @@ export default function CarsListPage() {
             disabled={loading}
           />
           {isOwner && (
-            <Button variant="outline" onClick={() => setImportExcelOpen(true)}>
+            <Button variant="outline" onClick={() => setImportExcelOpen(true)} data-tour-id="cars-list-import-excel-button">
               <FileSpreadsheet className="mr-2 size-4" />
               Import from Excel
             </Button>
           )}
           {canCreateCar && (
-            <Button asChild>
+            <Button asChild data-tour-id="cars-list-add-button">
               <Link href="/cars/add">Add Car</Link>
             </Button>
           )}
         </div>
       </div>
 
-      <Card>
+      <Card data-tour-id="cars-list-filters-panel">
         <CardHeader>
           <CardTitle>Filters</CardTitle>
           <CardDescription>
@@ -643,6 +643,7 @@ export default function CarsListPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="min-h-11 flex-1 text-base sm:text-sm"
+              data-tour-id="cars-list-search-input"
             />
             <Button
               variant="outline"
@@ -650,12 +651,13 @@ export default function CarsListPage() {
               className="size-11 min-h-11 min-w-11 shrink-0"
               onClick={() => setScanVinOpen(true)}
               title="Scan VIN"
+              data-tour-id="cars-list-scan-vin-button"
             >
               <ScanLine className="size-4" />
             </Button>
           </div>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger id="car-status-filter" className="w-[180px]">
+            <SelectTrigger id="car-status-filter" className="w-[180px]" data-tour-id="cars-list-filter-status">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
@@ -668,7 +670,7 @@ export default function CarsListPage() {
             </SelectContent>
           </Select>
           <Select value={locationFilter} onValueChange={setLocationFilter}>
-            <SelectTrigger id="car-location-filter" className="w-[180px]">
+            <SelectTrigger id="car-location-filter" className="w-[180px]" data-tour-id="cars-list-filter-location">
               <SelectValue placeholder="Location" />
             </SelectTrigger>
             <SelectContent>
@@ -683,7 +685,7 @@ export default function CarsListPage() {
             </SelectContent>
           </Select>
           <Select value={brandFilter} onValueChange={setBrandFilter}>
-            <SelectTrigger id="car-brand-filter" className="w-[140px]">
+            <SelectTrigger id="car-brand-filter" className="w-[140px]" data-tour-id="cars-list-filter-brand">
               <SelectValue placeholder="Brand" />
             </SelectTrigger>
             <SelectContent>
@@ -695,7 +697,7 @@ export default function CarsListPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card data-tour-id="cars-list-table-panel">
         <CardHeader>
           <CardTitle>Cars</CardTitle>
           <CardDescription>
@@ -1089,13 +1091,14 @@ export default function CarsListPage() {
                             </Button>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="size-7 shrink-0">
+                                <Button variant="ghost" size="icon" className="size-7 shrink-0" data-tour-id="cars-list-row-actions-trigger">
                                   <MoreHorizontal className="size-3.5" />
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" side="left" sideOffset={4}>
                                 <DropdownMenuItem
                                   onClick={() => router.push(`/cars/${encodeURIComponent(car.vin ?? car.id)}`)}
+                                  data-tour-id="cars-list-row-actions-view"
                                 >
                                   View profile
                                 </DropdownMenuItem>
@@ -1103,18 +1106,19 @@ export default function CarsListPage() {
                                   onClick={() =>
                                     router.push(`/cars/${encodeURIComponent(car.vin ?? car.id)}`)
                                   }
+                                  data-tour-id="cars-list-row-actions-documents"
                                 >
                                   <FileText className="mr-2 size-4" />
                                   Documents & PDFs
                                 </DropdownMenuItem>
                                 {canEditCar && (
                                   <>
-                                    <DropdownMenuItem onClick={() => setEditCar(car)}>Edit</DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => setMoveCar(car)}>Move</DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => setEditCar(car)} data-tour-id="cars-list-row-actions-edit">Edit</DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => setMoveCar(car)} data-tour-id="cars-list-row-actions-move">Move</DropdownMenuItem>
                                   </>
                                 )}
                                 {canDeleteCar && (
-                                  <DropdownMenuItem variant="destructive" onClick={() => setDeleteCar(car)}>
+                                  <DropdownMenuItem variant="destructive" onClick={() => setDeleteCar(car)} data-tour-id="cars-list-row-actions-scrap">
                                     Scrap vehicle
                                   </DropdownMenuItem>
                                 )}
@@ -1189,7 +1193,7 @@ export default function CarsListPage() {
         open={!!deleteCar}
         onOpenChange={(open) => !open && setDeleteCar(null)}
       >
-        <AlertDialogContent>
+        <AlertDialogContent data-tour-id="cars-list-delete-dialog">
           <AlertDialogHeader>
             <AlertDialogTitle>
               Permanently retire this car (scrapped)
@@ -1213,6 +1217,7 @@ export default function CarsListPage() {
                 value={deletePassword}
                 onChange={(e) => setDeletePassword(e.target.value)}
                 autoComplete="current-password"
+                data-tour-id="cars-list-delete-password-input"
               />
               {deleteError && (
                 <p className="text-sm text-destructive">{deleteError}</p>
@@ -1224,13 +1229,14 @@ export default function CarsListPage() {
             </p>
           )}
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel data-tour-id="cars-list-delete-cancel">Cancel</AlertDialogCancel>
             <Button
               variant="destructive"
               disabled={deleteLoading || !deletePassword || !(isOwner || profile?.user_role === "owner")}
               onClick={() => {
                 void handleDeleteCar();
               }}
+              data-tour-id="cars-list-delete-confirm"
             >
               {deleteLoading ? "Saving..." : "Confirm scrap"}
             </Button>
