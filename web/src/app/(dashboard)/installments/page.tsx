@@ -120,6 +120,7 @@ export default function InstallmentsPage() {
   const [receiptUrl, setReceiptUrl] = useState<string>("");
   const [note, setNote] = useState<string>("");
   const [markingPaid, setMarkingPaid] = useState(false);
+  const [detailPlan, setDetailPlan] = useState<PlanWithRelations | null>(null);
 
   const isOwner = appRole === "owner";
   // Page access: assistants, sales_ops, and anyone with the cashier capability
@@ -1510,7 +1511,12 @@ export default function InstallmentsPage() {
                       Start {format(new Date(p.start_date), "dd/MM/yyyy")} · Due day{" "}
                       {p.due_day}
                     </p>
-                    <Button variant="outline" size="sm" className="mt-3 w-full touch-manipulation">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-3 w-full touch-manipulation"
+                      onClick={() => setDetailPlan(p)}
+                    >
                       View Details
                     </Button>
                     {p.status === "defaulted" && isOwner && (
@@ -1605,7 +1611,11 @@ export default function InstallmentsPage() {
                         </TableCell>
                         <TableCell className="text-center">{p.due_day}</TableCell>
                         <TableCell className="text-right">
-                          <Button variant="outline" size="sm">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setDetailPlan(p)}
+                          >
                             View Details
                           </Button>
                         </TableCell>
@@ -2827,6 +2837,127 @@ export default function InstallmentsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog
+        open={detailPlan !== null}
+        onOpenChange={(o) => !o && setDetailPlan(null)}
+      >
+        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Payment plan —{" "}
+              {detailPlan?.customer ? formatName(detailPlan.customer) : "Customer"}
+            </DialogTitle>
+            <DialogDescription>
+              {detailPlan?.car
+                ? `${detailPlan.car.model} (${detailPlan.car.vin})`
+                : "No car linked"}
+            </DialogDescription>
+          </DialogHeader>
+          {detailPlan && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+                <div>
+                  <p className="text-xs text-muted-foreground">Total</p>
+                  <p className="font-medium">
+                    {currencyFormatter.format(detailPlan.total_amount)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Down payment</p>
+                  <p className="font-medium">
+                    {currencyFormatter.format(detailPlan.down_payment)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Monthly</p>
+                  <p className="font-medium">
+                    {currencyFormatter.format(detailPlan.monthly_amount)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Months</p>
+                  <p className="font-medium">{detailPlan.months}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Status</p>
+                  <p className="font-medium capitalize">{detailPlan.status}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Start date</p>
+                  <p className="font-medium">
+                    {format(new Date(detailPlan.start_date), "dd/MM/yyyy")}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Due day</p>
+                  <p className="font-medium">{detailPlan.due_day}</p>
+                </div>
+              </div>
+              <div className="rounded-lg border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>#</TableHead>
+                      <TableHead>Due date</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Paid</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {[...detailPlan.installments]
+                      .sort((a, b) => a.installment_no - b.installment_no)
+                      .map((i) => (
+                        <TableRow key={i.id}>
+                          <TableCell>#{i.installment_no}</TableCell>
+                          <TableCell>
+                            {format(new Date(i.due_date), "dd/MM/yyyy")}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {currencyFormatter.format(i.amount_due)}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              className={
+                                i.status === "paid"
+                                  ? "bg-emerald-100 text-emerald-800"
+                                  : i.status === "overdue"
+                                    ? "bg-red-100 text-red-800"
+                                    : "bg-amber-100 text-amber-800"
+                              }
+                            >
+                              {i.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {i.paid_amount != null
+                              ? `${currencyFormatter.format(i.paid_amount)}${
+                                  i.paid_at
+                                    ? ` · ${format(new Date(i.paid_at), "dd/MM/yyyy")}`
+                                    : ""
+                                }`
+                              : "—"}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    {detailPlan.installments.length === 0 && (
+                      <TableRow>
+                        <TableCell
+                          colSpan={5}
+                          className="py-6 text-center text-muted-foreground"
+                        >
+                          No installments on this plan.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
