@@ -796,7 +796,7 @@ export default function InstallmentsPage() {
         </div>
         {canCreatePlan && (
           <div className="flex shrink-0 flex-wrap gap-2">
-            <Button size="sm" onClick={openNewPlan}>
+            <Button size="sm" onClick={openNewPlan} data-tour-id="installments-new-plan-button">
               <Plus className="mr-2 size-4" />
               New Plan
             </Button>
@@ -898,7 +898,7 @@ export default function InstallmentsPage() {
 
       <Tabs defaultValue={defaultTab} className="space-y-4">
         <div className="border-b border-border overflow-x-auto">
-          <TabsList className="inline-flex h-auto gap-2 border-b-0 bg-transparent p-0">
+          <TabsList className="inline-flex h-auto gap-2 border-b-0 bg-transparent p-0" data-tour-id="installments-tabs">
             <TabsTrigger
               value="due"
               className="relative rounded-none border-b-[3px] border-transparent px-3 py-2 text-sm font-medium text-muted-foreground data-[state=active]:border-amber-500 data-[state=active]:text-foreground outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
@@ -1117,7 +1117,7 @@ export default function InstallmentsPage() {
                         </TableCell>
                         <TableCell className="text-right">
                           {canMarkPaid && (
-                            <Button size="sm" onClick={() => onOpenMarkPaid(i)}>
+                            <Button size="sm" onClick={() => onOpenMarkPaid(i)} data-tour-id="installments-due-row-mark-paid">
                               Mark Paid
                             </Button>
                           )}
@@ -1633,7 +1633,7 @@ export default function InstallmentsPage() {
       </Tabs>
 
       <Dialog open={markPaidOpen} onOpenChange={setMarkPaidOpen}>
-        <DialogContent className="max-w-xl bg-background p-6 sm:p-8">
+        <DialogContent className="max-w-xl bg-background p-6 sm:p-8" data-tour-id="installments-mark-paid-dialog">
           <DialogHeader>
             <DialogTitle>Mark Installment as Paid</DialogTitle>
           </DialogHeader>
@@ -1672,6 +1672,7 @@ export default function InstallmentsPage() {
                   step="0.01"
                   value={paidAmount}
                   onChange={(e) => setPaidAmount(e.target.value)}
+                  data-tour-id="installments-mark-paid-amount-input"
                 />
                 {(() => {
                   const amt = Number(paidAmount);
@@ -1711,7 +1712,7 @@ export default function InstallmentsPage() {
                   value={paymentMethod}
                   onValueChange={setPaymentMethod}
                 >
-                  <SelectTrigger id="payment-method">
+                  <SelectTrigger id="payment-method" data-tour-id="installments-mark-paid-method-select">
                     <SelectValue placeholder="Select method" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1746,6 +1747,7 @@ export default function InstallmentsPage() {
                   variant="outline"
                   type="button"
                   onClick={() => setMarkPaidOpen(false)}
+                  data-tour-id="installments-mark-paid-cancel"
                 >
                   Cancel
                 </Button>
@@ -1753,6 +1755,7 @@ export default function InstallmentsPage() {
                   type="button"
                   onClick={handleMarkPaid}
                   disabled={markingPaid}
+                  data-tour-id="installments-mark-paid-confirm"
                 >
                   {markingPaid ? "Saving..." : "Confirm Paid"}
                 </Button>
@@ -1771,7 +1774,7 @@ export default function InstallmentsPage() {
           }
         }}
       >
-        <DialogContent className="max-w-2xl bg-background">
+        <DialogContent className="max-w-2xl bg-background" data-tour-id="installments-new-plan-dialog">
           <DialogHeader>
             <DialogTitle>New Payment Plan</DialogTitle>
           </DialogHeader>
@@ -2827,4 +2830,3 @@ export default function InstallmentsPage() {
     </div>
   );
 }
-
