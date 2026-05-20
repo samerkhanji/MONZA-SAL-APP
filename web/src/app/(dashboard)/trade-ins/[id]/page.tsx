@@ -411,7 +411,7 @@ export default function TradeInDetailPage() {
       {/* Action drawer — visible action set depends on status + role */}
       <div className="flex flex-wrap gap-2">
         {t.status === "provisional" && canGarage && (
-          <Button onClick={() => void startInspection()} disabled={acting}>Start inspection</Button>
+          <Button onClick={() => void startInspection()} disabled={acting} data-tour-id="trade-in-detail-start-inspection">Start inspection</Button>
         )}
         {(t.status === "provisional" || t.status === "inspecting") && canGarage && (
           <Button variant="outline" onClick={() => setInspectOpen(true)} disabled={acting}>
