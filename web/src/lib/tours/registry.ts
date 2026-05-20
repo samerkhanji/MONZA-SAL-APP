@@ -1,7 +1,18 @@
 import type { AppRole } from "@/lib/permissions";
 import type { Tour } from "./types";
 import { ownerWelcomeTour } from "./tour-owner";
+
+// Workflow tours — cross-page interactive journeys.
 import { addCarWorkflowTour } from "./workflow-add-car";
+import { sellCarWorkflowTour } from "./workflow-sell-car";
+import { addCustomerWorkflowTour } from "./workflow-add-customer";
+import { testDriveWorkflowTour } from "./workflow-test-drive";
+import { cashSessionWorkflowTour } from "./workflow-cash-session";
+import { recordPaymentWorkflowTour } from "./workflow-record-payment";
+import { createJobWorkflowTour } from "./workflow-create-job";
+import { receivePartsWorkflowTour } from "./workflow-receive-parts";
+import { processRefundWorkflowTour } from "./workflow-process-refund";
+import { warrantyCaseWorkflowTour } from "./workflow-warranty-case";
 
 // Page tours — sales side
 import { carsPageTour } from "./page-cars";
@@ -120,7 +131,18 @@ const PAGE_TOURS: Record<string, Tour[]> = {
 // ============================================================================
 // Workflow tours — cross-page interactive journeys. Surfaced everywhere.
 // ============================================================================
-const WORKFLOW_TOURS: Tour[] = [addCarWorkflowTour];
+const WORKFLOW_TOURS: Tour[] = [
+  addCarWorkflowTour,
+  sellCarWorkflowTour,
+  addCustomerWorkflowTour,
+  testDriveWorkflowTour,
+  cashSessionWorkflowTour,
+  recordPaymentWorkflowTour,
+  createJobWorkflowTour,
+  receivePartsWorkflowTour,
+  processRefundWorkflowTour,
+  warrantyCaseWorkflowTour,
+];
 
 // ============================================================================
 // Lookup helpers.
