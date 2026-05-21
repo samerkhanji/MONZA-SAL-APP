@@ -52,6 +52,7 @@ export function StockMovementDialog({
   const [carId, setCarId] = useState<string | null>(null);
   const [carSearch, setCarSearch] = useState("");
   const [cars, setCars] = useState<CarOption[]>([]);
+  const [carSearched, setCarSearched] = useState(false);
   const [jobDescription, setJobDescription] = useState("");
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -65,6 +66,7 @@ export function StockMovementDialog({
       setCarId(null);
       setCarSearch("");
       setCars([]);
+      setCarSearched(false);
       setJobDescription("");
       setNote("");
     }
@@ -73,6 +75,7 @@ export function StockMovementDialog({
   useEffect(() => {
     if (!open || !carSearch.trim() || carSearch.length < 2) {
       setCars([]);
+      setCarSearched(false);
       return;
     }
     const q = carSearch.trim();
@@ -85,6 +88,7 @@ export function StockMovementDialog({
         .or(`vin.ilike.%${q}%,brand.ilike.%${q}%,model.ilike.%${q}%`)
         .limit(10);
       setCars((data as CarOption[]) ?? []);
+      setCarSearched(true);
     })();
   }, [carSearch, open]);
 
@@ -202,6 +206,11 @@ export function StockMovementDialog({
                       ))}
                     </SelectContent>
                   </Select>
+                )}
+                {carSearched && cars.length === 0 && (
+                  <p className="text-muted-foreground mt-2 text-sm">
+                    No car found matching &ldquo;{carSearch.trim()}&rdquo;.
+                  </p>
                 )}
               </div>
               <div>

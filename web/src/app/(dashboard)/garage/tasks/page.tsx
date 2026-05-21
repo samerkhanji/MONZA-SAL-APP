@@ -64,7 +64,7 @@ function statusBadgeVariant(s: string): "default" | "secondary" | "destructive" 
 }
 
 export default function GarageTasksBoardPage() {
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const { appRole, profile } = useUser();
   const canManage = appRole === "owner" || appRole === "garage_manager";
 

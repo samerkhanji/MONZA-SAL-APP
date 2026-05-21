@@ -58,8 +58,7 @@ export default function GarageWorkflowSettingsPage() {
 
   const [newTplOpen, setNewTplOpen] = useState(false);
   const [newTplName, setNewTplName] = useState("");
-  const [newItemTplId, setNewItemTplId] = useState<string | null>(null);
-  const [newItemDesc, setNewItemDesc] = useState("");
+  const [newItemDescByTpl, setNewItemDescByTpl] = useState<Record<string, string>>({});
   const [tplToDelete, setTplToDelete] = useState<{ id: string; name: string } | null>(null);
 
   const loadCapacities = useCallback(async () => {
@@ -196,7 +195,7 @@ export default function GarageWorkflowSettingsPage() {
   }
 
   async function addItem(templateId: string) {
-    const desc = newItemDesc.trim();
+    const desc = (newItemDescByTpl[templateId] ?? "").trim();
     if (!desc) return;
     const list = itemsByTpl[templateId] ?? [];
     const { error } = await supabase.from("garage_task_template_items").insert({
@@ -209,8 +208,7 @@ export default function GarageWorkflowSettingsPage() {
       toast.error(formatError(error));
       return;
     }
-    setNewItemDesc("");
-    setNewItemTplId(null);
+    setNewItemDescByTpl((prev) => ({ ...prev, [templateId]: "" }));
     await loadTemplates();
   }
 
@@ -395,19 +393,18 @@ export default function GarageWorkflowSettingsPage() {
               <div data-tour-id="settings-template-add-line" className="flex flex-col gap-2 sm:flex-row">
                 <Input
                   placeholder="New line description"
-                  value={newItemTplId === t.id ? newItemDesc : ""}
-                  onChange={(e) => {
-                    setNewItemTplId(t.id);
-                    setNewItemDesc(e.target.value);
-                  }}
+                  value={newItemDescByTpl[t.id] ?? ""}
+                  onChange={(e) =>
+                    setNewItemDescByTpl((prev) => ({
+                      ...prev,
+                      [t.id]: e.target.value,
+                    }))
+                  }
                 />
                 <Button
                   type="button"
                   size="sm"
-                  onClick={() => {
-                    setNewItemTplId(t.id);
-                    void addItem(t.id);
-                  }}
+                  onClick={() => void addItem(t.id)}
                 >
                   Add line
                 </Button>

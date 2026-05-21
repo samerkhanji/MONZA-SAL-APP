@@ -211,7 +211,8 @@ export default function GarageInventoryPage() {
 
   function quantityColor(p: Part): string {
     if (p.quantity === 0) return "text-red-600 dark:text-red-400";
-    if (p.quantity <= p.min_quantity) return "text-amber-600 dark:text-amber-400";
+    if (p.min_quantity != null && p.quantity <= p.min_quantity)
+      return "text-amber-600 dark:text-amber-400";
     return "text-green-600 dark:text-green-400";
   }
 

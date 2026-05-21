@@ -374,7 +374,9 @@ export default function RefundDetailPage() {
       </Dialog>
 
       <p className="text-muted-foreground text-xs">
-        Routed by you via {refund.requested_by ? `user ${refund.requested_by.slice(0, 8)}…` : "system"}.
+        {requesterIsMe
+          ? "Routed by you."
+          : `Routed by ${refund.requested_by ? `user ${refund.requested_by.slice(0, 8)}…` : "system"}.`}
       </p>
     </div>
   );

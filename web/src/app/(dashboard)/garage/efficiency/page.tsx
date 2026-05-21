@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
+import { useUser } from "@/lib/contexts/UserContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatError } from "@/lib/error-messages";
 
@@ -50,13 +52,22 @@ function fmtNum(n: number | null | undefined, digits = 2) {
 }
 
 export default function GarageEfficiencyPage() {
+  const router = useRouter();
   const supabase = createClient();
+  const { canManageGarage, loading: profileLoading } = useUser();
   const [jobs, setJobs] = useState<JobEfficiencyRow[]>([]);
   const [bays, setBays] = useState<BayUtilizationRow[]>([]);
   const [employees, setEmployees] = useState<EmployeeEfficiencyRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!profileLoading && !canManageGarage) {
+      router.replace("/garage");
+    }
+  }, [profileLoading, canManageGarage, router]);
+
+  useEffect(() => {
+    if (!canManageGarage) return;
     let cancelled = false;
     (async () => {
       setLoading(true);
@@ -87,7 +98,15 @@ export default function GarageEfficiencyPage() {
     return () => {
       cancelled = true;
     };
-  }, [supabase]);
+  }, [supabase, canManageGarage]);
+
+  if (profileLoading || !canManageGarage) {
+    return (
+      <div className="container py-12">
+        <p className="text-muted-foreground">Loading…</p>
+      </div>
+    );
+  }
 
   return (
     <div className="container space-y-6 py-6">

@@ -92,6 +92,7 @@ export default function GarageJobsPage() {
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search, 200);
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [pendingJobIds, setPendingJobIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (statusFromUrl && VALID_JOB_STATUSES.includes(statusFromUrl)) {
@@ -300,6 +301,20 @@ export default function GarageJobsPage() {
   }, [jobs]);
 
   async function handleStatusChange(job: JobWithCar, newStatus: string) {
+    if (pendingJobIds.has(job.id)) return;
+    setPendingJobIds((prev) => new Set(prev).add(job.id));
+    try {
+      await runStatusChange(job, newStatus);
+    } finally {
+      setPendingJobIds((prev) => {
+        const next = new Set(prev);
+        next.delete(job.id);
+        return next;
+      });
+    }
+  }
+
+  async function runStatusChange(job: JobWithCar, newStatus: string) {
     const updates: Record<string, unknown> = { status: newStatus };
     if (newStatus === "in_progress" && !job.started_at) {
       updates.started_at = new Date().toISOString();
@@ -599,6 +614,7 @@ export default function GarageJobsPage() {
               PRIORITY_BORDERS[job.priority] ?? "border-l-4 border-l-gray-300";
             const dueToday = isDueToday(job.due_date);
             const overtime = isOvertime(job);
+            const jobBusy = pendingJobIds.has(job.id);
             return (
               <div
                 key={job.id}
@@ -672,6 +688,7 @@ export default function GarageJobsPage() {
                           size="sm"
                           onClick={() => handleStatusChange(job, "in_progress")}
                           className="h-9"
+                          disabled={jobBusy}
                         >
                           Start
                         </Button>
@@ -682,6 +699,7 @@ export default function GarageJobsPage() {
                           variant="secondary"
                           onClick={() => setFinishJobOpen(job)}
                           className="h-9"
+                          disabled={jobBusy}
                         >
                           Finish
                         </Button>
@@ -692,8 +710,9 @@ export default function GarageJobsPage() {
                           variant="secondary"
                           onClick={() => handleStatusChange(job, "delivered")}
                           className="h-9"
+                          disabled={jobBusy}
                         >
-                          Delivered
+                          {jobBusy ? "Delivering…" : "Delivered"}
                         </Button>
                       )}
                       {job.status === "delivered" && (
@@ -710,7 +729,7 @@ export default function GarageJobsPage() {
                           }
                           void handleStatusChange(job, v);
                         }}
-                        disabled={!canManageGarage}
+                        disabled={!canManageGarage || jobBusy}
                       >
                         <SelectTrigger className="h-9 w-[160px]">
                           <SelectValue />
@@ -737,6 +756,7 @@ export default function GarageJobsPage() {
                         variant="outline"
                         onClick={() => router.push(`/garage/jobs/${job.id}`)}
                         className="h-9"
+                        disabled={jobBusy}
                       >
                         Open Job
                       </Button>
