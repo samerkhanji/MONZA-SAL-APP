@@ -213,6 +213,33 @@ export default function CustomersPage() {
       toast.error("You don't have permission to delete customers.");
       return;
     }
+
+    // Pre-check for related records the DB delete trigger doesn't cover
+    // (payment plans). Active sales orders are still blocked server-side
+    // via the customers delete trigger; this just surfaces a clear message
+    // before the request and stops payment plans being orphaned.
+    const [{ count: activeOrders }, { count: activePlans }] = await Promise.all([
+      supabase
+        .from("sales_orders")
+        .select("id", { count: "exact", head: true })
+        .eq("customer_id", deleteCustomer.id)
+        .not("status", "in", "(cancelled,delivered)"),
+      supabase
+        .from("payment_plans")
+        .select("id", { count: "exact", head: true })
+        .eq("customer_id", deleteCustomer.id)
+        .not("status", "in", "(completed,cancelled)"),
+    ]);
+    if ((activeOrders ?? 0) > 0 || (activePlans ?? 0) > 0) {
+      const parts: string[] = [];
+      if ((activeOrders ?? 0) > 0) parts.push(pluralize(activeOrders ?? 0, "active sales order"));
+      if ((activePlans ?? 0) > 0) parts.push(pluralize(activePlans ?? 0, "active payment plan"));
+      toast.error(
+        `Cannot delete this customer — they still have ${parts.join(" and ")}. Cancel or complete them first.`
+      );
+      return;
+    }
+
     const res = await fetch(`/api/customers/${deleteCustomer.id}`, {
       method: "DELETE",
       credentials: "include",
@@ -780,8 +807,9 @@ export default function CustomersPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Remove customer?</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to remove this customer? This action can be undone by an
-              admin.
+              This removes the customer from active lists. It is blocked if they
+              still have an active sales order or payment plan — cancel or
+              complete those first. The record can be restored by an admin.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
