@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
@@ -102,6 +102,27 @@ export default function RefundsPage() {
   const [bucket, setBucket] = useState<Bucket>("all");
   const [query, setQuery] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
+  // A warranty case can deep-link here to open a pre-filled, case-linked refund.
+  const searchParams = useSearchParams();
+  const [refundPrefill, setRefundPrefill] = useState<{
+    warrantyCaseId: string;
+    customerId: string;
+  } | null>(null);
+
+  useEffect(() => {
+    const warrantyCaseId = searchParams.get("warranty_case");
+    if (warrantyCaseId) {
+      setRefundPrefill({
+        warrantyCaseId,
+        customerId: searchParams.get("customer") ?? "",
+      });
+      setCreateOpen(true);
+      // Strip the params so a later manual "Request refund" starts blank.
+      router.replace("/garage/refunds");
+    }
+    // Consume the deep-link params once, on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const load = useCallback(async () => {
     if (!canRead) return;
@@ -272,9 +293,15 @@ export default function RefundsPage() {
 
       <CreateRefundDialog
         open={createOpen}
-        onClose={() => setCreateOpen(false)}
+        initialCustomerId={refundPrefill?.customerId}
+        initialWarrantyCaseId={refundPrefill?.warrantyCaseId}
+        onClose={() => {
+          setCreateOpen(false);
+          setRefundPrefill(null);
+        }}
         onCreated={(id) => {
           setCreateOpen(false);
+          setRefundPrefill(null);
           void load();
           router.push(`/garage/refunds/${id}`);
         }}
@@ -287,10 +314,14 @@ function CreateRefundDialog({
   open,
   onClose,
   onCreated,
+  initialCustomerId,
+  initialWarrantyCaseId,
 }: {
   open: boolean;
   onClose: () => void;
   onCreated: (id: string) => void;
+  initialCustomerId?: string;
+  initialWarrantyCaseId?: string;
 }) {
   const supabase = createClient();
   const [kind, setKind] = useState<"parts" | "service">("service");
@@ -310,7 +341,7 @@ function CreateRefundDialog({
   useEffect(() => {
     if (!open) return;
     setKind("service");
-    setCustomerId("");
+    setCustomerId(initialCustomerId ?? "");
     setAmount("");
     setCurrency("USD");
     setReason("");
@@ -326,7 +357,7 @@ function CreateRefundDialog({
       setCustomers(((c.data as CustomerLite[]) ?? []).sort((a, b) => (a.full_name ?? a.name ?? "").localeCompare(b.full_name ?? b.name ?? "")));
       setParts(((p.data as PartLite[]) ?? []).sort((a, b) => a.name.localeCompare(b.name)));
     })();
-  }, [open, supabase]);
+  }, [open, supabase, initialCustomerId]);
 
   async function submit() {
     if (!customerId) return toast.error("Pick a customer");
@@ -344,7 +375,7 @@ function CreateRefundDialog({
       p_currency: currency,
       p_job_id: jobId || null,
       p_invoice_id: null,
-      p_warranty_case_id: null,
+      p_warranty_case_id: initialWarrantyCaseId ?? null,
       p_part_id: kind === "parts" ? partId : null,
       p_quantity: kind === "parts" ? Number(quantity) || 1 : null,
       p_notes: notes.trim() || null,
@@ -365,6 +396,11 @@ function CreateRefundDialog({
             the owner threshold cannot be paid without owner sign-off.
           </DialogDescription>
         </DialogHeader>
+        {initialWarrantyCaseId && (
+          <p className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
+            This refund will be linked to the originating warranty case.
+          </p>
+        )}
         <div className="space-y-3">
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1">
