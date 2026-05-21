@@ -171,10 +171,14 @@ export default function NotificationsPage() {
     return list;
   }, [items, tab, query]);
 
-  const unreadCount = useMemo(
-    () => items.filter((n) => !n.is_read).length,
-    [items]
-  );
+  const unreadCount = useMemo(() => {
+    const now = Date.now();
+    return items.filter(
+      (n) =>
+        !n.is_read &&
+        (!n.snoozed_until || new Date(n.snoozed_until).getTime() <= now)
+    ).length;
+  }, [items]);
 
   const allSelected =
     filtered.length > 0 && filtered.every((n) => selectedIds.has(n.id));

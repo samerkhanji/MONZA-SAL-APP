@@ -77,9 +77,10 @@ export async function createNotificationsForUsers(
   }
 
   if (typeof window !== "undefined") {
-    for (const userId of userIds) {
-      try {
-        await fetch("/api/send-push", {
+    // Fire push requests concurrently — a slow recipient must not block the rest.
+    await Promise.allSettled(
+      userIds.map((userId) =>
+        fetch("/api/send-push", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -88,10 +89,9 @@ export async function createNotificationsForUsers(
             message,
             link,
           }),
-        });
-      } catch {
-        // Push send is best-effort
-      }
-    }
+        })
+      )
+    );
+    // Push send is best-effort; allSettled swallows individual failures.
   }
 }

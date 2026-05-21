@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
@@ -91,7 +91,7 @@ export default function DocumentsPage() {
     }
   }, [vinFromUrl, isOwner]);
 
-  async function fetchAccessRequests() {
+  const fetchAccessRequests = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     const { data } = await supabase
@@ -100,11 +100,11 @@ export default function DocumentsPage() {
       .eq("requested_by", user.id)
       .order("created_at", { ascending: false });
     setAccessRequests((data as DocumentAccessRequest[]) ?? []);
-  }
+  }, [supabase]);
 
   useEffect(() => {
     if (!isOwner && profile) fetchAccessRequests();
-  }, [isOwner, profile?.id]);
+  }, [isOwner, profile, fetchAccessRequests]);
 
   async function handleSearch(e?: React.FormEvent, overrideVin?: string) {
     e?.preventDefault();
@@ -169,7 +169,8 @@ export default function DocumentsPage() {
     fetchAccessRequests();
   }
 
-  async function handleViewApproved(vin: string) {
+  async function handleViewApproved(vinInput: string) {
+    const vin = vinInput.trim().toUpperCase();
     setMode("vin");
     setVinSearch(vin);
     setLoading(true);
