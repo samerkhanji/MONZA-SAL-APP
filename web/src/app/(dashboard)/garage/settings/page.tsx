@@ -49,6 +49,7 @@ export default function GarageWorkflowSettingsPage() {
   const supabase = createClient();
 
   const [caps, setCaps] = useState<CapRow[]>([]);
+  const [capDrafts, setCapDrafts] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
 
@@ -68,7 +69,11 @@ export default function GarageWorkflowSettingsPage() {
       toast.error(j?.error ?? "Failed to load capacities");
       return;
     }
-    setCaps((j.capacities as CapRow[]) ?? []);
+    const rows = (j.capacities as CapRow[]) ?? [];
+    setCaps(rows);
+    setCapDrafts(
+      Object.fromEntries(rows.map((c) => [c.resource_name, String(c.capacity)]))
+    );
   }, []);
 
   const loadTemplates = useCallback(async () => {
@@ -290,8 +295,13 @@ export default function GarageWorkflowSettingsPage() {
                         type="number" inputMode="decimal"
                         min={0}
                         className="w-28"
-                        key={`${c.resource_name}-${c.capacity}`}
-                        defaultValue={c.capacity}
+                        value={capDrafts[c.resource_name] ?? String(c.capacity)}
+                        onChange={(e) =>
+                          setCapDrafts((prev) => ({
+                            ...prev,
+                            [c.resource_name]: e.target.value,
+                          }))
+                        }
                         id={`cap-${c.resource_name}`}
                         disabled={saving === c.resource_name}
                       />
@@ -299,12 +309,12 @@ export default function GarageWorkflowSettingsPage() {
                         type="button"
                         size="sm"
                         disabled={saving === c.resource_name}
-                        onClick={() => {
-                          const el = document.getElementById(
-                            `cap-${c.resource_name}`
-                          ) as HTMLInputElement | null;
-                          if (el) void saveCapacity(c.resource_name, el.value);
-                        }}
+                        onClick={() =>
+                          void saveCapacity(
+                            c.resource_name,
+                            capDrafts[c.resource_name] ?? String(c.capacity)
+                          )
+                        }
                       >
                         {saving === c.resource_name ? (
                           <Loader2 className="size-4 animate-spin" />

@@ -133,18 +133,28 @@ export function FinishJobDialog({
     }
 
     if (job.cars) {
-      await supabase
+      // Only return the car to `available` if it is actually in a service
+      // status — never overwrite reserved / sold / recalled etc.
+      const { data: carRow } = await supabase
         .from("cars")
-        .update({ status: "available" })
-        .eq("id", job.cars.id);
-      await supabase.from("car_events").insert({
-        car_id: job.cars.id,
-        event_type: "status_changed",
-        from_value: "service",
-        to_value: "available",
-        note: `Job completed: ${job.title}`,
-        created_by: user.id,
-      });
+        .select("status")
+        .eq("id", job.cars.id)
+        .single();
+      const currentStatus = (carRow as { status?: string } | null)?.status ?? null;
+      if (currentStatus === "service") {
+        await supabase
+          .from("cars")
+          .update({ status: "available" })
+          .eq("id", job.cars.id);
+        await supabase.from("car_events").insert({
+          car_id: job.cars.id,
+          event_type: "status_changed",
+          from_value: currentStatus,
+          to_value: "available",
+          note: `Job completed: ${job.title}`,
+          created_by: user.id,
+        });
+      }
     }
 
     const { data: partsData } = await supabase

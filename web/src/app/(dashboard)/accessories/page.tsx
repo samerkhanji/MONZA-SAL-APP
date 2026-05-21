@@ -173,7 +173,12 @@ export default function AccessoriesPage() {
       const { error } = await supabase.from("accessory_inventory").delete().eq("id", id);
       if (error) {
         toast.error(`Could not delete: ${formatError(error)}`);
-        if (removed) setRows((prev) => [...prev, removed]);
+        if (removed) {
+          setRows((prev) => [...prev, removed]);
+          // The debounce timer may have cleared this id while the row was
+          // optimistically removed — re-mark it dirty so a pending edit isn't lost.
+          dirtyIdsRef.current.add(id);
+        }
         return;
       }
       toast.success("Row removed");

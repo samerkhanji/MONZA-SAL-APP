@@ -342,7 +342,9 @@ export default function GarageJobsPage() {
       return;
     }
 
-    if (newStatus === "done" && job.cars?.id) {
+    if (newStatus === "done" && job.cars?.id && job.cars.car_status === "service") {
+      // Only return the car to `available` if it is actually in a service
+      // status — never overwrite reserved / sold / recalled etc.
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -351,7 +353,7 @@ export default function GarageJobsPage() {
         await supabase.from("car_events").insert({
           car_id: job.cars.id,
           event_type: "status_changed",
-          from_value: "service",
+          from_value: job.cars.car_status,
           to_value: "available",
           note: `Job marked done from list: ${job.title}`,
           created_by: user.id,

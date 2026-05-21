@@ -210,104 +210,118 @@ export function NewJobDialog({
     }
 
     setSubmitting(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      toast.error("Not authenticated");
-      setSubmitting(false);
-      return;
-    }
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error("Not authenticated");
+        return;
+      }
 
-    // Resolve assignee fields — DB CHECK guarantees mutual exclusion.
-    const assignedTo =
-      assigneeMode === "internal" && internalAssigneeId ? internalAssigneeId : null;
-    const externalAssignee =
-      assigneeMode === "external" && externalAssigneeName.trim()
-        ? externalAssigneeName.trim()
-        : null;
+      // Resolve assignee fields — DB CHECK guarantees mutual exclusion.
+      const assignedTo =
+        assigneeMode === "internal" && internalAssigneeId ? internalAssigneeId : null;
+      const externalAssignee =
+        assigneeMode === "external" && externalAssigneeName.trim()
+          ? externalAssigneeName.trim()
+          : null;
 
-    const { data: jobData, error: jobError } = await supabase
-      .from("garage_jobs")
-      .insert({
-        car_id: batteryOnlyJob ? null : selectedCar!.id,
-        is_battery_only: batteryOnlyJob,
-        title: title.trim(),
-        description: description.trim() || null,
-        priority,
-        status: "pending",
-        assigned_to: assignedTo,
-        external_assignee_name: externalAssignee,
-        due_date: dueDate || null,
-        estimated_hours: estimatedHours ? parseFloat(estimatedHours) : null,
-        notes: notes.trim() || null,
-        created_by: user.id,
-      })
-      .select("id")
-      .single();
-
-    if (jobError) {
-      toast.error(formatError(jobError));
-      setSubmitting(false);
-      return;
-    }
-
-    if (!batteryOnlyJob && selectedCar) {
-      const { data: carData } = await supabase
-        .from("cars")
-        .select("status")
-        .eq("id", selectedCar.id)
+      const { data: jobData, error: jobError } = await supabase
+        .from("garage_jobs")
+        .insert({
+          car_id: batteryOnlyJob ? null : selectedCar!.id,
+          is_battery_only: batteryOnlyJob,
+          title: title.trim(),
+          description: description.trim() || null,
+          priority,
+          status: "pending",
+          assigned_to: assignedTo,
+          external_assignee_name: externalAssignee,
+          due_date: dueDate || null,
+          estimated_hours: estimatedHours ? parseFloat(estimatedHours) : null,
+          notes: notes.trim() || null,
+          created_by: user.id,
+        })
+        .select("id")
         .single();
 
-      const currentStatus = (carData as { status?: string } | null)?.status ?? "available";
-
-      await supabase
-        .from("cars")
-        .update({ status: "service" })
-        .eq("id", selectedCar.id);
-
-      await supabase.from("car_events").insert({
-        car_id: selectedCar.id,
-        event_type: "status_changed",
-        from_value: currentStatus,
-        to_value: "service",
-        note: `Garage job created: ${title.trim()}`,
-        created_by: user.id,
-      });
-    }
-
-    const jobId = (jobData as { id: string }).id;
-    for (const p of partsToAdd) {
-      const { error } = await supabase.rpc("use_part_on_job", {
-        p_job_id: jobId,
-        p_part_id: p.part_id,
-        p_quantity: p.quantity,
-        p_note: p.note || null,
-        p_user_id: user.id,
-      });
-      if (error) {
-        toast.error(`Failed to add part ${p.part_name}: ${formatError(error)}`);
+      if (jobError) {
+        toast.error(formatError(jobError));
+        return;
       }
-    }
 
-    const garageIds = await import("@/lib/user-lookup").then((m) =>
-      m.getProfileIdsByCapability("garage")
-    );
-    const recipients = garageIds.filter((id) => id !== user.id);
-    if (recipients.length > 0) {
-      await import("@/lib/notifications").then((m) =>
-        m.createNotificationsForUsers(
-          recipients,
-          "New garage job",
-          batteryOnlyJob
-            ? `New battery-lab job: ${title.trim()}`
-            : `New garage job created: ${title.trim()} for VIN ${selectedCar?.vin ?? "—"}`,
-          `/garage/jobs/${jobId}`
-        )
+      if (!batteryOnlyJob && selectedCar) {
+        const { data: carData } = await supabase
+          .from("cars")
+          .select("status")
+          .eq("id", selectedCar.id)
+          .single();
+
+        const currentStatus = (carData as { status?: string } | null)?.status ?? "available";
+
+        await supabase
+          .from("cars")
+          .update({ status: "service" })
+          .eq("id", selectedCar.id);
+
+        await supabase.from("car_events").insert({
+          car_id: selectedCar.id,
+          event_type: "status_changed",
+          from_value: currentStatus,
+          to_value: "service",
+          note: `Garage job created: ${title.trim()}`,
+          created_by: user.id,
+        });
+      }
+
+      const jobId = (jobData as { id: string }).id;
+      const failedParts: string[] = [];
+      for (const p of partsToAdd) {
+        const { error } = await supabase.rpc("use_part_on_job", {
+          p_job_id: jobId,
+          p_part_id: p.part_id,
+          p_quantity: p.quantity,
+          p_note: p.note || null,
+          p_user_id: user.id,
+        });
+        if (error) {
+          failedParts.push(p.part_name);
+          toast.error(`Failed to add part ${p.part_name}: ${formatError(error)}`);
+        }
+      }
+
+      const garageIds = await import("@/lib/user-lookup").then((m) =>
+        m.getProfileIdsByCapability("garage")
       );
-    }
+      const recipients = garageIds.filter((id) => id !== user.id);
+      if (recipients.length > 0) {
+        await import("@/lib/notifications").then((m) =>
+          m.createNotificationsForUsers(
+            recipients,
+            "New garage job",
+            batteryOnlyJob
+              ? `New battery-lab job: ${title.trim()}`
+              : `New garage job created: ${title.trim()} for VIN ${selectedCar?.vin ?? "—"}`,
+            `/garage/jobs/${jobId}`
+          )
+        );
+      }
 
-    toast.success(partsToAdd.length > 0 ? "Job created with parts" : "Job created");
-    onOpenChange(false);
-    onSuccess();
+      if (failedParts.length > 0) {
+        // Job is saved, but some parts were not applied. Keep the dialog open
+        // and tell the operator exactly which parts to reconcile by hand.
+        toast.error(
+          `Job created, but these parts were NOT applied — add them on the job page and check stock manually: ${failedParts.join(", ")}`
+        );
+        onSuccess();
+        return;
+      }
+
+      toast.success(partsToAdd.length > 0 ? "Job created with parts" : "Job created");
+      onOpenChange(false);
+      onSuccess();
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
