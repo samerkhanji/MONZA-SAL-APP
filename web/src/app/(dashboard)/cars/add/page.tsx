@@ -123,6 +123,12 @@ export default function AddCarPage() {
   const showCustomerSection = CUSTOMER_REQUIRED_STATUSES.includes(status) || soldMarker;
   const requireDeliveryDate = status === "sold" || soldMarker;
 
+  // EREV fields are only persisted when the toggle is on at submit. Warn the
+  // user if they entered EREV data but then turned the toggle off, so the
+  // data loss is visible rather than silent.
+  const hasUnsavedErevData =
+    !isErev && (motor.trim() !== "" || evKm.trim() !== "" || motorKm.trim() !== "");
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
@@ -834,6 +840,13 @@ export default function AddCarPage() {
                 <FieldHint text="Tick this for hybrids that have a small petrol engine to recharge the battery on the go." />
               </Label>
             </div>
+
+            {hasUnsavedErevData && (
+              <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+                EREV details you entered (Motor, EV KM, Motor KM) won&apos;t be
+                saved while this toggle is off. Turn it back on to keep them.
+              </p>
+            )}
 
             {isErev && (
               <div className="space-y-4 rounded-lg border p-4">

@@ -194,7 +194,7 @@ export default function SalesOrdersPage() {
             filename="Sales_Orders"
             options={{
               pageName: "Sales Orders",
-              summary: `Total: ${filtered.length} orders | Revenue: ${totalRevenue.toLocaleString()} USD`,
+              summary: `Total: ${filtered.length} orders | Revenue (all currencies, not converted): ${totalRevenue.toLocaleString()}`,
             }}
             disabled={loading}
           />
@@ -234,9 +234,12 @@ export default function SalesOrdersPage() {
         </Card>
         <Card>
           <CardContent className="pt-4">
-            <p className="text-muted-foreground text-sm">Revenue (filtered)</p>
+            <p className="text-muted-foreground text-sm">Revenue (all currencies)</p>
             <p className="text-2xl font-semibold tabular-nums">
-              {totalRevenue.toLocaleString()} USD
+              {totalRevenue.toLocaleString()}
+            </p>
+            <p className="text-muted-foreground text-xs">
+              Sum of selling prices across mixed currencies — not converted
             </p>
           </CardContent>
         </Card>
