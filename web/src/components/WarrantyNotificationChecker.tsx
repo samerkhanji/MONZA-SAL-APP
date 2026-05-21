@@ -54,6 +54,26 @@ export function WarrantyNotificationChecker() {
 
       if (cars.length === 0) return;
 
+      const carIds = cars.map((car) => car.id);
+      const { data: sentRows, error: sentErr } = await supabase
+        .from("warranty_notifications_sent")
+        .select("car_id, warranty_type, threshold_days")
+        .in("car_id", carIds);
+
+      if (sentErr) {
+        console.warn(
+          "warranty dedupe ledger fetch failed; skipping send to avoid spam",
+          { error: sentErr.message }
+        );
+        return;
+      }
+
+      const sentSet = new Set<string>(
+        (sentRows ?? []).map(
+          (row: any) => `${row.car_id}:${row.warranty_type}:${row.threshold_days}`
+        )
+      );
+
       for (const car of cars) {
         const makeModel = `${car.brand} ${car.model}`.trim();
 
@@ -66,14 +86,8 @@ export function WarrantyNotificationChecker() {
             expiry.setHours(0, 0, 0, 0);
             const diffDays = Math.round((expiry.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
             if (diffDays === days) {
-              const { data: existing } = await supabase
-                .from("warranty_notifications_sent")
-                .select("id")
-                .eq("car_id", car.id)
-                .eq("warranty_type", "dms")
-                .eq("threshold_days", days)
-                .limit(1);
-              if (!existing || existing.length === 0) {
+              const key = `${car.id}:dms:${days}`;
+              if (!sentSet.has(key)) {
                 await createNotificationsForUsers(
                   recipientIds,
                   "Warranty alert (DMS)",
@@ -93,6 +107,7 @@ export function WarrantyNotificationChecker() {
                     { car_id: car.id, days, error: dedupeErr.message }
                   );
                 }
+                sentSet.add(key);
               }
             }
           }
@@ -106,14 +121,8 @@ export function WarrantyNotificationChecker() {
             expiry.setHours(0, 0, 0, 0);
             const diffDays = Math.round((expiry.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
             if (diffDays === days) {
-              const { data: existing } = await supabase
-                .from("warranty_notifications_sent")
-                .select("id")
-                .eq("car_id", car.id)
-                .eq("warranty_type", "vehicle")
-                .eq("threshold_days", days)
-                .limit(1);
-              if (!existing || existing.length === 0) {
+              const key = `${car.id}:vehicle:${days}`;
+              if (!sentSet.has(key)) {
                 await createNotificationsForUsers(
                   recipientIds,
                   "Warranty alert (Vehicle)",
@@ -133,6 +142,7 @@ export function WarrantyNotificationChecker() {
                     { car_id: car.id, days, error: dedupeErr.message }
                   );
                 }
+                sentSet.add(key);
               }
             }
           }
@@ -142,14 +152,8 @@ export function WarrantyNotificationChecker() {
             expiry.setHours(0, 0, 0, 0);
             const diffDays = Math.round((expiry.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
             if (diffDays === days) {
-              const { data: existing } = await supabase
-                .from("warranty_notifications_sent")
-                .select("id")
-                .eq("car_id", car.id)
-                .eq("warranty_type", "battery")
-                .eq("threshold_days", days)
-                .limit(1);
-              if (!existing || existing.length === 0) {
+              const key = `${car.id}:battery:${days}`;
+              if (!sentSet.has(key)) {
                 await createNotificationsForUsers(
                   recipientIds,
                   "Warranty alert (Battery)",
@@ -169,6 +173,7 @@ export function WarrantyNotificationChecker() {
                     { car_id: car.id, days, error: dedupeErr.message }
                   );
                 }
+                sentSet.add(key);
               }
             }
           }
