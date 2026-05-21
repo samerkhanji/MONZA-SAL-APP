@@ -105,6 +105,7 @@ export default function GarageJobsPage() {
   const [cancelJobConfirm, setCancelJobConfirm] = useState<JobWithCar | null>(null);
   const [setCategoryFor, setSetCategoryFor] = useState<JobWithCar | null>(null);
   const dueTodayNotifiedRef = useRef(false);
+  const overtimeNotifiedRef = useRef<Set<string>>(new Set());
   const [preselectedCar, setPreselectedCar] = useState<{
     id: string;
     vin: string;
@@ -215,9 +216,13 @@ export default function GarageJobsPage() {
         j.status === "in_progress" &&
         (j.estimated_hours ?? 0) > 0 &&
         (j.actual_hours ?? 0) > (j.estimated_hours ?? 0) &&
-        !j.overtime_notified
+        !j.overtime_notified &&
+        !overtimeNotifiedRef.current.has(j.id)
     );
     for (const j of overtimeJobs) {
+      // Mark synchronously so a rapid re-run of this effect (before the
+      // DB `overtime_notified` write lands) won't fire a duplicate alert.
+      overtimeNotifiedRef.current.add(j.id);
       (async () => {
           const garageIds = await import("@/lib/user-lookup").then((m) =>
             m.getProfileIdsByCapability("garage")

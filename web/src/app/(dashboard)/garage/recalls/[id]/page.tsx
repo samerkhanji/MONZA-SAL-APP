@@ -128,6 +128,11 @@ export default function RecallDetailPage() {
     return { total, completed };
   }, [vehicles]);
 
+  const existingCarIds = useMemo(
+    () => new Set(vehicles.map((v) => v.car_id)),
+    [vehicles]
+  );
+
   async function changeVehicleStatus(vid: string, status: string) {
     const { error } = await supabase.rpc("mark_recall_vehicle", {
       p_recall_vehicle_id: vid,
@@ -305,7 +310,7 @@ export default function RecallDetailPage() {
         affectedModels={recall.affected_models ?? []}
         yearMin={recall.model_year_min}
         yearMax={recall.model_year_max}
-        existingCarIds={new Set(vehicles.map((v) => v.car_id))}
+        existingCarIds={existingCarIds}
         onAssigned={() => {
           setAssignOpen(false);
           void load();

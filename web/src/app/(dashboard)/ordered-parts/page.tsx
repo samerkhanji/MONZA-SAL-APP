@@ -51,7 +51,7 @@ interface OrderedPartRow {
 
 export default function OrderedPartsPage() {
   const router = useRouter();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   const [rows, setRows] = useState<OrderedPartRow[]>([]);
   const [loading, setLoading] = useState(true);
