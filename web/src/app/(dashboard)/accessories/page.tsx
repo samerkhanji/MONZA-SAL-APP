@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -211,8 +212,34 @@ export default function AccessoriesPage() {
 
   if (!hydrated) {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center text-muted-foreground">
-        Loading accessories…
+      <div className="mx-auto max-w-[1600px] space-y-6 p-4 pb-24 md:p-6">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Card key={i} className="border-border/60 bg-card/50 shadow-sm">
+              <CardHeader className="space-y-1 pb-2 pt-4">
+                <Skeleton className="h-3 w-20" />
+                <Skeleton className="h-7 w-12" />
+              </CardHeader>
+              <CardContent className="pb-4 pt-0">
+                <Skeleton className="h-3 w-16" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+        <div className="space-y-6">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Card key={i} className="border-border/70 overflow-hidden shadow-sm">
+              <CardHeader className="border-border/60 bg-muted/30 border-b py-4">
+                <Skeleton className="h-5 w-40" />
+              </CardHeader>
+              <CardContent className="space-y-2 p-4">
+                {Array.from({ length: 4 }).map((_, j) => (
+                  <Skeleton key={j} className="h-9 w-full" />
+                ))}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
     );
   }

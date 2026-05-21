@@ -25,9 +25,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ExportButton } from "@/components/ExportButton";
 import type { ExportColumn } from "@/lib/exportToExcel";
-import { Loader2, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { formatError } from "@/lib/error-messages";
 
 interface SalesOrderFull {
@@ -279,9 +280,13 @@ export default function SalesOrdersPage() {
           </div>
 
           {loading ? (
-            <div className="text-muted-foreground flex items-center gap-2 py-8">
-              <Loader2 className="size-4 animate-spin" />
-              <span>Loading sales orders…</span>
+            <div className="overflow-hidden rounded-lg border border-border/50">
+              <div className="space-y-2 p-4">
+                <Skeleton className="h-8 w-full" />
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <Skeleton key={i} className="h-12 w-full" />
+                ))}
+              </div>
             </div>
           ) : filtered.length === 0 ? (
             orders.length === 0 ? (

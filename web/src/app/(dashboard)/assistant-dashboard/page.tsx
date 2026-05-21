@@ -28,6 +28,7 @@ import { JOB_STATUS_LABELS } from "@/lib/constants/jobs";
 import { REQUEST_CATEGORIES } from "@/lib/constants/requests";
 import { ExportButton } from "@/components/ExportButton";
 import { KpiCard } from "@/components/ui/kpi-card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { getProfileFullName } from "@/lib/supabase-profile";
 import { formatError } from "@/lib/error-messages";
@@ -587,7 +588,11 @@ export default function AssistantDashboardPage() {
           </CardHeader>
           <CardContent>
             {loading ? (
-              <p className="text-muted-foreground text-sm">Loading…</p>
+              <div className="space-y-2">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <Skeleton key={i} className="h-16 w-full" />
+                ))}
+              </div>
             ) : repairProposals.length === 0 ? (
               <p className="text-muted-foreground text-sm">No active repair proposals.</p>
             ) : (
@@ -660,7 +665,14 @@ export default function AssistantDashboardPage() {
           </CardHeader>
           <CardContent>
             {loading ? (
-              <p className="text-muted-foreground">Loading...</p>
+              <div className="overflow-hidden rounded-lg border">
+                <div className="space-y-2 p-4">
+                  <Skeleton className="h-8 w-full" />
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <Skeleton key={i} className="h-12 w-full" />
+                  ))}
+                </div>
+              </div>
             ) : pendingRequests.length === 0 ? (
               <p className="py-8 text-center text-muted-foreground">No pending requests</p>
             ) : (
@@ -788,7 +800,14 @@ export default function AssistantDashboardPage() {
           </CardHeader>
           <CardContent>
             {loading ? (
-              <p className="text-muted-foreground">Loading...</p>
+              <div className="overflow-hidden rounded-lg border">
+                <div className="space-y-2 p-4">
+                  <Skeleton className="h-8 w-full" />
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <Skeleton key={i} className="h-12 w-full" />
+                  ))}
+                </div>
+              </div>
             ) : workshopJobs.length === 0 ? (
               <p className="py-8 text-center text-muted-foreground">No cars in workshop</p>
             ) : (
@@ -992,7 +1011,11 @@ export default function AssistantDashboardPage() {
           </CardHeader>
           <CardContent>
             {loading ? (
-              <p className="text-muted-foreground">Loading...</p>
+              <div className="space-y-2">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <Skeleton key={i} className="h-20 w-full" />
+                ))}
+              </div>
             ) : completedAwaitingPickup.length === 0 ? (
               <p className="py-8 text-center text-muted-foreground">
                 No cars awaiting pickup
@@ -1070,7 +1093,11 @@ export default function AssistantDashboardPage() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <p className="text-muted-foreground">Loading...</p>
+            <div className="space-y-2">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-14 w-full" />
+              ))}
+            </div>
           ) : warrantyAlerts.length === 0 ? (
             <p className="py-8 text-center text-green-600 dark:text-green-400">
               No upcoming warranty expirations

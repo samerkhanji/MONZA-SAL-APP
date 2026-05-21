@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
   SelectContent,
@@ -818,7 +819,14 @@ export default function RequestCenterPage() {
       </div>
 
       {loading ? (
-        <p className="py-12 text-center text-muted-foreground">Loading...</p>
+        <div className="rounded-lg border">
+          <div className="space-y-2 p-4">
+            <Skeleton className="h-8 w-full" />
+            {Array.from({ length: 8 }).map((_, i) => (
+              <Skeleton key={i} className="h-12 w-full" />
+            ))}
+          </div>
+        </div>
       ) : filteredRequests.length === 0 ? (
         <div className="rounded-lg border border-dashed py-16 text-center">
           <p className="text-muted-foreground">No requests found.</p>
