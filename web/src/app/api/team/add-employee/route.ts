@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { tryCreateAdminClient } from "@/lib/supabase/admin";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { APP_CAPABILITIES } from "@/lib/permissions";
+import { toPublicApiError } from "@/lib/server/api-error";
 
 export async function POST(request: NextRequest) {
   const adminClient = tryCreateAdminClient();
@@ -147,7 +148,7 @@ export async function POST(request: NextRequest) {
 
     if (profileError) {
       return NextResponse.json(
-        { error: profileError.message },
+        { error: toPublicApiError(profileError) },
         { status: 400 }
       );
     }

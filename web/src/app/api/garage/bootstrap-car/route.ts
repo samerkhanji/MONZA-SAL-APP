@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSessionUserAndRole, isGarageMgmtRole } from "@/lib/server/session-app-role";
+import { toPublicApiError } from "@/lib/server/api-error";
 import { isUuid } from "@/lib/validation/uuid";
 
 const DEFAULT_TEMPLATE_NAME = "Standard service";
@@ -50,7 +51,7 @@ export async function POST(req: Request) {
       .limit(1);
 
     if (exErr) {
-      return NextResponse.json({ error: exErr.message }, { status: 500 });
+      return NextResponse.json({ error: toPublicApiError(exErr) }, { status: 500 });
     }
     if (existing && existing.length > 0) {
       return NextResponse.json({
@@ -94,7 +95,7 @@ export async function POST(req: Request) {
       .order("sort_order", { ascending: true });
 
     if (itemsErr) {
-      return NextResponse.json({ error: itemsErr.message }, { status: 500 });
+      return NextResponse.json({ error: toPublicApiError(itemsErr) }, { status: 500 });
     }
     if (!items?.length) {
       return NextResponse.json({ error: "Template has no items" }, { status: 400 });
@@ -121,12 +122,11 @@ export async function POST(req: Request) {
 
     if (insErr) {
       const status = insErr.code === "42501" ? 403 : 500;
-      return NextResponse.json({ error: insErr.message }, { status });
+      return NextResponse.json({ error: toPublicApiError(insErr) }, { status });
     }
 
     return NextResponse.json({ tasks: inserted ?? [], skipped: false }, { status: 201 });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Unknown error";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: toPublicApiError(e) }, { status: 500 });
   }
 }

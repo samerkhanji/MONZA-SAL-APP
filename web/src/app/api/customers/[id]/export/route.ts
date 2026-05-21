@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireCrud } from "@/lib/server/require-crud";
+import { toPublicApiError } from "@/lib/server/api-error";
 import { isUuid } from "@/lib/validation/uuid";
 
 /**
@@ -45,7 +46,7 @@ export async function GET(
       ]);
 
     if (customer.error) {
-      return NextResponse.json({ error: customer.error.message }, { status: 500 });
+      return NextResponse.json({ error: toPublicApiError(customer.error) }, { status: 500 });
     }
     if (!customer.data) {
       return NextResponse.json({ error: "Customer not found" }, { status: 404 });
@@ -77,7 +78,6 @@ export async function GET(
       },
     });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Unknown error";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: toPublicApiError(e) }, { status: 500 });
   }
 }

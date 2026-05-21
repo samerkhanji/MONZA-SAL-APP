@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSessionUserAndRole } from "@/lib/server/session-app-role";
+import { toPublicApiError } from "@/lib/server/api-error";
 
 export async function PATCH(request: Request) {
   const s = await getSessionUserAndRole();
@@ -34,7 +35,7 @@ export async function PATCH(request: Request) {
     .eq("id", 1);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    return NextResponse.json({ error: toPublicApiError(error) }, { status: 400 });
   }
   return NextResponse.json({ ok: true });
 }

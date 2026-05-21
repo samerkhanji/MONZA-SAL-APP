@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { canEditGarageCapacities, getSessionUserAndRole } from "@/lib/server/session-app-role";
+import { toPublicApiError } from "@/lib/server/api-error";
 import { isGarageGmIncrementOnlyResource } from "@/lib/constants/garage-workflow";
 
 const ACTIVE_STATUSES = ["pending", "in_progress"] as const;
@@ -18,7 +19,7 @@ export async function GET() {
       .order("resource_name");
 
     if (capErr) {
-      return NextResponse.json({ error: capErr.message }, { status: 500 });
+      return NextResponse.json({ error: toPublicApiError(capErr) }, { status: 500 });
     }
 
     const { data: tasks, error: taskErr } = await session.supabase
@@ -27,7 +28,7 @@ export async function GET() {
       .in("status", [...ACTIVE_STATUSES]);
 
     if (taskErr) {
-      return NextResponse.json({ error: taskErr.message }, { status: 500 });
+      return NextResponse.json({ error: toPublicApiError(taskErr) }, { status: 500 });
     }
 
     const usage: Record<string, number> = {};
@@ -44,8 +45,7 @@ export async function GET() {
 
     return NextResponse.json({ capacities: list });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Unknown error";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: toPublicApiError(e) }, { status: 500 });
   }
 }
 
@@ -88,7 +88,7 @@ export async function PATCH(req: Request) {
         .eq("resource_name", resourceName)
         .maybeSingle();
       if (curErr) {
-        return NextResponse.json({ error: curErr.message }, { status: 500 });
+        return NextResponse.json({ error: toPublicApiError(curErr) }, { status: 500 });
       }
       if (!current) {
         return NextResponse.json({ error: "Unknown resource_name" }, { status: 404 });
@@ -116,7 +116,7 @@ export async function PATCH(req: Request) {
 
     if (error) {
       const status = error.code === "42501" ? 403 : 500;
-      return NextResponse.json({ error: error.message }, { status });
+      return NextResponse.json({ error: toPublicApiError(error) }, { status });
     }
     if (!data) {
       return NextResponse.json({ error: "Unknown resource_name" }, { status: 404 });
@@ -124,7 +124,6 @@ export async function PATCH(req: Request) {
 
     return NextResponse.json({ capacity: data });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Unknown error";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: toPublicApiError(e) }, { status: 500 });
   }
 }

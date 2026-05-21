@@ -3,6 +3,7 @@ import {
   getSessionUserAndRole,
   isGarageMgmtRole,
 } from "@/lib/server/session-app-role";
+import { toPublicApiError } from "@/lib/server/api-error";
 import type { AppRole } from "@/lib/permissions";
 
 function isUuid(s: string): boolean {
@@ -134,7 +135,7 @@ export async function PATCH(
 
     if (error) {
       const code = error.code === "42501" ? 403 : 400;
-      return NextResponse.json({ error: error.message }, { status: code });
+      return NextResponse.json({ error: toPublicApiError(error) }, { status: code });
     }
     if (!data) {
       return NextResponse.json(
@@ -145,8 +146,7 @@ export async function PATCH(
 
     return NextResponse.json({ task: data });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Unknown error";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: toPublicApiError(e) }, { status: 500 });
   }
 }
 
@@ -172,12 +172,11 @@ export async function DELETE(
 
     if (error) {
       const code = error.code === "42501" ? 403 : 500;
-      return NextResponse.json({ error: error.message }, { status: code });
+      return NextResponse.json({ error: toPublicApiError(error) }, { status: code });
     }
 
     return NextResponse.json({ ok: true });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Unknown error";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: toPublicApiError(e) }, { status: 500 });
   }
 }

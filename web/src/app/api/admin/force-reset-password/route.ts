@@ -2,6 +2,7 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { tryCreateAdminClient } from "@/lib/supabase/admin";
 import { getSessionUserAndRole } from "@/lib/server/session-app-role";
+import { toPublicApiError } from "@/lib/server/api-error";
 
 function constantTimeEqualSecret(a: string, b: string): boolean {
   try {
@@ -92,7 +93,7 @@ export async function POST(request: NextRequest) {
     const { data, error: listError } = await admin.auth.admin.listUsers({ page, perPage });
     if (listError) {
       return NextResponse.json(
-        { error: listError.message || "Failed to list users." },
+        { error: toPublicApiError(listError) },
         { status: 500 }
       );
     }
@@ -138,7 +139,7 @@ export async function POST(request: NextRequest) {
 
   if (updateError) {
     return NextResponse.json(
-      { error: updateError.message || "Failed to update password." },
+      { error: toPublicApiError(updateError) },
       { status: 400 }
     );
   }

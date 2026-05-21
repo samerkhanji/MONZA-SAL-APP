@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireCrud } from "@/lib/server/require-crud";
+import { toPublicApiError } from "@/lib/server/api-error";
 import { isUuid } from "@/lib/validation/uuid";
 
 export async function DELETE(
@@ -34,18 +35,17 @@ export async function DELETE(
       .from("customer-documents")
       .remove([path]);
     if (storageError) {
-      return NextResponse.json({ error: storageError.message }, { status: 500 });
+      return NextResponse.json({ error: toPublicApiError(storageError) }, { status: 500 });
     }
 
     const { error: delErr } = await gate.supabase.from("customer_documents").delete().eq("id", id);
     if (delErr) {
       const status = delErr.code === "42501" ? 403 : 500;
-      return NextResponse.json({ error: delErr.message }, { status });
+      return NextResponse.json({ error: toPublicApiError(delErr) }, { status });
     }
 
     return NextResponse.json({ ok: true });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Unknown error";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: toPublicApiError(e) }, { status: 500 });
   }
 }

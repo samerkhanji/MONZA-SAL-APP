@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireCrud } from "@/lib/server/require-crud";
+import { toPublicApiError } from "@/lib/server/api-error";
 import { isUuid } from "@/lib/validation/uuid";
 
 export async function DELETE(
@@ -22,12 +23,11 @@ export async function DELETE(
 
     if (error) {
       const status = error.code === "42501" ? 403 : 500;
-      return NextResponse.json({ error: error.message }, { status });
+      return NextResponse.json({ error: toPublicApiError(error) }, { status });
     }
 
     return NextResponse.json({ ok: true });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Unknown error";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: toPublicApiError(e) }, { status: 500 });
   }
 }

@@ -41,6 +41,57 @@ const MAX_TOKENS = 1024;
 // How many tool rounds the model may take before it must produce an answer.
 const MAX_TOOL_ROUNDS = 5;
 
+// Per-user rate limit: at most CHAT_RATE_LIMIT accepted requests per
+// CHAT_RATE_WINDOW_MS rolling window. Backed by api_rate_limit_events.
+const CHAT_RATE_LIMIT = 20;
+const CHAT_RATE_WINDOW_MS = 60_000;
+
+type RateLimitClient = Awaited<ReturnType<typeof createClient>>;
+
+/**
+ * Returns true if the user is within their chat rate limit (and records
+ * this request), false if they are over the limit.
+ *
+ * Fails open: if the api_rate_limit_events table is missing (migration
+ * 143 not yet applied) or the query errors, we log a warning and allow
+ * the request so the chat route keeps working.
+ */
+async function checkChatRateLimit(
+  supabase: RateLimitClient,
+  userId: string
+): Promise<boolean> {
+  try {
+    const since = new Date(Date.now() - CHAT_RATE_WINDOW_MS).toISOString();
+    const { count, error } = await supabase
+      .from("api_rate_limit_events")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("endpoint", "chat")
+      .gte("created_at", since);
+
+    if (error) {
+      console.warn("[api/chat] rate-limit check skipped:", error.message);
+      return true;
+    }
+
+    if ((count ?? 0) >= CHAT_RATE_LIMIT) {
+      return false;
+    }
+
+    const { error: insertError } = await supabase
+      .from("api_rate_limit_events")
+      .insert({ user_id: userId, endpoint: "chat" });
+    if (insertError) {
+      console.warn("[api/chat] rate-limit record skipped:", insertError.message);
+    }
+
+    return true;
+  } catch (e) {
+    console.warn("[api/chat] rate-limit check failed open:", e);
+    return true;
+  }
+}
+
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
 function isChatMessage(m: unknown): m is ChatMessage {
@@ -87,6 +138,16 @@ export async function POST(req: Request) {
   } = await supabase.auth.getUser();
   if (authError || !user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // 1b. Per-user rate limit — caps Anthropic API spend from a single user.
+  //     Fails open if the backing table is missing or the query errors.
+  const withinLimit = await checkChatRateLimit(supabase, user.id);
+  if (!withinLimit) {
+    return NextResponse.json(
+      { error: "You're sending messages too fast — please wait a moment." },
+      { status: 429 }
+    );
   }
 
   // 2. Look up the caller profile. We follow the dead-`role`-column-safe

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { toPublicApiError } from "@/lib/server/api-error";
 
 /** Updates profiles.last_active_at for the signed-in user (caller should throttle ~1/min). */
 export async function POST() {
@@ -20,11 +21,10 @@ export async function POST() {
       .eq("id", user.id);
 
     if (error) {
-      return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+      return NextResponse.json({ ok: false, error: toPublicApiError(error) }, { status: 400 });
     }
     return NextResponse.json({ ok: true });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Unknown error";
-    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
+    return NextResponse.json({ ok: false, error: toPublicApiError(e) }, { status: 500 });
   }
 }
