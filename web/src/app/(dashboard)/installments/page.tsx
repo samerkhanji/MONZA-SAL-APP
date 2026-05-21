@@ -2219,7 +2219,9 @@ export default function InstallmentsPage() {
                           date_of_birth: newCustDateOfBirth || null,
                           preferred_language:
                             newCustPreferredLanguage || "en",
-                          lead_status: "converted",
+                          // Stays "interested" until the plan row is actually
+                          // created — converted is set after create_payment_plan.
+                          lead_status: "interested",
                           lead_source: newCustLeadSource || null,
                           address: newCustAddress.trim() || null,
                           notes: newCustNotes.trim() || null,
@@ -2229,8 +2231,18 @@ export default function InstallmentsPage() {
                         .single();
                       setNewCustSubmitting(false);
                       if (error || !data) {
+                        const isDuplicate =
+                          error?.code === "23505" ||
+                          (error?.message ?? "")
+                            .toLowerCase()
+                            .includes("duplicate") ||
+                          (error?.message ?? "")
+                            .toLowerCase()
+                            .includes("unique");
                         toast.error(
-                          `Failed to create customer: ${error?.message ?? "Unknown error"}`
+                          isDuplicate
+                            ? "A customer with these details already exists."
+                            : `Failed to create customer: ${error?.message ?? "Unknown error"}`
                         );
                         return;
                       }

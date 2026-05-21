@@ -140,6 +140,7 @@ export default function SalesOrderDetailPage() {
   const [deliveryNotes, setDeliveryNotes] = useState("");
   const [voidOpen, setVoidOpen] = useState(false);
   const [voidReason, setVoidReason] = useState("");
+  const [deliverOpen, setDeliverOpen] = useState(false);
 
   const fetchOrder = useCallback(async () => {
     setLoading(true);
@@ -277,7 +278,6 @@ export default function SalesOrderDetailPage() {
   }
 
   async function markDelivered() {
-    if (!confirm("Mark this sale as delivered? This is the final step and will set the customer to converted.")) return;
     setSaving(true);
     try {
       const { error } = await supabase.rpc("complete_delivery", {
@@ -289,6 +289,7 @@ export default function SalesOrderDetailPage() {
         return;
       }
       toast.success("Delivered. Customer marked as converted.");
+      setDeliverOpen(false);
     } finally {
       // Always refetch — even on error the RPC may have partially applied
       // (e.g. updated the order but failed to insert the car_event row).
@@ -700,7 +701,7 @@ export default function SalesOrderDetailPage() {
                 />
               </div>
               <Button
-                onClick={markDelivered}
+                onClick={() => setDeliverOpen(true)}
                 disabled={!canEdit || saving}
                 className="bg-green-600 hover:bg-green-700"
               >
@@ -824,6 +825,40 @@ export default function SalesOrderDetailPage() {
             >
               {saving && <Loader2 className="mr-2 size-4 animate-spin" aria-hidden />}
               Void sale
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delivery confirmation — replaces the old window.confirm(). Marking
+          delivered is irreversible and auto-converts the customer. */}
+      <Dialog open={deliverOpen} onOpenChange={(open) => !saving && setDeliverOpen(open)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Mark this sale as delivered?</DialogTitle>
+            <DialogDescription>
+              This is the final step. It stamps the delivery time, advances the
+              order status to <span className="font-mono">delivered</span>, and
+              sets the customer&apos;s lead status to{" "}
+              <span className="font-mono">converted</span>. It can only be
+              reversed via the &quot;Void sale&quot; action.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setDeliverOpen(false)}
+              disabled={saving}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={markDelivered}
+              disabled={saving}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              {saving && <Loader2 className="mr-2 size-4 animate-spin" aria-hidden />}
+              Mark delivered
             </Button>
           </DialogFooter>
         </DialogContent>

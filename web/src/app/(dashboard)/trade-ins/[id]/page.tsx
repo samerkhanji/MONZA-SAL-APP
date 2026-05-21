@@ -121,6 +121,8 @@ export default function TradeInDetailPage() {
   const [approveOpen, setApproveOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [commitOpen, setCommitOpen] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -157,12 +159,16 @@ export default function TradeInDetailPage() {
   }
 
   async function cancel() {
-    const reason = window.prompt("Reason for cancelling (optional):") ?? "";
     setActing(true);
-    const { error } = await supabase.rpc("cancel_trade_in", { p_trade_in_id: id, p_reason: reason || null });
+    const { error } = await supabase.rpc("cancel_trade_in", {
+      p_trade_in_id: id,
+      p_reason: cancelReason.trim() || null,
+    });
     setActing(false);
     if (error) return toast.error(formatError(error));
     toast.success("Trade-in cancelled");
+    setCancelOpen(false);
+    setCancelReason("");
     void load();
   }
 
@@ -430,7 +436,7 @@ export default function TradeInDetailPage() {
           </Button>
         )}
         {canCancel && (
-          <Button variant="outline" onClick={() => void cancel()} disabled={acting}>Cancel</Button>
+          <Button variant="outline" onClick={() => setCancelOpen(true)} disabled={acting}>Cancel</Button>
         )}
       </div>
 
@@ -464,6 +470,48 @@ export default function TradeInDetailPage() {
         tradeIn={t}
         onDone={() => { setCommitOpen(false); void load(); }}
       />
+
+      {/* Cancel dialog — replaces the old window.prompt(). Reason is optional. */}
+      <Dialog
+        open={cancelOpen}
+        onOpenChange={(v) => {
+          if (acting) return;
+          setCancelOpen(v);
+          if (!v) setCancelReason("");
+        }}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Cancel trade-in</DialogTitle>
+            <DialogDescription>
+              This closes the trade-in. You can note a reason for the audit
+              trail (optional).
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            rows={4}
+            value={cancelReason}
+            onChange={(e) => setCancelReason(e.target.value)}
+            placeholder="Reason for cancelling (optional)"
+          />
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setCancelOpen(false)}
+              disabled={acting}
+            >
+              Keep trade-in
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => void cancel()}
+              disabled={acting}
+            >
+              {acting ? "Cancelling…" : "Cancel trade-in"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

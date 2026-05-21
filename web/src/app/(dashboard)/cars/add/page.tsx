@@ -167,6 +167,21 @@ export default function AddCarPage() {
       return;
     }
 
+    // Pre-check for an existing VIN so the user gets a clear message
+    // instead of a raw Postgres unique-violation.
+    const { data: existingCar } = await supabase
+      .from("cars")
+      .select("id")
+      .eq("vin", vinTrimmed)
+      .limit(1)
+      .maybeSingle();
+
+    if (existingCar) {
+      setSubmitting(false);
+      toast.error("A car with this VIN already exists.");
+      return;
+    }
+
     // ─── Step 1: Create car via RPC ───
     const { data: carData, error: carError } = await supabase.rpc("create_car", {
       p_vin: vinTrimmed,
@@ -187,8 +202,16 @@ export default function AddCarPage() {
         carError.code === "42501" ||
         carError.message.toLowerCase().includes("permission") ||
         carError.message.toLowerCase().includes("policy");
+      const isDuplicateVin =
+        carError.code === "23505" ||
+        carError.message.toLowerCase().includes("duplicate") ||
+        carError.message.toLowerCase().includes("unique");
       toast.error(
-        isRls ? "You don't have permission to add cars." : `Failed to add car: ${carError.message}`
+        isDuplicateVin
+          ? "A car with this VIN already exists."
+          : isRls
+            ? "You don't have permission to add cars."
+            : `Failed to add car: ${carError.message}`
       );
       return;
     }

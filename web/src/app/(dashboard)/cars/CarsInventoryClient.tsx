@@ -1215,7 +1215,7 @@ export function CarsInventoryClient({
               Re-enter your password below to confirm.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          {(isOwner || profile?.user_role === "owner") ? (
+          {canDeleteCar ? (
             <div className="space-y-2">
               <Label htmlFor="delete-password">Password</Label>
               <Input
@@ -1232,14 +1232,14 @@ export function CarsInventoryClient({
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">
-              Only owners can delete vehicles.
+              You don&apos;t have permission to delete vehicles.
             </p>
           )}
           <AlertDialogFooter>
             <AlertDialogCancel data-tour-id="cars-list-delete-cancel">Cancel</AlertDialogCancel>
             <Button
               variant="destructive"
-              disabled={deleteLoading || !deletePassword || !(isOwner || profile?.user_role === "owner")}
+              disabled={deleteLoading || !deletePassword || !canDeleteCar}
               onClick={() => {
                 void handleDeleteCar();
               }}
