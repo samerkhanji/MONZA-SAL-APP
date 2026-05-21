@@ -229,15 +229,20 @@ export default function NotificationsPage() {
   async function dismissBulk(ids: string[]) {
     if (ids.length === 0) return;
     setBusy(true);
+    const succeeded = new Set<string>();
     let failures = 0;
     for (const id of ids) {
       const { error } = await supabase.rpc("dismiss_notification", { p_id: id });
       if (error) failures++;
+      else succeeded.add(id);
     }
     setBusy(false);
     if (failures > 0) toast.error(`${failures} dismiss(es) failed`);
-    setItems((prev) => prev.filter((n) => !ids.includes(n.id)));
-    setSelectedIds(new Set());
+    // Only remove notifications that were actually dismissed — a failed one
+    // must stay visible, not silently vanish until the next reload.
+    setItems((prev) => prev.filter((n) => !succeeded.has(n.id)));
+    // Keep any that failed selected so the user can retry them.
+    setSelectedIds(new Set(ids.filter((id) => !succeeded.has(id))));
   }
 
   async function snooze(id: string, ms: number) {
