@@ -693,8 +693,19 @@ export default function GarageInventoryPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <Button variant="destructive" onClick={handleDelete}>
-              {canDeletePart ? "Delete" : "Send Request"}
+            {/* Disabled until the profile/role has loaded — otherwise the
+                delete-vs-request branch in handleDelete is decided on an
+                unresolved role and silently does the wrong thing. */}
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={!profile}
+            >
+              {!profile
+                ? "Checking permissions…"
+                : canDeletePart
+                  ? "Delete"
+                  : "Send Request"}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
