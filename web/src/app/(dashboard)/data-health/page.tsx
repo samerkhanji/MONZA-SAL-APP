@@ -185,7 +185,7 @@ function matchesSearch(
 function QuickFixCustomerPhone({ customerId, onSaved }: { customerId: string; onSaved: () => void }) {
   const [phone, setPhone] = useState("");
   const [saving, setSaving] = useState(false);
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   async function handleSave() {
     const trimmed = phone.trim();
     if (!trimmed) return;
@@ -221,7 +221,7 @@ function QuickFixCustomerPhone({ customerId, onSaved }: { customerId: string; on
 function QuickFixJobDiagnosis({ jobId, onSaved }: { jobId: string; onSaved: () => void }) {
   const [diagnosis, setDiagnosis] = useState("");
   const [saving, setSaving] = useState(false);
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   async function handleSave() {
     const trimmed = diagnosis.trim();
     if (!trimmed) return;
@@ -257,7 +257,7 @@ function QuickFixJobDiagnosis({ jobId, onSaved }: { jobId: string; onSaved: () =
 function QuickFixReservedBy({ carId, onSaved }: { carId: string; onSaved: () => void }) {
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   async function handleSave() {
     const trimmed = name.trim();
     if (!trimmed) return;
@@ -320,7 +320,7 @@ function SectionCard({
 
 export default function DataHealthPage() {
   const { appRole, profile } = useUser();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const [loading, setLoading] = useState(true);
   const [cars, setCars] = useState<CarRow[]>([]);
   const [salesOrders, setSalesOrders] = useState<SalesOrderRow[]>([]);
@@ -693,8 +693,7 @@ export default function DataHealthPage() {
 
   function isRowCritical(
     sectionId: DataHealthSectionId,
-    row: Record<string, unknown>,
-    subType?: "soldCar" | "soNoCar" | "soNoCustomer"
+    row: Record<string, unknown>
   ): boolean {
     if (sectionId === "broken_relationships") return true;
     if (sectionId === "cars_missing_data" || sectionId === "cars_missing_technical")
@@ -708,19 +707,17 @@ export default function DataHealthPage() {
 
   function getRowSeverityClass(
     sectionId: DataHealthSectionId,
-    row: Record<string, unknown>,
-    subType?: "soldCar" | "soNoCar" | "soNoCustomer"
+    row: Record<string, unknown>
   ): string {
-    return isRowCritical(sectionId, row, subType) ? "bg-destructive/10" : "bg-amber-500/10";
+    return isRowCritical(sectionId, row) ? "bg-destructive/10" : "bg-amber-500/10";
   }
 
   function filterRowBySeverity(
     sectionId: DataHealthSectionId,
-    row: Record<string, unknown>,
-    subType?: "soldCar" | "soNoCar" | "soNoCustomer"
+    row: Record<string, unknown>
   ): boolean {
     if (severityFilter === "all") return true;
-    const critical = isRowCritical(sectionId, row, subType);
+    const critical = isRowCritical(sectionId, row);
     if (severityFilter === "critical") return critical;
     if (severityFilter === "warning") return !critical;
     return true;
@@ -1394,7 +1391,7 @@ export default function DataHealthPage() {
                       </TableHeader>
                       <TableBody>
                         {filteredSold.map((c) => (
-                          <TableRow key={c.id} className={getRowSeverityClass("broken_relationships", c, "soldCar")}>
+                          <TableRow key={c.id} className={getRowSeverityClass("broken_relationships", c)}>
                             <TableCell className="font-mono text-sm">{c.vin ?? "—"}</TableCell>
                             <TableCell>{c.brand} {c.model}</TableCell>
                             <TableCell><Badge variant="outline">{c.status}</Badge></TableCell>
@@ -1417,7 +1414,7 @@ export default function DataHealthPage() {
                       </TableHeader>
                       <TableBody>
                         {filteredSoNoCar.map((so) => (
-                          <TableRow key={so.id} className={getRowSeverityClass("broken_relationships", so, "soNoCar")}>
+                          <TableRow key={so.id} className={getRowSeverityClass("broken_relationships", so)}>
                             <TableCell className="font-mono text-sm">{so.id.slice(0, 8)}…</TableCell>
                             <TableCell><ActionButtons isSalesOrder soCarId={so.car_id ?? undefined} soCustomerId={so.customer_id ?? undefined} /></TableCell>
                           </TableRow>
@@ -1438,7 +1435,7 @@ export default function DataHealthPage() {
                       </TableHeader>
                       <TableBody>
                         {filteredSoNoCust.map((so) => (
-                          <TableRow key={so.id} className={getRowSeverityClass("broken_relationships", so, "soNoCustomer")}>
+                          <TableRow key={so.id} className={getRowSeverityClass("broken_relationships", so)}>
                             <TableCell className="font-mono text-sm">{so.id.slice(0, 8)}…</TableCell>
                             <TableCell><ActionButtons isSalesOrder soCarId={so.car_id ?? undefined} soCustomerId={so.customer_id ?? undefined} /></TableCell>
                           </TableRow>

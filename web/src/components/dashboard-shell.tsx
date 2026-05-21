@@ -40,7 +40,6 @@ import {
   Ship,
   PackageSearch,
 } from "lucide-react";
-import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
 import { OnboardingTour, dispatchTourReplay } from "@/components/onboarding-tour";
 import { TourLauncher } from "@/components/tour-launcher";
@@ -58,7 +57,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { NotificationBell } from "@/components/NotificationBell";
 import { useInstall } from "@/lib/contexts/InstallContext";
-import { clearAuthSessionMarkers } from "@/lib/auth-session";
+import { signOut } from "@/lib/auth-session";
 import { cn } from "@/lib/utils";
 import { ROLES_WITH_DATA_HEALTH_ACCESS } from "@/lib/data-health-config";
 
@@ -445,10 +444,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   );
 
   async function handleSignOut() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    clearAuthSessionMarkers();
-    window.location.href = "/";
+    await signOut();
   }
 
   const displayName = profile?.full_name ?? "User";

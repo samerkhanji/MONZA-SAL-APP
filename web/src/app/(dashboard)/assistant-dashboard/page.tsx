@@ -570,7 +570,7 @@ export default function AssistantDashboardPage() {
             color={card.color}
             tourId={card.tourId}
             onClick={() =>
-              card.href ? (window.location.href = card.href) : card.ref && scrollTo(card.ref)
+              card.href ? router.push(card.href) : card.ref && scrollTo(card.ref)
             }
           />
         ))}
