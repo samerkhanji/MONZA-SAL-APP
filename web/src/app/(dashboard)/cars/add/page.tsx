@@ -200,6 +200,10 @@ export default function AddCarPage() {
       return;
     }
 
+    // Steps 2 and 3 are not transactional. Track whether any of them
+    // failed so we never tell the user "success" on a partial save.
+    let hadFailure = false;
+
     // ─── Step 2: Update car with extra fields ───
     const extraFields: Partial<{
       plate_number: string;
@@ -272,6 +276,7 @@ export default function AddCarPage() {
         .eq("id", carId);
 
       if (updateError) {
+        hadFailure = true;
         toast.error(
           `Car created but failed to save extra details: ${updateError.message}`
         );
@@ -295,6 +300,7 @@ export default function AddCarPage() {
         .single();
 
       if (customerError) {
+        hadFailure = true;
         toast.error(
           `Car created but failed to save customer: ${customerError.message}`
         );
@@ -327,6 +333,7 @@ export default function AddCarPage() {
           .insert(saleFields);
 
         if (saleError) {
+          hadFailure = true;
           toast.error(
             `Car + customer created but failed to save sale: ${saleError.message}`
           );
@@ -335,7 +342,13 @@ export default function AddCarPage() {
     }
 
     setSubmitting(false);
-    toast.success("Car added successfully!");
+    if (hadFailure) {
+      toast.warning(
+        "Car created, but not everything saved — open the car to review and complete it."
+      );
+    } else {
+      toast.success("Car added successfully!");
+    }
     router.push("/cars");
   }
 
