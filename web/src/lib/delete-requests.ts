@@ -130,6 +130,9 @@ export async function approveDeleteRequest(
 
   if (itemType === "car") {
     const now = new Date().toISOString();
+    // Cancel any active sales orders, then soft-delete (scrap) the car.
+    // The cars CHECK constraint requires status='scrapped' together with a
+    // non-null deleted_at.
     await supabase
       .from("sales_orders")
       .update({ status: "cancelled" })
@@ -138,17 +141,16 @@ export async function approveDeleteRequest(
     const { error: carErr } = await supabase
       .from("cars")
       .update({
-        customer_id: null,
-        status: "available",
-        deleted_at: null,
+        status: "scrapped",
+        deleted_at: now,
         updated_at: now,
       })
       .eq("id", itemId);
     if (carErr) return false;
     await createNotification({
       userId: (req as { requested_by: string }).requested_by,
-      title: "Vehicle returned to stock",
-      message: "The car was unlinked from the customer and set to Available (not scrapped).",
+      title: "Vehicle deletion approved",
+      message: "The car has been removed from inventory (scrapped).",
       link: "/cars",
     });
   } else {
