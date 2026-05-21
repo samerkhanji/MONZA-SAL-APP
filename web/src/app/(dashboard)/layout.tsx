@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { UserProvider } from "@/lib/contexts/UserContext";
 import { InstallProvider } from "@/lib/contexts/InstallContext";
 import { DashboardShell } from "@/components/dashboard-shell";
@@ -9,12 +10,19 @@ import { SessionEnforcer } from "@/components/auth/SessionEnforcer";
 import { FirstLoginGuard } from "@/components/auth/FirstLoginGuard";
 import { ProfileActivityHeartbeat } from "@/components/ProfileActivityHeartbeat";
 import { LogRocketInit } from "@/components/LogRocketInit";
+import { getSessionUserAndRole } from "@/lib/server/session-app-role";
 
-export default function DashboardLayout({
+export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // Server-side authentication gate for the whole dashboard route group —
+  // no dashboard HTML is rendered for an unauthenticated request. Per-page
+  // role authorization remains in PageAccessGuard (client).
+  const session = await getSessionUserAndRole();
+  if (!session) redirect("/login");
+
   return (
     <UserProvider>
       <ClientOnly>

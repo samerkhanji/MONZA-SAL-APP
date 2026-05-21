@@ -984,19 +984,15 @@ export default function CarProfilePage() {
     setDeleteError(null);
     setDeleteLoading(true);
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user?.email) {
-      setDeleteLoading(false);
-      toast.error("Unable to verify current user. Please sign in again.");
-      return;
-    }
-
-    const { error: authError } = await supabase.auth.signInWithPassword({
-      email: user.email,
-      password: deletePassword,
+    const verifyRes = await fetch("/api/auth/verify-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ password: deletePassword }),
     });
+    const verifyBody = await verifyRes.json().catch(() => ({}));
 
-    if (authError) {
+    if (!verifyBody?.ok) {
       setDeleteLoading(false);
       setDeleteError("Incorrect password");
       return;
