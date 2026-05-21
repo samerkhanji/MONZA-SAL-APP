@@ -4,9 +4,10 @@ import type { Tour } from "./types";
  * Page tour: /company-costs.
  *
  * Trains a non-technical employee on the Company Costs ledger — what it is
- * for, how to record an expense or income, how to attach a cost to a car /
- * supplier / job, and what owners use it for. Steps that would point inside
- * the (closed) add dialog are written as centered modal steps instead.
+ * for, how to record a cost, how to attach a cost to a car / supplier /
+ * job, and what owners use it for. This system tracks COSTS only — it does
+ * not record income, revenue, profit, or sale prices. Steps that would
+ * point inside the (closed) add dialog are written as centered modal steps.
  *
  * Tone: plain English, like a colleague standing beside the user.
  */
@@ -21,36 +22,28 @@ export const companyCostsPageTour: Tour = {
     {
       title: "Company Costs 👋",
       description:
-        "This page tracks money going in and out of the company. Every expense should be recorded here so the owners can understand the real cost of each car, each repair, each marketing campaign, and the whole business. Hit 'Next'.",
+        "This page tracks the money the company spends. Every cost should be recorded here so the owners can see the real cost of each car, each repair, each marketing campaign, and the whole business. Hit 'Next'.",
     },
     {
       element: '[data-tour-id="company-costs-summary-cards"]',
-      title: "Your money at a glance",
+      title: "Your spending at a glance",
       description:
-        "These cards show what the company spent and earned this month and this year. They update automatically as new entries are added.",
+        "These cards show how much the company spent this month and this year, and how many entries are still waiting for owner approval. They update automatically as new costs are added.",
       side: "bottom",
       align: "start",
     },
     {
       element: '[data-tour-id="company-costs-add-expense"]',
-      title: "Add an expense",
+      title: "Add a cost",
       description:
-        "This button adds a new expense. Use it whenever the company pays for something — ads, parts, shipping, customs, electricity, salaries, rent, supplies, or repairs.",
-      side: "bottom",
-      align: "start",
-    },
-    {
-      element: '[data-tour-id="company-costs-add-income"]',
-      title: "Add income",
-      description:
-        "This button records money coming in. Most income comes from car sales, but use this for any other money the company receives.",
+        "This button records a new cost. Use it whenever the company pays for something — ads, parts, shipping, customs, electricity, salaries, rent, supplies, or repairs.",
       side: "bottom",
       align: "start",
     },
     {
       title: "Pick the right category",
       description:
-        "Every entry needs a category — Marketing, Car, Parts, Garage, or Operating. The category is how owners later see where the money went, so choose it carefully. Add a short description too.",
+        "Every cost needs a category — Marketing, Car, Parts, Garage, or Operating. The category is how owners later see where the money went, so choose it carefully. Add a short description too.",
     },
     {
       title: "Connect the cost to a car",
@@ -60,7 +53,7 @@ export const companyCostsPageTour: Tour = {
     {
       title: "Connect to a supplier, job, or campaign",
       description:
-        "You can also link an entry to a supplier (for parts you bought), a garage job (for repair costs), a purchase order, or a marketing campaign. The more you link, the better the reports become.",
+        "You can also link a cost to a supplier (for parts you bought), a garage job (for repair costs), a purchase order, or a marketing campaign. The more you link, the better the reports become.",
     },
     {
       title: "Attach the receipt",
@@ -71,15 +64,15 @@ export const companyCostsPageTour: Tour = {
       element: '[data-tour-id="company-costs-filters"]',
       title: "Find any cost fast",
       description:
-        "Use these filters to narrow the list by date range, category, payment method, or type (income vs expense). Handy when the owner asks 'how much did we spend on X?'.",
+        "Use these filters to narrow the list by date range, category, or payment method. Handy when the owner asks 'how much did we spend on X?'.",
       side: "bottom",
       align: "start",
     },
     {
       element: '[data-tour-id="company-costs-reports"]',
-      title: "Costs and profit by car",
+      title: "Costs by car, category and campaign",
       description:
-        "Owners use this section to check monthly costs, cost by category, marketing cost by campaign, and the profit or loss on each car once all its costs are recorded.",
+        "Owners use this section to check monthly costs, cost by category, marketing cost by campaign, cost by supplier, and the total cost recorded against each car.",
       side: "top",
       align: "start",
     },
