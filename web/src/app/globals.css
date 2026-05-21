@@ -230,3 +230,98 @@ html, body {
     min-height: 44px;
   }
 }
+
+/* ============================================================================
+   Monza onboarding tour — popover styling.
+   driver.js renders the popover; `popoverClass: "monza-tour-popover"` (set in
+   components/onboarding-tour.tsx) lets us override its defaults here. The
+   compound/descendant selectors out-specify driver.js's base rules so CSS
+   load order does not matter.
+   ============================================================================ */
+.driver-popover.monza-tour-popover {
+  max-width: 420px;
+  min-width: 340px;
+  padding: 20px;
+  border-radius: 14px;
+}
+
+.monza-tour-popover .driver-popover-title {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.monza-tour-popover .driver-popover-description {
+  font-size: 14px;
+  line-height: 1.55;
+  margin-top: 6px;
+}
+
+.monza-tour-popover .driver-popover-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.monza-tour-popover .driver-popover-progress-text {
+  white-space: nowrap;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.monza-tour-popover .driver-popover-navigation-btns {
+  display: flex;
+  gap: 10px;
+}
+
+.monza-tour-popover .driver-popover-footer button {
+  min-height: 42px;
+  padding: 0 18px;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 8px;
+  text-shadow: none;
+}
+
+/* Next is the primary action — make it stand out. */
+.monza-tour-popover .driver-popover-next-btn {
+  min-width: 96px;
+  font-weight: 600;
+  color: #ffffff;
+  background-color: #2563eb;
+  border: 1px solid #2563eb;
+}
+.monza-tour-popover .driver-popover-next-btn:hover {
+  background-color: #1d4ed8;
+  border-color: #1d4ed8;
+}
+
+/* Back is the secondary action. */
+.monza-tour-popover .driver-popover-prev-btn {
+  min-width: 84px;
+  color: #334155;
+  background-color: #f1f5f9;
+  border: 1px solid #e2e8f0;
+}
+.monza-tour-popover .driver-popover-prev-btn:hover {
+  background-color: #e2e8f0;
+}
+
+@media (max-width: 640px) {
+  .driver-popover.monza-tour-popover {
+    max-width: calc(100vw - 32px);
+    min-width: unset;
+  }
+  .monza-tour-popover .driver-popover-footer {
+    flex-wrap: wrap;
+  }
+  .monza-tour-popover .driver-popover-navigation-btns {
+    flex: 1 1 100%;
+  }
+  .monza-tour-popover .driver-popover-navigation-btns button {
+    flex: 1;
+    min-height: 46px;
+  }
+}

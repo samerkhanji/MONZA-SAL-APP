@@ -469,7 +469,10 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           />
         </Link>
       </div>
-      <nav className="flex-1 min-h-0 space-y-1 overflow-y-auto overflow-x-hidden p-2 lg:p-4">
+      <nav
+        data-tour-id="sidebar-nav"
+        className="flex-1 min-h-0 space-y-1 overflow-y-auto overflow-x-hidden p-2 lg:p-4"
+      >
         {navItems.map((item) => {
           const hasChildren = item.children && item.children.length > 0;
           const isActive =

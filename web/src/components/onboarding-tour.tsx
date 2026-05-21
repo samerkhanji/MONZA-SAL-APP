@@ -79,6 +79,31 @@ function waitForElement(
   });
 }
 
+/**
+ * Drop steps whose target element is not on the page, so a tour never
+ * highlights a missing element (e.g. a button hidden by role/permission or
+ * an empty-state section). Only filters single-page tours: a step with no
+ * element renders as a centered modal and is always kept, and a step with
+ * `navigateTo` highlights an element that appears only after navigation,
+ * so it is kept too.
+ */
+function buildSafeTourSteps(
+  steps: TourStep[],
+  isPageTour: boolean
+): TourStep[] {
+  if (!isPageTour || typeof document === "undefined") return steps;
+  return steps.filter((s) => {
+    if (!s.element) return true; // centered modal step
+    if (s.navigateTo) return true; // element mounts after navigation
+    try {
+      return document.querySelector(s.element) !== null;
+    } catch {
+      // Malformed selector — keep the step rather than crash the tour.
+      return true;
+    }
+  });
+}
+
 // ============================================================================
 // Component
 // ============================================================================
@@ -149,13 +174,20 @@ export function OnboardingTour() {
 
       const isInteractive = mode === "interactive";
 
+      // Skip steps whose target element is missing so the tour never
+      // highlights nothing. Page tours only — workflow/welcome tours
+      // navigate, so their elements appear later.
+      const safeSteps = buildSafeTourSteps(tour.steps, tour.kind === "page");
+      if (safeSteps.length === 0) return;
+
       // Build the driver.js step list. We resolve elements lazily (via a
       // function) so navigateTo can fire before we read the DOM.
-      const driveSteps: DriveStep[] = tour.steps.map((step, idx) =>
-        buildDriveStep(step, idx, tour.steps.length, tour, isInteractive)
+      const driveSteps: DriveStep[] = safeSteps.map((step, idx) =>
+        buildDriveStep(step, idx, safeSteps.length, tour, isInteractive)
       );
 
       const config: Config = {
+        popoverClass: "monza-tour-popover",
         showProgress: true,
         progressText: "{{current}} / {{total}}",
         nextBtnText: "Next →",
@@ -183,7 +215,7 @@ export function OnboardingTour() {
           }
           if (isInteractive) {
             const stepIdx = opts.driver.getActiveIndex() ?? 0;
-            const tourStep = tour.steps[stepIdx];
+            const tourStep = safeSteps[stepIdx];
             interactiveCleanupRef.current = wireInteractiveStep(
               tourStep,
               opts.driver
@@ -229,7 +261,7 @@ export function OnboardingTour() {
       driverRef.current = d;
 
       // If the first step needs navigation, push first, then drive.
-      const firstStep = tour.steps[startAt];
+      const firstStep = safeSteps[startAt];
       const needsNav =
         firstStep?.navigateTo && firstStep.navigateTo !== window.location.pathname;
       if (needsNav && firstStep.navigateTo) {

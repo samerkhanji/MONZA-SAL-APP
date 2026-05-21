@@ -447,6 +447,7 @@ export default function AssistantDashboardPage() {
       color: "red" as const,
       icon: AlertTriangle,
       href: "/installments",
+      tourId: "assistant-dashboard-overdue-installments-card",
     },
   ];
 
@@ -546,7 +547,10 @@ export default function AssistantDashboardPage() {
       </div>
 
       {/* Overview Cards */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+      <div
+        data-tour-id="assistant-dashboard-summary-cards"
+        className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6"
+      >
         {cards.map((card, i) => (
           <KpiCard
             key={card.href ?? `card-${i}`}
@@ -554,6 +558,7 @@ export default function AssistantDashboardPage() {
             value={loading ? "—" : card.value}
             icon={card.icon}
             color={card.color}
+            tourId={card.tourId}
             onClick={() =>
               card.href ? (window.location.href = card.href) : card.ref && scrollTo(card.ref)
             }

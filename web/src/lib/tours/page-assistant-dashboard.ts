@@ -4,11 +4,11 @@ import type { Tour } from "./types";
  * Page tour: /assistant-dashboard.
  *
  * The assistant dashboard is the home screen for the request assistant —
- * it surfaces what needs a human's attention: requests to review, cars ready
- * for pickup, the workshop, and repair quotes waiting on the customer.
+ * it surfaces what needs a human's attention: requests to review, overdue
+ * payments, cars ready for pickup, and repair quotes waiting on the customer.
  *
- * Tone: short sentences, plain English, like explaining to a smart 12-year-old.
- * Selectors reference `data-tour-id` attributes — see SELECTORS.md.
+ * Tone: short sentences, plain English, like a colleague standing beside the
+ * user. Selectors reference `data-tour-id` attributes — see SELECTORS.md.
  */
 export const assistantDashboardPageTour: Tour = {
   id: "page-assistant-dashboard-v1",
@@ -16,53 +16,60 @@ export const assistantDashboardPageTour: Tour = {
   label: "Tour: This page",
   description: "Walk through the assistant dashboard.",
   page: "/assistant-dashboard",
+  estimatedMinutes: 2,
   steps: [
     {
-      title: "Your assistant dashboard 👋",
+      element: '[data-tour-id="assistant-dashboard-summary-cards"]',
+      title: "Your assistant dashboard",
       description:
-        "This is your home screen. It collects everything that needs a person to look at it — requests to review, cars to hand back to customers, and the garage's progress. Hit 'Next'.",
+        "This is your home screen. It shows the most important things that need attention today, like requests, overdue payments, cars ready for pickup, and repair proposals.",
+      side: "bottom",
+      align: "start",
+    },
+    {
+      element: '[data-tour-id="assistant-dashboard-pending-requests-panel"]',
+      title: "Requests needing review",
+      description:
+        "This card shows employee requests that need someone to check them. Open it to review the request and decide who should handle it.",
+      side: "top",
+      align: "start",
+    },
+    {
+      element: '[data-tour-id="assistant-dashboard-overdue-installments-card"]',
+      title: "Overdue installments",
+      description:
+        "This card shows customers who are late on payments. Use it to follow up before the problem becomes bigger.",
+      side: "bottom",
+      align: "start",
+    },
+    {
+      element: '[data-tour-id="assistant-dashboard-pickups-panel"]',
+      title: "Cars ready for pickup",
+      description:
+        "This card shows cars that are finished and ready to be handed back to the customer.",
+      side: "top",
+      align: "start",
     },
     {
       element: '[data-tour-id="assistant-dashboard-repair-proposals-panel"]',
       title: "Repair proposals",
       description:
-        "When the garage prepares a quote for a repair, it lands here. " +
-        "These are quotes waiting on the customer to say yes or no. Click 'Open job' to see the details and follow up.",
+        "This section shows repair quotes waiting for customer approval. Open the job, check the quote, then follow up with the customer.",
       side: "top",
       align: "start",
     },
     {
-      element: '[data-tour-id="assistant-dashboard-pending-requests-panel"]',
-      title: "Pending requests",
+      element: '[data-tour-id="sidebar-nav"]',
+      title: "Sidebar menu",
       description:
-        "A 'request' is when an employee asks permission for something. " +
-        "These ones have been sent up for review. Click 'Review' on any row to read it and decide what to do.",
-      side: "top",
+        "Use this menu to move between the main parts of the system. Each page has a specific job.",
+      side: "right",
       align: "start",
     },
     {
-      element: '[data-tour-id="assistant-dashboard-workshop-panel"]',
-      title: "Workshop status",
+      title: "Restart help anytime",
       description:
-        "Every car currently in the garage, with what's being done and whether it's running over its estimated time. " +
-        "Click 'View' to open any job.",
-      side: "top",
-      align: "start",
-    },
-    {
-      element: '[data-tour-id="assistant-dashboard-pickups-panel"]',
-      title: "Upcoming pickups",
-      description:
-        "Cars that are finished and just waiting for the customer to collect them — oldest first. " +
-        "When a customer takes their car, click 'Mark as Delivered' so it drops off this list.",
-      side: "top",
-      align: "start",
-    },
-    {
-      title: "That's your dashboard! ✅",
-      description:
-        "Scroll down for warranty alerts too — cars whose warranty is about to run out. " +
-        "The page refreshes itself every minute. Replay this tour anytime from your profile menu.",
+        "You can restart this tour anytime if you forget how the page works. Open your profile menu in the top corner and choose the tour option.",
     },
   ],
 };
