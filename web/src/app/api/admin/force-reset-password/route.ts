@@ -107,7 +107,12 @@ export async function POST(request: NextRequest) {
   }
 
   if (!userId) {
-    return NextResponse.json({ error: "No user found with that email." }, { status: 404 });
+    // Generic message + status so a non-existent account is indistinguishable
+    // from an account this tool refuses to act on (user-enumeration defense).
+    return NextResponse.json(
+      { error: "Unable to reset password for that account." },
+      { status: 400 }
+    );
   }
 
   // Never reset an owner account through this tool. Owner-account recovery
@@ -119,9 +124,11 @@ export async function POST(request: NextRequest) {
     .eq("id", userId)
     .maybeSingle();
   if ((targetProfile as { user_role?: string } | null)?.user_role === "owner") {
+    // Same generic response as a non-existent account: never confirm whether
+    // a given email maps to an (owner) account (user-enumeration defense).
     return NextResponse.json(
-      { error: "Owner accounts cannot be reset here. Use the Supabase dashboard." },
-      { status: 403 }
+      { error: "Unable to reset password for that account." },
+      { status: 400 }
     );
   }
 

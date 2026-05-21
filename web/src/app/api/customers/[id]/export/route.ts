@@ -9,16 +9,17 @@ import { isUuid } from "@/lib/validation/uuid";
  * JSON document the owner can hand to the customer or store as evidence
  * of a fulfilled "right of access" request (Art. 15 GDPR).
  *
- * Owner-only via the requireCrud("customers", "delete") gate (same gate
- * already used for the destructive customer routes — keeps the most
- * sensitive data behind a single permission).
+ * Gated by requireCrud("customers", "view") — exporting a customer's own
+ * data is a read operation, not a destructive one, so it is gated on the
+ * customer-read permission rather than the delete permission. (No dedicated
+ * "export" CrudAction exists; "view" is the closest appropriate capability.)
  */
 export async function GET(
   _req: Request,
   ctx: { params: Promise<{ id: string }> }
 ) {
   try {
-    const gate = await requireCrud("customers", "delete");
+    const gate = await requireCrud("customers", "view");
     if (!gate.ok) return gate.response;
 
     const { id } = await ctx.params;

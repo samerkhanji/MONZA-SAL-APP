@@ -122,7 +122,7 @@ export async function POST(req: Request) {
       for (const it of items) {
         rows.push({
           car_id: carId,
-          description: it.description,
+          description: (it.description ?? "").slice(0, 500),
           resource_type: it.default_resource_type ?? null,
           sort_order: it.sort_order ?? 0,
           created_by: session.userId,
