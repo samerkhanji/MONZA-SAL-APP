@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { tryCreateAdminClient } from "@/lib/supabase/admin";
 import { createClient as createServerClient } from "@/lib/supabase/server";
+import { APP_CAPABILITIES } from "@/lib/permissions";
 
 export async function POST(request: NextRequest) {
   const adminClient = tryCreateAdminClient();
@@ -41,19 +42,9 @@ export async function POST(request: NextRequest) {
     "it",
   ]);
 
-  // Whitelist of known capability strings the UI may toggle.
-  const ALLOWED_CAPABILITIES = new Set([
-    "garage",
-    "inventory",
-    "sales",
-    "customers",
-    "documents",
-    "requests",
-    "test_drive",
-    "accessories",
-    "data_health",
-    "installments",
-  ]);
+  // Allowlist of capability strings the UI may toggle, derived from the
+  // canonical AppCapability enum (mirrors public.user_capability DB enum).
+  const ALLOWED_CAPABILITIES = new Set<string>(APP_CAPABILITIES);
 
   const ALLOWED_EMPLOYMENT_STATUSES = new Set([
     "active",
