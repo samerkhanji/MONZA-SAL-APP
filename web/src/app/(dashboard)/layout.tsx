@@ -7,7 +7,6 @@ import { FloatingScanButton } from "@/components/scanner/FloatingScanButton";
 import { WarrantyNotificationChecker } from "@/components/WarrantyNotificationChecker";
 import { SessionEnforcer } from "@/components/auth/SessionEnforcer";
 import { FirstLoginGuard } from "@/components/auth/FirstLoginGuard";
-import { OnboardingTour } from "@/components/OnboardingTour";
 import { ProfileActivityHeartbeat } from "@/components/ProfileActivityHeartbeat";
 import { LogRocketInit } from "@/components/LogRocketInit";
 
@@ -30,7 +29,6 @@ export default function DashboardLayout({
                   {children}
                   <FloatingScanButton />
                 </PageAccessGuard>
-                <OnboardingTour />
               </FirstLoginGuard>
             </DashboardShell>
           </InstallProvider>
