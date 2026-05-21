@@ -49,6 +49,9 @@ const SALE_STAGE_LABELS: Record<string, string> = {
 
 const INVENTORY_AGE_ORDER = ["0-30", "31-60", "61-90", "90+"] as const;
 
+/** Number of trailing months (including the current one) shown in the cars-added series. */
+const CARS_OVER_TIME_MONTHS = 6;
+
 type DashboardSupabase = Awaited<ReturnType<typeof createClient>>;
 
 const POSTGREST_PAGE = 1000;
@@ -100,6 +103,9 @@ async function fetchOverviewData(supabase: DashboardSupabase): Promise<OwnerOver
   const monthStart = format(startOfMonth(now), "yyyy-MM-dd");
   const lastMonthStart = format(startOfMonth(subMonths(now, 1)), "yyyy-MM-dd");
   const lastMonthEnd = format(endOfMonth(subMonths(now, 1)), "yyyy-MM-dd");
+  const carsWindowStart = startOfMonth(subMonths(now, CARS_OVER_TIME_MONTHS - 1));
+  const carsWindowStartDate = format(carsWindowStart, "yyyy-MM-dd");
+  const carsWindowStartIso = `${carsWindowStartDate}T00:00:00Z`;
   const todayStartIso = `${today}T00:00:00Z`;
   const todayEndIso = `${today}T23:59:59Z`;
 
@@ -130,6 +136,7 @@ async function fetchOverviewData(supabase: DashboardSupabase): Promise<OwnerOver
     agedReceivablesRes,
     activeGarageJobsCountRes,
     openWarrantyCountRes,
+    carsAddedRes,
   ] = await Promise.all([
     supabase
       .from("cars_display")
@@ -277,6 +284,17 @@ async function fetchOverviewData(supabase: DashboardSupabase): Promise<OwnerOver
       .from("warranty_cases")
       .select("id", { count: "exact", head: true })
       .not("status", "in", "(closed,rejected,cancelled)"),
+    // Cars added over the last 6 months: bucket by date_bought, falling back to
+    // created_at when date_bought is null. The .or() covers both columns so the
+    // fallback rows are not excluded by a date_bought-only filter.
+    supabase
+      .from("cars")
+      .select("date_bought, created_at")
+      .is("deleted_at", null)
+      .or(
+        `date_bought.gte.${carsWindowStartDate},and(date_bought.is.null,created_at.gte.${carsWindowStartIso})`
+      )
+      .limit(10000),
   ]);
 
   if (carsCountRes.error) errors.push(`Cars count: ${carsCountRes.error.message}`);
@@ -316,6 +334,7 @@ async function fetchOverviewData(supabase: DashboardSupabase): Promise<OwnerOver
   if (openWarrantyCountRes.error) {
     errors.push(`Open warranty cases: ${openWarrantyCountRes.error.message}`);
   }
+  if (carsAddedRes.error) errors.push(`Cars added: ${carsAddedRes.error.message}`);
 
   const warrantyWindow = {
     start: startOfDay(now),
@@ -584,6 +603,32 @@ async function fetchOverviewData(supabase: DashboardSupabase): Promise<OwnerOver
     oldestDays,
   };
 
+  // Cars added per month: bucket each car by the month of date_bought, falling
+  // back to created_at when date_bought is null. Months outside the window stay 0.
+  const carsAddedRows = (carsAddedRes.data ?? []) as {
+    date_bought: string | null;
+    created_at: string | null;
+  }[];
+  const carsAddedBuckets: { key: string; month: string; count: number }[] = [];
+  const carsAddedIndex: Record<string, number> = {};
+  for (let i = CARS_OVER_TIME_MONTHS - 1; i >= 0; i--) {
+    const d = subMonths(now, i);
+    const key = format(d, "yyyy-MM");
+    carsAddedIndex[key] = carsAddedBuckets.length;
+    carsAddedBuckets.push({ key, month: format(d, "MMM yyyy"), count: 0 });
+  }
+  for (const r of carsAddedRows) {
+    const entry = r.date_bought ?? r.created_at;
+    if (!entry || typeof entry !== "string") continue;
+    const key = entry.slice(0, 7);
+    const idx = carsAddedIndex[key];
+    if (idx !== undefined) carsAddedBuckets[idx].count += 1;
+  }
+  const carsAddedPerMonth = carsAddedBuckets.map((b) => ({
+    month: b.month,
+    count: b.count,
+  }));
+
   return {
     summary: {
       totalCars,
@@ -595,6 +640,7 @@ async function fetchOverviewData(supabase: DashboardSupabase): Promise<OwnerOver
       openWarrantyCases: openWarrantyCountRes.count ?? 0,
     },
     carStatusChart,
+    carsAddedPerMonth,
     activeGarageTasks: tasksRes.count ?? 0,
     requestPriorityChart,
     installmentsDueSoon,
