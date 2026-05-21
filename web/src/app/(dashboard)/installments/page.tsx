@@ -172,6 +172,10 @@ export default function InstallmentsPage() {
   const [newPlanDown, setNewPlanDown] = useState("");
   const [newPlanMonths, setNewPlanMonths] = useState("");
   const [newPlanMonthly, setNewPlanMonthly] = useState("");
+  // Tracks whether the user typed the monthly amount themselves. While false,
+  // the monthly amount is kept in sync with total/down/months so the plan
+  // total can't silently disagree with the schedule.
+  const [newPlanMonthlyEdited, setNewPlanMonthlyEdited] = useState(false);
   const [newPlanStartDate, setNewPlanStartDate] = useState("");
   const [newPlanDueDay, setNewPlanDueDay] = useState("");
   const [newPlanInterestRate, setNewPlanInterestRate] = useState("");
@@ -309,18 +313,21 @@ export default function InstallmentsPage() {
   );
 
   useEffect(() => {
+    // Keep the monthly amount in sync with total/down/months until the user
+    // overrides it manually. This recomputes when any input changes so the
+    // plan total stays consistent with the generated schedule.
+    if (newPlanMonthlyEdited) return;
     const total = parseFloat(newPlanTotal || "0");
     const down = parseFloat(newPlanDown || "0");
     const months = parseInt(newPlanMonths || "0", 10);
     if (total > 0 && months > 0 && down >= 0 && down <= total) {
       const base = (total - down) / months;
       if (!Number.isNaN(base) && base > 0) {
-        if (!newPlanMonthly || Number(newPlanMonthly) === 0) {
-          setNewPlanMonthly(base.toFixed(2));
-        }
+        const next = base.toFixed(2);
+        setNewPlanMonthly((prev) => (prev === next ? prev : next));
       }
     }
-  }, [newPlanTotal, newPlanDown, newPlanMonths, newPlanMonthly]);
+  }, [newPlanTotal, newPlanDown, newPlanMonths, newPlanMonthlyEdited]);
 
   const overview = useMemo(() => {
     const now = new Date();
@@ -412,6 +419,7 @@ export default function InstallmentsPage() {
     setNewPlanDown("");
     setNewPlanMonths("");
     setNewPlanMonthly("");
+    setNewPlanMonthlyEdited(false);
     setNewPlanStartDate("");
     setNewPlanDueDay("");
   }
@@ -636,10 +644,13 @@ export default function InstallmentsPage() {
     setMarkPaidOpen(false);
     setSelectedInstallment(null);
 
-    const { data: refreshed } = await supabase
-      .from("installment_payments")
-      .select(
-        `
+    // Refetch installments AND plans — the payment RPC can complete a plan
+    // server-side, so the Plans tab status/progress must be refreshed too.
+    const [{ data: refreshed }, { data: refreshedPlans }] = await Promise.all([
+      supabase
+        .from("installment_payments")
+        .select(
+          `
         *,
         plan:payment_plans(
           *,
@@ -647,8 +658,22 @@ export default function InstallmentsPage() {
           car:cars(*)
         )
       `
-      );
+        ),
+      supabase
+        .from("payment_plans")
+        .select(
+          `
+        *,
+        customer:customers(*),
+        car:cars(*),
+        installments:installment_payments(*)
+      `
+        ),
+    ]);
     setInstallments((refreshed as InstallmentWithRelations[]) || []);
+    if (refreshedPlans) {
+      setPlans(refreshedPlans as PlanWithRelations[]);
+    }
   }
 
   if (loading) {
@@ -2453,7 +2478,10 @@ export default function InstallmentsPage() {
                     <Label>Monthly Amount *</Label>
                     <Input
                       value={newPlanMonthly}
-                      onChange={(e) => setNewPlanMonthly(e.target.value)}
+                      onChange={(e) => {
+                        setNewPlanMonthly(e.target.value);
+                        setNewPlanMonthlyEdited(true);
+                      }}
                       type="number" inputMode="decimal"
                       min={0}
                       step="0.01"

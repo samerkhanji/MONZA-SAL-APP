@@ -391,13 +391,21 @@ export function CarsInventoryClient({
   const supabase = createClient();
 
   async function handleVinScan(vin: string) {
-    const { data: car } = await supabase
+    const normalizedVin = vin.trim().toUpperCase();
+    // Use limit(1) + maybeSingle so a duplicate-VIN data anomaly still opens
+    // a car instead of throwing a misleading "No car found" error.
+    const { data: car, error } = await supabase
       .from("cars")
       .select("id, vin, brand, model")
-      .eq("vin", vin.trim().toUpperCase())
+      .eq("vin", normalizedVin)
       .is("deleted_at", null)
-      .single();
+      .limit(1)
+      .maybeSingle();
 
+    if (error) {
+      toast.error(`Could not look up VIN ${vin}: ${error.message}`);
+      return;
+    }
     if (!car) {
       toast.error(`No car found with VIN: ${vin}`);
       return;

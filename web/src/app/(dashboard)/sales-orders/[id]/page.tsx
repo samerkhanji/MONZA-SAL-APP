@@ -230,6 +230,7 @@ export default function SalesOrderDetailPage() {
   }
 
   async function saveDeposit() {
+    if (!order) return;
     const amt = parseFloat(depositAmount);
     if (isNaN(amt) || amt <= 0) {
       toast.error("Enter a positive deposit amount");
@@ -251,30 +252,51 @@ export default function SalesOrderDetailPage() {
       );
       return;
     }
+    // Auto-advance a draft order to 'reserved' once a deposit is recorded.
+    const willAdvance = order.status === "draft";
+    const nextStatus: SaleStatus = willAdvance ? "reserved" : order.status;
     const ok = await patchOrder({
       deposit_amount: amt,
       deposit_currency: orderCurrency,
       currency: orderCurrency,
       deposit_method: depositMethod || null,
-      deposit_paid_at: order?.deposit_paid_at ?? new Date().toISOString(),
-      // Auto-advance status
-      status: order?.status === "draft" ? ("reserved" as SaleStatus) : order!.status,
+      deposit_paid_at: order.deposit_paid_at ?? new Date().toISOString(),
+      status: nextStatus,
     });
-    if (ok) toast.success("Deposit recorded");
+    if (ok) {
+      toast.success(
+        willAdvance
+          ? 'Deposit recorded — order status advanced to "reserved".'
+          : "Deposit recorded"
+      );
+    }
   }
 
   async function saveContract() {
+    if (!order) return;
     const trimmed = contractUrl.trim();
     if (trimmed && !/^https?:\/\/[^\s]+$/i.test(trimmed)) {
       toast.error("Contract URL must start with http:// or https://");
       return;
     }
+    // Recording a signed contract advances draft/reserved orders to 'confirmed'.
+    const willAdvance =
+      !!trimmed && (order.status === "draft" || order.status === "reserved");
+    const nextStatus: SaleStatus = willAdvance ? "confirmed" : order.status;
     const ok = await patchOrder({
       signed_contract_url: trimmed || null,
       contract_signed_at: trimmed ? new Date().toISOString() : null,
-      status: order?.status === "draft" || order?.status === "reserved" ? ("confirmed" as SaleStatus) : order!.status,
+      status: nextStatus,
     });
-    if (ok) toast.success(trimmed ? "Contract recorded" : "Contract cleared");
+    if (ok) {
+      toast.success(
+        !trimmed
+          ? "Contract cleared"
+          : willAdvance
+            ? 'Contract recorded — order status advanced to "confirmed".'
+            : "Contract recorded"
+      );
+    }
   }
 
   async function markDelivered() {

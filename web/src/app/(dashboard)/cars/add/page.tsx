@@ -139,6 +139,15 @@ export default function AddCarPage() {
       return;
     }
 
+    if (modelYear.trim()) {
+      const yearNum = parseInt(modelYear, 10);
+      const maxYear = currentYear() + 2;
+      if (Number.isNaN(yearNum) || yearNum < 1990 || yearNum > maxYear) {
+        toast.error(`Model year must be between 1990 and ${maxYear}`);
+        return;
+      }
+    }
+
     if (showCustomerSection || soldMarker) {
       if (!clientFirstName.trim()) {
         toast.error("Client name is required");
@@ -471,8 +480,8 @@ export default function AddCarPage() {
                   id="car-model-year"
                   name="car-model-year"
                   type="number" inputMode="decimal"
-                  min={1900}
-                  max={2100}
+                  min={1990}
+                  max={currentYear() + 2}
                   value={modelYear}
                   onChange={(e) => setModelYear(e.target.value)}
                   placeholder="2024"
