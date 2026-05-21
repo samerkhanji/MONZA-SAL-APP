@@ -962,7 +962,6 @@ export default function RequestCenterPage() {
               <Select
                 value={newSendToUserId}
                 onValueChange={setNewSendToUserId}
-                required
               >
                 <SelectTrigger id="request-send-to" className="mt-2 w-full min-w-0">
                   <SelectValue placeholder="Select recipient" />

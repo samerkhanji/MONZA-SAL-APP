@@ -996,7 +996,7 @@ export function CarsInventoryClient({
                         key={car.id}
                         className="cursor-pointer odd:bg-gray-50 even:bg-white"
                         title={pendingDeletes[car.id] ? "Pending delete request" : undefined}
-                        onClick={() => router.push(`/cars/${encodeURIComponent(car.vin ?? car.id)}`)}
+                        onClick={() => router.push(`/cars/${encodeURIComponent(car.id)}`)}
                       >
                         <td title={car.vin ?? ""} className={`${CARS_TD} font-mono`}>
                           {car.vin ?? "—"}
@@ -1095,7 +1095,7 @@ export function CarsInventoryClient({
                               title="Open documents & files"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                router.push(`/cars/${encodeURIComponent(car.vin ?? car.id)}`);
+                                router.push(`/cars/${encodeURIComponent(car.id)}`);
                               }}
                             >
                               <FileText className="size-3.5" />
@@ -1108,14 +1108,14 @@ export function CarsInventoryClient({
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" side="left" sideOffset={4}>
                                 <DropdownMenuItem
-                                  onClick={() => router.push(`/cars/${encodeURIComponent(car.vin ?? car.id)}`)}
+                                  onClick={() => router.push(`/cars/${encodeURIComponent(car.id)}`)}
                                   data-tour-id="cars-list-row-actions-view"
                                 >
                                   View profile
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
                                   onClick={() =>
-                                    router.push(`/cars/${encodeURIComponent(car.vin ?? car.id)}`)
+                                    router.push(`/cars/${encodeURIComponent(car.id)}`)
                                   }
                                   data-tour-id="cars-list-row-actions-documents"
                                 >

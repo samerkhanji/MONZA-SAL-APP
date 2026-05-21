@@ -98,7 +98,6 @@ export default function PendingRequestsPage() {
         requested_by: r.requested_by,
         requester_name: namesMap[r.requested_by] ?? "Unknown",
         created_at: r.created_at,
-        link: "/requests/pending",
       });
     });
 
@@ -124,7 +123,6 @@ export default function PendingRequestsPage() {
         requested_by: r.requested_by,
         requester_name: namesMap[r.requested_by] ?? "Unknown",
         created_at: r.created_at,
-        link: "/requests/pending",
       });
     });
 
@@ -137,7 +135,6 @@ export default function PendingRequestsPage() {
         requested_by: r.requested_by,
         requester_name: namesMap[r.requested_by] ?? "Unknown",
         created_at: r.created_at,
-        link: "/requests/pending",
       });
     });
 

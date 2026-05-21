@@ -123,6 +123,7 @@ export default function TradeInDetailPage() {
   const [commitOpen, setCommitOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
+  const [uploading, setUploading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -174,6 +175,21 @@ export default function TradeInDetailPage() {
 
   async function uploadDocs(files: FileList | null) {
     if (!t || !files || files.length === 0) return;
+    const ALLOWED = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
+    const MAX_BYTES = 10 * 1024 * 1024;
+    for (const file of Array.from(files)) {
+      if (!ALLOWED.includes(file.type)) {
+        toast.error(
+          `${file.name}: only PDF and image files (JPEG, PNG, WebP) are allowed`
+        );
+        return;
+      }
+      if (file.size > MAX_BYTES) {
+        toast.error(`${file.name}: file size must be under 10MB`);
+        return;
+      }
+    }
+    setUploading(true);
     const { data: u } = await supabase.auth.getUser();
     const uid = u?.user?.id ?? null;
     for (const file of Array.from(files)) {
@@ -195,6 +211,7 @@ export default function TradeInDetailPage() {
       });
       if (error) toast.error(formatError(error));
     }
+    setUploading(false);
     void load();
   }
 
@@ -374,8 +391,18 @@ export default function TradeInDetailPage() {
           {(canGarage || canSales) && (
             <div>
               <Label htmlFor="ti-files" className="text-muted-foreground text-xs uppercase">Upload</Label>
-              <Input id="ti-files" type="file" multiple onChange={(e) => void uploadDocs(e.target.files)} />
+              <Input
+                id="ti-files"
+                type="file"
+                multiple
+                accept=".pdf,image/jpeg,image/png,image/webp"
+                disabled={uploading}
+                onChange={(e) => void uploadDocs(e.target.files)}
+              />
               <p className="text-muted-foreground mt-1 text-xs">
+                {uploading
+                  ? "Uploading…"
+                  : "PDF or image (JPEG, PNG, WebP), up to 10MB."}{" "}
                 Stored in <code>job-documents/trade-ins/{t.id}/</code>.
               </p>
             </div>

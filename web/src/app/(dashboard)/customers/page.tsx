@@ -483,7 +483,7 @@ export default function CustomersPage() {
             Sold Cars
             {!soldLoading && (
               <Badge variant="secondary" className="ml-2">
-                {soldCustomers.length}
+                {convertedSoldCars.length}
               </Badge>
             )}
           </TabsTrigger>

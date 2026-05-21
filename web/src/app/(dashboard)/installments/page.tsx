@@ -112,6 +112,7 @@ export default function InstallmentsPage() {
   const [loading, setLoading] = useState(true);
   const [installments, setInstallments] = useState<InstallmentWithRelations[]>([]);
   const [plans, setPlans] = useState<PlanWithRelations[]>([]);
+  const [profileNames, setProfileNames] = useState<Record<string, string>>({});
 
   const [markPaidOpen, setMarkPaidOpen] = useState(false);
   const [selectedInstallment, setSelectedInstallment] = useState<InstallmentWithRelations | null>(null);
@@ -241,12 +242,17 @@ export default function InstallmentsPage() {
     async function loadData() {
       setLoading(true);
 
-      const [{ data: installmentsData }, { data: plansData }, { data: customersData }, { data: carsData }] =
-        await Promise.all([
-          supabase
-            .from("installment_payments")
-            .select(
-              `
+      const [
+        { data: installmentsData },
+        { data: plansData },
+        { data: customersData },
+        { data: carsData },
+        { data: profilesData },
+      ] = await Promise.all([
+        supabase
+          .from("installment_payments")
+          .select(
+            `
           *,
           plan:payment_plans(
             *,
@@ -254,25 +260,33 @@ export default function InstallmentsPage() {
             car:cars(*)
           )
         `
-            ),
-          supabase
-            .from("payment_plans")
-            .select(
-              `
+          ),
+        supabase
+          .from("payment_plans")
+          .select(
+            `
           *,
           customer:customers(*),
           car:cars(*),
           installments:installment_payments(*)
         `
-            ),
-          supabase.from("customers").select("*").order("first_name"),
-          supabase.from("cars").select("*").order("model"),
-        ]);
+          ),
+        supabase.from("customers").select("*").order("first_name"),
+        supabase.from("cars").select("*").order("model"),
+        supabase.from("profiles").select("id, full_name"),
+      ]);
 
       setInstallments((installmentsData as InstallmentWithRelations[]) || []);
       setPlans((plansData as PlanWithRelations[]) || []);
       setCustomers((customersData as Customer[]) || []);
       setCars((carsData as Car[]) || []);
+      setProfileNames(
+        Object.fromEntries(
+          ((profilesData as { id: string; full_name: string | null }[]) ?? []).map(
+            (p) => [p.id, p.full_name ?? "Unknown"]
+          )
+        )
+      );
       setLoading(false);
     }
 
@@ -1428,7 +1442,11 @@ export default function InstallmentsPage() {
                         {currencyFormatter.format(i.paid_amount || 0)}
                       </TableCell>
                       <TableCell>{i.payment_method || "—"}</TableCell>
-                      <TableCell>—</TableCell>
+                      <TableCell>
+                        {i.marked_paid_by
+                          ? profileNames[i.marked_paid_by] ?? "Unknown"
+                          : "—"}
+                      </TableCell>
                     </TableRow>
                   ))}
                   {paidInstallments.length === 0 && (

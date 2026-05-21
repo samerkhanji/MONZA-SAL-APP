@@ -20,6 +20,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -59,6 +69,7 @@ export default function OrderedCarsPage() {
   const [query, setQuery] = useState("");
   const [addOpen, setAddOpen] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [arrivingCar, setArrivingCar] = useState<IncomingCar | null>(null);
 
   // Add-incoming-car form state
   const [vin, setVin] = useState("");
@@ -181,8 +192,6 @@ export default function OrderedCarsPage() {
 
   async function handleArrived(car: IncomingCar) {
     if (!canEditInventory) return;
-    if (!confirm(`Mark VIN ${car.vin} as arrived? It will move into inventory.`))
-      return;
     setBusyId(car.id);
     const { error } = await supabase
       .from("cars")
@@ -295,7 +304,7 @@ export default function OrderedCarsPage() {
                             <Button
                               size="sm"
                               disabled={busyId === c.id}
-                              onClick={() => handleArrived(c)}
+                              onClick={() => setArrivingCar(c)}
                             >
                               {busyId === c.id ? "Saving…" : "Mark as arrived"}
                             </Button>
@@ -410,6 +419,34 @@ export default function OrderedCarsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={arrivingCar !== null}
+        onOpenChange={(open) => !open && setArrivingCar(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Mark as arrived?</AlertDialogTitle>
+            <AlertDialogDescription>
+              VIN {arrivingCar?.vin} will move into inventory and drop off this
+              list.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (arrivingCar) {
+                  void handleArrived(arrivingCar);
+                  setArrivingCar(null);
+                }
+              }}
+            >
+              Mark as arrived
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -707,24 +707,30 @@ export default function CarProfilePage() {
         return;
       }
       if (patch.status != null && patch.status !== prev.status) {
-        await supabase.from("car_events").insert({
+        const { error: eventError } = await supabase.from("car_events").insert({
           car_id: car.id,
           event_type: "status_changed",
           from_value: prev.status,
           to_value: patch.status,
           created_by: user?.id ?? null,
         });
+        if (eventError) {
+          console.warn("Failed to record car_events status change:", eventError);
+        }
       } else if (patch.customs_status != null || patch.location_type != null) {
         const note =
           patch.customs_status != null
             ? `Customs status → ${patch.customs_status}`
             : `Location type → ${patch.location_type}`;
-        await supabase.from("car_events").insert({
+        const { error: eventError } = await supabase.from("car_events").insert({
           car_id: car.id,
           event_type: "details_updated",
           note,
           created_by: user?.id ?? null,
         });
+        if (eventError) {
+          console.warn("Failed to record car_events details update:", eventError);
+        }
       }
       toast.success("Saved");
       await fetchCar();
