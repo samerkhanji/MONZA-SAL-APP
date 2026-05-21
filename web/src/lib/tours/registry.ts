@@ -74,6 +74,7 @@ import { settingsPageTour } from "./page-settings";
 import { settingsApprovalThresholdsPageTour } from "./page-settings-approval-thresholds";
 import { settingsNotificationsPageTour } from "./page-settings-notifications";
 import { settingsWorkflowRulesPageTour } from "./page-settings-workflow-rules";
+import { companyCostsPageTour } from "./page-company-costs";
 
 // ============================================================================
 // Welcome tours — one per role. Auto-fired on first login. Manual mode only.
@@ -138,6 +139,7 @@ const PAGE_TOURS: Record<string, Tour[]> = {
   "/settings/approval-thresholds": [settingsApprovalThresholdsPageTour],
   "/settings/notifications": [settingsNotificationsPageTour],
   "/settings/workflow-rules": [settingsWorkflowRulesPageTour],
+  "/company-costs": [companyCostsPageTour],
 };
 
 // ============================================================================

@@ -39,6 +39,7 @@ import {
   Siren,
   Ship,
   PackageSearch,
+  Receipt,
 } from "lucide-react";
 import { useUser } from "@/lib/contexts/UserContext";
 import { OnboardingTour, dispatchTourReplay } from "@/components/onboarding-tour";
@@ -105,6 +106,12 @@ const BASE_NAV_ITEMS: Array<{
   { href: "/data-health", label: "Data Health", icon: Activity, tourId: "nav-data-health" },
   { href: "/installments", label: "Installments", icon: CreditCard, tourId: "nav-installments" },
   { href: "/cash", label: "Cash register", icon: Wallet, tourId: "nav-cash" },
+  {
+    href: "/company-costs",
+    label: "Company Costs",
+    icon: Receipt,
+    tourId: "nav-company-costs",
+  },
   { href: "/sales-orders", label: "Sales Orders", icon: ShoppingBag, tourId: "nav-sales-orders" },
   { href: "/trade-ins", label: "Trade-ins", icon: Repeat, tourId: "nav-trade-ins" },
   { href: "/reports", label: "Reports", icon: BarChart3, tourId: "nav-reports" },
@@ -201,6 +208,7 @@ function getPageTitle(pathname: string): string {
   if (pathname.startsWith("/customers")) return "Customers";
   if (pathname.startsWith("/data-health")) return "Data Health";
   if (pathname.startsWith("/installments")) return "Installments";
+  if (pathname.startsWith("/company-costs")) return "Company Costs";
   if (pathname.startsWith("/sales-orders")) return "Sales Orders";
   if (pathname.startsWith("/trade-ins")) return "Trade-ins";
   if (pathname.startsWith("/requests/pending")) return "Pending Requests";
@@ -326,6 +334,14 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             "sales_ops",
             "sales",
           ].includes(appRole);
+        if (item.href === "/company-costs")
+          return (
+            appRole === "owner" ||
+            hasCapability("view_reports") ||
+            hasCapability("cashier") ||
+            hasCapability("garage") ||
+            hasCapability("manage_team")
+          );
         if (item.href === "/sales-orders")
           return [
             "owner",
