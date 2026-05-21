@@ -169,7 +169,8 @@ export default function DashboardPage() {
         .limit(5),
       supabase
         .from("requests")
-        .select("id, status, submitted_by, assigned_to, send_to, send_to_user_id"),
+        .select("id, status, submitted_by, assigned_to, send_to, send_to_user_id")
+        .in("status", ["submitted", "awaiting_approval", "needs_more_info"]),
     ]);
 
     if (carsAllRes.error) {

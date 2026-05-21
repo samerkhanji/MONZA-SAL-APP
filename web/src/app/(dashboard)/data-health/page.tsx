@@ -329,6 +329,7 @@ export default function DataHealthPage() {
   const [garageJobs, setGarageJobs] = useState<GarageJobRow[]>([]);
   const [parts, setParts] = useState<PartRow[]>([]);
   const [requests, setRequests] = useState<RequestRow[]>([]);
+  const [loadErrors, setLoadErrors] = useState<string[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [sectionFilter, setSectionFilter] = useState<string>("all");
@@ -359,13 +360,13 @@ export default function DataHealthPage() {
       }
 
       const [
-        { data: carsData },
-        { data: soData },
-        { data: custData },
-        { data: plansData },
-        { data: jobsData },
-        { data: partsData },
-        { data: reqData },
+        carsRes,
+        soRes,
+        custRes,
+        plansRes,
+        jobsRes,
+        partsRes,
+        reqRes,
       ] = await Promise.all([
         supabase.from("cars_display").select(carSelect).is("deleted_at", null),
         supabase
@@ -381,13 +382,23 @@ export default function DataHealthPage() {
         reqQuery,
       ]);
 
-      setCars((carsData as CarRow[]) ?? []);
-      setSalesOrders((soData as SalesOrderRow[]) ?? []);
-      setCustomers((custData as CustomerRow[]) ?? []);
-      setPaymentPlans((plansData as PaymentPlanRow[]) ?? []);
-      setGarageJobs((jobsData as GarageJobRow[]) ?? []);
-      setParts((partsData as PartRow[]) ?? []);
-      setRequests((reqData as RequestRow[]) ?? []);
+      const errors: string[] = [];
+      if (carsRes.error) errors.push("Cars");
+      if (soRes.error) errors.push("Sales Orders");
+      if (custRes.error) errors.push("Customers");
+      if (plansRes.error) errors.push("Payment Plans");
+      if (jobsRes.error) errors.push("Garage Jobs");
+      if (partsRes.error) errors.push("Parts");
+      if (reqRes.error) errors.push("Requests");
+
+      setCars((carsRes.data as CarRow[]) ?? []);
+      setSalesOrders((soRes.data as SalesOrderRow[]) ?? []);
+      setCustomers((custRes.data as CustomerRow[]) ?? []);
+      setPaymentPlans((plansRes.data as PaymentPlanRow[]) ?? []);
+      setGarageJobs((jobsRes.data as GarageJobRow[]) ?? []);
+      setParts((partsRes.data as PartRow[]) ?? []);
+      setRequests((reqRes.data as RequestRow[]) ?? []);
+      setLoadErrors(errors);
       setLoading(false);
     }
     fetch();
@@ -495,19 +506,6 @@ export default function DataHealthPage() {
       const inst = p.installments ?? [];
       return inst.length === 0 || inst.some((i) => empty(i.due_date));
     });
-  }, [paymentPlans]);
-
-  // Overdue installments (due_date < today, status != paid)
-  const overdueInstallmentsCount = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    let count = 0;
-    for (const p of paymentPlans) {
-      const inst = p.installments ?? [];
-      for (const i of inst) {
-        if (i.due_date && i.due_date < today && (i as InstallmentRow).status !== "paid") count++;
-      }
-    }
-    return count;
   }, [paymentPlans]);
 
   // 8. Software health (IT)
@@ -619,7 +617,6 @@ export default function DataHealthPage() {
     ]
   );
   const carsMissingVin = useMemo(() => cars.filter((c) => empty(c.vin)), [cars]);
-  const criticalCount = soldCarsNoOrder.length + soNoCar.length + soNoCustomer.length + carsMissingVin.length + overdueInstallmentsCount;
 
   // Lookup maps for search
   const carById = useMemo(() => new Map(cars.map((c) => [c.id, c])), [cars]);
@@ -635,6 +632,41 @@ export default function DataHealthPage() {
     }
     return ids;
   }, [paymentPlans]);
+
+  // Critical count must stay consistent with the per-row severity used by
+  // isRowCritical / filterRowBySeverity, and only counts visible sections so
+  // warningCount = totalVisibleCount - criticalCount stays correct.
+  const criticalCount = useMemo(() => {
+    let count = 0;
+    if (visibleSections.includes("broken_relationships")) {
+      count += soldCarsNoOrder.length + soNoCar.length + soNoCustomer.length;
+    }
+    if (visibleSections.includes("cars_missing_data")) {
+      count += carsMissingData.filter((c) => empty(c.vin)).length;
+    }
+    if (visibleSections.includes("cars_missing_technical")) {
+      count += carsMissingTechnical.filter((c) => empty(c.vin)).length;
+    }
+    if (visibleSections.includes("sales_orders_missing_data")) {
+      count += soMissingData.filter(
+        (so) => empty(so.car_id) || empty(so.customer_id)
+      ).length;
+    }
+    if (visibleSections.includes("installment_data_missing")) {
+      count += plansMissingInstallments.filter((p) => planIdsWithOverdue.has(p.id)).length;
+    }
+    return count;
+  }, [
+    visibleSections,
+    soldCarsNoOrder.length,
+    soNoCar.length,
+    soNoCustomer.length,
+    carsMissingData,
+    carsMissingTechnical,
+    soMissingData,
+    plansMissingInstallments,
+    planIdsWithOverdue,
+  ]);
 
   function rowMatchesSearch(
     sectionId: DataHealthSectionId,
@@ -924,6 +956,19 @@ export default function DataHealthPage() {
             : `Showing data health for: ${roleLabel}`}
         </p>
       </div>
+
+      {loadErrors.length > 0 && (
+        <div
+          role="alert"
+          className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950/30 dark:text-amber-300"
+        >
+          <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
+          <div>
+            <p className="font-medium">Some data couldn&apos;t load.</p>
+            <p>Affected: {loadErrors.join(", ")}. Counts below may be incomplete — refresh to retry.</p>
+          </div>
+        </div>
+      )}
 
       {/* Global Critical / Warning indicator */}
       <div className="flex flex-wrap gap-4" data-tour-id="data-health-severity-totals">

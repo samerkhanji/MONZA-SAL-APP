@@ -73,26 +73,26 @@ export function WarrantyNotificationChecker() {
                 .eq("warranty_type", "dms")
                 .eq("threshold_days", days)
                 .limit(1);
-              if (existing && existing.length > 0) continue;
-
-              await createNotificationsForUsers(
-                recipientIds,
-                "Warranty alert (DMS)",
-                `Warranty alert (DMS): VIN ${car.vin} — ${makeModel} warranty expires in ${days} days (${car.warranty_per_dms})`,
-                `/cars/${car.vin}`
-              );
-              const { error: dedupeErr } = await supabase
-                .from("warranty_notifications_sent")
-                .insert({
-                  car_id: car.id,
-                  warranty_type: "dms",
-                  threshold_days: days,
-                });
-              if (dedupeErr) {
-                console.warn(
-                  "warranty dedupe insert failed (dms)",
-                  { car_id: car.id, days, error: dedupeErr.message }
+              if (!existing || existing.length === 0) {
+                await createNotificationsForUsers(
+                  recipientIds,
+                  "Warranty alert (DMS)",
+                  `Warranty alert (DMS): VIN ${car.vin} — ${makeModel} warranty expires in ${days} days (${car.warranty_per_dms})`,
+                  `/cars/${car.vin}`
                 );
+                const { error: dedupeErr } = await supabase
+                  .from("warranty_notifications_sent")
+                  .insert({
+                    car_id: car.id,
+                    warranty_type: "dms",
+                    threshold_days: days,
+                  });
+                if (dedupeErr) {
+                  console.warn(
+                    "warranty dedupe insert failed (dms)",
+                    { car_id: car.id, days, error: dedupeErr.message }
+                  );
+                }
               }
             }
           }
@@ -113,26 +113,26 @@ export function WarrantyNotificationChecker() {
                 .eq("warranty_type", "vehicle")
                 .eq("threshold_days", days)
                 .limit(1);
-              if (existing && existing.length > 0) continue;
-
-              await createNotificationsForUsers(
-                recipientIds,
-                "Warranty alert (Vehicle)",
-                `Warranty alert (Vehicle): VIN ${car.vin} — ${makeModel} warranty expires in ${days} days (${vehicleExpiry})`,
-                `/cars/${car.vin}`
-              );
-              const { error: dedupeErr } = await supabase
-                .from("warranty_notifications_sent")
-                .insert({
-                  car_id: car.id,
-                  warranty_type: "vehicle",
-                  threshold_days: days,
-                });
-              if (dedupeErr) {
-                console.warn(
-                  "warranty dedupe insert failed (vehicle)",
-                  { car_id: car.id, days, error: dedupeErr.message }
+              if (!existing || existing.length === 0) {
+                await createNotificationsForUsers(
+                  recipientIds,
+                  "Warranty alert (Vehicle)",
+                  `Warranty alert (Vehicle): VIN ${car.vin} — ${makeModel} warranty expires in ${days} days (${vehicleExpiry})`,
+                  `/cars/${car.vin}`
                 );
+                const { error: dedupeErr } = await supabase
+                  .from("warranty_notifications_sent")
+                  .insert({
+                    car_id: car.id,
+                    warranty_type: "vehicle",
+                    threshold_days: days,
+                  });
+                if (dedupeErr) {
+                  console.warn(
+                    "warranty dedupe insert failed (vehicle)",
+                    { car_id: car.id, days, error: dedupeErr.message }
+                  );
+                }
               }
             }
           }
@@ -149,26 +149,26 @@ export function WarrantyNotificationChecker() {
                 .eq("warranty_type", "battery")
                 .eq("threshold_days", days)
                 .limit(1);
-              if (existing && existing.length > 0) continue;
-
-              await createNotificationsForUsers(
-                recipientIds,
-                "Warranty alert (Battery)",
-                `Warranty alert (Battery): VIN ${car.vin} — ${makeModel} warranty expires in ${days} days (${car.warranty_battery_expiry})`,
-                `/cars/${car.vin}`
-              );
-              const { error: dedupeErr } = await supabase
-                .from("warranty_notifications_sent")
-                .insert({
-                  car_id: car.id,
-                  warranty_type: "battery",
-                  threshold_days: days,
-                });
-              if (dedupeErr) {
-                console.warn(
-                  "warranty dedupe insert failed (battery)",
-                  { car_id: car.id, days, error: dedupeErr.message }
+              if (!existing || existing.length === 0) {
+                await createNotificationsForUsers(
+                  recipientIds,
+                  "Warranty alert (Battery)",
+                  `Warranty alert (Battery): VIN ${car.vin} — ${makeModel} warranty expires in ${days} days (${car.warranty_battery_expiry})`,
+                  `/cars/${car.vin}`
                 );
+                const { error: dedupeErr } = await supabase
+                  .from("warranty_notifications_sent")
+                  .insert({
+                    car_id: car.id,
+                    warranty_type: "battery",
+                    threshold_days: days,
+                  });
+                if (dedupeErr) {
+                  console.warn(
+                    "warranty dedupe insert failed (battery)",
+                    { car_id: car.id, days, error: dedupeErr.message }
+                  );
+                }
               }
             }
           }

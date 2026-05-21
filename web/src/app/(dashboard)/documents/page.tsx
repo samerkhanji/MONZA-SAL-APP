@@ -31,8 +31,16 @@ interface DocumentAccessRequest {
 interface CustomerSearchResult {
   id: string;
   full_name: string | null;
+  first_name: string | null;
+  last_name: string | null;
   phone_primary: string | null;
   phone_secondary: string | null;
+}
+
+function customerDisplayName(c: CustomerSearchResult): string {
+  if (c.full_name && c.full_name.trim()) return c.full_name.trim();
+  const combined = `${c.first_name ?? ""} ${c.last_name ?? ""}`.trim();
+  return combined || "Unnamed customer";
 }
 
 type SearchMode = "vin" | "customer";
@@ -406,7 +414,7 @@ export default function DocumentsPage() {
                 <p className="text-sm text-muted-foreground">
                   Documents for{" "}
                   <span className="font-medium text-foreground">
-                    {selectedCustomer.full_name ?? "Unnamed customer"}
+                    {customerDisplayName(selectedCustomer)}
                   </span>
                   {selectedCustomer.phone_primary
                     ? ` — ${selectedCustomer.phone_primary}`
@@ -461,7 +469,7 @@ export default function DocumentsPage() {
                       >
                         <div>
                           <p className="font-medium">
-                            {c.full_name ?? "Unnamed customer"}
+                            {customerDisplayName(c)}
                           </p>
                           <p className="text-muted-foreground text-sm">
                             {c.phone_primary ?? "No phone"}
