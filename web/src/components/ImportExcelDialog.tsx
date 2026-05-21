@@ -70,7 +70,7 @@ export function ImportExcelDialog({
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<{ cars: number; clients: number; updates: number } | null>(null);
   const [importing, setImporting] = useState(false);
-  const [result, setResult] = useState<{ cars: number; clients: number; updates: number } | null>(null);
+  const [result, setResult] = useState<{ cars: number; clients: number; updates: number; failed: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const supabase = createClient();
 
@@ -150,6 +150,7 @@ export function ImportExcelDialog({
         let carsImported = 0;
         let clientsImported = 0;
         let recordsUpdated = 0;
+        let failed = 0;
 
         const carsByVin = new Map<string, Record<string, unknown>>();
 
@@ -207,9 +208,11 @@ export function ImportExcelDialog({
           if (existing) {
             const { error } = await supabase.from("cars").update(car).eq("id", (existing as { id: string }).id);
             if (!error) recordsUpdated++;
+            else failed++;
           } else {
             const { error } = await supabase.from("cars").insert(car);
             if (!error) carsImported++;
+            else failed++;
           }
         }
 
@@ -238,6 +241,7 @@ export function ImportExcelDialog({
               created_by: user.id,
             });
             if (!custErr) clientsImported++;
+            else failed++;
           }
         }
 
@@ -312,11 +316,18 @@ export function ImportExcelDialog({
 
             const { error: saleErr } = await supabase.from("sales_orders").insert(salePayload);
             if (!saleErr) recordsUpdated++;
+            else failed++;
           }
         }
 
-        setResult({ cars: carsImported, clients: clientsImported, updates: recordsUpdated });
-        toast.success(`Imported ${carsImported} cars, ${clientsImported} clients, ${recordsUpdated} updates`);
+        setResult({ cars: carsImported, clients: clientsImported, updates: recordsUpdated, failed });
+        if (failed > 0) {
+          toast.warning(
+            `Imported ${carsImported} cars, ${clientsImported} clients, ${recordsUpdated} updates — ${failed} row(s) skipped.`
+          );
+        } else {
+          toast.success(`Imported ${carsImported} cars, ${clientsImported} clients, ${recordsUpdated} updates`);
+        }
         onSuccess();
       } catch (err) {
         console.error(err);
@@ -371,10 +382,19 @@ export function ImportExcelDialog({
             </div>
           )}
           {result && (
-            <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-sm dark:border-green-800 dark:bg-green-950/30">
-              <p className="font-medium">Import complete</p>
+            <div
+              className={
+                result.failed > 0
+                  ? "rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm dark:border-amber-800 dark:bg-amber-950/30"
+                  : "rounded-lg border border-green-200 bg-green-50 p-4 text-sm dark:border-green-800 dark:bg-green-950/30"
+              }
+            >
+              <p className="font-medium">
+                {result.failed > 0 ? "Import complete (with skipped rows)" : "Import complete"}
+              </p>
               <p className="text-muted-foreground">
                 {result.cars} cars, {result.clients} clients, {result.updates} updates
+                {result.failed > 0 ? ` · ${result.failed} skipped` : ""}
               </p>
             </div>
           )}

@@ -13,6 +13,18 @@ import { createJobWorkflowTour } from "./workflow-create-job";
 import { receivePartsWorkflowTour } from "./workflow-receive-parts";
 import { processRefundWorkflowTour } from "./workflow-process-refund";
 import { warrantyCaseWorkflowTour } from "./workflow-warranty-case";
+import { updateJobStatusWorkflowTour } from "./workflow-update-job-status";
+import { assignWorkWorkflowTour } from "./workflow-assign-work";
+import { addPartsToJobWorkflowTour } from "./workflow-add-parts-to-job";
+import { createPurchaseOrderWorkflowTour } from "./workflow-create-purchase-order";
+import { manageLowStockWorkflowTour } from "./workflow-manage-low-stock";
+import { manageTradeInWorkflowTour } from "./workflow-manage-trade-in";
+import { submitRequestWorkflowTour } from "./workflow-submit-request";
+import { reviewRequestsWorkflowTour } from "./workflow-review-requests";
+import { checkReportsWorkflowTour } from "./workflow-check-reports";
+import { fixDataHealthWorkflowTour } from "./workflow-fix-data-health";
+import { uploadDocumentsWorkflowTour } from "./workflow-upload-documents";
+import { handleRecallWorkflowTour } from "./workflow-handle-recall";
 
 // Page tours — sales side
 import { carsPageTour } from "./page-cars";
@@ -62,6 +74,8 @@ import { settingsPageTour } from "./page-settings";
 import { settingsApprovalThresholdsPageTour } from "./page-settings-approval-thresholds";
 import { settingsNotificationsPageTour } from "./page-settings-notifications";
 import { settingsWorkflowRulesPageTour } from "./page-settings-workflow-rules";
+import { companyCostsPageTour } from "./page-company-costs";
+import { orderedCarsPageTour } from "./page-ordered-cars";
 
 // ============================================================================
 // Welcome tours — one per role. Auto-fired on first login. Manual mode only.
@@ -126,6 +140,8 @@ const PAGE_TOURS: Record<string, Tour[]> = {
   "/settings/approval-thresholds": [settingsApprovalThresholdsPageTour],
   "/settings/notifications": [settingsNotificationsPageTour],
   "/settings/workflow-rules": [settingsWorkflowRulesPageTour],
+  "/company-costs": [companyCostsPageTour],
+  "/ordered-cars": [orderedCarsPageTour],
 };
 
 // ============================================================================
@@ -142,6 +158,18 @@ const WORKFLOW_TOURS: Tour[] = [
   receivePartsWorkflowTour,
   processRefundWorkflowTour,
   warrantyCaseWorkflowTour,
+  updateJobStatusWorkflowTour,
+  assignWorkWorkflowTour,
+  addPartsToJobWorkflowTour,
+  createPurchaseOrderWorkflowTour,
+  manageLowStockWorkflowTour,
+  manageTradeInWorkflowTour,
+  submitRequestWorkflowTour,
+  reviewRequestsWorkflowTour,
+  checkReportsWorkflowTour,
+  fixDataHealthWorkflowTour,
+  uploadDocumentsWorkflowTour,
+  handleRecallWorkflowTour,
 ];
 
 // ============================================================================

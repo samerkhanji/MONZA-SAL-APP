@@ -707,24 +707,30 @@ export default function CarProfilePage() {
         return;
       }
       if (patch.status != null && patch.status !== prev.status) {
-        await supabase.from("car_events").insert({
+        const { error: eventError } = await supabase.from("car_events").insert({
           car_id: car.id,
           event_type: "status_changed",
           from_value: prev.status,
           to_value: patch.status,
           created_by: user?.id ?? null,
         });
+        if (eventError) {
+          console.warn("Failed to record car_events status change:", eventError);
+        }
       } else if (patch.customs_status != null || patch.location_type != null) {
         const note =
           patch.customs_status != null
             ? `Customs status → ${patch.customs_status}`
             : `Location type → ${patch.location_type}`;
-        await supabase.from("car_events").insert({
+        const { error: eventError } = await supabase.from("car_events").insert({
           car_id: car.id,
           event_type: "details_updated",
           note,
           created_by: user?.id ?? null,
         });
+        if (eventError) {
+          console.warn("Failed to record car_events details update:", eventError);
+        }
       }
       toast.success("Saved");
       await fetchCar();
@@ -984,19 +990,15 @@ export default function CarProfilePage() {
     setDeleteError(null);
     setDeleteLoading(true);
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user?.email) {
-      setDeleteLoading(false);
-      toast.error("Unable to verify current user. Please sign in again.");
-      return;
-    }
-
-    const { error: authError } = await supabase.auth.signInWithPassword({
-      email: user.email,
-      password: deletePassword,
+    const verifyRes = await fetch("/api/auth/verify-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ password: deletePassword }),
     });
+    const verifyBody = await verifyRes.json().catch(() => ({}));
 
-    if (authError) {
+    if (!verifyBody?.ok) {
       setDeleteLoading(false);
       setDeleteError("Incorrect password");
       return;

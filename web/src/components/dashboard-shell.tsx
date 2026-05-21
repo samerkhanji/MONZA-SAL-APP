@@ -39,8 +39,8 @@ import {
   Siren,
   Ship,
   PackageSearch,
+  Receipt,
 } from "lucide-react";
-import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
 import { OnboardingTour, dispatchTourReplay } from "@/components/onboarding-tour";
 import { TourLauncher } from "@/components/tour-launcher";
@@ -58,7 +58,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { NotificationBell } from "@/components/NotificationBell";
 import { useInstall } from "@/lib/contexts/InstallContext";
-import { clearAuthSessionMarkers } from "@/lib/auth-session";
+import { signOut } from "@/lib/auth-session";
 import { cn } from "@/lib/utils";
 import { ROLES_WITH_DATA_HEALTH_ACCESS } from "@/lib/data-health-config";
 
@@ -106,6 +106,12 @@ const BASE_NAV_ITEMS: Array<{
   { href: "/data-health", label: "Data Health", icon: Activity, tourId: "nav-data-health" },
   { href: "/installments", label: "Installments", icon: CreditCard, tourId: "nav-installments" },
   { href: "/cash", label: "Cash register", icon: Wallet, tourId: "nav-cash" },
+  {
+    href: "/company-costs",
+    label: "Company Costs",
+    icon: Receipt,
+    tourId: "nav-company-costs",
+  },
   { href: "/sales-orders", label: "Sales Orders", icon: ShoppingBag, tourId: "nav-sales-orders" },
   { href: "/trade-ins", label: "Trade-ins", icon: Repeat, tourId: "nav-trade-ins" },
   { href: "/reports", label: "Reports", icon: BarChart3, tourId: "nav-reports" },
@@ -202,6 +208,7 @@ function getPageTitle(pathname: string): string {
   if (pathname.startsWith("/customers")) return "Customers";
   if (pathname.startsWith("/data-health")) return "Data Health";
   if (pathname.startsWith("/installments")) return "Installments";
+  if (pathname.startsWith("/company-costs")) return "Company Costs";
   if (pathname.startsWith("/sales-orders")) return "Sales Orders";
   if (pathname.startsWith("/trade-ins")) return "Trade-ins";
   if (pathname.startsWith("/requests/pending")) return "Pending Requests";
@@ -327,6 +334,14 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             "sales_ops",
             "sales",
           ].includes(appRole);
+        if (item.href === "/company-costs")
+          return (
+            appRole === "owner" ||
+            hasCapability("view_reports") ||
+            hasCapability("cashier") ||
+            hasCapability("garage") ||
+            hasCapability("manage_team")
+          );
         if (item.href === "/sales-orders")
           return [
             "owner",
@@ -445,10 +460,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   );
 
   async function handleSignOut() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    clearAuthSessionMarkers();
-    window.location.href = "/";
+    await signOut();
   }
 
   const displayName = profile?.full_name ?? "User";
@@ -469,7 +481,10 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           />
         </Link>
       </div>
-      <nav className="flex-1 min-h-0 space-y-1 overflow-y-auto overflow-x-hidden p-2 lg:p-4">
+      <nav
+        data-tour-id="sidebar-nav"
+        className="flex-1 min-h-0 space-y-1 overflow-y-auto overflow-x-hidden p-2 lg:p-4"
+      >
         {navItems.map((item) => {
           const hasChildren = item.children && item.children.length > 0;
           const isActive =

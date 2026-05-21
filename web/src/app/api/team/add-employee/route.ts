@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { tryCreateAdminClient } from "@/lib/supabase/admin";
 import { createClient as createServerClient } from "@/lib/supabase/server";
+import { APP_CAPABILITIES } from "@/lib/permissions";
+import { toPublicApiError } from "@/lib/server/api-error";
 
 export async function POST(request: NextRequest) {
   const adminClient = tryCreateAdminClient();
@@ -41,19 +43,9 @@ export async function POST(request: NextRequest) {
     "it",
   ]);
 
-  // Whitelist of known capability strings the UI may toggle.
-  const ALLOWED_CAPABILITIES = new Set([
-    "garage",
-    "inventory",
-    "sales",
-    "customers",
-    "documents",
-    "requests",
-    "test_drive",
-    "accessories",
-    "data_health",
-    "installments",
-  ]);
+  // Allowlist of capability strings the UI may toggle, derived from the
+  // canonical AppCapability enum (mirrors public.user_capability DB enum).
+  const ALLOWED_CAPABILITIES = new Set<string>(APP_CAPABILITIES);
 
   const ALLOWED_EMPLOYMENT_STATUSES = new Set([
     "active",
@@ -128,10 +120,10 @@ export async function POST(request: NextRequest) {
     if (authError) {
       // H3: do NOT log Supabase auth error details to console — they leak
       // user-enumeration signal (status 422 vs 400 etc.) into shared logs.
-      // Surface a generic message; the caller already gets the original
-      // Supabase message in the JSON response if they're authorized.
+      // Surface a generic message so an "email already registered" failure is
+      // indistinguishable from any other creation failure.
       return NextResponse.json(
-        { error: authError.message },
+        { error: "Unable to create employee with the provided details." },
         { status: 400 }
       );
     }
@@ -156,7 +148,7 @@ export async function POST(request: NextRequest) {
 
     if (profileError) {
       return NextResponse.json(
-        { error: profileError.message },
+        { error: toPublicApiError(profileError) },
         { status: 400 }
       );
     }

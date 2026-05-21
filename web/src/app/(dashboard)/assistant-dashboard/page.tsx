@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -133,7 +133,15 @@ export default function AssistantDashboardPage() {
   const [markingDelivered, setMarkingDelivered] = useState<string | null>(null);
   const [repairProposals, setRepairProposals] = useState<RepairProposalDashRow[]>([]);
 
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
+  const aliveRef = useRef(true);
+
+  useEffect(() => {
+    aliveRef.current = true;
+    return () => {
+      aliveRef.current = false;
+    };
+  }, []);
 
   async function handleMarkDelivered(job: JobWithCar) {
     setMarkingDelivered(job.id);
@@ -233,6 +241,8 @@ export default function AssistantDashboardPage() {
         .neq("status", "waived")
         .lt("due_date", today),
     ]);
+
+    if (!aliveRef.current) return;
 
     if (jobsRes.error) errors.push("Workshop Jobs");
     if (carsRes.error) errors.push("Warranty Alerts");
@@ -447,6 +457,7 @@ export default function AssistantDashboardPage() {
       color: "red" as const,
       icon: AlertTriangle,
       href: "/installments",
+      tourId: "assistant-dashboard-overdue-installments-card",
     },
   ];
 
@@ -546,7 +557,10 @@ export default function AssistantDashboardPage() {
       </div>
 
       {/* Overview Cards */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+      <div
+        data-tour-id="assistant-dashboard-summary-cards"
+        className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6"
+      >
         {cards.map((card, i) => (
           <KpiCard
             key={card.href ?? `card-${i}`}
@@ -554,8 +568,9 @@ export default function AssistantDashboardPage() {
             value={loading ? "—" : card.value}
             icon={card.icon}
             color={card.color}
+            tourId={card.tourId}
             onClick={() =>
-              card.href ? (window.location.href = card.href) : card.ref && scrollTo(card.ref)
+              card.href ? router.push(card.href) : card.ref && scrollTo(card.ref)
             }
           />
         ))}
@@ -986,7 +1001,7 @@ export default function AssistantDashboardPage() {
               <div className="space-y-2">
                 {completedAwaitingPickup.map((job) => {
                   const car = Array.isArray(job.cars) ? job.cars[0] : job.cars;
-                  const completed = job.completed_at ?? "";
+                  const completed = job.completed_at ?? job.created_at ?? "";
                   const daysWaiting = daysSince(completed);
                   const isOverdue = daysWaiting > 3;
                   return (

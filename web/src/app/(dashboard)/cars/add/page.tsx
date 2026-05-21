@@ -123,6 +123,12 @@ export default function AddCarPage() {
   const showCustomerSection = CUSTOMER_REQUIRED_STATUSES.includes(status) || soldMarker;
   const requireDeliveryDate = status === "sold" || soldMarker;
 
+  // EREV fields are only persisted when the toggle is on at submit. Warn the
+  // user if they entered EREV data but then turned the toggle off, so the
+  // data loss is visible rather than silent.
+  const hasUnsavedErevData =
+    !isErev && (motor.trim() !== "" || evKm.trim() !== "" || motorKm.trim() !== "");
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
@@ -137,6 +143,15 @@ export default function AddCarPage() {
     if (!brand) {
       toast.error("Please select a brand");
       return;
+    }
+
+    if (modelYear.trim()) {
+      const yearNum = parseInt(modelYear, 10);
+      const maxYear = currentYear() + 2;
+      if (Number.isNaN(yearNum) || yearNum < 1990 || yearNum > maxYear) {
+        toast.error(`Model year must be between 1990 and ${maxYear}`);
+        return;
+      }
     }
 
     if (showCustomerSection || soldMarker) {
@@ -167,6 +182,21 @@ export default function AddCarPage() {
       return;
     }
 
+    // Pre-check for an existing VIN so the user gets a clear message
+    // instead of a raw Postgres unique-violation.
+    const { data: existingCar } = await supabase
+      .from("cars")
+      .select("id")
+      .eq("vin", vinTrimmed)
+      .limit(1)
+      .maybeSingle();
+
+    if (existingCar) {
+      setSubmitting(false);
+      toast.error("A car with this VIN already exists.");
+      return;
+    }
+
     // ─── Step 1: Create car via RPC ───
     const { data: carData, error: carError } = await supabase.rpc("create_car", {
       p_vin: vinTrimmed,
@@ -187,8 +217,16 @@ export default function AddCarPage() {
         carError.code === "42501" ||
         carError.message.toLowerCase().includes("permission") ||
         carError.message.toLowerCase().includes("policy");
+      const isDuplicateVin =
+        carError.code === "23505" ||
+        carError.message.toLowerCase().includes("duplicate") ||
+        carError.message.toLowerCase().includes("unique");
       toast.error(
-        isRls ? "You don't have permission to add cars." : `Failed to add car: ${carError.message}`
+        isDuplicateVin
+          ? "A car with this VIN already exists."
+          : isRls
+            ? "You don't have permission to add cars."
+            : `Failed to add car: ${carError.message}`
       );
       return;
     }
@@ -448,8 +486,8 @@ export default function AddCarPage() {
                   id="car-model-year"
                   name="car-model-year"
                   type="number" inputMode="decimal"
-                  min={1900}
-                  max={2100}
+                  min={1990}
+                  max={currentYear() + 2}
                   value={modelYear}
                   onChange={(e) => setModelYear(e.target.value)}
                   placeholder="2024"
@@ -802,6 +840,13 @@ export default function AddCarPage() {
                 <FieldHint text="Tick this for hybrids that have a small petrol engine to recharge the battery on the go." />
               </Label>
             </div>
+
+            {hasUnsavedErevData && (
+              <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+                EREV details you entered (Motor, EV KM, Motor KM) won&apos;t be
+                saved while this toggle is off. Turn it back on to keep them.
+              </p>
+            )}
 
             {isErev && (
               <div className="space-y-4 rounded-lg border p-4">

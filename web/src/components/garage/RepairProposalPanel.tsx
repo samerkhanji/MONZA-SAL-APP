@@ -121,7 +121,16 @@ export function RepairProposalPanel({
   }, [load]);
 
   const originalTotal = useMemo(
-    () => items.reduce((s, i) => s + Number(i.total_price || 0), 0),
+    () =>
+      items.reduce(
+        (s, i) =>
+          s +
+          Math.round(
+            (Number(i.quantity) || 0) * (Number(i.unit_price) || 0) * 100
+          ) /
+            100,
+        0
+      ),
     [items]
   );
   const approvedTotal = useMemo(

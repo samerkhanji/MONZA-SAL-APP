@@ -12,6 +12,16 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Search, Siren } from "lucide-react";
 
 interface RecalledCar {
@@ -43,7 +53,7 @@ function reasonLabel(reason: string | null): string {
 
 export default function RecallCenterPage() {
   const router = useRouter();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const { canEditInventory } = useUser();
 
   const [cars, setCars] = useState<RecalledCar[]>([]);
@@ -51,6 +61,7 @@ export default function RecallCenterPage() {
   const [bucket, setBucket] = useState<Bucket>("all");
   const [query, setQuery] = useState("");
   const [clearingId, setClearingId] = useState<string | null>(null);
+  const [clearTarget, setClearTarget] = useState<RecalledCar | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -101,7 +112,6 @@ export default function RecallCenterPage() {
 
   async function handleClear(car: RecalledCar) {
     if (!canEditInventory) return;
-    if (!confirm(`Clear the recall on VIN ${car.vin}?`)) return;
     setClearingId(car.id);
     const { error } = await supabase
       .from("cars")
@@ -231,7 +241,7 @@ export default function RecallCenterPage() {
                               variant="outline"
                               className="text-destructive hover:text-destructive"
                               disabled={clearingId === c.id}
-                              onClick={() => handleClear(c)}
+                              onClick={() => setClearTarget(c)}
                             >
                               {clearingId === c.id ? "Clearing…" : "Clear recall"}
                             </Button>
@@ -246,6 +256,35 @@ export default function RecallCenterPage() {
           )}
         </CardContent>
       </Card>
+
+      <AlertDialog
+        open={clearTarget !== null}
+        onOpenChange={(open) => !open && setClearTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear recall?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {clearTarget
+                ? `The recall on VIN ${clearTarget.vin} will be cleared and the car removed from this list.`
+                : ""}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (clearTarget) {
+                  void handleClear(clearTarget);
+                  setClearTarget(null);
+                }
+              }}
+            >
+              Clear recall
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

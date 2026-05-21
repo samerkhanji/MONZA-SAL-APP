@@ -3,6 +3,7 @@ import {
   getSessionUserAndRole,
   isGarageMgmtRole,
 } from "@/lib/server/session-app-role";
+import { toPublicApiError } from "@/lib/server/api-error";
 import type { AppRole } from "@/lib/permissions";
 
 function isUuid(s: string): boolean {
@@ -67,13 +68,12 @@ export async function GET(req: Request) {
     const { data, error } = await q;
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: toPublicApiError(error) }, { status: 500 });
     }
 
     return NextResponse.json({ openTimers: data ?? [] });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Unknown error";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: toPublicApiError(e) }, { status: 500 });
   }
 }
 
@@ -129,7 +129,7 @@ export async function POST(req: Request) {
 
       if (error) {
         const code = error.code === "42501" ? 403 : 400;
-        return NextResponse.json({ error: error.message }, { status: code });
+        return NextResponse.json({ error: toPublicApiError(error) }, { status: code });
       }
 
       return NextResponse.json({ timer: data }, { status: 201 });
@@ -167,7 +167,7 @@ export async function POST(req: Request) {
 
       if (error) {
         const code = error.code === "42501" ? 403 : 400;
-        return NextResponse.json({ error: error.message }, { status: code });
+        return NextResponse.json({ error: toPublicApiError(error) }, { status: code });
       }
 
       return NextResponse.json({ timer: data });
@@ -175,7 +175,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ error: "action must be start or stop" }, { status: 400 });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Unknown error";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: toPublicApiError(e) }, { status: 500 });
   }
 }

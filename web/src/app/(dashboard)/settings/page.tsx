@@ -53,6 +53,7 @@ import { getProfileFullName } from "@/lib/supabase-profile";
 import { ProfileActivityDot } from "@/components/profile-activity-dot";
 import { DatabaseComputeSection } from "@/components/settings/DatabaseComputeSection";
 import { formatError } from "@/lib/error-messages";
+import { invalidateProfilesCache } from "@/lib/user-lookup";
 
 function formatLastOnline(iso: string | null | undefined): string {
   if (!iso) return "Never";
@@ -199,6 +200,9 @@ export default function SettingsPage() {
   }, [canAccessSettings, router]);
 
   const fetchProfiles = useCallback(async () => {
+    // Team list reloads after every add/edit/deactivate — drop the shared
+    // profile cache so name-based notification lookups don't go stale.
+    invalidateProfilesCache();
     setProfilesLoading(true);
     const { data, error } = await supabase
       .from("profiles")
@@ -353,22 +357,34 @@ export default function SettingsPage() {
             ? ""
             : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
+    // Apply the date filter server-side BEFORE the limit so the 50 most-recent
+    // rows are drawn from the chosen window, not silently truncated to rows
+    // newer than whatever the limit happened to capture.
+    const carQuery = supabase
+      .from("car_events")
+      .select("*, profiles:created_by(full_name), cars:car_id(vin, brand, model)")
+      .order("created_at", { ascending: false })
+      .limit(50);
+    const partQuery = supabase
+      .from("part_movements")
+      .select("*, profiles:created_by(full_name), parts:part_id(part_name, oe_number), cars:car_id(vin, brand, model)")
+      .order("created_at", { ascending: false })
+      .limit(50);
+    const noteQuery = supabase
+      .from("customer_notes")
+      .select("*, profiles:created_by(full_name), customers:customer_id(first_name, last_name)")
+      .order("created_at", { ascending: false })
+      .limit(50);
+    if (cutoff) {
+      carQuery.gte("created_at", cutoff);
+      partQuery.gte("created_at", cutoff);
+      noteQuery.gte("created_at", cutoff);
+    }
+
     const [carRes, partRes, noteRes] = await Promise.all([
-      supabase
-        .from("car_events")
-        .select("*, profiles:created_by(full_name), cars:car_id(vin, brand, model)")
-        .order("created_at", { ascending: false })
-        .limit(50),
-      supabase
-        .from("part_movements")
-        .select("*, profiles:created_by(full_name), parts:part_id(part_name, oe_number), cars:car_id(vin, brand, model)")
-        .order("created_at", { ascending: false })
-        .limit(50),
-      supabase
-        .from("customer_notes")
-        .select("*, profiles:created_by(full_name), customers:customer_id(first_name, last_name)")
-        .order("created_at", { ascending: false })
-        .limit(50),
+      carQuery,
+      partQuery,
+      noteQuery,
     ]);
 
     const items: Array<{

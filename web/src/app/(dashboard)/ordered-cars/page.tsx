@@ -10,6 +10,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
@@ -26,13 +29,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, Ship, Plus } from "lucide-react";
+import { Search, Ship, Plus, ClipboardCheck } from "lucide-react";
 
 /**
  * Ordered Cars — tracks cars that have been ordered and are inbound
  * (car status 'inbound'). Shows shipment code, ETA and VIN. When a car
- * arrives it is marked as in inventory and drops off this list, so the
- * page works as an arrivals checklist.
+ * arrives it is received via a receiving inspection checklist, then moves
+ * into inventory and is gated as "Awaiting PDI" until its PDI is done.
  */
 
 const BRANDS = ["Voyah", "MHero"] as const;
@@ -49,16 +52,48 @@ interface IncomingCar {
   notes: string | null;
 }
 
+interface AwaitingPdiCar {
+  id: string;
+  vin: string;
+  brand: string;
+  model: string;
+  model_year: number | null;
+  date_arrived: string | null;
+  pdi_status: string | null;
+  has_issues: boolean;
+}
+
+const RECEIVE_CHECKS = [
+  { key: "vin_confirmed", label: "VIN matches the shipment", isReceived: false },
+  { key: "keys_received", label: "Keys received", isReceived: true },
+  { key: "documents_received", label: "Documents received", isReceived: true },
+  {
+    key: "charger_received",
+    label: "Charger / charging cable received",
+    isReceived: true,
+  },
+  { key: "accessories_received", label: "Accessories received", isReceived: true },
+  { key: "exterior_ok", label: "Exterior — no damage", isReceived: false },
+] as const;
+
+type CheckKey = (typeof RECEIVE_CHECKS)[number]["key"];
+
+const PDI_BADGE_LABEL: Record<string, string> = {
+  pending: "PDI pending",
+  in_progress: "PDI in progress",
+  done: "PDI done",
+};
+
 export default function OrderedCarsPage() {
   const router = useRouter();
   const supabase = createClient();
   const { canEditInventory } = useUser();
 
   const [cars, setCars] = useState<IncomingCar[]>([]);
+  const [awaitingPdi, setAwaitingPdi] = useState<AwaitingPdiCar[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [addOpen, setAddOpen] = useState(false);
-  const [busyId, setBusyId] = useState<string | null>(null);
 
   // Add-incoming-car form state
   const [vin, setVin] = useState("");
@@ -69,22 +104,88 @@ export default function OrderedCarsPage() {
   const [eta, setEta] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  // Receive-car dialog state
+  const [receivingCar, setReceivingCar] = useState<IncomingCar | null>(null);
+  const [checks, setChecks] = useState<Record<CheckKey, boolean>>({
+    vin_confirmed: false,
+    keys_received: false,
+    documents_received: false,
+    charger_received: false,
+    accessories_received: false,
+    exterior_ok: false,
+  });
+  const [damageNotes, setDamageNotes] = useState("");
+  const [missingNotes, setMissingNotes] = useState("");
+  const [receiving, setReceiving] = useState(false);
+
   const load = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
+
+    const inboundReq = supabase
       .from("cars")
       .select(
         "id, vin, brand, model, model_year, shipment_code, incoming_eta, notes"
       )
       .eq("status", "inbound")
       .is("deleted_at", null)
-      .order("incoming_eta", { ascending: true, nullsFirst: false });
-    if (error) {
-      toast.error(formatError(error));
+      .order("incoming_eta", { ascending: true, nullsFirst: false })
+      .limit(500);
+
+    const checksReq = supabase
+      .from("car_arrival_checks")
+      .select("car_id, has_issues, checked_at")
+      .order("checked_at", { ascending: false })
+      .limit(500);
+
+    const arrivedReq = supabase
+      .from("cars")
+      .select("id, vin, brand, model, model_year, date_arrived, pdi_status")
+      .eq("status", "inventory")
+      .neq("pdi_status", "done")
+      .is("deleted_at", null)
+      .limit(500);
+
+    const [inboundRes, checksRes, arrivedRes] = await Promise.all([
+      inboundReq,
+      checksReq,
+      arrivedReq,
+    ]);
+
+    if (inboundRes.error) {
+      toast.error(formatError(inboundRes.error));
       setCars([]);
     } else {
-      setCars((data as IncomingCar[]) ?? []);
+      setCars((inboundRes.data as IncomingCar[]) ?? []);
     }
+
+    if (checksRes.error || arrivedRes.error) {
+      toast.error(formatError(checksRes.error ?? arrivedRes.error));
+      setAwaitingPdi([]);
+    } else {
+      const checkRows =
+        (checksRes.data as { car_id: string; has_issues: boolean }[]) ?? [];
+      const issuesByCar = new Map<string, boolean>();
+      for (const row of checkRows) {
+        if (!issuesByCar.has(row.car_id)) {
+          issuesByCar.set(row.car_id, row.has_issues);
+        } else if (row.has_issues) {
+          issuesByCar.set(row.car_id, true);
+        }
+      }
+      const arrivedRows =
+        (arrivedRes.data as Omit<AwaitingPdiCar, "has_issues">[]) ?? [];
+      const awaiting = arrivedRows
+        .filter((c) => issuesByCar.has(c.id))
+        .map<AwaitingPdiCar>((c) => ({
+          ...c,
+          has_issues: issuesByCar.get(c.id) ?? false,
+        }))
+        .sort((a, b) =>
+          (b.date_arrived ?? "").localeCompare(a.date_arrived ?? "")
+        );
+      setAwaitingPdi(awaiting);
+    }
+
     setLoading(false);
   }, [supabase]);
 
@@ -179,25 +280,94 @@ export default function OrderedCarsPage() {
     void load();
   }
 
-  async function handleArrived(car: IncomingCar) {
-    if (!canEditInventory) return;
-    if (!confirm(`Mark VIN ${car.vin} as arrived? It will move into inventory.`))
+  function openReceive(car: IncomingCar) {
+    setReceivingCar(car);
+    setChecks({
+      vin_confirmed: false,
+      keys_received: false,
+      documents_received: false,
+      charger_received: false,
+      accessories_received: false,
+      exterior_ok: false,
+    });
+    setDamageNotes("");
+    setMissingNotes("");
+  }
+
+  function closeReceive() {
+    setReceivingCar(null);
+  }
+
+  async function handleReceive() {
+    if (!receivingCar || !canEditInventory) return;
+
+    const hasIssues = RECEIVE_CHECKS.some((c) => !checks[c.key]);
+
+    // Foolproof rule: an unchecked box must be explained in the matching note.
+    const missingUnchecked = RECEIVE_CHECKS.some(
+      (c) => c.isReceived && !checks[c.key]
+    );
+    if (missingUnchecked && !missingNotes.trim()) {
+      toast.error(
+        "Some items were not received — fill in the missing items notes."
+      );
       return;
-    setBusyId(car.id);
-    const { error } = await supabase
+    }
+    if (!checks.vin_confirmed && !missingNotes.trim()) {
+      toast.error(
+        "VIN does not match — explain it in the missing items notes."
+      );
+      return;
+    }
+    if (!checks.exterior_ok && !damageNotes.trim()) {
+      toast.error(
+        "Exterior is not clear — describe the damage in the damage notes."
+      );
+      return;
+    }
+
+    setReceiving(true);
+    const { data: { user } } = await supabase.auth.getUser();
+
+    const { error: checkError } = await supabase
+      .from("car_arrival_checks")
+      .insert({
+        car_id: receivingCar.id,
+        vin_confirmed: checks.vin_confirmed,
+        keys_received: checks.keys_received,
+        documents_received: checks.documents_received,
+        charger_received: checks.charger_received,
+        accessories_received: checks.accessories_received,
+        exterior_ok: checks.exterior_ok,
+        has_issues: hasIssues,
+        damage_notes: damageNotes.trim() || null,
+        missing_notes: missingNotes.trim() || null,
+        checked_by: user?.id ?? null,
+      });
+
+    if (checkError) {
+      setReceiving(false);
+      toast.error(formatError(checkError));
+      return;
+    }
+
+    const { error: carError } = await supabase
       .from("cars")
       .update({
         status: "inventory",
         date_arrived: new Date().toISOString().slice(0, 10),
       })
-      .eq("id", car.id);
-    setBusyId(null);
-    if (error) {
-      toast.error(formatError(error));
+      .eq("id", receivingCar.id);
+
+    setReceiving(false);
+    if (carError) {
+      toast.error(formatError(carError));
       return;
     }
-    toast.success(`${car.vin} marked as arrived`);
-    setCars((prev) => prev.filter((c) => c.id !== car.id));
+
+    toast.success(`${receivingCar.vin} received — now awaiting PDI`);
+    setReceivingCar(null);
+    void load();
   }
 
   return (
@@ -209,12 +379,15 @@ export default function OrderedCarsPage() {
             Ordered Cars
           </h1>
           <p className="text-muted-foreground text-sm">
-            Cars on order and inbound — shipment code, ETA and VIN. Mark each
-            one as arrived when it lands and it drops off the list.
+            Cars on order and inbound — shipment code, ETA and VIN. Receive each
+            one with the inspection checklist when it lands.
           </p>
         </div>
         {canEditInventory && (
-          <Button onClick={() => setAddOpen(true)}>
+          <Button
+            data-tour-id="ordered-cars-add"
+            onClick={() => setAddOpen(true)}
+          >
             <Plus className="mr-1.5 size-4" />
             Add incoming car
           </Button>
@@ -231,7 +404,7 @@ export default function OrderedCarsPage() {
         />
       </div>
 
-      <Card>
+      <Card data-tour-id="ordered-cars-in-transit">
         <CardContent className="p-0">
           {loading ? (
             <div className="space-y-2 p-4">
@@ -293,11 +466,11 @@ export default function OrderedCarsPage() {
                           </Button>
                           {canEditInventory && (
                             <Button
+                              data-tour-id="ordered-cars-receive"
                               size="sm"
-                              disabled={busyId === c.id}
-                              onClick={() => handleArrived(c)}
+                              onClick={() => openReceive(c)}
                             >
-                              {busyId === c.id ? "Saving…" : "Mark as arrived"}
+                              Receive car
                             </Button>
                           )}
                         </div>
@@ -310,6 +483,89 @@ export default function OrderedCarsPage() {
           )}
         </CardContent>
       </Card>
+
+      <div data-tour-id="ordered-cars-awaiting-pdi" className="space-y-3">
+        <div>
+          <h2 className="flex items-center gap-2 text-lg font-semibold">
+            <ClipboardCheck className="size-5" />
+            Awaiting PDI
+          </h2>
+          <p className="text-muted-foreground text-sm">
+            Cars that have been received but still need a PDI check before they
+            count as fleet-ready. Open a car to record its PDI.
+          </p>
+        </div>
+        <Card>
+          <CardContent className="p-0">
+            {loading ? (
+              <div className="space-y-2 p-4">
+                {Array.from({ length: 2 }).map((_, i) => (
+                  <Skeleton key={i} className="h-12 w-full" />
+                ))}
+              </div>
+            ) : awaitingPdi.length === 0 ? (
+              <p className="text-muted-foreground p-8 text-center text-sm">
+                No cars are waiting for a PDI check.
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead className="border-b text-left text-xs uppercase text-muted-foreground">
+                    <tr>
+                      <th className="px-3 py-2">VIN</th>
+                      <th className="px-3 py-2">Vehicle</th>
+                      <th className="px-3 py-2">Arrived</th>
+                      <th className="px-3 py-2">PDI status</th>
+                      <th className="px-3 py-2 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-border divide-y">
+                    {awaitingPdi.map((c) => (
+                      <tr key={c.id} className="hover:bg-muted/50">
+                        <td
+                          className="cursor-pointer px-3 py-2 font-mono"
+                          onClick={() => router.push(`/cars/${c.id}`)}
+                        >
+                          {c.vin}
+                        </td>
+                        <td className="px-3 py-2">
+                          {c.brand} {c.model}
+                          {c.model_year ? ` (${c.model_year})` : ""}
+                        </td>
+                        <td className="text-muted-foreground px-3 py-2">
+                          {c.date_arrived
+                            ? new Date(c.date_arrived).toLocaleDateString()
+                            : "—"}
+                        </td>
+                        <td className="px-3 py-2">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <Badge variant="secondary">
+                              {PDI_BADGE_LABEL[c.pdi_status ?? "pending"] ??
+                                "PDI pending"}
+                            </Badge>
+                            {c.has_issues && (
+                              <Badge variant="destructive">Issues noted</Badge>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => router.push(`/cars/${c.id}`)}
+                          >
+                            Open
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       <Dialog
         open={addOpen}
@@ -406,6 +662,82 @@ export default function OrderedCarsPage() {
             </Button>
             <Button onClick={handleAdd} disabled={submitting}>
               {submitting ? "Adding…" : "Add incoming car"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={receivingCar !== null}
+        onOpenChange={(o) => !o && closeReceive()}
+      >
+        <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Receive car — {receivingCar?.vin}
+            </DialogTitle>
+            <DialogDescription>
+              Go through the receiving inspection. Tick everything that is
+              correct; anything missing or damaged must be written down.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-3">
+              {RECEIVE_CHECKS.map((c) => (
+                <div key={c.key} className="flex items-center gap-2.5">
+                  <Checkbox
+                    id={`receive-${c.key}`}
+                    checked={checks[c.key]}
+                    onCheckedChange={(v) =>
+                      setChecks((prev) => ({ ...prev, [c.key]: v === true }))
+                    }
+                  />
+                  <Label
+                    htmlFor={`receive-${c.key}`}
+                    className="cursor-pointer text-sm font-normal"
+                  >
+                    {c.label}
+                  </Label>
+                </div>
+              ))}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="receive-damage">Damage notes</Label>
+              <Textarea
+                id="receive-damage"
+                value={damageNotes}
+                onChange={(e) => setDamageNotes(e.target.value)}
+                placeholder="Describe any exterior damage found."
+                rows={3}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="receive-missing">Missing items notes</Label>
+              <Textarea
+                id="receive-missing"
+                value={missingNotes}
+                onChange={(e) => setMissingNotes(e.target.value)}
+                placeholder="List anything that did not arrive (keys, documents, charger, accessories)."
+                rows={3}
+              />
+            </div>
+
+            <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
+              After receiving, this car still needs a PDI check before it counts
+              as fleet-ready.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={closeReceive}
+              disabled={receiving}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleReceive} disabled={receiving}>
+              {receiving ? "Saving…" : "Confirm receive"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -326,7 +326,7 @@ export default function PurchaseOrderDetailPage() {
                             size="icon-xs"
                             variant="ghost"
                             className="text-muted-foreground hover:text-destructive"
-                            onClick={() => void deleteLine(supabase, l.id, lines, setLines)}
+                            onClick={() => void deleteLine(supabase, po.id, l.id, lines, setLines)}
                           >
                             <Trash2 className="size-3.5" />
                           </Button>
@@ -620,6 +620,7 @@ export default function PurchaseOrderDetailPage() {
 
 async function deleteLine(
   supabase: ReturnType<typeof createClient>,
+  poId: string,
   id: string,
   lines: POLine[],
   setLines: (l: POLine[]) => void
@@ -629,7 +630,13 @@ async function deleteLine(
     toast.error(formatError(error));
     return;
   }
-  setLines(lines.filter((l) => l.id !== id));
+  const remaining = lines.filter((l) => l.id !== id);
+  setLines(remaining);
+  const newTotal = remaining.reduce((s, l) => s + Number(l.line_total ?? 0), 0);
+  await supabase
+    .from("purchase_orders")
+    .update({ estimated_total: newTotal })
+    .eq("id", poId);
 }
 
 function AddLineForm({
@@ -670,11 +677,24 @@ function AddLineForm({
       unit_cost: isNaN(uc) ? 0 : uc,
       note: note.trim() || null,
     });
-    setSubmitting(false);
     if (error) {
+      setSubmitting(false);
       toast.error(formatError(error));
       return;
     }
+    const { data: allLines } = await supabase
+      .from("purchase_order_lines")
+      .select("line_total")
+      .eq("po_id", poId);
+    const newTotal = ((allLines as { line_total: number }[]) ?? []).reduce(
+      (s, l) => s + Number(l.line_total ?? 0),
+      0
+    );
+    await supabase
+      .from("purchase_orders")
+      .update({ estimated_total: newTotal })
+      .eq("id", poId);
+    setSubmitting(false);
     setPartId("");
     setQuantity("1");
     setUnitCost("");

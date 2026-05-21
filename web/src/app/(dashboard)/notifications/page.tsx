@@ -171,10 +171,14 @@ export default function NotificationsPage() {
     return list;
   }, [items, tab, query]);
 
-  const unreadCount = useMemo(
-    () => items.filter((n) => !n.is_read).length,
-    [items]
-  );
+  const unreadCount = useMemo(() => {
+    const now = Date.now();
+    return items.filter(
+      (n) =>
+        !n.is_read &&
+        (!n.snoozed_until || new Date(n.snoozed_until).getTime() <= now)
+    ).length;
+  }, [items]);
 
   const allSelected =
     filtered.length > 0 && filtered.every((n) => selectedIds.has(n.id));
@@ -245,8 +249,8 @@ export default function NotificationsPage() {
     setSelectedIds(new Set(ids.filter((id) => !succeeded.has(id))));
   }
 
-  async function snooze(id: string, ms: number) {
-    const until = new Date(Date.now() + ms).toISOString();
+  async function snooze(id: string, getUntil: () => Date) {
+    const until = getUntil().toISOString();
     setBusy(true);
     const { error } = await supabase.rpc("snooze_notification", {
       p_id: id,
@@ -462,13 +466,20 @@ export default function NotificationsPage() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="start" className="w-40">
                               {[
-                                { label: "1 hour", ms: 60 * 60 * 1000 },
-                                { label: "Tomorrow 8am", ms: msUntilTomorrowMorning() },
-                                { label: "Next week", ms: 7 * 24 * 60 * 60 * 1000 },
+                                {
+                                  label: "1 hour",
+                                  getUntil: () => new Date(Date.now() + 60 * 60 * 1000),
+                                },
+                                { label: "Tomorrow 8am", getUntil: tomorrowMorning },
+                                {
+                                  label: "Next week",
+                                  getUntil: () =>
+                                    new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+                                },
                               ].map((opt) => (
                                 <DropdownMenuItem
                                   key={opt.label}
-                                  onSelect={() => void snooze(n.id, opt.ms)}
+                                  onSelect={() => void snooze(n.id, opt.getUntil)}
                                   className="text-xs"
                                 >
                                   {opt.label}
@@ -506,9 +517,11 @@ export default function NotificationsPage() {
   );
 }
 
-function msUntilTomorrowMorning(): number {
+// Always resolves to 08:00 on the next calendar day, computed at click time
+// so it cannot drift earlier than 8am the way an elapsed-duration would.
+function tomorrowMorning(): Date {
   const d = new Date();
   d.setDate(d.getDate() + 1);
   d.setHours(8, 0, 0, 0);
-  return Math.max(60 * 60 * 1000, d.getTime() - Date.now());
+  return d;
 }

@@ -150,7 +150,12 @@ export default function WarrantyPage() {
 
   const counts = useMemo(() => {
     const m: Record<string, number> = {};
-    rows.forEach((x) => (m[x.status] = (m[x.status] ?? 0) + 1));
+    rows.forEach((x) => {
+      // The "rejected" tab folds in cancelled rows — count them under that
+      // bucket so the badge matches the filtered list.
+      const key = x.status === "cancelled" ? "rejected" : x.status;
+      m[key] = (m[key] ?? 0) + 1;
+    });
     return m;
   }, [rows]);
 

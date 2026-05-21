@@ -9,6 +9,16 @@ let profilesCache: ProfileBasic[] | null = null;
 let cacheTime = 0;
 const CACHE_MS = 60_000;
 
+/**
+ * Drops the in-memory profile cache. Call this after a profile is created,
+ * renamed, or deactivated so name-based lookups don't keep routing to stale
+ * staff for up to the TTL window.
+ */
+export function invalidateProfilesCache(): void {
+  profilesCache = null;
+  cacheTime = 0;
+}
+
 export async function getAllProfiles(): Promise<ProfileBasic[]> {
   if (profilesCache && Date.now() - cacheTime < CACHE_MS) {
     return profilesCache;

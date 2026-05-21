@@ -3,6 +3,7 @@ import {
   getSessionUserAndRole,
   isGarageMgmtRole,
 } from "@/lib/server/session-app-role";
+import { toPublicApiError } from "@/lib/server/api-error";
 
 function isUuid(s: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -53,13 +54,12 @@ export async function GET(req: Request) {
     const { data, error } = await q;
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: toPublicApiError(error) }, { status: 500 });
     }
 
     return NextResponse.json({ tasks: data ?? [] });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Unknown error";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: toPublicApiError(e) }, { status: 500 });
   }
 }
 
@@ -114,7 +114,7 @@ export async function POST(req: Request) {
         .order("sort_order", { ascending: true });
 
       if (itemsErr) {
-        return NextResponse.json({ error: itemsErr.message }, { status: 500 });
+        return NextResponse.json({ error: toPublicApiError(itemsErr) }, { status: 500 });
       }
       if (!items?.length) {
         return NextResponse.json({ error: "Template has no items" }, { status: 400 });
@@ -122,7 +122,7 @@ export async function POST(req: Request) {
       for (const it of items) {
         rows.push({
           car_id: carId,
-          description: it.description,
+          description: (it.description ?? "").slice(0, 500),
           resource_type: it.default_resource_type ?? null,
           sort_order: it.sort_order ?? 0,
           created_by: session.userId,
@@ -172,12 +172,11 @@ export async function POST(req: Request) {
 
     if (error) {
       const code = error.code === "42501" ? 403 : 500;
-      return NextResponse.json({ error: error.message }, { status: code });
+      return NextResponse.json({ error: toPublicApiError(error) }, { status: code });
     }
 
     return NextResponse.json({ tasks: data ?? [] }, { status: 201 });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Unknown error";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: toPublicApiError(e) }, { status: 500 });
   }
 }

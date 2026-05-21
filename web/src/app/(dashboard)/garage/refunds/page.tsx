@@ -58,6 +58,12 @@ interface PartLite {
   name: string;
 }
 
+interface JobLite {
+  id: string;
+  title: string;
+  vin: string | null;
+}
+
 const STATUS_BUCKETS = [
   { id: "all", label: "All" },
   { id: "pending", label: "Pending" },
@@ -172,7 +178,12 @@ export default function RefundsPage() {
 
   const counts = useMemo(() => {
     const m: Record<string, number> = {};
-    rows.forEach((x) => (m[x.status] = (m[x.status] ?? 0) + 1));
+    rows.forEach((x) => {
+      // The "rejected" tab folds in cancelled rows — count them under that
+      // bucket so the badge matches the filtered list.
+      const key = x.status === "cancelled" ? "rejected" : x.status;
+      m[key] = (m[key] ?? 0) + 1;
+    });
     return m;
   }, [rows]);
 
@@ -337,6 +348,7 @@ function CreateRefundDialog({
 
   const [customers, setCustomers] = useState<CustomerLite[]>([]);
   const [parts, setParts] = useState<PartLite[]>([]);
+  const [jobs, setJobs] = useState<JobLite[]>([]);
 
   useEffect(() => {
     if (!open) return;
@@ -350,12 +362,24 @@ function CreateRefundDialog({
     setQuantity("1");
     setJobId("");
     void (async () => {
-      const [c, p] = await Promise.all([
+      const [c, p, j] = await Promise.all([
         supabase.from("customers_display").select("id, full_name").limit(2000),
         supabase.from("parts").select("id, name:part_name").limit(2000),
+        supabase
+          .from("garage_jobs")
+          .select("id, title, cars:car_id(vin)")
+          .order("created_at", { ascending: false })
+          .limit(500),
       ]);
       setCustomers(((c.data as CustomerLite[]) ?? []).sort((a, b) => (a.full_name ?? a.name ?? "").localeCompare(b.full_name ?? b.name ?? "")));
       setParts(((p.data as PartLite[]) ?? []).sort((a, b) => a.name.localeCompare(b.name)));
+      type JobRaw = { id: string; title: string; cars?: { vin?: string | null } | { vin?: string | null }[] | null };
+      setJobs(
+        ((j.data as JobRaw[]) ?? []).map((row) => {
+          const car = Array.isArray(row.cars) ? row.cars[0] : row.cars;
+          return { id: row.id, title: row.title, vin: car?.vin ?? null };
+        })
+      );
     })();
   }, [open, supabase, initialCustomerId]);
 
@@ -445,7 +469,20 @@ function CreateRefundDialog({
             </div>
             <div className="space-y-1">
               <Label>Linked job (optional)</Label>
-              <Input value={jobId} onChange={(e) => setJobId(e.target.value)} placeholder="Garage job UUID" />
+              <Select
+                value={jobId || "__none__"}
+                onValueChange={(v) => setJobId(v === "__none__" ? "" : v)}
+              >
+                <SelectTrigger><SelectValue placeholder="No linked job" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">No linked job</SelectItem>
+                  {jobs.map((j) => (
+                    <SelectItem key={j.id} value={j.id}>
+                      {j.title}{j.vin ? ` — ${j.vin}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 

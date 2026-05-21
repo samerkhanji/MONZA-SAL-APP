@@ -15,6 +15,13 @@ import { canPerform } from "@/lib/permissions";
 import { JOB_DOCUMENT_TYPES } from "@/lib/constants/jobs";
 import { Button } from "@/components/ui/button";
 import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -394,90 +401,93 @@ export function JobDocuments({ jobId, onDocumentsChange }: JobDocumentsProps) {
         )}
       </div>
 
-      {uploadOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-lg bg-background p-6">
-            <h3 className="mb-4 text-lg font-semibold">Upload Document</h3>
-            <div className="space-y-4">
-              <div>
-                <Label>Document Type *</Label>
-                <Select value={uploadType} onValueChange={setUploadType}>
-                  <SelectTrigger className="mt-1 min-h-11">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {JOB_DOCUMENT_TYPES.map((t) => (
-                      <SelectItem key={t.value} value={t.value}>
-                        {t.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>File *</Label>
-                <div
-                  className="mt-1 flex min-h-24 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/25 p-6 transition-colors hover:border-muted-foreground/50"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <input
-                    ref={fileInputRef}
-                    id="job-document-upload"
-                    name="job-document-upload"
-                    type="file"
-                    accept=".pdf,image/jpeg,image/png,image/webp"
-                    className="hidden"
-                    onChange={(e) =>
-                      setUploadFile(e.target.files?.[0] ?? null)
-                    }
-                  />
-                  {uploadFile ? (
-                    <p className="text-sm font-medium">{uploadFile.name}</p>
-                  ) : (
-                    <p className="text-muted-foreground text-sm">
-                      Tap to choose file
-                    </p>
-                  )}
-                  <p className="text-muted-foreground text-xs">
-                    PDF, JPEG, PNG, WebP · Max 10 MB
-                  </p>
-                </div>
-              </div>
-              <div>
-                <Label>Notes (optional)</Label>
-                <Textarea
-                  value={uploadNotes}
-                  onChange={(e) => setUploadNotes(e.target.value)}
-                  placeholder="Optional description"
-                  rows={2}
-                  className="mt-1"
+      <Dialog
+        open={uploadOpen}
+        onOpenChange={(open) => {
+          setUploadOpen(open);
+          if (!open) {
+            setUploadFile(null);
+            setUploadNotes("");
+            if (fileInputRef.current) fileInputRef.current.value = "";
+          }
+        }}
+      >
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Upload Document</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Document Type *</Label>
+              <Select value={uploadType} onValueChange={setUploadType}>
+                <SelectTrigger className="mt-1 min-h-11">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {JOB_DOCUMENT_TYPES.map((t) => (
+                    <SelectItem key={t.value} value={t.value}>
+                      {t.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>File *</Label>
+              <div
+                className="mt-1 flex min-h-24 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/25 p-6 transition-colors hover:border-muted-foreground/50"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <input
+                  ref={fileInputRef}
+                  id="job-document-upload"
+                  name="job-document-upload"
+                  type="file"
+                  accept=".pdf,image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)}
                 />
+                {uploadFile ? (
+                  <p className="text-sm font-medium">{uploadFile.name}</p>
+                ) : (
+                  <p className="text-muted-foreground text-sm">
+                    Tap to choose file
+                  </p>
+                )}
+                <p className="text-muted-foreground text-xs">
+                  PDF, JPEG, PNG, WebP · Max 10 MB
+                </p>
               </div>
             </div>
-            <div className="mt-6 flex gap-2">
-              <Button
-                variant="outline"
-                size="lg"
-                onClick={() => {
-                  setUploadOpen(false);
-                  setUploadFile(null);
-                  setUploadNotes("");
-                  if (fileInputRef.current) fileInputRef.current.value = "";
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                size="lg"
-                onClick={handleUpload}
-                disabled={!uploadFile || uploading}
-              >
-                {uploading ? "Uploading..." : "Upload"}
-              </Button>
+            <div>
+              <Label>Notes (optional)</Label>
+              <Textarea
+                value={uploadNotes}
+                onChange={(e) => setUploadNotes(e.target.value)}
+                placeholder="Optional description"
+                rows={2}
+                className="mt-1"
+              />
             </div>
           </div>
-        </div>
-      )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={() => setUploadOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="lg"
+              onClick={handleUpload}
+              disabled={!uploadFile || uploading}
+            >
+              {uploading ? "Uploading..." : "Upload"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

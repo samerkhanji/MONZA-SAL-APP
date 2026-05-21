@@ -15,6 +15,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ThemeToggle } from "@/components/theme-toggle";
 import { parseAuthErrorParams } from "@/lib/auth-utils";
 
+function validatePassword(pw: string): string | null {
+  if (pw.length < 8) return "Password must be at least 8 characters.";
+  if (!/[A-Za-z]/.test(pw) || !/[0-9]/.test(pw)) {
+    return "Password must contain at least one letter and one number.";
+  }
+  return null;
+}
+
 function friendlyExchangeError(err: { message?: string }): string {
   if (isPkceVerifierOrCrossDeviceError(err)) {
     return PASSWORD_RESET_CROSS_DEVICE_USER_MESSAGE;
@@ -198,8 +206,9 @@ function ResetPasswordInner() {
       return;
     }
 
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters");
+    const pwError = validatePassword(password);
+    if (pwError) {
+      setError(pwError);
       return;
     }
 
@@ -280,10 +289,13 @@ function ResetPasswordInner() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  minLength={6}
+                  minLength={8}
                   autoComplete="new-password"
                   disabled={loading || !recoveryReady}
                 />
+                <p className="text-xs text-muted-foreground">
+                  Minimum 8 characters, must contain at least one letter and one number.
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="confirm">Confirm password</Label>
@@ -294,7 +306,7 @@ function ResetPasswordInner() {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
-                  minLength={6}
+                  minLength={8}
                   autoComplete="new-password"
                   disabled={loading || !recoveryReady}
                 />

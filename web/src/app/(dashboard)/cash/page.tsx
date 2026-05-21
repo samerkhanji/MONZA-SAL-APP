@@ -185,14 +185,23 @@ function Body() {
   }, [load]);
 
   const totals = useMemo(() => {
-    const cashIn = openSessionMoves
+    // A cash session reconciles a single currency (cash_settings.currency).
+    // Summing movements logged in another currency would corrupt the
+    // expected total and the variance check, so only count matching-currency
+    // movements here. otherCurrencyCount surfaces any that were excluded.
+    const sessionCurrency = settings?.currency ?? "USD";
+    const inCurrency = openSessionMoves.filter(
+      (m) => (m.currency ?? "USD") === sessionCurrency
+    );
+    const otherCurrencyCount = openSessionMoves.length - inCurrency.length;
+    const cashIn = inCurrency
       .filter((m) => m.direction === "in")
       .reduce((s, m) => s + Number(m.amount), 0);
-    const cashOut = openSessionMoves
+    const cashOut = inCurrency
       .filter((m) => m.direction === "out")
       .reduce((s, m) => s + Number(m.amount), 0);
-    return { cashIn, cashOut, expected: cashIn - cashOut };
-  }, [openSessionMoves]);
+    return { cashIn, cashOut, expected: cashIn - cashOut, otherCurrencyCount };
+  }, [openSessionMoves, settings?.currency]);
 
   return (
     <div className="container space-y-6 py-6">
@@ -282,6 +291,16 @@ function Body() {
                 emphasize
               />
             </div>
+
+            {totals.otherCurrencyCount > 0 && (
+              <p className="flex items-center gap-1.5 text-xs text-amber-700 dark:text-amber-400">
+                <AlertTriangle className="size-3.5 shrink-0" />
+                {totals.otherCurrencyCount} movement
+                {totals.otherCurrencyCount === 1 ? " is" : "s are"} in another
+                currency and {totals.otherCurrencyCount === 1 ? "is" : "are"} not
+                included in the {settings?.currency ?? "USD"} totals above.
+              </p>
+            )}
 
             {openSessionMoves.length === 0 ? (
               <p className="text-muted-foreground text-sm">No movements yet.</p>
@@ -758,6 +777,7 @@ function ManualMovementDialog({
   const supabase = createClient();
   const [kind, setKind] = useState<string>("expense");
   const [direction, setDirection] = useState<"in" | "out">("out");
+  const [directionTouched, setDirectionTouched] = useState(false);
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -766,16 +786,18 @@ function ManualMovementDialog({
     if (open) {
       setKind("expense");
       setDirection("out");
+      setDirectionTouched(false);
       setAmount("");
       setNote("");
     }
   }, [open]);
 
   useEffect(() => {
-    // Sensible default direction per kind
+    // Sensible default direction per kind — but never override a manual choice.
+    if (directionTouched) return;
     if (kind === "expense" || kind === "refund") setDirection("out");
     else if (kind === "service_payment" || kind === "parts_payment") setDirection("in");
-  }, [kind]);
+  }, [kind, directionTouched]);
 
   async function submit() {
     const v = Number(amount);
@@ -834,7 +856,13 @@ function ManualMovementDialog({
               Direction *
               <FieldHint text="Whether cash is coming into the drawer or going out of it." />
             </Label>
-            <Select value={direction} onValueChange={(v) => setDirection(v as "in" | "out")}>
+            <Select
+              value={direction}
+              onValueChange={(v) => {
+                setDirectionTouched(true);
+                setDirection(v as "in" | "out");
+              }}
+            >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>

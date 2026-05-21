@@ -143,26 +143,60 @@ export function ImportPartsDialog({
     const { data: { user } } = await supabase.auth.getUser();
 
     let success = 0;
+    let failed = 0;
     for (const r of rows) {
-      const { error } = await supabase.from("parts").insert({
-        part_name: r.part_name ?? "",
-        oe_number: r.oe_number ?? null,
-        car_model: r.car_model ?? null,
-        quantity: typeof r.quantity === "number" ? r.quantity : 0,
-        min_quantity: typeof r.min_quantity === "number" ? r.min_quantity : 2,
-        storage_zone: r.storage_zone ?? null,
-        supplier: r.supplier ?? null,
-        unit_cost: r.unit_cost ?? null,
-        currency: r.currency ?? "USD",
-        order_date: r.order_date || null,
-        notes: r.notes ?? null,
-        created_by: user?.id ?? null,
-      });
-      if (!error) success++;
+      const qty = typeof r.quantity === "number" ? r.quantity : 0;
+      const { data: inserted, error } = await supabase
+        .from("parts")
+        .insert({
+          part_name: r.part_name ?? "",
+          oe_number: r.oe_number ?? null,
+          car_model: r.car_model ?? null,
+          quantity: qty,
+          min_quantity: typeof r.min_quantity === "number" ? r.min_quantity : 2,
+          storage_zone: r.storage_zone ?? null,
+          supplier: r.supplier ?? null,
+          unit_cost: r.unit_cost ?? null,
+          currency: r.currency ?? "USD",
+          order_date: r.order_date || null,
+          notes: r.notes ?? null,
+          created_by: user?.id ?? null,
+        })
+        .select("id")
+        .single();
+      if (error) {
+        failed++;
+        continue;
+      }
+      success++;
+      const partId = (inserted as { id?: string } | null)?.id;
+      if (partId && qty > 0) {
+        await supabase.from("part_movements").insert({
+          part_id: partId,
+          movement_type: "stock_in",
+          quantity: qty,
+          car_id: null,
+          job_description: null,
+          note: "Received — Excel import",
+          created_by: user?.id ?? null,
+        });
+      }
     }
 
     setImporting(false);
-    toast.success(`Imported ${success} parts successfully`);
+
+    if (success === 0) {
+      // Nothing was saved — keep the dialog open so the operator can retry
+      // or fix the file rather than silently losing the import.
+      toast.error(`Import failed — none of the ${rows.length} rows could be saved.`);
+      return;
+    }
+
+    if (failed > 0) {
+      toast.warning(`Imported ${success} of ${rows.length} parts — ${failed} failed.`);
+    } else {
+      toast.success(`Imported ${success} parts successfully`);
+    }
     onOpenChange(false);
     onSuccess();
   }

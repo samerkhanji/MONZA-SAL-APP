@@ -17,6 +17,7 @@ import {
   Clock,
   DollarSign,
   Package,
+  RefreshCw,
   TrendingUp,
   Users,
 } from "lucide-react";
@@ -224,14 +225,26 @@ function ReportsBody() {
 
   return (
     <div className="container space-y-6 py-6">
-      <div>
-        <h1 className="flex items-center gap-2 text-2xl font-semibold">
-          <ChartLine className="size-6" /> Reports
-        </h1>
-        <p className="text-muted-foreground text-sm">
-          Profit, sales-rep performance, inventory aging, aged receivables,
-          time-in-state. Live from the database.
-        </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="flex items-center gap-2 text-2xl font-semibold">
+            <ChartLine className="size-6" /> Reports
+          </h1>
+          <p className="text-muted-foreground text-sm">
+            Profit, sales-rep performance, inventory aging, aged receivables,
+            time-in-state. Live from the database.
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="shrink-0"
+          onClick={() => void load()}
+          disabled={loading}
+        >
+          <RefreshCw className={`mr-1 size-4 ${loading ? "animate-spin" : ""}`} aria-hidden />
+          Refresh
+        </Button>
       </div>
 
       {/* Top-of-page summary tiles */}

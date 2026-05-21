@@ -244,7 +244,8 @@ export default function CustomerDetailPage() {
   }
 
   async function fetchLegacyVehicles(fullName: string) {
-    if (!fullName.trim()) {
+    const normalizedName = fullName.trim().replace(/\s+/g, " ").toLowerCase();
+    if (!normalizedName) {
       setLegacyVehicles([]);
       return;
     }
@@ -253,6 +254,8 @@ export default function CustomerDetailPage() {
     // base cars table. Embedding sales_orders from a view isn't reliable in
     // PostgREST, so we fetch matching cars and the customer's orders
     // separately, then filter out cars that already have a sales order.
+    // Match is case-insensitive (ilike); a normalized client-side compare
+    // below also absorbs stray whitespace differences in stored names.
     const { data, error } = await supabase
       .from("cars_display")
       .select(
@@ -268,7 +271,7 @@ export default function CustomerDetailPage() {
         client_phone
       `
       )
-      .eq("client_name", fullName)
+      .ilike("client_name", fullName.trim())
       .is("deleted_at", null);
 
     if (error || !data) {
@@ -276,7 +279,7 @@ export default function CustomerDetailPage() {
       return;
     }
 
-    const rows = data as unknown as {
+    const allRows = data as unknown as {
       id: string;
       vin: string;
       brand: string;
@@ -287,6 +290,12 @@ export default function CustomerDetailPage() {
       client_name: string | null;
       client_phone: string | null;
     }[];
+
+    const rows = allRows.filter(
+      (r) =>
+        (r.client_name ?? "").trim().replace(/\s+/g, " ").toLowerCase() ===
+        normalizedName
+    );
 
     const carIds = rows.map((r) => r.id);
     const linkedCarIds = new Set<string>();
@@ -338,6 +347,37 @@ export default function CustomerDetailPage() {
       toast.error("You don't have permission to delete customers.");
       return;
     }
+
+    // Pre-check for related records the DB delete trigger doesn't cover
+    // (payment plans). Active sales orders are still blocked server-side
+    // via the customers delete trigger; this just surfaces a clear message
+    // before the request and stops payment plans being orphaned.
+    const [{ count: activeOrders }, { count: activePlans }] = await Promise.all([
+      supabase
+        .from("sales_orders")
+        .select("id", { count: "exact", head: true })
+        .eq("customer_id", customer.id)
+        .not("status", "in", "(cancelled,delivered)"),
+      supabase
+        .from("payment_plans")
+        .select("id", { count: "exact", head: true })
+        .eq("customer_id", customer.id)
+        .not("status", "in", "(completed,cancelled)"),
+    ]);
+    if ((activeOrders ?? 0) > 0 || (activePlans ?? 0) > 0) {
+      const parts: string[] = [];
+      if ((activeOrders ?? 0) > 0) {
+        parts.push(`${activeOrders} active sales order${(activeOrders ?? 0) === 1 ? "" : "s"}`);
+      }
+      if ((activePlans ?? 0) > 0) {
+        parts.push(`${activePlans} active payment plan${(activePlans ?? 0) === 1 ? "" : "s"}`);
+      }
+      toast.error(
+        `Cannot delete this customer — they still have ${parts.join(" and ")}. Cancel or complete them first.`
+      );
+      return;
+    }
+
     const res = await fetch(`/api/customers/${customer.id}`, {
       method: "DELETE",
       credentials: "include",
@@ -385,6 +425,25 @@ export default function CustomerDetailPage() {
     if (!customer) return;
     setStartSaleSubmitting(true);
     const sb = createClient();
+
+    // Guard against creating a duplicate order for a car that already has an
+    // active (non-cancelled) sales order — e.g. it's already reserved.
+    const { data: existingOrder } = await sb
+      .from("sales_orders")
+      .select("id, status")
+      .eq("car_id", carId)
+      .not("status", "eq", "cancelled")
+      .limit(1)
+      .maybeSingle();
+
+    if (existingOrder) {
+      setStartSaleSubmitting(false);
+      toast.error(
+        "This car already has an active sales order. Open that order instead of starting a new one."
+      );
+      return;
+    }
+
     const { data, error } = await sb
       .from("sales_orders")
       .insert({
@@ -485,8 +544,9 @@ export default function CustomerDetailPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Remove customer?</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to remove this customer? This action can be undone by an
-              admin.
+              This removes the customer from active lists. It is blocked if they
+              still have an active sales order or payment plan — cancel or
+              complete those first. The record can be restored by an admin.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

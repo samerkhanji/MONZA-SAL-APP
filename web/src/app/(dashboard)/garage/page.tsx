@@ -92,6 +92,7 @@ export default function GarageJobsPage() {
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search, 200);
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [pendingJobIds, setPendingJobIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (statusFromUrl && VALID_JOB_STATUSES.includes(statusFromUrl)) {
@@ -105,6 +106,7 @@ export default function GarageJobsPage() {
   const [cancelJobConfirm, setCancelJobConfirm] = useState<JobWithCar | null>(null);
   const [setCategoryFor, setSetCategoryFor] = useState<JobWithCar | null>(null);
   const dueTodayNotifiedRef = useRef(false);
+  const overtimeNotifiedRef = useRef<Set<string>>(new Set());
   const [preselectedCar, setPreselectedCar] = useState<{
     id: string;
     vin: string;
@@ -215,9 +217,13 @@ export default function GarageJobsPage() {
         j.status === "in_progress" &&
         (j.estimated_hours ?? 0) > 0 &&
         (j.actual_hours ?? 0) > (j.estimated_hours ?? 0) &&
-        !j.overtime_notified
+        !j.overtime_notified &&
+        !overtimeNotifiedRef.current.has(j.id)
     );
     for (const j of overtimeJobs) {
+      // Mark synchronously so a rapid re-run of this effect (before the
+      // DB `overtime_notified` write lands) won't fire a duplicate alert.
+      overtimeNotifiedRef.current.add(j.id);
       (async () => {
           const garageIds = await import("@/lib/user-lookup").then((m) =>
             m.getProfileIdsByCapability("garage")
@@ -295,6 +301,20 @@ export default function GarageJobsPage() {
   }, [jobs]);
 
   async function handleStatusChange(job: JobWithCar, newStatus: string) {
+    if (pendingJobIds.has(job.id)) return;
+    setPendingJobIds((prev) => new Set(prev).add(job.id));
+    try {
+      await runStatusChange(job, newStatus);
+    } finally {
+      setPendingJobIds((prev) => {
+        const next = new Set(prev);
+        next.delete(job.id);
+        return next;
+      });
+    }
+  }
+
+  async function runStatusChange(job: JobWithCar, newStatus: string) {
     const updates: Record<string, unknown> = { status: newStatus };
     if (newStatus === "in_progress" && !job.started_at) {
       updates.started_at = new Date().toISOString();
@@ -342,7 +362,9 @@ export default function GarageJobsPage() {
       return;
     }
 
-    if (newStatus === "done" && job.cars?.id) {
+    if (newStatus === "done" && job.cars?.id && job.cars.car_status === "service") {
+      // Only return the car to `available` if it is actually in a service
+      // status — never overwrite reserved / sold / recalled etc.
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -351,7 +373,7 @@ export default function GarageJobsPage() {
         await supabase.from("car_events").insert({
           car_id: job.cars.id,
           event_type: "status_changed",
-          from_value: "service",
+          from_value: job.cars.car_status,
           to_value: "available",
           note: `Job marked done from list: ${job.title}`,
           created_by: user.id,
@@ -592,6 +614,7 @@ export default function GarageJobsPage() {
               PRIORITY_BORDERS[job.priority] ?? "border-l-4 border-l-gray-300";
             const dueToday = isDueToday(job.due_date);
             const overtime = isOvertime(job);
+            const jobBusy = pendingJobIds.has(job.id);
             return (
               <div
                 key={job.id}
@@ -665,6 +688,7 @@ export default function GarageJobsPage() {
                           size="sm"
                           onClick={() => handleStatusChange(job, "in_progress")}
                           className="h-9"
+                          disabled={jobBusy}
                         >
                           Start
                         </Button>
@@ -675,6 +699,7 @@ export default function GarageJobsPage() {
                           variant="secondary"
                           onClick={() => setFinishJobOpen(job)}
                           className="h-9"
+                          disabled={jobBusy}
                         >
                           Finish
                         </Button>
@@ -685,8 +710,9 @@ export default function GarageJobsPage() {
                           variant="secondary"
                           onClick={() => handleStatusChange(job, "delivered")}
                           className="h-9"
+                          disabled={jobBusy}
                         >
-                          Delivered
+                          {jobBusy ? "Delivering…" : "Delivered"}
                         </Button>
                       )}
                       {job.status === "delivered" && (
@@ -703,7 +729,7 @@ export default function GarageJobsPage() {
                           }
                           void handleStatusChange(job, v);
                         }}
-                        disabled={!canManageGarage}
+                        disabled={!canManageGarage || jobBusy}
                       >
                         <SelectTrigger className="h-9 w-[160px]">
                           <SelectValue />
@@ -730,6 +756,7 @@ export default function GarageJobsPage() {
                         variant="outline"
                         onClick={() => router.push(`/garage/jobs/${job.id}`)}
                         className="h-9"
+                        disabled={jobBusy}
                       >
                         Open Job
                       </Button>

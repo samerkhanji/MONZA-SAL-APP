@@ -39,6 +39,21 @@ export function clearAuthSessionMarkers() {
   window.sessionStorage.removeItem(LAST_ACTIVITY_KEY);
 }
 
+/**
+ * Shared sign-out routine used by every sign-out control in the app so they
+ * behave identically: end the Supabase session, clear local markers, then do a
+ * hard navigation to `/` to guarantee no authenticated client state survives.
+ */
+export async function signOut() {
+  const { createClient } = await import("./supabase");
+  const supabase = createClient();
+  await supabase.auth.signOut();
+  clearAuthSessionMarkers();
+  if (typeof window !== "undefined") {
+    window.location.href = "/";
+  }
+}
+
 export function hasAuthSessionUnlocked(): boolean {
   if (typeof window === "undefined") return false;
   return window.sessionStorage.getItem(AUTH_UNLOCKED_KEY) === "1";

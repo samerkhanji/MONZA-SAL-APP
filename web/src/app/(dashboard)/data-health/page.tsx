@@ -185,7 +185,7 @@ function matchesSearch(
 function QuickFixCustomerPhone({ customerId, onSaved }: { customerId: string; onSaved: () => void }) {
   const [phone, setPhone] = useState("");
   const [saving, setSaving] = useState(false);
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   async function handleSave() {
     const trimmed = phone.trim();
     if (!trimmed) return;
@@ -221,7 +221,7 @@ function QuickFixCustomerPhone({ customerId, onSaved }: { customerId: string; on
 function QuickFixJobDiagnosis({ jobId, onSaved }: { jobId: string; onSaved: () => void }) {
   const [diagnosis, setDiagnosis] = useState("");
   const [saving, setSaving] = useState(false);
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   async function handleSave() {
     const trimmed = diagnosis.trim();
     if (!trimmed) return;
@@ -257,7 +257,7 @@ function QuickFixJobDiagnosis({ jobId, onSaved }: { jobId: string; onSaved: () =
 function QuickFixReservedBy({ carId, onSaved }: { carId: string; onSaved: () => void }) {
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   async function handleSave() {
     const trimmed = name.trim();
     if (!trimmed) return;
@@ -320,7 +320,7 @@ function SectionCard({
 
 export default function DataHealthPage() {
   const { appRole, profile } = useUser();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const [loading, setLoading] = useState(true);
   const [cars, setCars] = useState<CarRow[]>([]);
   const [salesOrders, setSalesOrders] = useState<SalesOrderRow[]>([]);
@@ -329,6 +329,7 @@ export default function DataHealthPage() {
   const [garageJobs, setGarageJobs] = useState<GarageJobRow[]>([]);
   const [parts, setParts] = useState<PartRow[]>([]);
   const [requests, setRequests] = useState<RequestRow[]>([]);
+  const [loadErrors, setLoadErrors] = useState<string[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [sectionFilter, setSectionFilter] = useState<string>("all");
@@ -359,35 +360,46 @@ export default function DataHealthPage() {
       }
 
       const [
-        { data: carsData },
-        { data: soData },
-        { data: custData },
-        { data: plansData },
-        { data: jobsData },
-        { data: partsData },
-        { data: reqData },
+        carsRes,
+        soRes,
+        custRes,
+        plansRes,
+        jobsRes,
+        partsRes,
+        reqRes,
       ] = await Promise.all([
-        supabase.from("cars_display").select(carSelect).is("deleted_at", null),
+        supabase.from("cars_display").select(carSelect).is("deleted_at", null).limit(10000),
         supabase
           .from("sales_orders")
           .select(
             "id, car_id, customer_id, selling_price, currency, sale_date, date_bought, delivery_date, reservation_date, status, created_at, updated_at"
           )
-          .not("status", "eq", "cancelled"),
-        supabase.from("customers").select("id, first_name, last_name, phone_primary, email, address, deleted_at, created_at, updated_at").is("deleted_at", null),
-        supabase.from("payment_plans").select("id, customer_id, car_id, status, total_amount, installments:installment_payments(due_date, status)"),
-        jobsQuery,
-        supabase.from("parts").select("id, part_name, oe_number, deleted_at").is("deleted_at", null),
-        reqQuery,
+          .not("status", "eq", "cancelled")
+          .limit(10000),
+        supabase.from("customers").select("id, first_name, last_name, phone_primary, email, address, deleted_at, created_at, updated_at").is("deleted_at", null).limit(10000),
+        supabase.from("payment_plans").select("id, customer_id, car_id, status, total_amount, installments:installment_payments(due_date, status)").limit(10000),
+        jobsQuery.limit(10000),
+        supabase.from("parts").select("id, part_name, oe_number, deleted_at").is("deleted_at", null).limit(10000),
+        reqQuery.limit(10000),
       ]);
 
-      setCars((carsData as CarRow[]) ?? []);
-      setSalesOrders((soData as SalesOrderRow[]) ?? []);
-      setCustomers((custData as CustomerRow[]) ?? []);
-      setPaymentPlans((plansData as PaymentPlanRow[]) ?? []);
-      setGarageJobs((jobsData as GarageJobRow[]) ?? []);
-      setParts((partsData as PartRow[]) ?? []);
-      setRequests((reqData as RequestRow[]) ?? []);
+      const errors: string[] = [];
+      if (carsRes.error) errors.push("Cars");
+      if (soRes.error) errors.push("Sales Orders");
+      if (custRes.error) errors.push("Customers");
+      if (plansRes.error) errors.push("Payment Plans");
+      if (jobsRes.error) errors.push("Garage Jobs");
+      if (partsRes.error) errors.push("Parts");
+      if (reqRes.error) errors.push("Requests");
+
+      setCars((carsRes.data as CarRow[]) ?? []);
+      setSalesOrders((soRes.data as SalesOrderRow[]) ?? []);
+      setCustomers((custRes.data as CustomerRow[]) ?? []);
+      setPaymentPlans((plansRes.data as PaymentPlanRow[]) ?? []);
+      setGarageJobs((jobsRes.data as GarageJobRow[]) ?? []);
+      setParts((partsRes.data as PartRow[]) ?? []);
+      setRequests((reqRes.data as RequestRow[]) ?? []);
+      setLoadErrors(errors);
       setLoading(false);
     }
     fetch();
@@ -495,19 +507,6 @@ export default function DataHealthPage() {
       const inst = p.installments ?? [];
       return inst.length === 0 || inst.some((i) => empty(i.due_date));
     });
-  }, [paymentPlans]);
-
-  // Overdue installments (due_date < today, status != paid)
-  const overdueInstallmentsCount = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    let count = 0;
-    for (const p of paymentPlans) {
-      const inst = p.installments ?? [];
-      for (const i of inst) {
-        if (i.due_date && i.due_date < today && (i as InstallmentRow).status !== "paid") count++;
-      }
-    }
-    return count;
   }, [paymentPlans]);
 
   // 8. Software health (IT)
@@ -619,7 +618,6 @@ export default function DataHealthPage() {
     ]
   );
   const carsMissingVin = useMemo(() => cars.filter((c) => empty(c.vin)), [cars]);
-  const criticalCount = soldCarsNoOrder.length + soNoCar.length + soNoCustomer.length + carsMissingVin.length + overdueInstallmentsCount;
 
   // Lookup maps for search
   const carById = useMemo(() => new Map(cars.map((c) => [c.id, c])), [cars]);
@@ -635,6 +633,41 @@ export default function DataHealthPage() {
     }
     return ids;
   }, [paymentPlans]);
+
+  // Critical count must stay consistent with the per-row severity used by
+  // isRowCritical / filterRowBySeverity, and only counts visible sections so
+  // warningCount = totalVisibleCount - criticalCount stays correct.
+  const criticalCount = useMemo(() => {
+    let count = 0;
+    if (visibleSections.includes("broken_relationships")) {
+      count += soldCarsNoOrder.length + soNoCar.length + soNoCustomer.length;
+    }
+    if (visibleSections.includes("cars_missing_data")) {
+      count += carsMissingData.filter((c) => empty(c.vin)).length;
+    }
+    if (visibleSections.includes("cars_missing_technical")) {
+      count += carsMissingTechnical.filter((c) => empty(c.vin)).length;
+    }
+    if (visibleSections.includes("sales_orders_missing_data")) {
+      count += soMissingData.filter(
+        (so) => empty(so.car_id) || empty(so.customer_id)
+      ).length;
+    }
+    if (visibleSections.includes("installment_data_missing")) {
+      count += plansMissingInstallments.filter((p) => planIdsWithOverdue.has(p.id)).length;
+    }
+    return count;
+  }, [
+    visibleSections,
+    soldCarsNoOrder.length,
+    soNoCar.length,
+    soNoCustomer.length,
+    carsMissingData,
+    carsMissingTechnical,
+    soMissingData,
+    plansMissingInstallments,
+    planIdsWithOverdue,
+  ]);
 
   function rowMatchesSearch(
     sectionId: DataHealthSectionId,
@@ -661,8 +694,7 @@ export default function DataHealthPage() {
 
   function isRowCritical(
     sectionId: DataHealthSectionId,
-    row: Record<string, unknown>,
-    subType?: "soldCar" | "soNoCar" | "soNoCustomer"
+    row: Record<string, unknown>
   ): boolean {
     if (sectionId === "broken_relationships") return true;
     if (sectionId === "cars_missing_data" || sectionId === "cars_missing_technical")
@@ -676,19 +708,17 @@ export default function DataHealthPage() {
 
   function getRowSeverityClass(
     sectionId: DataHealthSectionId,
-    row: Record<string, unknown>,
-    subType?: "soldCar" | "soNoCar" | "soNoCustomer"
+    row: Record<string, unknown>
   ): string {
-    return isRowCritical(sectionId, row, subType) ? "bg-destructive/10" : "bg-amber-500/10";
+    return isRowCritical(sectionId, row) ? "bg-destructive/10" : "bg-amber-500/10";
   }
 
   function filterRowBySeverity(
     sectionId: DataHealthSectionId,
-    row: Record<string, unknown>,
-    subType?: "soldCar" | "soNoCar" | "soNoCustomer"
+    row: Record<string, unknown>
   ): boolean {
     if (severityFilter === "all") return true;
-    const critical = isRowCritical(sectionId, row, subType);
+    const critical = isRowCritical(sectionId, row);
     if (severityFilter === "critical") return critical;
     if (severityFilter === "warning") return !critical;
     return true;
@@ -924,6 +954,19 @@ export default function DataHealthPage() {
             : `Showing data health for: ${roleLabel}`}
         </p>
       </div>
+
+      {loadErrors.length > 0 && (
+        <div
+          role="alert"
+          className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950/30 dark:text-amber-300"
+        >
+          <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
+          <div>
+            <p className="font-medium">Some data couldn&apos;t load.</p>
+            <p>Affected: {loadErrors.join(", ")}. Counts below may be incomplete — refresh to retry.</p>
+          </div>
+        </div>
+      )}
 
       {/* Global Critical / Warning indicator */}
       <div className="flex flex-wrap gap-4" data-tour-id="data-health-severity-totals">
@@ -1349,7 +1392,7 @@ export default function DataHealthPage() {
                       </TableHeader>
                       <TableBody>
                         {filteredSold.map((c) => (
-                          <TableRow key={c.id} className={getRowSeverityClass("broken_relationships", c, "soldCar")}>
+                          <TableRow key={c.id} className={getRowSeverityClass("broken_relationships", c)}>
                             <TableCell className="font-mono text-sm">{c.vin ?? "—"}</TableCell>
                             <TableCell>{c.brand} {c.model}</TableCell>
                             <TableCell><Badge variant="outline">{c.status}</Badge></TableCell>
@@ -1372,7 +1415,7 @@ export default function DataHealthPage() {
                       </TableHeader>
                       <TableBody>
                         {filteredSoNoCar.map((so) => (
-                          <TableRow key={so.id} className={getRowSeverityClass("broken_relationships", so, "soNoCar")}>
+                          <TableRow key={so.id} className={getRowSeverityClass("broken_relationships", so)}>
                             <TableCell className="font-mono text-sm">{so.id.slice(0, 8)}…</TableCell>
                             <TableCell><ActionButtons isSalesOrder soCarId={so.car_id ?? undefined} soCustomerId={so.customer_id ?? undefined} /></TableCell>
                           </TableRow>
@@ -1393,7 +1436,7 @@ export default function DataHealthPage() {
                       </TableHeader>
                       <TableBody>
                         {filteredSoNoCust.map((so) => (
-                          <TableRow key={so.id} className={getRowSeverityClass("broken_relationships", so, "soNoCustomer")}>
+                          <TableRow key={so.id} className={getRowSeverityClass("broken_relationships", so)}>
                             <TableCell className="font-mono text-sm">{so.id.slice(0, 8)}…</TableCell>
                             <TableCell><ActionButtons isSalesOrder soCarId={so.car_id ?? undefined} soCustomerId={so.customer_id ?? undefined} /></TableCell>
                           </TableRow>

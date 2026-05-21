@@ -212,9 +212,9 @@ export default function JobDetailPage() {
 
   async function handleAddPart() {
     if (!selectedPartId || !job) return;
-    const qty = parseInt(partQuantity, 10);
-    if (isNaN(qty) || qty < 1) {
-      toast.error("Enter valid quantity");
+    const qty = Number(partQuantity);
+    if (!Number.isInteger(qty) || qty < 1) {
+      toast.error("Enter a whole number quantity of 1 or more");
       return;
     }
     setPartSubmitting(true);
@@ -522,10 +522,15 @@ export default function JobDetailPage() {
                   checked={item.done}
                   disabled={!(canEditJob || canGarageStaffEditLimited)}
                   onChange={async (e) => {
-                    const next = (job.work_checklist ?? []).map((x) =>
-                      x.id === item.id ? { ...x, done: e.target.checked } : x
-                    );
-                    setJob({ ...job, work_checklist: next });
+                    const checked = e.target.checked;
+                    let next = job.work_checklist ?? [];
+                    setJob((prev) => {
+                      if (!prev) return prev;
+                      next = (prev.work_checklist ?? []).map((x) =>
+                        x.id === item.id ? { ...x, done: checked } : x
+                      );
+                      return { ...prev, work_checklist: next };
+                    });
                     const { error } = await supabase
                       .from("garage_jobs")
                       .update({ work_checklist: next })
@@ -773,8 +778,10 @@ export default function JobDetailPage() {
                   <Input
                     id="add-part-quantity"
                     name="add-part-quantity"
-                    type="number" inputMode="decimal"
+                    type="number"
+                    inputMode="numeric"
                     min={1}
+                    step={1}
                     value={partQuantity}
                     onChange={(e) => setPartQuantity(e.target.value)}
                     className="mt-1"

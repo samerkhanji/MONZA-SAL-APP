@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
+import { safeRedirectTo } from "@/lib/auth-utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,7 +35,7 @@ export default function MfaChallengePage() {
 function MfaChallengeInner() {
   const router = useRouter();
   const params = useSearchParams();
-  const redirectTo = params.get("redirectTo") ?? "/";
+  const redirectTo = safeRedirectTo(params.get("redirectTo"), "/");
 
   const [factorId, setFactorId] = useState<string | null>(null);
   const [challengeId, setChallengeId] = useState<string | null>(null);
@@ -64,7 +65,7 @@ function MfaChallengeInner() {
       const verified = (factors?.totp ?? []).find((f) => f.status === "verified");
       if (!verified) {
         // No factor enrolled → straight through.
-        window.location.href = redirectTo.startsWith("/") ? redirectTo : "/";
+        window.location.href = redirectTo;
         return;
       }
 
@@ -107,7 +108,7 @@ function MfaChallengeInner() {
       return;
     }
     toast.success("Verified");
-    window.location.href = redirectTo.startsWith("/") ? redirectTo : "/";
+    window.location.href = redirectTo;
   }
 
   return (

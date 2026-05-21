@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
@@ -31,8 +31,16 @@ interface DocumentAccessRequest {
 interface CustomerSearchResult {
   id: string;
   full_name: string | null;
+  first_name: string | null;
+  last_name: string | null;
   phone_primary: string | null;
   phone_secondary: string | null;
+}
+
+function customerDisplayName(c: CustomerSearchResult): string {
+  if (c.full_name && c.full_name.trim()) return c.full_name.trim();
+  const combined = `${c.first_name ?? ""} ${c.last_name ?? ""}`.trim();
+  return combined || "Unnamed customer";
 }
 
 type SearchMode = "vin" | "customer";
@@ -83,7 +91,7 @@ export default function DocumentsPage() {
     }
   }, [vinFromUrl, isOwner]);
 
-  async function fetchAccessRequests() {
+  const fetchAccessRequests = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     const { data } = await supabase
@@ -92,11 +100,11 @@ export default function DocumentsPage() {
       .eq("requested_by", user.id)
       .order("created_at", { ascending: false });
     setAccessRequests((data as DocumentAccessRequest[]) ?? []);
-  }
+  }, [supabase]);
 
   useEffect(() => {
     if (!isOwner && profile) fetchAccessRequests();
-  }, [isOwner, profile?.id]);
+  }, [isOwner, profile, fetchAccessRequests]);
 
   async function handleSearch(e?: React.FormEvent, overrideVin?: string) {
     e?.preventDefault();
@@ -161,7 +169,8 @@ export default function DocumentsPage() {
     fetchAccessRequests();
   }
 
-  async function handleViewApproved(vin: string) {
+  async function handleViewApproved(vinInput: string) {
+    const vin = vinInput.trim().toUpperCase();
     setMode("vin");
     setVinSearch(vin);
     setLoading(true);
@@ -406,7 +415,7 @@ export default function DocumentsPage() {
                 <p className="text-sm text-muted-foreground">
                   Documents for{" "}
                   <span className="font-medium text-foreground">
-                    {selectedCustomer.full_name ?? "Unnamed customer"}
+                    {customerDisplayName(selectedCustomer)}
                   </span>
                   {selectedCustomer.phone_primary
                     ? ` — ${selectedCustomer.phone_primary}`
@@ -461,7 +470,7 @@ export default function DocumentsPage() {
                       >
                         <div>
                           <p className="font-medium">
-                            {c.full_name ?? "Unnamed customer"}
+                            {customerDisplayName(c)}
                           </p>
                           <p className="text-muted-foreground text-sm">
                             {c.phone_primary ?? "No phone"}

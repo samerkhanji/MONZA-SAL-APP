@@ -49,6 +49,7 @@ export default function GarageWorkflowSettingsPage() {
   const supabase = createClient();
 
   const [caps, setCaps] = useState<CapRow[]>([]);
+  const [capDrafts, setCapDrafts] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
 
@@ -57,8 +58,7 @@ export default function GarageWorkflowSettingsPage() {
 
   const [newTplOpen, setNewTplOpen] = useState(false);
   const [newTplName, setNewTplName] = useState("");
-  const [newItemTplId, setNewItemTplId] = useState<string | null>(null);
-  const [newItemDesc, setNewItemDesc] = useState("");
+  const [newItemDescByTpl, setNewItemDescByTpl] = useState<Record<string, string>>({});
   const [tplToDelete, setTplToDelete] = useState<{ id: string; name: string } | null>(null);
 
   const loadCapacities = useCallback(async () => {
@@ -68,7 +68,11 @@ export default function GarageWorkflowSettingsPage() {
       toast.error(j?.error ?? "Failed to load capacities");
       return;
     }
-    setCaps((j.capacities as CapRow[]) ?? []);
+    const rows = (j.capacities as CapRow[]) ?? [];
+    setCaps(rows);
+    setCapDrafts(
+      Object.fromEntries(rows.map((c) => [c.resource_name, String(c.capacity)]))
+    );
   }, []);
 
   const loadTemplates = useCallback(async () => {
@@ -191,7 +195,7 @@ export default function GarageWorkflowSettingsPage() {
   }
 
   async function addItem(templateId: string) {
-    const desc = newItemDesc.trim();
+    const desc = (newItemDescByTpl[templateId] ?? "").trim();
     if (!desc) return;
     const list = itemsByTpl[templateId] ?? [];
     const { error } = await supabase.from("garage_task_template_items").insert({
@@ -204,8 +208,7 @@ export default function GarageWorkflowSettingsPage() {
       toast.error(formatError(error));
       return;
     }
-    setNewItemDesc("");
-    setNewItemTplId(null);
+    setNewItemDescByTpl((prev) => ({ ...prev, [templateId]: "" }));
     await loadTemplates();
   }
 
@@ -290,8 +293,13 @@ export default function GarageWorkflowSettingsPage() {
                         type="number" inputMode="decimal"
                         min={0}
                         className="w-28"
-                        key={`${c.resource_name}-${c.capacity}`}
-                        defaultValue={c.capacity}
+                        value={capDrafts[c.resource_name] ?? String(c.capacity)}
+                        onChange={(e) =>
+                          setCapDrafts((prev) => ({
+                            ...prev,
+                            [c.resource_name]: e.target.value,
+                          }))
+                        }
                         id={`cap-${c.resource_name}`}
                         disabled={saving === c.resource_name}
                       />
@@ -299,12 +307,12 @@ export default function GarageWorkflowSettingsPage() {
                         type="button"
                         size="sm"
                         disabled={saving === c.resource_name}
-                        onClick={() => {
-                          const el = document.getElementById(
-                            `cap-${c.resource_name}`
-                          ) as HTMLInputElement | null;
-                          if (el) void saveCapacity(c.resource_name, el.value);
-                        }}
+                        onClick={() =>
+                          void saveCapacity(
+                            c.resource_name,
+                            capDrafts[c.resource_name] ?? String(c.capacity)
+                          )
+                        }
                       >
                         {saving === c.resource_name ? (
                           <Loader2 className="size-4 animate-spin" />
@@ -385,19 +393,18 @@ export default function GarageWorkflowSettingsPage() {
               <div data-tour-id="settings-template-add-line" className="flex flex-col gap-2 sm:flex-row">
                 <Input
                   placeholder="New line description"
-                  value={newItemTplId === t.id ? newItemDesc : ""}
-                  onChange={(e) => {
-                    setNewItemTplId(t.id);
-                    setNewItemDesc(e.target.value);
-                  }}
+                  value={newItemDescByTpl[t.id] ?? ""}
+                  onChange={(e) =>
+                    setNewItemDescByTpl((prev) => ({
+                      ...prev,
+                      [t.id]: e.target.value,
+                    }))
+                  }
                 />
                 <Button
                   type="button"
                   size="sm"
-                  onClick={() => {
-                    setNewItemTplId(t.id);
-                    void addItem(t.id);
-                  }}
+                  onClick={() => void addItem(t.id)}
                 >
                   Add line
                 </Button>

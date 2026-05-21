@@ -21,6 +21,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Play, Square, ClipboardList } from "lucide-react";
@@ -54,7 +64,7 @@ function statusBadgeVariant(s: string): "default" | "secondary" | "destructive" 
 }
 
 export default function GarageTasksBoardPage() {
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const { appRole, profile } = useUser();
   const canManage = appRole === "owner" || appRole === "garage_manager";
 
@@ -71,6 +81,7 @@ export default function GarageTasksBoardPage() {
   const [tplCarId, setTplCarId] = useState("");
   const [tplTemplateId, setTplTemplateId] = useState("");
   const [tplSubmitting, setTplSubmitting] = useState(false);
+  const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null);
 
   const loadTasks = useCallback(async () => {
     const res = await fetch("/api/garage/tasks", { credentials: "include" });
@@ -205,7 +216,6 @@ export default function GarageTasksBoardPage() {
 
   async function deleteTask(id: string) {
     if (!canManage) return;
-    if (!confirm("Delete this task?")) return;
     const res = await fetch(`/api/garage/tasks/${id}`, { method: "DELETE", credentials: "include" });
     const j = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -440,7 +450,7 @@ export default function GarageTasksBoardPage() {
                             </Button>
                           )}
                           {canManage ? (
-                            <Button type="button" size="sm" variant="destructive" onClick={() => void deleteTask(t.id)}>
+                            <Button type="button" size="sm" variant="destructive" onClick={() => setDeleteTaskId(t.id)}>
                               Delete
                             </Button>
                           ) : null}
@@ -454,6 +464,33 @@ export default function GarageTasksBoardPage() {
           })}
         </div>
       )}
+
+      <AlertDialog
+        open={deleteTaskId !== null}
+        onOpenChange={(open) => !open && setDeleteTaskId(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this task?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The task will be permanently removed from the board.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteTaskId) {
+                  void deleteTask(deleteTaskId);
+                  setDeleteTaskId(null);
+                }
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

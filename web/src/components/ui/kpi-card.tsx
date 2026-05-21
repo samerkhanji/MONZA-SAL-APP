@@ -10,9 +10,10 @@ interface KpiCardProps {
   color: "amber" | "green" | "red";
   onClick?: () => void;
   className?: string;
+  tourId?: string;
 }
 
-export function KpiCard({ label, value, icon: Icon, color, onClick, className }: KpiCardProps) {
+export function KpiCard({ label, value, icon: Icon, color, onClick, className, tourId }: KpiCardProps) {
   const content = (
     <>
       <div
@@ -47,11 +48,20 @@ export function KpiCard({ label, value, icon: Icon, color, onClick, className }:
 
   if (onClick) {
     return (
-      <button type="button" onClick={onClick} className={cn(baseClasses, "text-left")}>
+      <button
+        type="button"
+        onClick={onClick}
+        className={cn(baseClasses, "text-left")}
+        data-tour-id={tourId}
+      >
         {content}
       </button>
     );
   }
 
-  return <div className={baseClasses}>{content}</div>;
+  return (
+    <div className={baseClasses} data-tour-id={tourId}>
+      {content}
+    </div>
+  );
 }

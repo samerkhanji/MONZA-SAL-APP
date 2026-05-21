@@ -3,6 +3,7 @@ import {
   getSessionUserAndRole,
   isGarageMgmtRole,
 } from "@/lib/server/session-app-role";
+import { toPublicApiError } from "@/lib/server/api-error";
 import type { AppRole } from "@/lib/permissions";
 
 function isUuid(s: string): boolean {
@@ -120,25 +121,32 @@ export async function PATCH(
       patch.completed_at = new Date().toISOString();
     }
 
-    const { data, error } = await session.supabase
+    let updateQuery = session.supabase
       .from("garage_tasks")
       .update(patch)
-      .eq("id", id)
-      .select()
-      .maybeSingle();
+      .eq("id", id);
+    // Fold the staff ownership check into the write so the check and update
+    // are atomic — no TOCTOU window for a reassignment between them.
+    if (isStaff) {
+      updateQuery = updateQuery.eq("assigned_to", session.userId);
+    }
+
+    const { data, error } = await updateQuery.select().maybeSingle();
 
     if (error) {
       const code = error.code === "42501" ? 403 : 400;
-      return NextResponse.json({ error: error.message }, { status: code });
+      return NextResponse.json({ error: toPublicApiError(error) }, { status: code });
     }
     if (!data) {
-      return NextResponse.json({ error: "Task not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: isStaff ? "Forbidden" : "Task not found" },
+        { status: isStaff ? 403 : 404 }
+      );
     }
 
     return NextResponse.json({ task: data });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Unknown error";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: toPublicApiError(e) }, { status: 500 });
   }
 }
 
@@ -164,12 +172,11 @@ export async function DELETE(
 
     if (error) {
       const code = error.code === "42501" ? 403 : 500;
-      return NextResponse.json({ error: error.message }, { status: code });
+      return NextResponse.json({ error: toPublicApiError(error) }, { status: code });
     }
 
     return NextResponse.json({ ok: true });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Unknown error";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: toPublicApiError(e) }, { status: 500 });
   }
 }

@@ -140,6 +140,7 @@ export default function SalesOrderDetailPage() {
   const [deliveryNotes, setDeliveryNotes] = useState("");
   const [voidOpen, setVoidOpen] = useState(false);
   const [voidReason, setVoidReason] = useState("");
+  const [deliverOpen, setDeliverOpen] = useState(false);
 
   const fetchOrder = useCallback(async () => {
     setLoading(true);
@@ -229,6 +230,7 @@ export default function SalesOrderDetailPage() {
   }
 
   async function saveDeposit() {
+    if (!order) return;
     const amt = parseFloat(depositAmount);
     if (isNaN(amt) || amt <= 0) {
       toast.error("Enter a positive deposit amount");
@@ -250,34 +252,54 @@ export default function SalesOrderDetailPage() {
       );
       return;
     }
+    // Auto-advance a draft order to 'reserved' once a deposit is recorded.
+    const willAdvance = order.status === "draft";
+    const nextStatus: SaleStatus = willAdvance ? "reserved" : order.status;
     const ok = await patchOrder({
       deposit_amount: amt,
       deposit_currency: orderCurrency,
       currency: orderCurrency,
       deposit_method: depositMethod || null,
-      deposit_paid_at: order?.deposit_paid_at ?? new Date().toISOString(),
-      // Auto-advance status
-      status: order?.status === "draft" ? ("reserved" as SaleStatus) : order!.status,
+      deposit_paid_at: order.deposit_paid_at ?? new Date().toISOString(),
+      status: nextStatus,
     });
-    if (ok) toast.success("Deposit recorded");
+    if (ok) {
+      toast.success(
+        willAdvance
+          ? 'Deposit recorded — order status advanced to "reserved".'
+          : "Deposit recorded"
+      );
+    }
   }
 
   async function saveContract() {
+    if (!order) return;
     const trimmed = contractUrl.trim();
     if (trimmed && !/^https?:\/\/[^\s]+$/i.test(trimmed)) {
       toast.error("Contract URL must start with http:// or https://");
       return;
     }
+    // Recording a signed contract advances draft/reserved orders to 'confirmed'.
+    const willAdvance =
+      !!trimmed && (order.status === "draft" || order.status === "reserved");
+    const nextStatus: SaleStatus = willAdvance ? "confirmed" : order.status;
     const ok = await patchOrder({
       signed_contract_url: trimmed || null,
       contract_signed_at: trimmed ? new Date().toISOString() : null,
-      status: order?.status === "draft" || order?.status === "reserved" ? ("confirmed" as SaleStatus) : order!.status,
+      status: nextStatus,
     });
-    if (ok) toast.success(trimmed ? "Contract recorded" : "Contract cleared");
+    if (ok) {
+      toast.success(
+        !trimmed
+          ? "Contract cleared"
+          : willAdvance
+            ? 'Contract recorded — order status advanced to "confirmed".'
+            : "Contract recorded"
+      );
+    }
   }
 
   async function markDelivered() {
-    if (!confirm("Mark this sale as delivered? This is the final step and will set the customer to converted.")) return;
     setSaving(true);
     try {
       const { error } = await supabase.rpc("complete_delivery", {
@@ -289,6 +311,7 @@ export default function SalesOrderDetailPage() {
         return;
       }
       toast.success("Delivered. Customer marked as converted.");
+      setDeliverOpen(false);
     } finally {
       // Always refetch — even on error the RPC may have partially applied
       // (e.g. updated the order but failed to insert the car_event row).
@@ -700,7 +723,7 @@ export default function SalesOrderDetailPage() {
                 />
               </div>
               <Button
-                onClick={markDelivered}
+                onClick={() => setDeliverOpen(true)}
                 disabled={!canEdit || saving}
                 className="bg-green-600 hover:bg-green-700"
               >
@@ -824,6 +847,40 @@ export default function SalesOrderDetailPage() {
             >
               {saving && <Loader2 className="mr-2 size-4 animate-spin" aria-hidden />}
               Void sale
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delivery confirmation — replaces the old window.confirm(). Marking
+          delivered is irreversible and auto-converts the customer. */}
+      <Dialog open={deliverOpen} onOpenChange={(open) => !saving && setDeliverOpen(open)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Mark this sale as delivered?</DialogTitle>
+            <DialogDescription>
+              This is the final step. It stamps the delivery time, advances the
+              order status to <span className="font-mono">delivered</span>, and
+              sets the customer&apos;s lead status to{" "}
+              <span className="font-mono">converted</span>. It can only be
+              reversed via the &quot;Void sale&quot; action.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setDeliverOpen(false)}
+              disabled={saving}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={markDelivered}
+              disabled={saving}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              {saving && <Loader2 className="mr-2 size-4 animate-spin" aria-hidden />}
+              Mark delivered
             </Button>
           </DialogFooter>
         </DialogContent>

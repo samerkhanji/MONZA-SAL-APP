@@ -2,6 +2,7 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { tryCreateAdminClient } from "@/lib/supabase/admin";
 import { getSessionUserAndRole } from "@/lib/server/session-app-role";
+import { toPublicApiError } from "@/lib/server/api-error";
 
 function constantTimeEqualSecret(a: string, b: string): boolean {
   try {
@@ -92,7 +93,7 @@ export async function POST(request: NextRequest) {
     const { data, error: listError } = await admin.auth.admin.listUsers({ page, perPage });
     if (listError) {
       return NextResponse.json(
-        { error: listError.message || "Failed to list users." },
+        { error: toPublicApiError(listError) },
         { status: 500 }
       );
     }
@@ -107,7 +108,12 @@ export async function POST(request: NextRequest) {
   }
 
   if (!userId) {
-    return NextResponse.json({ error: "No user found with that email." }, { status: 404 });
+    // Generic message + status so a non-existent account is indistinguishable
+    // from an account this tool refuses to act on (user-enumeration defense).
+    return NextResponse.json(
+      { error: "Unable to reset password for that account." },
+      { status: 400 }
+    );
   }
 
   // Never reset an owner account through this tool. Owner-account recovery
@@ -119,9 +125,11 @@ export async function POST(request: NextRequest) {
     .eq("id", userId)
     .maybeSingle();
   if ((targetProfile as { user_role?: string } | null)?.user_role === "owner") {
+    // Same generic response as a non-existent account: never confirm whether
+    // a given email maps to an (owner) account (user-enumeration defense).
     return NextResponse.json(
-      { error: "Owner accounts cannot be reset here. Use the Supabase dashboard." },
-      { status: 403 }
+      { error: "Unable to reset password for that account." },
+      { status: 400 }
     );
   }
 
@@ -131,7 +139,7 @@ export async function POST(request: NextRequest) {
 
   if (updateError) {
     return NextResponse.json(
-      { error: updateError.message || "Failed to update password." },
+      { error: toPublicApiError(updateError) },
       { status: 400 }
     );
   }

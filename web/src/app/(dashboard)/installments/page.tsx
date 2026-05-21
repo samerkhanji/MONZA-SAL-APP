@@ -112,6 +112,7 @@ export default function InstallmentsPage() {
   const [loading, setLoading] = useState(true);
   const [installments, setInstallments] = useState<InstallmentWithRelations[]>([]);
   const [plans, setPlans] = useState<PlanWithRelations[]>([]);
+  const [profileNames, setProfileNames] = useState<Record<string, string>>({});
 
   const [markPaidOpen, setMarkPaidOpen] = useState(false);
   const [selectedInstallment, setSelectedInstallment] = useState<InstallmentWithRelations | null>(null);
@@ -172,6 +173,10 @@ export default function InstallmentsPage() {
   const [newPlanDown, setNewPlanDown] = useState("");
   const [newPlanMonths, setNewPlanMonths] = useState("");
   const [newPlanMonthly, setNewPlanMonthly] = useState("");
+  // Tracks whether the user typed the monthly amount themselves. While false,
+  // the monthly amount is kept in sync with total/down/months so the plan
+  // total can't silently disagree with the schedule.
+  const [newPlanMonthlyEdited, setNewPlanMonthlyEdited] = useState(false);
   const [newPlanStartDate, setNewPlanStartDate] = useState("");
   const [newPlanDueDay, setNewPlanDueDay] = useState("");
   const [newPlanInterestRate, setNewPlanInterestRate] = useState("");
@@ -237,12 +242,17 @@ export default function InstallmentsPage() {
     async function loadData() {
       setLoading(true);
 
-      const [{ data: installmentsData }, { data: plansData }, { data: customersData }, { data: carsData }] =
-        await Promise.all([
-          supabase
-            .from("installment_payments")
-            .select(
-              `
+      const [
+        { data: installmentsData },
+        { data: plansData },
+        { data: customersData },
+        { data: carsData },
+        { data: profilesData },
+      ] = await Promise.all([
+        supabase
+          .from("installment_payments")
+          .select(
+            `
           *,
           plan:payment_plans(
             *,
@@ -250,25 +260,33 @@ export default function InstallmentsPage() {
             car:cars(*)
           )
         `
-            ),
-          supabase
-            .from("payment_plans")
-            .select(
-              `
+          ),
+        supabase
+          .from("payment_plans")
+          .select(
+            `
           *,
           customer:customers(*),
           car:cars(*),
           installments:installment_payments(*)
         `
-            ),
-          supabase.from("customers").select("*").order("first_name"),
-          supabase.from("cars").select("*").order("model"),
-        ]);
+          ),
+        supabase.from("customers").select("*").order("first_name"),
+        supabase.from("cars").select("*").order("model"),
+        supabase.from("profiles").select("id, full_name"),
+      ]);
 
       setInstallments((installmentsData as InstallmentWithRelations[]) || []);
       setPlans((plansData as PlanWithRelations[]) || []);
       setCustomers((customersData as Customer[]) || []);
       setCars((carsData as Car[]) || []);
+      setProfileNames(
+        Object.fromEntries(
+          ((profilesData as { id: string; full_name: string | null }[]) ?? []).map(
+            (p) => [p.id, p.full_name ?? "Unknown"]
+          )
+        )
+      );
       setLoading(false);
     }
 
@@ -309,18 +327,21 @@ export default function InstallmentsPage() {
   );
 
   useEffect(() => {
+    // Keep the monthly amount in sync with total/down/months until the user
+    // overrides it manually. This recomputes when any input changes so the
+    // plan total stays consistent with the generated schedule.
+    if (newPlanMonthlyEdited) return;
     const total = parseFloat(newPlanTotal || "0");
     const down = parseFloat(newPlanDown || "0");
     const months = parseInt(newPlanMonths || "0", 10);
     if (total > 0 && months > 0 && down >= 0 && down <= total) {
       const base = (total - down) / months;
       if (!Number.isNaN(base) && base > 0) {
-        if (!newPlanMonthly || Number(newPlanMonthly) === 0) {
-          setNewPlanMonthly(base.toFixed(2));
-        }
+        const next = base.toFixed(2);
+        setNewPlanMonthly((prev) => (prev === next ? prev : next));
       }
     }
-  }, [newPlanTotal, newPlanDown, newPlanMonths, newPlanMonthly]);
+  }, [newPlanTotal, newPlanDown, newPlanMonths, newPlanMonthlyEdited]);
 
   const overview = useMemo(() => {
     const now = new Date();
@@ -412,6 +433,7 @@ export default function InstallmentsPage() {
     setNewPlanDown("");
     setNewPlanMonths("");
     setNewPlanMonthly("");
+    setNewPlanMonthlyEdited(false);
     setNewPlanStartDate("");
     setNewPlanDueDay("");
   }
@@ -636,10 +658,13 @@ export default function InstallmentsPage() {
     setMarkPaidOpen(false);
     setSelectedInstallment(null);
 
-    const { data: refreshed } = await supabase
-      .from("installment_payments")
-      .select(
-        `
+    // Refetch installments AND plans — the payment RPC can complete a plan
+    // server-side, so the Plans tab status/progress must be refreshed too.
+    const [{ data: refreshed }, { data: refreshedPlans }] = await Promise.all([
+      supabase
+        .from("installment_payments")
+        .select(
+          `
         *,
         plan:payment_plans(
           *,
@@ -647,8 +672,22 @@ export default function InstallmentsPage() {
           car:cars(*)
         )
       `
-      );
+        ),
+      supabase
+        .from("payment_plans")
+        .select(
+          `
+        *,
+        customer:customers(*),
+        car:cars(*),
+        installments:installment_payments(*)
+      `
+        ),
+    ]);
     setInstallments((refreshed as InstallmentWithRelations[]) || []);
+    if (refreshedPlans) {
+      setPlans(refreshedPlans as PlanWithRelations[]);
+    }
   }
 
   if (loading) {
@@ -1403,7 +1442,11 @@ export default function InstallmentsPage() {
                         {currencyFormatter.format(i.paid_amount || 0)}
                       </TableCell>
                       <TableCell>{i.payment_method || "—"}</TableCell>
-                      <TableCell>—</TableCell>
+                      <TableCell>
+                        {i.marked_paid_by
+                          ? profileNames[i.marked_paid_by] ?? "Unknown"
+                          : "—"}
+                      </TableCell>
                     </TableRow>
                   ))}
                   {paidInstallments.length === 0 && (
@@ -2219,7 +2262,9 @@ export default function InstallmentsPage() {
                           date_of_birth: newCustDateOfBirth || null,
                           preferred_language:
                             newCustPreferredLanguage || "en",
-                          lead_status: "converted",
+                          // Stays "interested" until the plan row is actually
+                          // created — converted is set after create_payment_plan.
+                          lead_status: "interested",
                           lead_source: newCustLeadSource || null,
                           address: newCustAddress.trim() || null,
                           notes: newCustNotes.trim() || null,
@@ -2229,8 +2274,18 @@ export default function InstallmentsPage() {
                         .single();
                       setNewCustSubmitting(false);
                       if (error || !data) {
+                        const isDuplicate =
+                          error?.code === "23505" ||
+                          (error?.message ?? "")
+                            .toLowerCase()
+                            .includes("duplicate") ||
+                          (error?.message ?? "")
+                            .toLowerCase()
+                            .includes("unique");
                         toast.error(
-                          `Failed to create customer: ${error?.message ?? "Unknown error"}`
+                          isDuplicate
+                            ? "A customer with these details already exists."
+                            : `Failed to create customer: ${error?.message ?? "Unknown error"}`
                         );
                         return;
                       }
@@ -2441,7 +2496,10 @@ export default function InstallmentsPage() {
                     <Label>Monthly Amount *</Label>
                     <Input
                       value={newPlanMonthly}
-                      onChange={(e) => setNewPlanMonthly(e.target.value)}
+                      onChange={(e) => {
+                        setNewPlanMonthly(e.target.value);
+                        setNewPlanMonthlyEdited(true);
+                      }}
                       type="number" inputMode="decimal"
                       min={0}
                       step="0.01"

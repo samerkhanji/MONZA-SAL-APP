@@ -157,7 +157,12 @@ export default function PurchaseOrdersPage() {
 
   const counts = useMemo(() => {
     const c: Record<string, number> = {};
-    pos.forEach((p) => (c[p.status] = (c[p.status] ?? 0) + 1));
+    pos.forEach((p) => {
+      // The "cancelled" tab folds in rejected POs — count them under that
+      // bucket so the badge matches the filtered list.
+      const key = p.status === "rejected" ? "cancelled" : p.status;
+      c[key] = (c[key] ?? 0) + 1;
+    });
     return c;
   }, [pos]);
 

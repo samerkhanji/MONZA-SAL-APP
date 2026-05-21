@@ -1,10 +1,15 @@
 #!/usr/bin/env node
 /**
- * Bulk-set every Supabase Auth user’s password to a temporary value (service role).
+ * Bulk-reset every Supabase Auth user’s password to a unique random temporary
+ * value (service role), and flag each profile so the user must change it on
+ * next login.
  *
  * SAFETY:
  *   - Default is --dry-run (no updates). Use --confirm to apply.
  *   - Requires NEXT_PUBLIC_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY in the environment.
+ *   - Each user gets a DIFFERENT random strong password — there is no shared
+ *     default. The per-user passwords are written to the CSV report so the
+ *     operator can distribute them (and/or via --send-email).
  *
  * Run (from repo root, Node 20.6+ for --env-file):
  *   node --env-file=web/.env.local scripts/bulk-reset-passwords.mjs
@@ -13,7 +18,6 @@
  *   node --env-file=web/.env.local scripts/bulk-reset-passwords.mjs --confirm --send-email
  *
  * Env (optional):
- *   BULK_RESET_TEMP_PASSWORD   default: Temp123! (must meet Supabase Auth password policy)
  *   RESEND_API_KEY             required if --send-email
  *   RESEND_FROM_EMAIL          required if --send-email
  *
@@ -22,11 +26,14 @@
  *      npm run bulk-reset-passwords -- --confirm --send-email
  *
  * Output: ./scripts/bulk-reset-passwords-report.csv (override with BULK_RESET_CSV_PATH)
+ *         The CSV contains the plaintext temporary passwords — treat it as a
+ *         secret and delete it once passwords have been distributed.
  */
 
 import { createClient } from "@supabase/supabase-js";
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { randomBytes, randomInt } from "node:crypto";
 
 const RESEND_URL = "https://api.resend.com/emails";
 
@@ -43,6 +50,32 @@ function csvEscape(s) {
   const t = String(s ?? "");
   if (/[",\n\r]/.test(t)) return `"${t.replace(/"/g, '""')}"`;
   return t;
+}
+
+/**
+ * Generate a unique, strong temporary password. Uses crypto-random bytes and
+ * guarantees at least one lowercase, uppercase, digit and symbol so it meets
+ * any reasonable Supabase Auth password policy.
+ */
+function generateTempPassword() {
+  const lower = "abcdefghijkmnpqrstuvwxyz";
+  const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const digits = "23456789";
+  const symbols = "!@#$%^&*";
+  const all = lower + upper + digits + symbols;
+  const length = 20;
+
+  const pick = (set) => set[randomInt(set.length)];
+  const chars = [pick(lower), pick(upper), pick(digits), pick(symbols)];
+  const bytes = randomBytes(length - chars.length);
+  for (const b of bytes) chars.push(all[b % all.length]);
+
+  // Fisher–Yates shuffle so the guaranteed chars aren't always in front.
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = randomInt(i + 1);
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+  return chars.join("");
 }
 
 function escapeHtml(s) {
@@ -103,7 +136,6 @@ async function main() {
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
-  const tempPassword = process.env.BULK_RESET_TEMP_PASSWORD?.trim() || "Temp123!";
   const csvPath =
     process.env.BULK_RESET_CSV_PATH?.trim() ||
     resolve(process.cwd(), "scripts", "bulk-reset-passwords-report.csv");
@@ -130,7 +162,7 @@ async function main() {
       ? "MODE: APPLY (passwords will be changed)"
       : "MODE: DRY-RUN (no password changes; add --confirm to apply)"
   );
-  console.log(`Temporary password template: ${tempPassword === "Temp123!" ? "Temp123! (default)" : "(custom)"}`);
+  console.log("Each user receives a unique random temporary password (see CSV report).");
   if (sendEmail) console.log("Email: will notify via Resend after each successful update.");
   console.log(`CSV output: ${csvPath}\n`);
 
@@ -141,7 +173,7 @@ async function main() {
   const users = await fetchAllUsers(admin);
   console.log(`Found ${users.length} user(s).\n`);
 
-  const rows = [["email", "user_id", "status", "email_sent", "error_message"]];
+  const rows = [["email", "user_id", "temp_password", "status", "email_sent", "error_message"]];
   const resendKey = process.env.RESEND_API_KEY?.trim();
   const resendFrom = process.env.RESEND_FROM_EMAIL?.trim();
 
@@ -149,24 +181,35 @@ async function main() {
     const email = (u.email ?? "").trim();
     const id = u.id;
     if (!email) {
-      rows.push([csvEscape(""), csvEscape(id), "skipped_no_email", "no", ""]);
+      rows.push([csvEscape(""), csvEscape(id), "", "skipped_no_email", "no", ""]);
       continue;
     }
 
     if (!actuallyRun) {
-      rows.push([csvEscape(email), csvEscape(id), "dry_run", "no", ""]);
+      rows.push([csvEscape(email), csvEscape(id), "", "dry_run", "no", ""]);
       console.log(`[dry-run] ${email}`);
       continue;
     }
+
+    const tempPassword = generateTempPassword();
 
     const { error: updErr } = await admin.auth.admin.updateUserById(id, {
       password: tempPassword,
     });
 
     if (updErr) {
-      rows.push([csvEscape(email), csvEscape(id), "error", "no", csvEscape(updErr.message)]);
+      rows.push([csvEscape(email), csvEscape(id), "", "error", "no", csvEscape(updErr.message)]);
       console.error(`[error] ${email}: ${updErr.message}`);
       continue;
+    }
+
+    // Force the user to set their own password on next login.
+    const { error: flagErr } = await admin
+      .from("profiles")
+      .update({ must_change_password: true })
+      .eq("id", id);
+    if (flagErr) {
+      console.error(`[warn] ${email}: password reset but must_change_password not set: ${flagErr.message}`);
     }
 
     let emailSent = "no";
@@ -192,9 +235,10 @@ async function main() {
     rows.push([
       csvEscape(email),
       csvEscape(id),
+      csvEscape(tempPassword),
       "updated",
       emailSent,
-      csvEscape(emailErr),
+      csvEscape(flagErr ? `must_change_password not set: ${flagErr.message}` : emailErr),
     ]);
   }
 

@@ -4,6 +4,7 @@ import {
   validatePasswordResetRedirectUrl,
 } from "@/lib/auth-app-url";
 import { tryCreateAdminClient } from "@/lib/supabase/admin";
+import { toPublicApiError } from "@/lib/server/api-error";
 
 /**
  * **Does not send email.** Returns GoTrue’s `action_link` for debugging or for a custom mailer /
@@ -50,7 +51,7 @@ export async function POST(request: NextRequest) {
 
   if (error) {
     return NextResponse.json(
-      { error: error.message, code: (error as { code?: string }).code },
+      { error: toPublicApiError(error), code: (error as { code?: string }).code },
       { status: 400 }
     );
   }

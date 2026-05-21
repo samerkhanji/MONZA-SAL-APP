@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { format, formatDistanceToNow, subMonths } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import {
   Bar,
   BarChart,
@@ -29,7 +29,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { CAR_STATUS_LABELS } from "@/types/database";
 import { refreshOwnerOverview } from "./actions";
 
 const CHART_COLORS = [
@@ -60,20 +59,6 @@ function carStatusFill(statusLabel: string): string {
   return CHART_COLORS[4];
 }
 
-/**
- * Illustrative last-6-month curve; latest month equals totalVehicles from the same load as KPIs.
- * Replace with real time-series when available.
- */
-function buildCarsOverTimeFromFleetTotal(totalVehicles: number): { month: string; total: number }[] {
-  const now = new Date();
-  return [5, 4, 3, 2, 1, 0].map((back) => {
-    const d = subMonths(now, back);
-    const t = (5 - back) / 5;
-    const total = Math.max(0, Math.round(totalVehicles * (0.72 + 0.28 * t)));
-    return { month: format(d, "MMM yyyy"), total };
-  });
-}
-
 const CAR_STATUS_CHART_TYPES = ["bar", "pie", "donut", "horizontal", "line"] as const;
 type CarStatusChartType = (typeof CAR_STATUS_CHART_TYPES)[number];
 
@@ -96,6 +81,7 @@ export type OwnerOverviewData = {
     openWarrantyCases: number;
   };
   carStatusChart: { name: string; count: number }[];
+  carsAddedPerMonth: { month: string; count: number }[];
   activeGarageTasks: number;
   requestPriorityChart: { name: string; count: number }[];
   installmentsDueSoon: {
@@ -232,19 +218,15 @@ function MoneyStack({
 function CarsByStatusChartCard({
   rows,
   totalVehicles,
-  soldCarsCount,
+  carsAddedPerMonth,
 }: {
   rows: { name: string; count: number }[];
   totalVehicles: number;
-  soldCarsCount: number;
+  carsAddedPerMonth: { month: string; count: number }[];
 }) {
   const [chartType, setChartType] = useState<CarStatusChartType>("bar");
   const carsByStatusData = useMemo(() => rows.filter((d) => d.count > 0), [rows]);
   const pieData = carsByStatusData;
-  const carsOverTime = useMemo(
-    () => buildCarsOverTimeFromFleetTotal(totalVehicles),
-    [totalVehicles]
-  );
   const chartKey = `${chartType}-${rows.map((r) => `${r.name}:${r.count}`).join("|")}-${totalVehicles}`;
 
   return (
@@ -254,15 +236,17 @@ function CarsByStatusChartCard({
           <div className="min-w-0 flex-1 space-y-1.5">
             <CardTitle className="text-lg">Cars by status</CardTitle>
             <CardDescription>
-              Same scope as the inventory list: all rows from{" "}
-              <code className="text-xs">cars_display</code>.
               {chartType === "line" ? (
-                <span className="mt-1 block text-xs">
-                  Line shows an illustrative 6‑month curve ending at the current fleet total (
-                  {totalVehicles} vehicles, {soldCarsCount} sold). Replace with real history when
-                  available.
-                </span>
-              ) : null}
+                <>
+                  Cars added per month over the last 6 months, bucketed by{" "}
+                  <code className="text-xs">date_bought</code> (or arrival date when not set).
+                </>
+              ) : (
+                <>
+                  Same scope as the inventory list: all rows from{" "}
+                  <code className="text-xs">cars_display</code>.
+                </>
+              )}
             </CardDescription>
           </div>
           <div
@@ -294,15 +278,15 @@ function CarsByStatusChartCard({
         ) : chartType === "line" ? (
           <div className="h-[320px] w-full min-w-0">
             <ResponsiveContainer width="100%" height={320}>
-              <LineChart key={chartKey} data={carsOverTime} margin={{ left: 8, right: 16, top: 8, bottom: 8 }}>
+              <LineChart key={chartKey} data={carsAddedPerMonth} margin={{ left: 8, right: 16, top: 8, bottom: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                 <XAxis dataKey="month" tick={{ fontSize: 11 }} className="text-muted-foreground" />
                 <YAxis allowDecimals={false} className="text-xs" />
                 <Tooltip contentStyle={tooltipContentStyle} />
                 <Line
                   type="monotone"
-                  dataKey="total"
-                  name="Total vehicles"
+                  dataKey="count"
+                  name="Cars added"
                   stroke="hsl(var(--primary))"
                   strokeWidth={2}
                   dot={{ fill: "hsl(var(--primary))", r: 4 }}
@@ -686,8 +670,6 @@ export function OverviewDashboard({ data }: { data: OwnerOverviewData }) {
   const [pending, startTransition] = useTransition();
 
   const totalVehicles = data.summary.totalCars;
-  const soldCarsCount =
-    data.carStatusChart.find((r) => r.name === CAR_STATUS_LABELS.sold)?.count ?? 0;
 
   const revenueMTDUSD = data.salesMTD.revenueByCurrency["USD"] ?? 0;
 
@@ -859,7 +841,7 @@ export function OverviewDashboard({ data }: { data: OwnerOverviewData }) {
         <CarsByStatusChartCard
           rows={data.carStatusChart}
           totalVehicles={totalVehicles}
-          soldCarsCount={soldCarsCount}
+          carsAddedPerMonth={data.carsAddedPerMonth}
         />
 
         <Card>

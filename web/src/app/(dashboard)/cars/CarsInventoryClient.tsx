@@ -391,13 +391,21 @@ export function CarsInventoryClient({
   const supabase = createClient();
 
   async function handleVinScan(vin: string) {
-    const { data: car } = await supabase
+    const normalizedVin = vin.trim().toUpperCase();
+    // Use limit(1) + maybeSingle so a duplicate-VIN data anomaly still opens
+    // a car instead of throwing a misleading "No car found" error.
+    const { data: car, error } = await supabase
       .from("cars")
       .select("id, vin, brand, model")
-      .eq("vin", vin.trim().toUpperCase())
+      .eq("vin", normalizedVin)
       .is("deleted_at", null)
-      .single();
+      .limit(1)
+      .maybeSingle();
 
+    if (error) {
+      toast.error(`Could not look up VIN ${vin}: ${error.message}`);
+      return;
+    }
     if (!car) {
       toast.error(`No car found with VIN: ${vin}`);
       return;
@@ -421,19 +429,15 @@ export function CarsInventoryClient({
     setDeleteError(null);
     setDeleteLoading(true);
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user?.email) {
-      setDeleteLoading(false);
-      toast.error("Unable to verify current user. Please sign in again.");
-      return;
-    }
-
-    const { error: authError } = await supabase.auth.signInWithPassword({
-      email: user.email,
-      password: deletePassword,
+    const verifyRes = await fetch("/api/auth/verify-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ password: deletePassword }),
     });
+    const verifyBody = await verifyRes.json().catch(() => ({}));
 
-    if (authError) {
+    if (!verifyBody?.ok) {
       setDeleteLoading(false);
       setDeleteError("Incorrect password");
       return;
@@ -992,7 +996,7 @@ export function CarsInventoryClient({
                         key={car.id}
                         className="cursor-pointer odd:bg-gray-50 even:bg-white"
                         title={pendingDeletes[car.id] ? "Pending delete request" : undefined}
-                        onClick={() => router.push(`/cars/${encodeURIComponent(car.vin ?? car.id)}`)}
+                        onClick={() => router.push(`/cars/${encodeURIComponent(car.id)}`)}
                       >
                         <td title={car.vin ?? ""} className={`${CARS_TD} font-mono`}>
                           {car.vin ?? "—"}
@@ -1091,7 +1095,7 @@ export function CarsInventoryClient({
                               title="Open documents & files"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                router.push(`/cars/${encodeURIComponent(car.vin ?? car.id)}`);
+                                router.push(`/cars/${encodeURIComponent(car.id)}`);
                               }}
                             >
                               <FileText className="size-3.5" />
@@ -1104,14 +1108,14 @@ export function CarsInventoryClient({
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" side="left" sideOffset={4}>
                                 <DropdownMenuItem
-                                  onClick={() => router.push(`/cars/${encodeURIComponent(car.vin ?? car.id)}`)}
+                                  onClick={() => router.push(`/cars/${encodeURIComponent(car.id)}`)}
                                   data-tour-id="cars-list-row-actions-view"
                                 >
                                   View profile
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
                                   onClick={() =>
-                                    router.push(`/cars/${encodeURIComponent(car.vin ?? car.id)}`)
+                                    router.push(`/cars/${encodeURIComponent(car.id)}`)
                                   }
                                   data-tour-id="cars-list-row-actions-documents"
                                 >
@@ -1215,7 +1219,7 @@ export function CarsInventoryClient({
               Re-enter your password below to confirm.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          {(isOwner || profile?.user_role === "owner") ? (
+          {canDeleteCar ? (
             <div className="space-y-2">
               <Label htmlFor="delete-password">Password</Label>
               <Input
@@ -1232,14 +1236,14 @@ export function CarsInventoryClient({
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">
-              Only owners can delete vehicles.
+              You don&apos;t have permission to delete vehicles.
             </p>
           )}
           <AlertDialogFooter>
             <AlertDialogCancel data-tour-id="cars-list-delete-cancel">Cancel</AlertDialogCancel>
             <Button
               variant="destructive"
-              disabled={deleteLoading || !deletePassword || !(isOwner || profile?.user_role === "owner")}
+              disabled={deleteLoading || !deletePassword || !canDeleteCar}
               onClick={() => {
                 void handleDeleteCar();
               }}

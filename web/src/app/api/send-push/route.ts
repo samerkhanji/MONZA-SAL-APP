@@ -8,7 +8,14 @@ const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
 
 // Roles that may fan out push notifications to arbitrary users.
 // Everyone else can only push to themselves (e.g. a test).
-const BROADCAST_ROLES = new Set(["owner", "assistant", "hybrid", "it", "garage_manager"]);
+const BROADCAST_ROLES = new Set([
+  "owner",
+  "assistant",
+  "hybrid",
+  "khalil_hybrid",
+  "it",
+  "garage_manager",
+]);
 
 function configureWebPush(): { ok: true } | { ok: false; error: string } {
   if (!VAPID_PUBLIC_KEY?.trim() || !VAPID_PRIVATE_KEY?.trim()) {

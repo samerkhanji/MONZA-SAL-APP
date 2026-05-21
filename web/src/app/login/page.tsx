@@ -119,6 +119,7 @@ function LoginForm() {
         owner: "/dashboard",
         assistant: "/assistant-dashboard",
         hybrid: "/requests",
+        khalil_hybrid: "/requests",
         it: "/requests",
         garage_manager: "/garage",
         garage_staff: "/garage",

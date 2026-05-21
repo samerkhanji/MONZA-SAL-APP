@@ -312,14 +312,33 @@ export default function RequestCenterPage() {
     sortBy,
   ]);
 
-  function getSendToForUserId(userId: string): string | null {
+  /**
+   * Resolves the recipient's app role so request routing can key off
+   * owner-vs-assistant instead of hard-coded names. Returns null if the
+   * recipient's role can't be determined (treated as a non-owner employee).
+   */
+  async function getRecipientRole(userId: string): Promise<AppRole | null> {
+    const { data } = await supabase
+      .from("profiles")
+      .select("user_role")
+      .eq("id", userId)
+      .maybeSingle();
+    return (data as { user_role: AppRole | null } | null)?.user_role ?? null;
+  }
+
+  /**
+   * Builds the value stored in the `requests.send_to` column. This is a
+   * display/filter label consumed by other pages and is intentionally kept
+   * separate from the role-based routing decision above.
+   */
+  function getSendToLabelForUserId(userId: string): string {
     const p = allProfiles.find((pr) => pr.id === userId);
-    if (!p?.full_name) return null;
+    if (!p?.full_name) return "employee";
     const name = p.full_name.toLowerCase();
     if (name.includes("houssam")) return "houssam";
     if (name.includes("kareem")) return "kareem";
     if (name.includes("samer")) return "samer";
-    return null;
+    return "employee";
   }
 
   const requestExportColumns: ExportColumn[] = [
@@ -362,19 +381,19 @@ export default function RequestCenterPage() {
 
     setNewSubmitting(true);
 
-    const sendTo = getSendToForUserId(newSendToUserId);
-    const isDirectToOwner = sendTo === "samer" || sendTo === "kareem";
-    const isToHoussam = sendTo === "houssam";
+    const recipientRole = await getRecipientRole(newSendToUserId);
+    const isToOwner = recipientRole === "owner";
+    const isToAssistant = recipientRole === "assistant";
     let assignedTo: string | null = null;
     let status: string = "submitted";
-    const effectiveSendTo = sendTo ?? "employee";
+    const effectiveSendTo = getSendToLabelForUserId(newSendToUserId);
 
-    if (isDirectToOwner || !sendTo) {
-      status = "awaiting_approval";
-      assignedTo = newSendToUserId;
-    } else if (isToHoussam) {
+    if (isToAssistant) {
       status = "submitted";
       assignedTo = null;
+    } else {
+      status = "awaiting_approval";
+      assignedTo = newSendToUserId;
     }
 
     const vinNorm = newVin.trim().toUpperCase().slice(0, 17);
@@ -400,21 +419,21 @@ export default function RequestCenterPage() {
     }
 
     const submitterName = profile?.full_name ?? "Someone";
-    if (isToHoussam) {
+    if (isToAssistant) {
       const { getProfileIdsByRole } = await import("@/lib/user-lookup");
       const assistantIds = await getProfileIdsByRole("assistant");
-      const ownerId = newSendToUserId;
+      const recipientId = newSendToUserId;
       const notifyIds = [...assistantIds];
-      if (ownerId && !assistantIds.includes(ownerId)) notifyIds.push(ownerId);
+      if (recipientId && !assistantIds.includes(recipientId)) notifyIds.push(recipientId);
       if (notifyIds.length > 0) {
         await createNotificationsForUsers(
           notifyIds,
           "New request for review",
-          `${submitterName} submitted a request to Houssam: "${newSubject.trim()}"`,
+          `${submitterName} submitted a request for review: "${newSubject.trim()}"`,
           `/requests`
         );
       }
-    } else if (isDirectToOwner && sendTo) {
+    } else if (isToOwner) {
       const recipientId = newSendToUserId;
       if (recipientId) {
         await createNotification({
@@ -962,7 +981,6 @@ export default function RequestCenterPage() {
               <Select
                 value={newSendToUserId}
                 onValueChange={setNewSendToUserId}
-                required
               >
                 <SelectTrigger id="request-send-to" className="mt-2 w-full min-w-0">
                   <SelectValue placeholder="Select recipient" />

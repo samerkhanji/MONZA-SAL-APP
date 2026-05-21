@@ -125,7 +125,7 @@ export default function DashboardPage() {
       customersRes,
       jobsRes,
       jobsDetailRes,
-      jobsStatusRes,
+      jobsStatusResults,
       carsStatusRes,
       partsRes,
       requestsRes,
@@ -155,10 +155,16 @@ export default function DashboardPage() {
         .neq("status", "cancelled")
         .order("created_at", { ascending: false })
         .limit(10),
-      supabase
-        .from("garage_jobs")
-        .select("status")
-        .is("deleted_at", null),
+      // Count each job status server-side instead of transferring every row.
+      Promise.all(
+        JOB_STATUS_ORDER.map((status) =>
+          supabase
+            .from("garage_jobs")
+            .select("*", { count: "exact", head: true })
+            .is("deleted_at", null)
+            .eq("status", status)
+        )
+      ),
       supabase.from("cars_display").select("status").is("deleted_at", null),
       supabase
         .from("parts")
@@ -169,7 +175,8 @@ export default function DashboardPage() {
         .limit(5),
       supabase
         .from("requests")
-        .select("id, status, submitted_by, assigned_to, send_to, send_to_user_id"),
+        .select("id, status, submitted_by, assigned_to, send_to, send_to_user_id")
+        .in("status", ["submitted", "awaiting_approval", "needs_more_info"]),
     ]);
 
     if (carsAllRes.error) {
@@ -202,18 +209,12 @@ export default function DashboardPage() {
       setRecentJobs((jobsDetailRes.data as unknown as GarageJobRow[]) ?? []);
     }
 
-    if (jobsStatusRes.error) {
+    if (jobsStatusResults.some((r) => r.error)) {
       errors.push("Job Statuses");
     } else {
-      const counts: Record<string, number> = {
-        pending: 0,
-        in_progress: 0,
-        waiting_parts: 0,
-        done: 0,
-        cancelled: 0,
-      };
-      (jobsStatusRes.data ?? []).forEach((row: { status: string }) => {
-        counts[row.status] = (counts[row.status] ?? 0) + 1;
+      const counts: Record<string, number> = {};
+      JOB_STATUS_ORDER.forEach((status, i) => {
+        counts[status] = jobsStatusResults[i].count ?? 0;
       });
       setJobStatusCounts(counts);
     }

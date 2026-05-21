@@ -174,11 +174,12 @@ function NotificationBellInner() {
       toast.error(formatError(error));
       return;
     }
-    setNotifications((prev) => prev.filter((n) => n.id !== id));
-    setUnreadCount((c) => {
-      const wasUnread = notifications.find((n) => n.id === id && !n.is_read);
-      return wasUnread ? Math.max(0, c - 1) : c;
+    let wasUnread = false;
+    setNotifications((prev) => {
+      wasUnread = prev.some((n) => n.id === id && !n.is_read);
+      return prev.filter((n) => n.id !== id);
     });
+    setUnreadCount((c) => (wasUnread ? Math.max(0, c - 1) : c));
     toast.success("Snoozed");
   }
 
@@ -188,11 +189,12 @@ function NotificationBellInner() {
       toast.error(formatError(error));
       return;
     }
-    setNotifications((prev) => prev.filter((n) => n.id !== id));
-    setUnreadCount((c) => {
-      const wasUnread = notifications.find((n) => n.id === id && !n.is_read);
-      return wasUnread ? Math.max(0, c - 1) : c;
+    let wasUnread = false;
+    setNotifications((prev) => {
+      wasUnread = prev.some((n) => n.id === id && !n.is_read);
+      return prev.filter((n) => n.id !== id);
     });
+    setUnreadCount((c) => (wasUnread ? Math.max(0, c - 1) : c));
   }
 
   function handleNotificationClick(n: Notification) {
