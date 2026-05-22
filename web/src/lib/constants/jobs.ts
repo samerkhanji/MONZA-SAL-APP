@@ -29,6 +29,18 @@ export const JOB_PRIORITY_LABELS: Record<string, string> = {
   urgent: "🔴 Urgent",
 };
 
+// Allowed next statuses for a garage job. A job can always keep its current
+// status; only the listed transitions may be applied from the UI. Terminal
+// statuses (cancelled) cannot move; `delivered` is terminal in practice.
+export const JOB_STATUS_TRANSITIONS: Record<string, string[]> = {
+  pending: ["in_progress", "cancelled"],
+  in_progress: ["waiting_parts", "done", "cancelled"],
+  waiting_parts: ["in_progress", "cancelled"],
+  done: ["delivered"],
+  delivered: [],
+  cancelled: [],
+};
+
 export const PRIORITY_BORDERS: Record<string, string> = {
   low: "border-l-4 border-l-gray-300",
   normal: "border-l-4 border-l-blue-500",

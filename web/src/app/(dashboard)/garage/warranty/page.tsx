@@ -107,7 +107,7 @@ export default function WarrantyPage() {
         .select("id, case_number, car_id, customer_id, job_id, kind, severity, status, summary, opened_at")
         .is("deleted_at", null)
         .order("opened_at", { ascending: false })
-        .limit(500),
+        .limit(5000),
       supabase.from("cars").select("id, vin, model, model_year").limit(5000),
       supabase.from("customers_display").select("id, full_name").limit(5000),
     ]);

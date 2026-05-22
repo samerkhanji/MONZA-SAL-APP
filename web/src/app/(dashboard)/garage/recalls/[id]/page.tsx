@@ -69,6 +69,20 @@ interface CarLite {
 
 const VEHICLE_STATUSES = ["pending","customer_notified","scheduled","in_progress","completed","not_applicable","customer_refused"];
 
+const RECALL_STATUS_OPTIONS: { value: string; label: string }[] = [
+  { value: "open", label: "Open" },
+  { value: "active", label: "Active" },
+  { value: "closed", label: "Closed" },
+  { value: "cancelled", label: "Cancelled" },
+];
+
+const RECALL_STATUS_TRANSITIONS: Record<string, string[]> = {
+  open: ["active", "cancelled"],
+  active: ["closed", "cancelled"],
+  closed: [],
+  cancelled: [],
+};
+
 const STATUS_COLOR: Record<string, string> = {
   pending: "bg-muted text-foreground",
   customer_notified: "bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300",
@@ -95,7 +109,7 @@ export default function RecallDetailPage() {
   const load = useCallback(async () => {
     setLoading(true);
     const [r, v] = await Promise.all([
-      supabase.from("recalls").select("*").eq("id", id).single(),
+      supabase.from("recalls").select("*").eq("id", id).is("deleted_at", null).single(),
       supabase.from("recall_vehicles").select("*").eq("recall_id", id),
     ]);
     if (r.error) {
@@ -144,6 +158,11 @@ export default function RecallDetailPage() {
 
   async function changeRecallStatus(next: string) {
     if (!recall) return;
+    if (next === recall.status) return;
+    if (!(RECALL_STATUS_TRANSITIONS[recall.status] ?? []).includes(next)) {
+      toast.error(`Cannot move a ${recall.status} recall to ${next}.`);
+      return;
+    }
     const { error } = await supabase.rpc("set_recall_status", {
       p_recall_id: recall.id,
       p_status: next,
@@ -186,14 +205,19 @@ export default function RecallDetailPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant="outline" className="h-6 px-2 text-[11px] uppercase">{recall.status}</Badge>
-          {canWrite && (
+          {canWrite && (RECALL_STATUS_TRANSITIONS[recall.status] ?? []).length > 0 && (
             <Select value={recall.status} onValueChange={(v) => void changeRecallStatus(v)}>
               <SelectTrigger data-tour-id="recall-detail-status" className="h-8 w-32 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="open">Open</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="closed">Closed</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
+                {RECALL_STATUS_OPTIONS.filter(
+                  (o) =>
+                    o.value === recall.status ||
+                    (RECALL_STATUS_TRANSITIONS[recall.status] ?? []).includes(o.value)
+                ).map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           )}

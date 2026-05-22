@@ -112,7 +112,7 @@ export default function WarrantyDetailPage() {
   const load = useCallback(async () => {
     setLoading(true);
     const [w, p, d, allParts] = await Promise.all([
-      supabase.from("warranty_cases").select("*").eq("id", id).single(),
+      supabase.from("warranty_cases").select("*").eq("id", id).is("deleted_at", null).single(),
       supabase.from("warranty_case_parts").select("*").eq("case_id", id).order("created_at"),
       supabase.from("warranty_case_documents").select("*").eq("case_id", id).order("created_at", { ascending: false }),
       supabase.from("parts").select("id, name:part_name").limit(2000),

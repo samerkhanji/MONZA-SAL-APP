@@ -107,7 +107,7 @@ export default function PurchaseOrdersPage() {
         .select("id, po_number, status, estimated_total, currency, supplier_id, created_at, requested_by, expected_delivery_at")
         .is("deleted_at", null)
         .order("created_at", { ascending: false })
-        .limit(500),
+        .limit(5000),
       supabase
         .from("suppliers")
         .select("id, name")

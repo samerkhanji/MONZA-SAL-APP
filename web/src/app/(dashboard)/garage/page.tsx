@@ -11,8 +11,8 @@ import { useDebouncedValue } from "@/lib/hooks/useDebouncedValue";
 import { canPerform } from "@/lib/permissions";
 import type { GarageJob } from "@/types/database";
 import {
-  JOB_STATUS_COLORS,
   JOB_STATUS_LABELS,
+  JOB_STATUS_TRANSITIONS,
   JOB_PRIORITY_LABELS,
   PRIORITY_BORDERS,
 } from "@/lib/constants/jobs";
@@ -315,6 +315,15 @@ export default function GarageJobsPage() {
   }
 
   async function runStatusChange(job: JobWithCar, newStatus: string) {
+    if (
+      newStatus !== job.status &&
+      !(JOB_STATUS_TRANSITIONS[job.status] ?? []).includes(newStatus)
+    ) {
+      toast.error(
+        `Cannot move a ${JOB_STATUS_LABELS[job.status] ?? job.status} job to ${JOB_STATUS_LABELS[newStatus] ?? newStatus}.`
+      );
+      return;
+    }
     const updates: Record<string, unknown> = { status: newStatus };
     if (newStatus === "in_progress" && !job.started_at) {
       updates.started_at = new Date().toISOString();
@@ -723,8 +732,23 @@ export default function GarageJobsPage() {
                       <Select
                         value={job.status}
                         onValueChange={(v) => {
-                          if (v === "cancelled" && job.status !== "cancelled") {
+                          if (v === job.status) return;
+                          if (
+                            !(JOB_STATUS_TRANSITIONS[job.status] ?? []).includes(v)
+                          ) {
+                            toast.error(
+                              `Cannot move a ${JOB_STATUS_LABELS[job.status] ?? job.status} job to ${JOB_STATUS_LABELS[v] ?? v}.`
+                            );
+                            return;
+                          }
+                          if (v === "cancelled") {
                             setCancelJobConfirm(job);
+                            return;
+                          }
+                          if (v === "done") {
+                            // Completing a job must capture work-done/photos —
+                            // route through FinishJobDialog, never a bare update.
+                            setFinishJobOpen(job);
                             return;
                           }
                           void handleStatusChange(job, v);
@@ -735,18 +759,12 @@ export default function GarageJobsPage() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {(
-                            [
-                              "pending",
-                              "in_progress",
-                              "waiting_parts",
-                              "done",
-                              "delivered",
-                              "cancelled",
-                            ] as const
-                          ).map((s) => (
+                          {[
+                            job.status,
+                            ...(JOB_STATUS_TRANSITIONS[job.status] ?? []),
+                          ].map((s) => (
                             <SelectItem key={s} value={s}>
-                              {JOB_STATUS_LABELS[s]}
+                              {JOB_STATUS_LABELS[s] ?? s}
                             </SelectItem>
                           ))}
                         </SelectContent>

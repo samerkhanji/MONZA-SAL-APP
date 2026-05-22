@@ -28,6 +28,7 @@ import { JOB_STATUS_LABELS } from "@/lib/constants/jobs";
 import { REQUEST_CATEGORIES } from "@/lib/constants/requests";
 import { ExportButton } from "@/components/ExportButton";
 import { KpiCard } from "@/components/ui/kpi-card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { getProfileFullName } from "@/lib/supabase-profile";
 import { formatError } from "@/lib/error-messages";
@@ -175,9 +176,6 @@ export default function AssistantDashboardPage() {
     const today = new Date().toISOString().slice(0, 10);
     const threeDaysAgo = new Date(Date.now() - 3 * 86400000).toISOString();
     const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString();
-    const sevenDaysAgoDate = new Date(Date.now() - 7 * 86400000)
-      .toISOString()
-      .slice(0, 10);
 
     const [
       jobsRes,
@@ -195,7 +193,8 @@ export default function AssistantDashboardPage() {
         .select("*, cars:car_id(id, vin, brand, model), assigned_profile:assigned_to(id, full_name)")
         .is("deleted_at", null)
         .in("status", ["pending", "in_progress", "waiting_parts", "done", "delivered"])
-        .order("created_at", { ascending: false }),
+        .order("created_at", { ascending: false })
+        .limit(5000),
       supabase
         .from("delete_requests")
         .select("id", { count: "exact", head: true })
@@ -233,7 +232,7 @@ export default function AssistantDashboardPage() {
         .select("*", { count: "exact", head: true })
         .is("deleted_at", null)
         .in("status", ["pending", "waiting_parts"])
-        .lt("created_at", sevenDaysAgoDate),
+        .lt("created_at", sevenDaysAgo),
       supabase
         .from("installment_payments")
         .select("amount_due, paid_amount")
@@ -587,7 +586,11 @@ export default function AssistantDashboardPage() {
           </CardHeader>
           <CardContent>
             {loading ? (
-              <p className="text-muted-foreground text-sm">Loading…</p>
+              <div className="space-y-2">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <Skeleton key={i} className="h-16 w-full" />
+                ))}
+              </div>
             ) : repairProposals.length === 0 ? (
               <p className="text-muted-foreground text-sm">No active repair proposals.</p>
             ) : (
@@ -660,7 +663,14 @@ export default function AssistantDashboardPage() {
           </CardHeader>
           <CardContent>
             {loading ? (
-              <p className="text-muted-foreground">Loading...</p>
+              <div className="overflow-hidden rounded-lg border">
+                <div className="space-y-2 p-4">
+                  <Skeleton className="h-8 w-full" />
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <Skeleton key={i} className="h-12 w-full" />
+                  ))}
+                </div>
+              </div>
             ) : pendingRequests.length === 0 ? (
               <p className="py-8 text-center text-muted-foreground">No pending requests</p>
             ) : (
@@ -788,7 +798,14 @@ export default function AssistantDashboardPage() {
           </CardHeader>
           <CardContent>
             {loading ? (
-              <p className="text-muted-foreground">Loading...</p>
+              <div className="overflow-hidden rounded-lg border">
+                <div className="space-y-2 p-4">
+                  <Skeleton className="h-8 w-full" />
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <Skeleton key={i} className="h-12 w-full" />
+                  ))}
+                </div>
+              </div>
             ) : workshopJobs.length === 0 ? (
               <p className="py-8 text-center text-muted-foreground">No cars in workshop</p>
             ) : (
@@ -992,7 +1009,11 @@ export default function AssistantDashboardPage() {
           </CardHeader>
           <CardContent>
             {loading ? (
-              <p className="text-muted-foreground">Loading...</p>
+              <div className="space-y-2">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <Skeleton key={i} className="h-20 w-full" />
+                ))}
+              </div>
             ) : completedAwaitingPickup.length === 0 ? (
               <p className="py-8 text-center text-muted-foreground">
                 No cars awaiting pickup
@@ -1070,7 +1091,11 @@ export default function AssistantDashboardPage() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <p className="text-muted-foreground">Loading...</p>
+            <div className="space-y-2">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-14 w-full" />
+              ))}
+            </div>
           ) : warrantyAlerts.length === 0 ? (
             <p className="py-8 text-center text-green-600 dark:text-green-400">
               No upcoming warranty expirations

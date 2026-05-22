@@ -26,6 +26,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
   SelectContent,
@@ -705,7 +706,14 @@ export default function SettingsPage() {
                 </Button>
               </div>
               {profilesLoading ? (
-                <p className="text-muted-foreground">Loading...</p>
+                <div className="overflow-hidden rounded-lg border">
+                  <div className="space-y-2 p-4">
+                    <Skeleton className="h-8 w-full" />
+                    {Array.from({ length: 8 }).map((_, i) => (
+                      <Skeleton key={i} className="h-12 w-full" />
+                    ))}
+                  </div>
+                </div>
               ) : (
                 <>
                   {(() => {
@@ -907,7 +915,15 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent>
               {prefsLoading ? (
-                <p className="text-muted-foreground">Loading...</p>
+                <div className="space-y-4">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <div key={i} className="space-y-2">
+                      <Skeleton className="h-4 w-28" />
+                      <Skeleton className="h-10 w-full" />
+                    </div>
+                  ))}
+                  <Skeleton className="h-10 w-32" />
+                </div>
               ) : (
                 <form onSubmit={handleSaveCompany} className="space-y-4">
                   <div>
@@ -983,7 +999,15 @@ export default function SettingsPage() {
               </CardHeader>
               <CardContent>
                 {prefsLoading ? (
-                  <p className="text-muted-foreground">Loading...</p>
+                  <div className="space-y-4">
+                    {Array.from({ length: 2 }).map((_, i) => (
+                      <div key={i} className="space-y-2">
+                        <Skeleton className="h-4 w-32" />
+                        <Skeleton className="h-10 w-[180px]" />
+                      </div>
+                    ))}
+                    <Skeleton className="h-10 w-32" />
+                  </div>
                 ) : (
                   <form onSubmit={handleSavePrefs} className="space-y-4">
                     <div>
@@ -1131,7 +1155,11 @@ export default function SettingsPage() {
                 </Select>
               </div>
               {auditLoading ? (
-                <p className="text-muted-foreground">Loading...</p>
+                <div className="space-y-1 rounded-lg border p-1">
+                  {Array.from({ length: 8 }).map((_, i) => (
+                    <Skeleton key={i} className="h-12 w-full" />
+                  ))}
+                </div>
               ) : filteredAudit.length === 0 ? (
                 <p className="py-8 text-center text-muted-foreground">
                   No activity found

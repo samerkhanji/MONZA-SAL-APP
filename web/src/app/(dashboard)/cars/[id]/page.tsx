@@ -634,10 +634,19 @@ export default function CarProfilePage() {
           throw new Error("Not authenticated");
         }
         const customerId = await resolveCustomerIdForNewSalesOrder(carId);
+        const newOrderStatus = defaultSalesOrderStatusForCar(car.status);
+        // defaultSalesOrderStatusForCar only ever yields a non-draft status,
+        // so a customer is mandatory here — a customerless order is only valid
+        // for drafts.
+        if (!customerId) {
+          throw new Error(
+            "Cannot create a non-draft sales order without a customer. Link a customer to this car first."
+          );
+        }
         const { error: insertError } = await supabase.from("sales_orders").insert({
           car_id: carId,
           customer_id: customerId ?? null,
-          status: defaultSalesOrderStatusForCar(car.status),
+          status: newOrderStatus,
           created_by: user.id,
           selling_price: car.price ?? null,
           currency: car.price_currency ?? "USD",

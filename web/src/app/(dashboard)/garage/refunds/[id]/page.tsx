@@ -81,6 +81,7 @@ export default function RefundDetailPage() {
 
   const [refund, setRefund] = useState<Refund | null>(null);
   const [customer, setCustomer] = useState<{ id: string; full_name?: string | null; name?: string | null } | null>(null);
+  const [requesterName, setRequesterName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
@@ -94,6 +95,7 @@ export default function RefundDetailPage() {
       .from("refunds")
       .select("*")
       .eq("id", id)
+      .is("deleted_at", null)
       .single();
     if (error) {
       toast.error(formatError(error));
@@ -108,6 +110,15 @@ export default function RefundDetailPage() {
         .eq("id", (data as Refund).customer_id)
         .single();
       setCustomer((c as { id: string; full_name?: string | null; name?: string | null } | null) ?? null);
+    }
+    const requestedBy = (data as Refund).requested_by;
+    if (requestedBy) {
+      const { data: rp } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", requestedBy)
+        .single();
+      setRequesterName((rp as { full_name?: string | null } | null)?.full_name ?? null);
     }
     setLoading(false);
   }, [id, supabase]);
@@ -376,7 +387,11 @@ export default function RefundDetailPage() {
       <p className="text-muted-foreground text-xs">
         {requesterIsMe
           ? "Routed by you."
-          : `Routed by ${refund.requested_by ? `user ${refund.requested_by.slice(0, 8)}…` : "system"}.`}
+          : `Routed by ${
+              refund.requested_by
+                ? requesterName ?? `user ${refund.requested_by.slice(0, 8)}…`
+                : "system"
+            }.`}
       </p>
     </div>
   );

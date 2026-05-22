@@ -244,11 +244,20 @@ export default function SalesOrderDetailPage() {
       return;
     }
     // The quote lifecycle fills quote_amount; selling_price stays null until
-    // the order is finalised. Cap the deposit against whichever price is set.
-    const priceCap = order?.selling_price ?? order?.quote_amount ?? null;
-    if (priceCap != null && Number.isFinite(priceCap) && amt > priceCap) {
+    // the order is finalised. Cap the deposit against whichever price is set,
+    // less any committed trade-in credit applied to this order.
+    const basePrice = order?.selling_price ?? order?.quote_amount ?? null;
+    const tradeInCredit = committedTradeIns.reduce(
+      (sum, t) => sum + (Number(t.accepted_value) || 0),
+      0
+    );
+    const priceCap =
+      basePrice != null && Number.isFinite(basePrice)
+        ? Math.max(0, basePrice - tradeInCredit)
+        : null;
+    if (priceCap != null && amt > priceCap) {
       toast.error(
-        `Deposit (${amt.toLocaleString()}) cannot exceed the price (${priceCap.toLocaleString()}).`
+        `Deposit (${amt.toLocaleString()}) cannot exceed the price after trade-in credit (${priceCap.toLocaleString()}).`
       );
       return;
     }

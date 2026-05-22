@@ -142,9 +142,36 @@ export function ImportPartsDialog({
     setImporting(true);
     const { data: { user } } = await supabase.auth.getUser();
 
+    // Skip rows whose oe_number already exists — avoids duplicate parts on
+    // re-imports of the same file.
+    const oeNumbers = Array.from(
+      new Set(
+        rows
+          .map((r) => r.oe_number?.trim())
+          .filter((v): v is string => !!v)
+      )
+    );
+    const existingOe = new Set<string>();
+    if (oeNumbers.length > 0) {
+      const { data: existing } = await supabase
+        .from("parts")
+        .select("oe_number")
+        .is("deleted_at", null)
+        .in("oe_number", oeNumbers);
+      ((existing as { oe_number: string | null }[]) ?? []).forEach((p) => {
+        if (p.oe_number) existingOe.add(p.oe_number.trim());
+      });
+    }
+
     let success = 0;
     let failed = 0;
+    let skipped = 0;
     for (const r of rows) {
+      const oe = r.oe_number?.trim();
+      if (oe && existingOe.has(oe)) {
+        skipped++;
+        continue;
+      }
       const qty = typeof r.quantity === "number" ? r.quantity : 0;
       const { data: inserted, error } = await supabase
         .from("parts")
@@ -169,6 +196,7 @@ export function ImportPartsDialog({
         continue;
       }
       success++;
+      if (oe) existingOe.add(oe);
       const partId = (inserted as { id?: string } | null)?.id;
       if (partId && qty > 0) {
         await supabase.from("part_movements").insert({
@@ -185,15 +213,27 @@ export function ImportPartsDialog({
 
     setImporting(false);
 
+    const skippedSuffix = skipped > 0 ? ` — ${skipped} skipped (duplicate OE number)` : "";
+
+    if (success === 0 && failed === 0 && skipped > 0) {
+      // Every row was a duplicate — nothing new to save.
+      toast.warning(`Nothing imported — all ${rows.length} rows are duplicate OE numbers.`);
+      onOpenChange(false);
+      onSuccess();
+      return;
+    }
+
     if (success === 0) {
       // Nothing was saved — keep the dialog open so the operator can retry
       // or fix the file rather than silently losing the import.
-      toast.error(`Import failed — none of the ${rows.length} rows could be saved.`);
+      toast.error(`Import failed — none of the ${rows.length} rows could be saved.${skippedSuffix}`);
       return;
     }
 
     if (failed > 0) {
-      toast.warning(`Imported ${success} of ${rows.length} parts — ${failed} failed.`);
+      toast.warning(`Imported ${success} of ${rows.length} parts — ${failed} failed${skippedSuffix}.`);
+    } else if (skipped > 0) {
+      toast.success(`Imported ${success} parts${skippedSuffix}.`);
     } else {
       toast.success(`Imported ${success} parts successfully`);
     }
