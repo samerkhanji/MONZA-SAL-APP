@@ -20,6 +20,15 @@ function isApprovalType(v: string): v is ApprovalType {
   return v === "delete" || v === "document-access" || v === "page-access";
 }
 
+// Requester-supplied text gets interpolated into notification messages.
+// Trim, strip angle brackets, and length-cap before storing.
+function sanitizeRequesterText(value: unknown): string {
+  return String(value ?? "")
+    .replace(/[<>]/g, "")
+    .trim()
+    .slice(0, 200);
+}
+
 export async function POST(
   request: NextRequest,
   ctx: { params: Promise<{ type: string; id: string }> }
@@ -165,13 +174,14 @@ export async function POST(
         return NextResponse.json({ error: "Failed to update request" }, { status: 500 });
       }
 
+      const safeSearchQuery = sanitizeRequesterText(req.search_query);
       await admin.from("notifications").insert({
         user_id: req.requested_by,
         title: action === "approve" ? "Document search approved" : "Document search not approved",
         message:
           action === "approve"
-            ? `Your document search for "${req.search_query}" has been approved.`
-            : `Your document search for "${req.search_query}" was not approved.`,
+            ? `Your document search for "${safeSearchQuery}" has been approved.`
+            : `Your document search for "${safeSearchQuery}" was not approved.`,
         link: "/documents",
       });
 
@@ -208,13 +218,14 @@ export async function POST(
       return NextResponse.json({ error: "Failed to update request" }, { status: 500 });
     }
 
+    const safePageName = sanitizeRequesterText(req.page_name);
     await admin.from("notifications").insert({
       user_id: req.requested_by,
       title: action === "approve" ? "Access approved" : "Access not approved",
       message:
         action === "approve"
-          ? `Your access to ${req.page_name} has been approved.`
-          : `Your access to ${req.page_name} was not approved.`,
+          ? `Your access to ${safePageName} has been approved.`
+          : `Your access to ${safePageName} was not approved.`,
       link: "/requests/pending",
     });
 

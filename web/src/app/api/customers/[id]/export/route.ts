@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireCrud } from "@/lib/server/require-crud";
+import { createClient } from "@/lib/supabase/server";
 import { toPublicApiError } from "@/lib/server/api-error";
 import { isUuid } from "@/lib/validation/uuid";
 
@@ -10,25 +10,41 @@ import { isUuid } from "@/lib/validation/uuid";
  * JSON document the owner can hand to the customer or store as evidence
  * of a fulfilled "right of access" request (Art. 15 GDPR).
  *
- * Gated by requireCrud("customers", "view") — exporting a customer's own
- * data is a read operation, not a destructive one, so it is gated on the
- * customer-read permission rather than the delete permission. (No dedicated
- * "export" CrudAction exists; "view" is the closest appropriate capability.)
+ * Bulk export of a customer's full personal record is sensitive: gated on
+ * owner role OR the `manage_team` capability, and every export is recorded
+ * in system_events for accountability.
  */
 export async function GET(
   _req: Request,
   ctx: { params: Promise<{ id: string }> }
 ) {
   try {
-    const gate = await requireCrud("customers", "view");
-    if (!gate.ok) return gate.response;
+    const sb = await createClient();
+    const {
+      data: { user },
+    } = await sb.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { data: profile } = await sb
+      .from("profiles")
+      .select("user_role, capabilities")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    const isOwner = (profile as { user_role?: string } | null)?.user_role === "owner";
+    const hasManageTeam = (
+      (profile as { capabilities?: string[] } | null)?.capabilities ?? []
+    ).includes("manage_team");
+    if (!isOwner && !hasManageTeam) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
     const { id } = await ctx.params;
     if (!id || !isUuid(id)) {
       return NextResponse.json({ error: "Invalid customer id" }, { status: 400 });
     }
-
-    const sb = gate.supabase;
 
     // Pull each related dataset in parallel. RLS still applies.
     const [customer, salesOrders, paymentPlans, installments, notes, interactions, appointments] =
@@ -52,10 +68,20 @@ export async function GET(
       return NextResponse.json({ error: "Customer not found" }, { status: 404 });
     }
 
+    await sb.from("system_events").insert({
+      event_type: "customer.data_export",
+      severity: "warning",
+      message: `Customer GDPR export for ${id} by ${user.id}`,
+      metadata: {
+        customer_id: id,
+        actor_user_id: user.id,
+      },
+    });
+
     const payload = {
       meta: {
         exported_at: new Date().toISOString(),
-        exported_by: gate.userId,
+        exported_by: user.id,
         purpose: "GDPR Article 15 — Right of access. Includes all data this dealership holds about the named customer.",
       },
       customer: customer.data,

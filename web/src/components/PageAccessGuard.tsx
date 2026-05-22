@@ -25,7 +25,17 @@ type PageKey =
   | "documents"
   | "settings"
   | "garage_settings"
-  | "dashboard_overview";
+  | "dashboard_overview"
+  | "cash"
+  | "company_costs"
+  | "data_health"
+  | "notifications"
+  | "ordered_cars"
+  | "ordered_parts"
+  | "recall_center"
+  | "reports"
+  | "sales_orders"
+  | "trade_ins";
 
 function getPageKeyFromPathname(pathname: string): PageKey | null {
   if (pathname.startsWith("/assistant-dashboard")) return "assistant_dashboard";
@@ -48,6 +58,16 @@ function getPageKeyFromPathname(pathname: string): PageKey | null {
     return "garage";
   if (pathname.startsWith("/garage/settings")) return "garage_settings";
   if (pathname.startsWith("/settings")) return "settings";
+  if (pathname.startsWith("/cash")) return "cash";
+  if (pathname.startsWith("/company-costs")) return "company_costs";
+  if (pathname.startsWith("/data-health")) return "data_health";
+  if (pathname.startsWith("/notifications")) return "notifications";
+  if (pathname.startsWith("/ordered-cars")) return "ordered_cars";
+  if (pathname.startsWith("/ordered-parts")) return "ordered_parts";
+  if (pathname.startsWith("/recall-center")) return "recall_center";
+  if (pathname.startsWith("/reports")) return "reports";
+  if (pathname.startsWith("/sales-orders")) return "sales_orders";
+  if (pathname.startsWith("/trade-ins")) return "trade_ins";
   return null;
 }
 

@@ -11,6 +11,18 @@ export type AppRole =
   | "sales_ops"
   | "sales";
 
+const ALL_ROLES: AppRole[] = [
+  "owner",
+  "assistant",
+  "hybrid",
+  "khalil_hybrid",
+  "it",
+  "garage_manager",
+  "garage_staff",
+  "sales_ops",
+  "sales",
+];
+
 export const PAGE_PERMISSIONS: Record<
   | "dashboard"
   | "assistant_dashboard"
@@ -26,7 +38,17 @@ export const PAGE_PERMISSIONS: Record<
   | "documents"
   | "settings"
   | "garage_settings"
-  | "dashboard_overview",
+  | "dashboard_overview"
+  | "cash"
+  | "company_costs"
+  | "data_health"
+  | "notifications"
+  | "ordered_cars"
+  | "ordered_parts"
+  | "recall_center"
+  | "reports"
+  | "sales_orders"
+  | "trade_ins",
   AppRole[]
 > = {
   dashboard: ["owner"],
@@ -101,6 +123,46 @@ export const PAGE_PERMISSIONS: Record<
   ],
   settings: ["owner"],
   garage_settings: ["owner", "garage_manager", "hybrid", "khalil_hybrid"],
+  // Capability-gated pages: any role may hold the underlying capability, so the
+  // role gate is permissive and the page's own hasCapability() check is the
+  // effective gate. PAGE_CAPABILITY_FALLBACK covers single-capability cases.
+  cash: ALL_ROLES,
+  company_costs: ALL_ROLES,
+  reports: ALL_ROLES,
+  trade_ins: ALL_ROLES,
+  // Per-user inbox: every authenticated user sees only their own rows.
+  notifications: ALL_ROLES,
+  data_health: [
+    "owner",
+    "assistant",
+    "sales_ops",
+    "sales",
+    "garage_manager",
+    "garage_staff",
+    "it",
+    "hybrid",
+    "khalil_hybrid",
+  ],
+  ordered_cars: [
+    "owner",
+    "assistant",
+    "hybrid",
+    "khalil_hybrid",
+    "it",
+    "sales_ops",
+    "sales",
+  ],
+  recall_center: [
+    "owner",
+    "assistant",
+    "hybrid",
+    "khalil_hybrid",
+    "it",
+    "sales_ops",
+    "sales",
+  ],
+  ordered_parts: ALL_ROLES,
+  sales_orders: ["owner", "assistant", "sales_ops"],
 };
 
 export const CRUD_PERMISSIONS = {
