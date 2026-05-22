@@ -175,14 +175,22 @@ const CAMPAIGN_STATUS_COLOR: Record<string, string> = {
 const RECEIPT_BUCKET = "cost-receipts";
 const MAX_RECEIPT_BYTES = 10 * 1024 * 1024; // 10 MB
 
-const fmt = (n: number | null | undefined, currency = "USD") =>
-  n == null
-    ? "—"
-    : new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency,
-        maximumFractionDigits: 2,
-      }).format(n);
+const ALLOWED_CURRENCIES = ["USD", "LBP", "EUR", "AED"] as const;
+
+const fmt = (n: number | null | undefined, currency = "USD") => {
+  if (n == null) return "—";
+  try {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency,
+      maximumFractionDigits: 2,
+    }).format(n);
+  } catch {
+    return `${new Intl.NumberFormat("en-US", {
+      maximumFractionDigits: 2,
+    }).format(n)} ${currency}`;
+  }
+};
 
 const NONE = "__none__";
 
@@ -263,6 +271,7 @@ function Body() {
       supabase
         .from("cars")
         .select("id, vin, brand, model, model_year")
+        .is("deleted_at", null)
         .order("brand"),
       supabase
         .from("customers")
@@ -349,11 +358,12 @@ function Body() {
     let yearCost = 0;
     let pendingCount = 0;
     for (const c of costs) {
+      if (c.approval_status === "pending") pendingCount += 1;
+      if (c.approval_status !== "approved") continue;
       const d = new Date(c.cost_date);
       const amt = Number(c.amount) || 0;
       if (d >= yearStart) yearCost += amt;
       if (d >= monthStart) monthCost += amt;
-      if (c.approval_status === "pending") pendingCount += 1;
     }
     return { monthCost, yearCost, pendingCount };
   }, [costs]);
@@ -392,11 +402,13 @@ function Body() {
   );
 
   async function handleApprove(id: string, status: ApprovalStatus) {
+    const { data: userData } = await supabase.auth.getUser();
     const { error } = await supabase
       .from("company_costs")
       .update({
         approval_status: status,
         approved_at: new Date().toISOString(),
+        approved_by: userData.user?.id ?? null,
       })
       .eq("id", id);
     if (error) {
@@ -763,6 +775,7 @@ function ReportsTab({
   const byCar = useMemo(() => {
     const m = new Map<string, number>();
     for (const c of costs) {
+      if (c.approval_status !== "approved") continue;
       if (!c.related_car_id) continue;
       m.set(
         c.related_car_id,
@@ -777,6 +790,7 @@ function ReportsTab({
   const byMonth = useMemo(() => {
     const m = new Map<string, number>();
     for (const c of costs) {
+      if (c.approval_status !== "approved") continue;
       const key = (c.cost_date ?? "").slice(0, 7); // YYYY-MM
       if (!key) continue;
       m.set(key, (m.get(key) ?? 0) + (Number(c.amount) || 0));
@@ -789,6 +803,7 @@ function ReportsTab({
   const byCategory = useMemo(() => {
     const m = new Map<CostCategory, number>();
     for (const c of costs) {
+      if (c.approval_status !== "approved") continue;
       m.set(c.category, (m.get(c.category) ?? 0) + (Number(c.amount) || 0));
     }
     return [...m.entries()]
@@ -799,6 +814,7 @@ function ReportsTab({
   const bySupplier = useMemo(() => {
     const m = new Map<string, number>();
     for (const c of costs) {
+      if (c.approval_status !== "approved") continue;
       if (!c.related_supplier_id) continue;
       m.set(
         c.related_supplier_id,
@@ -817,6 +833,7 @@ function ReportsTab({
   const byCampaign = useMemo(() => {
     const m = new Map<string, number>();
     for (const c of costs) {
+      if (c.approval_status !== "approved") continue;
       if (!c.related_marketing_campaign_id) continue;
       m.set(
         c.related_marketing_campaign_id,
@@ -1126,6 +1143,10 @@ function AddCostDialog({
       toast.error("Receipt must be 10 MB or smaller");
       return;
     }
+    if (!(ALLOWED_CURRENCIES as readonly string[]).includes(currency)) {
+      toast.error("Pick a supported currency");
+      return;
+    }
 
     setSubmitting(true);
 
@@ -1163,7 +1184,12 @@ function AddCostDialog({
 
     // Upload receipt (optional) and attach its path.
     if (receiptFile) {
-      const path = `${costId}/${Date.now()}_${receiptFile.name}`;
+      const safeName =
+        receiptFile.name
+          .replace(/[^a-zA-Z0-9._-]/g, "_")
+          .replace(/_+/g, "_")
+          .slice(0, 100) || "receipt";
+      const path = `${costId}/${Date.now()}_${safeName}`;
       const { error: upErr } = await supabase.storage
         .from(RECEIPT_BUCKET)
         .upload(path, receiptFile, {
@@ -1254,12 +1280,18 @@ function AddCostDialog({
           </div>
           <div className="space-y-1">
             <Label>Currency</Label>
-            <Input
-              value={currency}
-              onChange={(e) => setCurrency(e.target.value.toUpperCase())}
-              placeholder="USD"
-              maxLength={3}
-            />
+            <Select value={currency} onValueChange={setCurrency}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {ALLOWED_CURRENCIES.map((c) => (
+                  <SelectItem key={c} value={c}>
+                    {c}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-1">
