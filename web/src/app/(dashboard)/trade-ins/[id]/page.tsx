@@ -833,6 +833,17 @@ function CommitDialog({
 
   async function submit() {
     if (!salesOrderId) return toast.error("Pick a sales order");
+    const targetOrder = orders.find((o) => o.id === salesOrderId);
+    if (
+      targetOrder &&
+      targetOrder.currency &&
+      tradeIn.currency &&
+      targetOrder.currency !== tradeIn.currency
+    ) {
+      return toast.error(
+        `Currency mismatch: trade-in is in ${tradeIn.currency} but the sales order is in ${targetOrder.currency}.`
+      );
+    }
     setBusy(true);
     const { error } = await supabase.rpc("commit_trade_in_to_sale", {
       p_trade_in_id: tradeIn.id,

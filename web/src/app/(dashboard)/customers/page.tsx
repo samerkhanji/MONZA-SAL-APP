@@ -121,7 +121,8 @@ export default function CustomersPage() {
     const { data, error } = await supabase
       .from("customers_display")
       .select("*")
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .limit(5000);
 
     if (error) {
       toast.error("Failed to load customers");
@@ -155,7 +156,8 @@ export default function CustomersPage() {
         )
       `)
       .not("status", "eq", "cancelled")
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .limit(5000);
 
     if (!error && data) {
       setSoldCars(data as unknown as SoldCar[]);
@@ -196,11 +198,6 @@ export default function CustomersPage() {
     });
     return ids;
   }, [convertedSoldCars]);
-
-  const soldCustomers = useMemo(
-    () => customers.filter((c) => soldCustomerIds.has(c.id)),
-    [customers, soldCustomerIds]
-  );
 
   const exclusiveLeadCustomers = useMemo(
     () => leadCustomers.filter((c) => !soldCustomerIds.has(c.id)),
@@ -601,13 +598,13 @@ export default function CustomersPage() {
               <CardDescription>
                 {soldLoading
                   ? "Loading..."
-                  : `${pluralize(soldCustomers.length, "customer")} with sold cars (converted)`}
+                  : `${pluralize(convertedSoldCars.length, "sold car")} (converted)`}
               </CardDescription>
             </CardHeader>
             <CardContent className="min-w-0 overflow-hidden">
               {soldLoading ? (
                 <p className="text-muted-foreground">Loading...</p>
-              ) : soldCustomers.length === 0 ? (
+              ) : convertedSoldCars.length === 0 ? (
                 <p className="text-muted-foreground">No sold cars found.</p>
               ) : (
                 <div className="scrollbar-thick w-full min-w-0 max-h-[min(72vh,calc(100dvh-14rem))] overflow-x-auto overflow-y-auto rounded-md border border-border bg-card [-webkit-overflow-scrolling:touch]">

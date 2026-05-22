@@ -113,7 +113,8 @@ export default function SalesOrdersPage() {
          cars:car_id (id, vin, brand, model, model_year, exterior_color, status),
          customers:customer_id (id, first_name, last_name, phone_primary)`
       )
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .limit(5000);
 
     if (error) {
       toast.error(formatError(error));

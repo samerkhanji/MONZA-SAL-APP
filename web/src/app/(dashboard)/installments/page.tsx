@@ -260,7 +260,8 @@ export default function InstallmentsPage() {
             car:cars(*)
           )
         `
-          ),
+          )
+          .limit(5000),
         supabase
           .from("payment_plans")
           .select(
@@ -270,9 +271,10 @@ export default function InstallmentsPage() {
           car:cars(*),
           installments:installment_payments(*)
         `
-          ),
-        supabase.from("customers").select("*").order("first_name"),
-        supabase.from("cars").select("*").order("model"),
+          )
+          .limit(5000),
+        supabase.from("customers").select("*").order("first_name").limit(5000),
+        supabase.from("cars").select("*").order("model").limit(5000),
         supabase.from("profiles").select("id, full_name"),
       ]);
 
@@ -2615,6 +2617,15 @@ export default function InstallmentsPage() {
                       }
                       if (!(monthlyNum > 0)) {
                         toast.error("Monthly amount must be greater than 0.");
+                        return;
+                      }
+                      const expectedMonthly = (totalNum - downNum) / monthsNum;
+                      if (Math.abs(expectedMonthly - monthlyNum) > 0.02) {
+                        toast.error(
+                          `Monthly amount is inconsistent: (total − down) ÷ months = ${currencyFormatter.format(
+                            expectedMonthly
+                          )}, but monthly is ${currencyFormatter.format(monthlyNum)}.`
+                        );
                         return;
                       }
                       if (!newPlanStartDate) {
