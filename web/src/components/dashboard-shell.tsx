@@ -14,7 +14,6 @@ import {
   Package,
   History,
   Settings,
-  Menu,
   Lock,
   Download,
   ClipboardList,
@@ -54,7 +53,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { MobileBottomNav } from "@/components/mobile-bottom-nav";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { NotificationBell } from "@/components/NotificationBell";
 import { useInstall } from "@/lib/contexts/InstallContext";
@@ -459,6 +459,18 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     [appRole, hasCapability]
   );
 
+  // First few role-visible destinations power the phone bottom tab bar; the
+  // rest stay reachable via its "More" tab (the full nav drawer).
+  const bottomNavItems = useMemo(
+    () =>
+      navItems.slice(0, 4).map((item) => ({
+        href: item.href,
+        label: item.label,
+        icon: item.icon,
+      })),
+    [navItems]
+  );
+
   async function handleSignOut() {
     await signOut();
   }
@@ -670,20 +682,11 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        {/* Topbar */}
-        <header className="sticky top-0 z-10 flex h-14 min-h-14 items-center gap-2 border-b border-border bg-background px-4 md:px-6">
-          {/* Mobile: menu button top-left */}
+        {/* Topbar — app-style translucent sticky header; respects the
+            status-bar safe area when running as an installed PWA. */}
+        <header className="sticky top-0 z-20 flex min-h-[calc(3.5rem+env(safe-area-inset-top))] items-center gap-2 border-b border-border bg-background/80 px-4 pt-[env(safe-area-inset-top)] backdrop-blur-md md:px-6">
+          {/* Full navigation drawer — opened from the bottom nav's "More" tab. */}
           <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-            <SheetTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="-ml-1 size-11 shrink-0 md:hidden"
-                aria-label="Open menu"
-              >
-                <Menu className="size-5" />
-              </Button>
-            </SheetTrigger>
             <SheetContent side="left" className="w-72 max-w-[85vw] max-h-[100dvh] border-sidebar-border bg-sidebar p-0 sm:max-w-sm">
               {renderSidebarContent()}
             </SheetContent>
@@ -747,9 +750,19 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        {/* Main content */}
-        <main className="flex-1 bg-background">{children}</main>
+        {/* Main content — bottom padding on phones clears the fixed tab bar. */}
+        <main className="flex-1 bg-background pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0">
+          {children}
+        </main>
       </div>
+
+      {bottomNavItems.length > 0 && (
+        <MobileBottomNav
+          items={bottomNavItems}
+          pathname={pathname}
+          onMore={() => setSidebarOpen(true)}
+        />
+      )}
 
       <ChangePasswordDialog
         open={changePasswordOpen}

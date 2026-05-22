@@ -135,6 +135,12 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    /* No grey/blue flash on tap — a key "native app" tell. */
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* Suppress the iOS long-press callout on interactive chrome. */
+  a, button, [role="button"], label, summary {
+    -webkit-touch-callout: none;
   }
   html {
     overflow-x: hidden;
@@ -211,9 +217,10 @@
   background: #FFFBEB !important;
 }
 
-/* Disable swipe back/forward navigation on mobile (PWA) */
+/* Disable swipe back/forward navigation and the rubber-band / pull-to-refresh
+   bounce — both make a PWA feel like a browser tab instead of an app. */
 html, body {
-  overscroll-behavior-x: none;
+  overscroll-behavior: none;
   touch-action: pan-y;
 }
 

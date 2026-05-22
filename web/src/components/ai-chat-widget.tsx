@@ -314,9 +314,9 @@ export function AIChatWidget() {
         onClick={() => setOpen((v) => !v)}
         className={cn(
           "fixed z-50 flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105 active:scale-95",
-          // Mobile: bottom-4 right-20 (the scan button sits at right-4)
+          // Mobile: sits above the bottom tab bar, beside the scan button
           // Desktop: bottom-6 right-20 (left of the scan button)
-          "bottom-4 right-20 sm:bottom-6 sm:right-20"
+          "bottom-[calc(env(safe-area-inset-bottom)+4.75rem)] right-20 sm:bottom-6 sm:right-20"
         )}
       >
         {open ? (
