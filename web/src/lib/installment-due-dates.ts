@@ -15,6 +15,10 @@ export function installmentDueDateIso(
   const m2 = firstOfTarget.getMonth();
   const daysInMonth = new Date(y2, m2 + 1, 0).getDate();
   const day = Math.min(Math.max(1, dueDay), daysInMonth);
-  const due = new Date(y2, m2, day);
-  return due.toISOString().split("T")[0]!;
+  // Format directly from the parts — never round-trip through toISOString(),
+  // which converts local midnight to UTC and shifts the day backwards in
+  // positive-offset timezones (e.g. Lebanon, UTC+2/+3).
+  const mm = String(m2 + 1).padStart(2, "0");
+  const dd = String(day).padStart(2, "0");
+  return `${y2}-${mm}-${dd}`;
 }
