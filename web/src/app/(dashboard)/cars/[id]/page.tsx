@@ -919,6 +919,15 @@ export default function CarProfilePage() {
 
   async function handleUpdateToSold() {
     if (!car || !canEditInventory) return;
+    // Never let a car be marked "sold" without an underlying confirmed sale.
+    // The button only renders under this condition, but enforce it in the
+    // handler too so the car status can't be set sold with no sales order.
+    if (!(salesOrder?.customer && salesOrder?.status === "confirmed")) {
+      toast.error(
+        "This car needs a confirmed sales order with a customer before it can be marked Sold."
+      );
+      return;
+    }
     const { error } = await supabase
       .from("cars")
       .update({ status: "sold" })
