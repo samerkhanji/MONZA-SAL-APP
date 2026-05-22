@@ -89,7 +89,7 @@ export default function RecallsPage() {
         .select("id, recall_number, title, status, affected_models, model_year_min, model_year_max, opened_at")
         .is("deleted_at", null)
         .order("opened_at", { ascending: false })
-        .limit(500),
+        .limit(5000),
       supabase.from("recall_vehicles").select("recall_id, status"),
     ]);
     if (r.error) toast.error(formatError(r.error));

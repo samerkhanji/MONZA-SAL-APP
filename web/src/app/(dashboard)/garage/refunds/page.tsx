@@ -139,7 +139,7 @@ export default function RefundsPage() {
         .select("id, refund_number, kind, customer_id, amount, currency, status, approval_required, reason, requested_at, requested_by")
         .is("deleted_at", null)
         .order("requested_at", { ascending: false })
-        .limit(500),
+        .limit(5000),
       supabase.from("customers_display").select("id, full_name").limit(2000),
     ]);
     if (r.error) toast.error(formatError(r.error));
@@ -389,6 +389,11 @@ function CreateRefundDialog({
     if (!Number.isFinite(amt) || amt <= 0) return toast.error("Enter a positive amount");
     if (!reason.trim()) return toast.error("Reason is required");
     if (kind === "parts" && !partId) return toast.error("Pick the part being refunded");
+    if (kind === "parts") {
+      const qty = Number(quantity);
+      if (!Number.isInteger(qty) || qty < 1 || qty > 1000)
+        return toast.error("Enter a whole part quantity between 1 and 1000");
+    }
 
     setSubmitting(true);
     const { data, error } = await supabase.rpc("request_refund", {
@@ -401,7 +406,7 @@ function CreateRefundDialog({
       p_invoice_id: null,
       p_warranty_case_id: initialWarrantyCaseId ?? null,
       p_part_id: kind === "parts" ? partId : null,
-      p_quantity: kind === "parts" ? Number(quantity) || 1 : null,
+      p_quantity: kind === "parts" ? Number(quantity) : null,
       p_notes: notes.trim() || null,
     });
     setSubmitting(false);
