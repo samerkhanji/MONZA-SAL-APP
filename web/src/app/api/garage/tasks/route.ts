@@ -11,6 +11,15 @@ function isUuid(s: string): boolean {
   );
 }
 
+// Mirrors ALLOWED_TASK_STATUSES in [id]/route.ts (PATCH).
+const ALLOWED_TASK_STATUSES = new Set([
+  "pending",
+  "in_progress",
+  "blocked",
+  "done",
+  "cancelled",
+]);
+
 /** GET: list tasks (RLS filters by role). Query: car_id, status, assigned_to */
 export async function GET(req: Request) {
   try {
@@ -42,6 +51,9 @@ export async function GET(req: Request) {
       q = q.eq("car_id", carId);
     }
     if (status) {
+      if (!ALLOWED_TASK_STATUSES.has(status)) {
+        return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+      }
       q = q.eq("status", status);
     }
     if (assignedTo) {

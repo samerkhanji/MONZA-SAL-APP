@@ -72,7 +72,8 @@ export default function RecallCenterPage() {
       )
       .not("recalled_at", "is", null)
       .is("deleted_at", null)
-      .order("recalled_at", { ascending: false });
+      .order("recalled_at", { ascending: false })
+      .limit(5000);
     if (error) {
       toast.error(formatError(error));
       setCars([]);

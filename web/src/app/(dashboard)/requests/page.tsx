@@ -1017,7 +1017,11 @@ export default function RequestCenterPage() {
               <Button type="button" variant="outline" onClick={() => setNewOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={newSubmitting}>
+              <Button
+                type="submit"
+                disabled={newSubmitting}
+                data-tour-id="requests-new-submit"
+              >
                 {newSubmitting ? "Submitting..." : "Submit"}
               </Button>
             </DialogFooter>

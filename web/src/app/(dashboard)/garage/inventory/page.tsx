@@ -150,6 +150,15 @@ export default function GarageInventoryPage() {
     toast.success(`Found: ${p.part_name} · Stock: ${p.quantity}`);
   }
 
+  const supplierOptions = useMemo(() => {
+    const set = new Set<string>();
+    parts.forEach((p) => {
+      const s = p.supplier?.trim();
+      if (s) set.add(s);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [parts]);
+
   const filteredParts = useMemo(() => {
     return parts.filter((p) => {
       if (!matchesSearch(p, search)) return false;
@@ -343,8 +352,11 @@ export default function GarageInventoryPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All</SelectItem>
-                <SelectItem value="AZ">AZ</SelectItem>
-                <SelectItem value="DF">DF</SelectItem>
+                {supplierOptions.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {s}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>

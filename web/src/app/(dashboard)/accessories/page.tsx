@@ -79,7 +79,8 @@ export default function AccessoriesPage() {
     async function init() {
       const { data, error } = await supabase
         .from("accessory_inventory")
-        .select("*");
+        .select("*")
+        .limit(5000);
       if (cancelled) return;
       if (error) {
         toast.error(`Could not load accessories: ${formatError(error)}`);
@@ -409,7 +410,9 @@ export default function AccessoriesPage() {
                                 value={Number.isFinite(row.quantity) ? row.quantity : 0}
                                 onChange={(e) => {
                                   const v = parseFloat(e.target.value);
-                                  patchRow(row.id, { quantity: Number.isFinite(v) ? v : 0 });
+                                  patchRow(row.id, {
+                                    quantity: Number.isFinite(v) ? Math.max(0, Math.floor(v)) : 0,
+                                  });
                                 }}
                                 className="bg-background/80 h-9 w-full min-w-[4.5rem] border-transparent shadow-none focus-visible:border-input"
                               />

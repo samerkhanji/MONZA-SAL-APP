@@ -111,7 +111,7 @@ function LoginForm() {
     if (authUser) {
       const { data: profile } = await supabase
         .from("profiles")
-        .select("id, full_name, role, user_role")
+        .select("id, full_name, user_role")
         .eq("id", authUser.id)
         .maybeSingle();
       const appRole = getAppRoleFromProfile(profile as any);

@@ -345,8 +345,16 @@ function RequestTradeInDialog({
     });
     setSubmitting(false);
     if (error) return toast.error(formatError(error));
+    // request_trade_in may return the new id as a scalar or as an object { id }.
+    const newId =
+      data && typeof data === "object"
+        ? String((data as { id?: unknown }).id ?? "")
+        : String(data ?? "");
+    if (!newId) {
+      return toast.error("Trade-in created but server returned no id");
+    }
     toast.success("Trade-in request created — garage will inspect");
-    onCreated(data as string);
+    onCreated(newId);
   }
 
   return (

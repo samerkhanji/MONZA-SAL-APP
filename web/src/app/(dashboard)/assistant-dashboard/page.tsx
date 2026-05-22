@@ -176,9 +176,6 @@ export default function AssistantDashboardPage() {
     const today = new Date().toISOString().slice(0, 10);
     const threeDaysAgo = new Date(Date.now() - 3 * 86400000).toISOString();
     const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString();
-    const sevenDaysAgoDate = new Date(Date.now() - 7 * 86400000)
-      .toISOString()
-      .slice(0, 10);
 
     const [
       jobsRes,
@@ -196,7 +193,8 @@ export default function AssistantDashboardPage() {
         .select("*, cars:car_id(id, vin, brand, model), assigned_profile:assigned_to(id, full_name)")
         .is("deleted_at", null)
         .in("status", ["pending", "in_progress", "waiting_parts", "done", "delivered"])
-        .order("created_at", { ascending: false }),
+        .order("created_at", { ascending: false })
+        .limit(5000),
       supabase
         .from("delete_requests")
         .select("id", { count: "exact", head: true })
@@ -234,7 +232,7 @@ export default function AssistantDashboardPage() {
         .select("*", { count: "exact", head: true })
         .is("deleted_at", null)
         .in("status", ["pending", "waiting_parts"])
-        .lt("created_at", sevenDaysAgoDate),
+        .lt("created_at", sevenDaysAgo),
       supabase
         .from("installment_payments")
         .select("amount_due, paid_amount")

@@ -175,7 +175,6 @@ export default function OrderedCarsPage() {
       const arrivedRows =
         (arrivedRes.data as Omit<AwaitingPdiCar, "has_issues">[]) ?? [];
       const awaiting = arrivedRows
-        .filter((c) => issuesByCar.has(c.id))
         .map<AwaitingPdiCar>((c) => ({
           ...c,
           has_issues: issuesByCar.get(c.id) ?? false,
@@ -435,9 +434,7 @@ export default function OrderedCarsPage() {
                     <tr key={c.id} className="hover:bg-muted/50">
                       <td
                         className="cursor-pointer px-3 py-2 font-mono"
-                        onClick={() =>
-                          router.push(`/cars/${encodeURIComponent(c.vin)}`)
-                        }
+                        onClick={() => router.push(`/cars/${c.id}`)}
                       >
                         {c.vin}
                       </td>
@@ -458,9 +455,7 @@ export default function OrderedCarsPage() {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() =>
-                              router.push(`/cars/${encodeURIComponent(c.vin)}`)
-                            }
+                            onClick={() => router.push(`/cars/${c.id}`)}
                           >
                             Open
                           </Button>

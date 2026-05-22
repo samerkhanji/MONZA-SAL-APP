@@ -22,6 +22,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -123,6 +133,7 @@ export function JobDocuments({ jobId, onDocumentsChange }: JobDocumentsProps) {
   const [uploadNotes, setUploadNotes] = useState("");
   const [uploading, setUploading] = useState(false);
   const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [deleteTarget, setDeleteTarget] = useState<JobDocumentRow | null>(null);
 
   const canUpload = canManageGarage || appRole === "garage_staff";
   const canDeleteDocs = canPerform("garage_jobs", "delete", appRole ?? null);
@@ -191,7 +202,6 @@ export function JobDocuments({ jobId, onDocumentsChange }: JobDocumentsProps) {
 
   async function handleDelete(doc: JobDocumentRow) {
     if (!canDeleteDocs) return;
-    if (!confirm(`Delete "${doc.file_name}"?`)) return;
 
     const res = await fetch(`/api/documents/job/${doc.id}`, {
       method: "DELETE",
@@ -387,7 +397,7 @@ export function JobDocuments({ jobId, onDocumentsChange }: JobDocumentsProps) {
                       <Button
                         variant="outline"
                         size="lg"
-                        onClick={() => handleDelete(doc)}
+                        onClick={() => setDeleteTarget(doc)}
                         className="text-destructive hover:text-destructive"
                       >
                         <Trash2 className="size-4" />
@@ -488,6 +498,35 @@ export function JobDocuments({ jobId, onDocumentsChange }: JobDocumentsProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete document?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget
+                ? `"${deleteTarget.file_name}" will be permanently removed.`
+                : ""}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteTarget) {
+                  void handleDelete(deleteTarget);
+                  setDeleteTarget(null);
+                }
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
