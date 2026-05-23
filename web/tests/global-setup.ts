@@ -109,22 +109,24 @@ export default async function globalSetup(config: FullConfig) {
 
     // Either we land on /requests (post-login default) or /change-password.
     // The latter means the reset flag wasn't cleared → fail the run early.
+    // Predicate: success = navigated to any path that isn't /login and isn't bare "/".
     await page.waitForURL(
-      (url) =>
-        !url.pathname.startsWith("/login") && !url.pathname.startsWith("/"),
+      (url) => !url.pathname.startsWith("/login") && url.pathname !== "/",
       { timeout: 20_000 }
     ).catch(async () => {
       const current = page.url();
       if (current.includes("/change-password")) {
+        await dumpDiagnostics("landed on /change-password");
         throw new Error(
           `Login landed on /change-password. Expected flag to be cleared — check global-setup step 1.`
         );
       }
-      // else: we're still on /login or /, likely wrong password. Dump for debugging.
+      await dumpDiagnostics("login did not navigate");
+      // Also save the legacy login-failure.html for backwards compat.
       const html = await page.content();
       fs.writeFileSync(path.join(authDir, "login-failure.html"), html);
       throw new Error(
-        `Login did not navigate away from /login or /. See tests/.auth/login-failure.html.`
+        `Login did not navigate away from /login or /. Current URL: ${current}. See tests/.auth/diag.txt + diag-page.png.`
       );
     });
 
