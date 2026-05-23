@@ -63,9 +63,49 @@ export default async function globalSetup(config: FullConfig) {
     const page = await context.newPage();
 
     await page.goto("/login");
-    await page.fill('input[type="email"]', email);
-    await page.fill('input[type="password"]', password);
-    await page.click('button[type="submit"]');
+
+    // DIAGNOSTIC: dump page state on any login-step failure so we can see what
+    // the page actually looked like instead of just "selector timed out".
+    async function dumpDiagnostics(label: string) {
+      try {
+        const url = page.url();
+        const title = await page.title().catch(() => "<no title>");
+        const inputs = await page.$$eval("input", (els) =>
+          els.map((e) => ({
+            type: (e as HTMLInputElement).type,
+            id: e.id,
+            name: (e as HTMLInputElement).name,
+            visible: !!(e as HTMLElement).offsetParent,
+            ariaHidden: e.getAttribute("aria-hidden"),
+          }))
+        );
+        const html = await page.content();
+        fs.writeFileSync(path.join(authDir, "diag-page.html"), html);
+        await page.screenshot({ path: path.join(authDir, "diag-page.png"), fullPage: true });
+        const report = [
+          `=== DIAG: ${label} ===`,
+          `url: ${url}`,
+          `title: ${title}`,
+          `input count: ${inputs.length}`,
+          ...inputs.map((i, n) => `  [${n}] type=${i.type} id=${i.id} name=${i.name} visible=${i.visible} aria-hidden=${i.ariaHidden}`),
+          `screenshot: tests/.auth/diag-page.png`,
+          `html:       tests/.auth/diag-page.html`,
+        ].join("\n");
+        fs.writeFileSync(path.join(authDir, "diag.txt"), report);
+        console.error("\n" + report + "\n");
+      } catch (e) {
+        console.error("[diag] failed to capture:", e);
+      }
+    }
+
+    try {
+      await page.fill('input[type="email"]', email);
+      await page.fill('input[type="password"]', password);
+      await page.click('button[type="submit"]');
+    } catch (err) {
+      await dumpDiagnostics("fill/click failed");
+      throw err;
+    }
 
     // Either we land on /requests (post-login default) or /change-password.
     // The latter means the reset flag wasn't cleared → fail the run early.
