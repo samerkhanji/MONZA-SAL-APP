@@ -1,4 +1,4 @@
-# Monza CRM Launch Readiness Report
+# Monza App Launch Readiness Report
 
 **Date:** 2026-05-19 (Beirut)
 **Auditor:** Final QA (read-only static + DB verification)

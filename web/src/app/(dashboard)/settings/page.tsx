@@ -636,7 +636,7 @@ export default function SettingsPage() {
                   <div className="min-w-0 flex-1">
                     <p className="font-medium">Onboarding Tour</p>
                     <p className="text-sm text-muted-foreground">
-                      Walk through the main features of Monza CRM for your role.
+                      Walk through the main features of Monza App for your role.
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
                       Tour completed on:{" "}

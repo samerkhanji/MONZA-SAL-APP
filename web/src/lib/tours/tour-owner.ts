@@ -19,7 +19,7 @@ export const ownerWelcomeTour: Tour = {
   allowedRoles: ["owner"],
   steps: [
     {
-      title: "Welcome to Monza CRM 👋",
+      title: "Welcome to Monza App 👋",
       description:
         "Hi! I'm going to walk you through your dealership in about 2 minutes. " +
         "I'll point at each thing on the screen and tell you what it does. " +

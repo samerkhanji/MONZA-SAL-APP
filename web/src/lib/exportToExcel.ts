@@ -95,7 +95,7 @@ export function exportToExcel(
 
   const aoa: (string | number | Date | "")[][] = [];
   if (includeTitleRow && pageName) {
-    aoa.push([`Monza CRM — ${pageName} Export`]);
+    aoa.push([`Monza App — ${pageName} Export`]);
   }
   aoa.push(columns.map((c) => c.header));
   rows.forEach((r) =>

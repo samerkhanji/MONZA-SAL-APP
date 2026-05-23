@@ -10,7 +10,7 @@ import { tryCreateAdminClient } from "@/lib/supabase/admin";
  * - NEXT_PUBLIC_SUPABASE_URL
  * - SUPABASE_SERVICE_ROLE_KEY — admin.generateLink only on server
  * - RESEND_API_KEY — https://resend.com/api-keys
- * - RESEND_FROM_EMAIL — verified sender, e.g. "Monza CRM <onboarding@resend.dev>" or your domain
+ * - RESEND_FROM_EMAIL — verified sender, e.g. "Monza App <onboarding@resend.dev>" or your domain
  *
  * Optional: NEXT_PUBLIC_SITE_URL — used with Origin to compute redirectTo (allow-list in Supabase).
  * Production fallback matches https://monzasal.vercel.app/reset-password when unset.
@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
 <html>
 <body style="font-family: system-ui, sans-serif; line-height: 1.5;">
   <h2>Reset your password</h2>
-  <p>You asked to reset your password for Monza CRM. Open the link below on any device:</p>
+  <p>You asked to reset your password for Monza App. Open the link below on any device:</p>
   <p><a href="${href}">Reset your password</a></p>
   <p style="color:#666;font-size:14px;">If you did not request this, you can ignore this email.</p>
 </body>
@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
     body: JSON.stringify({
       from: fromEmail,
       to: [email],
-      subject: "Reset your Monza CRM password",
+      subject: "Reset your Monza App password",
       html,
     }),
   });

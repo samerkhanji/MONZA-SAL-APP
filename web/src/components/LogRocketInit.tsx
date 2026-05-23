@@ -5,7 +5,7 @@ import { useUser } from "@/lib/contexts/UserContext";
 import { createClient } from "@/lib/supabase";
 
 /**
- * LogRocket SDK initialization for Monza CRM.
+ * LogRocket SDK initialization for Monza App.
  *
  * App ID: px16ic/monza-crm
  *

@@ -105,7 +105,7 @@ async function fetchAllUsers(admin) {
 async function sendResendEmail({ to, tempPassword, from, apiKey }) {
   const html = `<!DOCTYPE html>
 <html><body style="font-family:system-ui,sans-serif;line-height:1.5;">
-  <h2>Monza CRM — temporary password</h2>
+  <h2>Monza App — temporary password</h2>
   <p>Your account password was reset by an administrator.</p>
   <p><strong>Temporary password:</strong> <code>${escapeHtml(tempPassword)}</code></p>
   <p>Sign in and change it immediately under <strong>Settings</strong> (or use “Change password”).</p>
@@ -121,7 +121,7 @@ async function sendResendEmail({ to, tempPassword, from, apiKey }) {
     body: JSON.stringify({
       from,
       to: [to],
-      subject: "Monza CRM — your temporary password",
+      subject: "Monza App — your temporary password",
       html,
     }),
   });

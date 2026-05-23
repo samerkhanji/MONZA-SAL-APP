@@ -1,4 +1,4 @@
-// Monza CRM service worker.
+// Monza App service worker.
 //
 // Strategies:
 //   - Navigation (HTML): network-first; if offline, serve a cached fallback
@@ -126,7 +126,7 @@ self.addEventListener("fetch", (event) => {
 
 self.addEventListener("push", function (event) {
   const data = event.data ? event.data.json() : {};
-  const title = data.title || "Monza CRM";
+  const title = data.title || "Monza App";
   const options = {
     body: data.message || "You have a new notification",
     icon: "/icons/icon-192.png",

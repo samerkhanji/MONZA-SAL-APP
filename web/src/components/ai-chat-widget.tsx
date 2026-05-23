@@ -10,7 +10,7 @@ import { USER_ROLE_LABELS } from "@/lib/constants/user";
 import { cn } from "@/lib/utils";
 
 /**
- * Floating AI chat assistant for the Monza CRM.
+ * Floating AI chat assistant for the Monza App.
  *
  * v1 design:
  *   - Hidden when the user is not signed in.

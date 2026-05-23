@@ -1,8 +1,8 @@
-# Monza CRM — Architecture Overview
+# Monza App — Architecture Overview
 
 ## System Overview
 
-Monza CRM is an internal ERP-style web application for Monza S.A.L. It centralizes:
+Monza App is an internal ERP-style web application for Monza S.A.L. It centralizes:
 
 - **Inventory**: vehicles, locations, movement history
 - **CRM**: customers, requests, sales funnel
@@ -246,5 +246,5 @@ To further improve maintainability and AI guidance, the next recommended step is
   - Describe triggers, functions, and RLS policies.
   - Explain any non-obvious invariants or data migrations.
 
-Having both **architecture** and **database schema** docs will significantly reduce onboarding time and accidental regressions as Monza CRM grows.
+Having both **architecture** and **database schema** docs will significantly reduce onboarding time and accidental regressions as Monza App grows.
 

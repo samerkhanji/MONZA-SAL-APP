@@ -1,6 +1,6 @@
 # Auth & Supabase Email Pipeline — Audit Report
 
-**Scope:** MONZA CRM `web` app (Next.js 16, Supabase Auth), Vercel deployment.  
+**Scope:** MONZA APP `web` app (Next.js 16, Supabase Auth), Vercel deployment.  
 **Date:** 2026-04-01  
 **Method:** Static codebase review + configuration alignment with approved audit plan.  
 **Note:** SMTP deliverability for Auth emails is configured in **Supabase Dashboard**, not in this repository.

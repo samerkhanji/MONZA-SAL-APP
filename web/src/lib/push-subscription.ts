@@ -84,7 +84,7 @@ export async function registerPushSubscription(userId: string): Promise<Register
         ok: false,
         reason: "subscribe_failed",
         message: isIOS
-          ? "On iPhone/iPad: Add Monza CRM to your Home Screen first (Share → Add to Home Screen), then open the app from the home screen icon. Push does not work in Safari tabs."
+          ? "On iPhone/iPad: Add Monza App to your Home Screen first (Share → Add to Home Screen), then open the app from the home screen icon. Push does not work in Safari tabs."
           : "Push service unavailable. Use Chrome or Edge (not incognito), ensure the site uses HTTPS, and allow notifications when prompted. On Windows: Settings → System → Notifications → ensure your browser can show notifications.",
       };
     }

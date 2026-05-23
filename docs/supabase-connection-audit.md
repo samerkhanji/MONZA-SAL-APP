@@ -1,4 +1,4 @@
-# Supabase Connection Audit — Monza CRM
+# Supabase Connection Audit — Monza App
 
 > Refresh of the Feb 2025 audit, current as of migration `132` and launch sprint PRs #67–#74. Project: `okxpsvukzjjubinhamek`, region `eu-central-1`.
 
