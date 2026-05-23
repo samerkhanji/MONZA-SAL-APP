@@ -14,9 +14,11 @@ function extraAllowedDevOrigins(): string[] {
 
 const nextConfig: NextConfig = {
   // Cross-origin dev requests (e.g. phone on LAN). Prefer http://localhost:3000 for HMR stability.
+  // Next.js 16 expects bare hostnames here, not full URLs — otherwise HMR WebSocket gets
+  // blocked and floods the console with `ws://.../webpack-hmr handshake failed` errors.
   allowedDevOrigins: [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
+    "localhost",
+    "127.0.0.1",
     ...extraAllowedDevOrigins(),
   ],
   // Must match turbopack.root or Next warns (and tracing can mis-resolve in monorepos).
