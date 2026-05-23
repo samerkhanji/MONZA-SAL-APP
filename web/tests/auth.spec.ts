@@ -29,7 +29,11 @@ test.describe("auth", () => {
     // the only thing keeping us in, we should be kicked to /login.
     await context.clearCookies();
     await page.reload();
-    await expect(page).toHaveURL(/\/login|\/$/);
+    // After cookie clear the app may redirect to `/login`, bare `/`, or
+    // `/?redirectTo=…`. Match on pathname only so query strings don't break us.
+    await expect(page).toHaveURL((url) =>
+      url.pathname === "/" || url.pathname.startsWith("/login")
+    );
 
     await finish();
   });
