@@ -14,11 +14,11 @@
 | Severity | ID | Area | Finding |
 |----------|-----|------|---------|
 | **High** | H1 | Product copy / ops | `POST /api/team/add-employee` success message claimed users “will receive a password reset email”; **`auth.admin.createUser` with `email_confirm: true` does not send password-reset or welcome mail** from Supabase by default. |
-| **High** | H2 | Supabase (dashboard) | **Site URL** must be canonical production (`https://monzacrm.vercel.app`); using a **preview URL** as Site URL breaks `{{ .SiteURL }}` in templates and default redirects. (Observed in prior config; verify in dashboard.) |
+| **High** | H2 | Supabase (dashboard) | **Site URL** must be canonical production (`https://monzasal.vercel.app`); using a **preview URL** as Site URL breaks `{{ .SiteURL }}` in templates and default redirects. (Observed in prior config; verify in dashboard.) |
 | **High** | H3 | Supabase (dashboard) | **Redirect URL** allow list must include every origin/path the app sends as `redirectTo` — especially **`{origin}/reset-password`** (see code) and preview wildcards (`https://*.vercel.app/**`). |
 | **Medium** | M1 | Observability | PKCE/token exchange runs in **client components**; failures are mostly **browser console** + **Supabase Auth logs**, not Vercel Node function logs for `/auth/callback`. |
 | **Medium** | M2 | Error UX | Forgot-password on `/` used raw `resetError.message`; **`formatAuthApiErrorMessage`** (rate limits, codes) was not applied consistently with `/login`. |
-| **Medium** | M3 | `getAuthSiteUrl()` | Hardcoded fallback `https://monzacrm.vercel.app` if `NEXT_PUBLIC_SITE_URL` unset in production build — wrong if production domain changes. |
+| **Medium** | M3 | `getAuthSiteUrl()` | Hardcoded fallback `https://monzasal.vercel.app` if `NEXT_PUBLIC_SITE_URL` unset in production build — wrong if production domain changes. |
 | **Low** | L1 | Monitoring | No **Sentry** (or similar) in `web/src` for client auth failures. |
 | **Low** | L2 | Edge session (`proxy` + lib) | `getUser()` errors only `console.warn` in **development**; production failures are silent on the server edge (`web/src/proxy.ts` → `web/src/lib/supabase/middleware.ts`). |
 
@@ -56,7 +56,7 @@
 | Item | Implementation |
 |------|------------------|
 | **Password reset `redirectTo`** | `getPasswordResetRedirectUrl()` → `` `${getAuthSiteUrl()}/reset-password` `` |
-| **`NEXT_PUBLIC_SITE_URL`** | Trimmed; trailing `/` stripped. Browser: `fromEnv \|\| window.location.origin`. SSR production: `fromEnv \|\| "https://monzacrm.vercel.app"`. |
+| **`NEXT_PUBLIC_SITE_URL`** | Trimmed; trailing `/` stripped. Browser: `fromEnv \|\| window.location.origin`. SSR production: `fromEnv \|\| "https://monzasal.vercel.app"`. |
 | **Preview** | If env unset in browser, origin is the preview host — must match Supabase **Redirect URLs** (e.g. `https://*.vercel.app/**`). |
 | **Call sites** | `fetch('/api/auth/reset-password', …)` from `web/src/app/page.tsx`; `submitPasswordResetRequest` → same API from `web/src/app/login/page.tsx` |
 
@@ -113,7 +113,7 @@
 
 ### Dashboard / Vercel (operators)
 
-1. Set **Site URL** to production `https://monzacrm.vercel.app` (or your real prod domain).
+1. Set **Site URL** to production `https://monzasal.vercel.app` (or your real prod domain).
 2. Maintain **Redirect URLs** as in §2.2 checklist.
 3. Configure **SMTP** in Supabase if default mail is insufficient; monitor provider + DNS.
 4. **Vercel Production:** set `NEXT_PUBLIC_SITE_URL` to canonical prod URL; **Preview:** often leave unset for per-preview origin.

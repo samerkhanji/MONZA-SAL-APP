@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
       redirectTo,
       originHeader: origin,
       nextPublicSiteUrl: process.env.NEXT_PUBLIC_SITE_URL?.trim() || "(unset)",
-      matchesProductionCanonical: redirectTo === "https://monzacrm.vercel.app/reset-password",
+      matchesProductionCanonical: redirectTo === "https://monzasal.vercel.app/reset-password",
       email: redactEmail(email),
     });
   }

@@ -13,7 +13,7 @@ import { tryCreateAdminClient } from "@/lib/supabase/admin";
  * - RESEND_FROM_EMAIL — verified sender, e.g. "Monza CRM <onboarding@resend.dev>" or your domain
  *
  * Optional: NEXT_PUBLIC_SITE_URL — used with Origin to compute redirectTo (allow-list in Supabase).
- * Production fallback matches https://monzacrm.vercel.app/reset-password when unset.
+ * Production fallback matches https://monzasal.vercel.app/reset-password when unset.
  */
 const RESEND_SEND_URL = "https://api.resend.com/emails";
 

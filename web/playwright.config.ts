@@ -8,7 +8,7 @@ dotenv.config({ path: path.resolve(__dirname, ".env.local"), override: false });
 
 /**
  * BASE URL selection
- *   `PLAYWRIGHT_BASE_URL=https://monzacrm.vercel.app` → run against production
+ *   `PLAYWRIGHT_BASE_URL=https://monzasal.vercel.app` → run against production
  *   otherwise: boot `next dev` on :3000 via webServer below
  */
 const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3000";
