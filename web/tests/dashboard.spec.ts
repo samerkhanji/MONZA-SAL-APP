@@ -13,9 +13,13 @@ test.describe("dashboard integrity", () => {
     await expect(page).not.toHaveURL(/\/change-password/);
 
     // Nothing rendered should contain either the generic Next error overlay
-    // or the app's red-toast error border.
-    const nextOverlay = page.locator("nextjs-portal");
-    await expect(nextOverlay).toHaveCount(0);
+    // or the app's red-toast error border. The <nextjs-portal> element itself
+    // is always present in dev (it also hosts the Dev Tools indicator), so
+    // assert on the actual error dialog instead.
+    const nextErrorDialog = page.locator(
+      "nextjs-portal [data-nextjs-dialog-overlay], nextjs-portal [data-nextjs-dialog]"
+    );
+    await expect(nextErrorDialog).toHaveCount(0);
 
     const visibleErrorCopy = page.getByText(/Something went wrong|Unexpected error/i);
     await expect(visibleErrorCopy).toHaveCount(0);
