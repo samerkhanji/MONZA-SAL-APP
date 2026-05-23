@@ -58,6 +58,8 @@ export function TwoFactorAuthSection() {
   const [code, setCode] = useState("");
   const [verifying, setVerifying] = useState(false);
   const [disableTarget, setDisableTarget] = useState<string | null>(null);
+  const [disableCode, setDisableCode] = useState("");
+  const [disabling, setDisabling] = useState(false);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -142,13 +144,45 @@ export function TwoFactorAuthSection() {
     void refresh();
   }
 
-  async function disableMFA(factorId: string) {
-    const { error } = await supabase.auth.mfa.unenroll({ factorId });
-    if (error) {
-      toast.error(formatError(error));
+  async function confirmDisable() {
+    if (!disableTarget) return;
+    const trimmed = disableCode.trim();
+    if (!/^\d{6}$/.test(trimmed)) {
+      toast.error("Enter the 6-digit code from your authenticator app");
+      return;
+    }
+    setDisabling(true);
+    // Fresh challenge + verify before unenroll: without this a stolen AAL1
+    // session could disable MFA and keep persistent access.
+    const { data: challenge, error: chErr } = await supabase.auth.mfa.challenge({
+      factorId: disableTarget,
+    });
+    if (chErr || !challenge) {
+      setDisabling(false);
+      toast.error(chErr ? formatError(chErr) : "Failed to start verification");
+      return;
+    }
+    const { error: vErr } = await supabase.auth.mfa.verify({
+      factorId: disableTarget,
+      challengeId: challenge.id,
+      code: trimmed,
+    });
+    if (vErr) {
+      setDisabling(false);
+      toast.error(formatError(vErr));
+      return;
+    }
+    const { error: unErr } = await supabase.auth.mfa.unenroll({
+      factorId: disableTarget,
+    });
+    setDisabling(false);
+    if (unErr) {
+      toast.error(formatError(unErr));
       return;
     }
     toast.success("Two-factor authentication disabled");
+    setDisableTarget(null);
+    setDisableCode("");
     void refresh();
   }
 
@@ -248,28 +282,42 @@ export function TwoFactorAuthSection() {
 
       <AlertDialog
         open={disableTarget !== null}
-        onOpenChange={(open) => !open && setDisableTarget(null)}
+        onOpenChange={(open) => {
+          if (!open && !disabling) {
+            setDisableTarget(null);
+            setDisableCode("");
+          }
+        }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Remove two-factor authentication?</AlertDialogTitle>
             <AlertDialogDescription>
-              You&apos;ll only need a password to log in until you re-enable it. This
-              significantly weakens your account&apos;s security.
+              Enter your current 6-digit code to disable two-factor auth. After this
+              you&apos;ll only need a password to log in until you re-enable it.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <div className="py-2">
+            <Input
+              inputMode="numeric"
+              maxLength={6}
+              placeholder="123456"
+              value={disableCode}
+              onChange={(e) => setDisableCode(e.target.value.replace(/\D/g, ""))}
+              className="max-w-[140px] tracking-widest text-center text-lg"
+              autoComplete="one-time-code"
+              autoFocus
+            />
+          </div>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                if (disableTarget) {
-                  void disableMFA(disableTarget);
-                  setDisableTarget(null);
-                }
-              }}
+            <AlertDialogCancel disabled={disabling}>Cancel</AlertDialogCancel>
+            <Button
+              variant="destructive"
+              onClick={confirmDisable}
+              disabled={disabling || disableCode.length !== 6}
             >
-              Disable 2FA
-            </AlertDialogAction>
+              {disabling ? "Disabling…" : "Disable 2FA"}
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
