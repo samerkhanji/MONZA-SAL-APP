@@ -46,6 +46,7 @@ const CAPABILITY_LABELS: Record<UserCapability, string> = {
   deactivate_users: "Deactivate Users",
   view_reports: "View Reports",
   data_health: "Data Health",
+  view_customer_documents: "View Customer Documents",
 };
 
 const ROLE_COLORS: Record<string, string> = {

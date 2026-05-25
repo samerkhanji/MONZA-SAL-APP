@@ -327,7 +327,8 @@ export type AppCapability =
   | "view_reports"
   | "inventory"
   | "sales"
-  | "data_health";
+  | "data_health"
+  | "view_customer_documents";
 
 /** All known capability values (use for type-safe lookups, dropdowns, etc). */
 export const APP_CAPABILITIES: readonly AppCapability[] = [
@@ -342,6 +343,7 @@ export const APP_CAPABILITIES: readonly AppCapability[] = [
   "inventory",
   "sales",
   "data_health",
+  "view_customer_documents",
 ] as const;
 
 /**

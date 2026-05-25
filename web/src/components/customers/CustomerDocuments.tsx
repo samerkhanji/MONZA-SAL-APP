@@ -11,7 +11,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
-import { canPerform } from "@/lib/permissions";
+import { canPerform, hasCapability } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -96,8 +96,14 @@ function applyCustomName(customName: string, originalName: string): string {
 }
 
 export function CustomerDocuments({ customerId }: CustomerDocumentsProps) {
-  const { canEditInventory, appRole } = useUser();
-  const canUpload = canPerform("customers", "edit", appRole ?? null);
+  const { canEditInventory, appRole, profile } = useUser();
+  // Customer documents carry PII (passport scans, IDs, insurance). Reading
+  // and uploading require the explicit `view_customer_documents` capability
+  // (owners auto-grant via hasCapability). Migration 155 enforces the same
+  // gate at the DB + storage layer; this UI check just avoids a confusing
+  // empty list / 403 for users who lack the capability.
+  const canViewDocs = hasCapability(profile, "view_customer_documents");
+  const canUpload = canViewDocs;
   const canDeleteDocs = canPerform("customers", "delete", appRole ?? null);
   const supabase = createClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -258,6 +264,20 @@ export function CustomerDocuments({ customerId }: CustomerDocumentsProps) {
 
   function getUploaderName(doc: CustomerDocumentRow): string {
     return getProfileFullName(doc.profiles);
+  }
+
+  if (!canViewDocs) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Documents</CardTitle>
+          <CardDescription>
+            Restricted to users with the “View Customer Documents” capability.
+            Ask an owner to grant access if you need it.
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    );
   }
 
   return (
