@@ -2699,16 +2699,30 @@ export default function InstallmentsPage() {
                         ? `${selectedCar.model} (${selectedCar.vin})`
                         : "No car linked";
 
-                      // Link car and sales order if we have both customer and car
-        if (customer && newPlanCarId) {
-          const carUpdate: Record<string, unknown> = {
-            status: "sold",
-            sold_marker: "X",
-          };
-          await supabase
-            .from("cars")
-            .update(carUpdate)
-            .eq("id", newPlanCarId);
+                      // Link car and sales order if we have both customer and car.
+                      if (customer && newPlanCarId) {
+                        // Read the car's current state so we can (a) decide
+                        // whether the status transition to 'sold' is safe and
+                        // (b) seed the auto-created sales_order with real
+                        // price/currency instead of the financed total + USD.
+                        const { data: carRow } = await supabase
+                          .from("cars")
+                          .select("status, price, price_currency")
+                          .eq("id", newPlanCarId)
+                          .maybeSingle();
+
+                        // Only flip to 'sold' from a pre-sale state. Don't
+                        // clobber delivered / service / recalled / etc.
+                        const carStatus = (carRow?.status ?? null) as string | null;
+                        const transitionable =
+                          carStatus !== null &&
+                          ["available", "inventory", "reserved"].includes(carStatus);
+                        if (transitionable) {
+                          await supabase
+                            .from("cars")
+                            .update({ status: "sold", sold_marker: "X" })
+                            .eq("id", newPlanCarId);
+                        }
 
                         const { data: existingSale } = await supabase
                           .from("sales_orders")
@@ -2720,13 +2734,22 @@ export default function InstallmentsPage() {
                           .maybeSingle();
 
                         if (!existingSale) {
+                          // 'draft' (not 'confirmed') so the sales-order detail
+                          // page surfaces the incomplete lifecycle and reports
+                          // don't count this as a finalized sale yet.
+                          // selling_price/currency come from the car (the actual
+                          // cash price) rather than the plan's financed total.
                           await supabase.from("sales_orders").insert({
                             car_id: newPlanCarId,
                             customer_id: newPlanCustomerId,
-                            status: "confirmed",
-                            selling_price: totalNum,
-                            currency: "USD",
+                            status: "draft",
+                            selling_price:
+                              (carRow?.price as number | null | undefined) ?? totalNum,
+                            currency:
+                              (carRow?.price_currency as string | null | undefined) ?? "USD",
                             created_by: creatorId,
+                            notes:
+                              "Auto-created from installment plan. Complete quote / deposit / contract lifecycle.",
                           });
                         }
                       }

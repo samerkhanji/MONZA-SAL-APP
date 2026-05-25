@@ -15,6 +15,7 @@ const BROADCAST_ROLES = new Set([
   "khalil_hybrid",
   "it",
   "garage_manager",
+  "sales_ops",
 ]);
 
 function configureWebPush(): { ok: true } | { ok: false; error: string } {
@@ -23,7 +24,7 @@ function configureWebPush(): { ok: true } | { ok: false; error: string } {
   }
   try {
     webpush.setVapidDetails(
-      "mailto:support@monza.com",
+      process.env.VAPID_SUBJECT?.trim() || "mailto:support@monzasal.com",
       VAPID_PUBLIC_KEY,
       VAPID_PRIVATE_KEY
     );
@@ -92,7 +93,7 @@ export async function POST(request: NextRequest) {
 
     const { data: subs } = await supabase
       .from("push_subscriptions")
-      .select("subscription")
+      .select("id, subscription")
       .eq("user_id", user_id);
 
     if (!subs || subs.length === 0) {
@@ -118,8 +119,31 @@ export async function POST(request: NextRequest) {
       })
     );
 
+    // Prune subscriptions whose endpoint the push service has retired.
+    // Without this, push_subscriptions grows monotonically and every send
+    // to a dead endpoint re-fails forever, wasting Vercel/web-push budget.
+    const deadIds: string[] = [];
+    results.forEach((r, i) => {
+      if (r.status !== "rejected") return;
+      const reason = r.reason as { statusCode?: number } | undefined;
+      const code = reason?.statusCode;
+      if (code === 404 || code === 410) {
+        const id = (subs[i] as { id?: string }).id;
+        if (id) deadIds.push(id);
+      }
+    });
+    if (deadIds.length > 0) {
+      const { error: pruneErr } = await supabase
+        .from("push_subscriptions")
+        .delete()
+        .in("id", deadIds);
+      if (pruneErr) {
+        console.error("Failed to prune dead push subscriptions:", pruneErr);
+      }
+    }
+
     const sent = results.filter((r) => r.status === "fulfilled").length;
-    return NextResponse.json({ sent });
+    return NextResponse.json({ sent, pruned: deadIds.length });
   } catch (err) {
     console.error("Send push error:", err);
     return NextResponse.json(
