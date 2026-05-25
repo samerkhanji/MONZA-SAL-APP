@@ -236,12 +236,22 @@ export default function SalesOrdersPage() {
         </Card>
         <Card>
           <CardContent className="pt-4">
-            <p className="text-muted-foreground text-sm">Revenue (all currencies)</p>
+            <p className="text-muted-foreground text-sm">Revenue (USD)</p>
             <p className="text-2xl font-semibold tabular-nums">
-              {totalRevenue.toLocaleString()}
+              ${totalRevenue.toLocaleString()}
             </p>
             <p className="text-muted-foreground text-xs">
-              Sum of selling prices across mixed currencies — not converted
+              {(() => {
+                const priced = filtered.filter(
+                  (so) => so.status !== "cancelled" && (so.selling_price ?? 0) > 0
+                ).length;
+                const active = filtered.filter((so) => so.status !== "cancelled").length;
+                return active === 0
+                  ? "No active orders in view."
+                  : priced === active
+                  ? `Sum across ${priced} active orders`
+                  : `${priced} of ${active} active orders have a price set`;
+              })()}
             </p>
           </CardContent>
         </Card>
