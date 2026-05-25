@@ -296,6 +296,25 @@ function ResetPasswordInner() {
       return;
     }
 
+    // Clear must_change_password — they just SET a new password through the
+    // recovery email flow, so the first-login prompt would be confusing.
+    // Best-effort: if this fails (RLS, network), don't block the success
+    // path — the user's password is already updated. FirstLoginGuard will
+    // bounce them to /change-password on next dashboard load which they
+    // can complete legitimately.
+    const userId = session.user.id;
+    try {
+      await supabase
+        .from("profiles")
+        .update({ must_change_password: false })
+        .eq("id", userId);
+    } catch (clearErr) {
+      console.warn(
+        "[reset-password] could not clear must_change_password flag:",
+        clearErr
+      );
+    }
+
     setSuccess(true);
     setTimeout(() => {
       router.push("/login?resetSuccess=1");
