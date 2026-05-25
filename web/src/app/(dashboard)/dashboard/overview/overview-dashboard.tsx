@@ -73,6 +73,8 @@ const CHART_TYPE_LABELS: Record<CarStatusChartType, string> = {
 export type OwnerOverviewData = {
   summary: {
     totalCars: number;
+    /** Subset of totalCars excluding sold + delivered. Matches Reports. */
+    inStockCars: number;
     totalCustomers: number;
     activeSalesOrders: number;
     pendingRequests: number;
@@ -502,7 +504,9 @@ function FleetLogisticsCard({ data }: { data: OwnerOverviewData }) {
           </p>
           <div className="grid grid-cols-4 gap-2">
             {data.inventoryAging.map((b) => {
-              const isAged = b.bucket === "90+";
+              // ">180" days = the long-aged bucket emitted by
+              // report_inventory_aging. Highlight in amber.
+              const isAged = b.bucket === ">180";
               return (
                 <div
                   key={b.bucket}
@@ -725,6 +729,9 @@ export function OverviewDashboard({ data }: { data: OwnerOverviewData }) {
           <CardHeader className="pb-2">
             <CardDescription>Vehicles</CardDescription>
             <CardTitle className="text-2xl tabular-nums">{totalVehicles}</CardTitle>
+            <p className="text-[11px] text-muted-foreground">
+              {data.summary.inStockCars} in stock
+            </p>
           </CardHeader>
           <CardContent className="pt-0">
             <Button variant="link" className="h-auto px-0 text-xs" asChild>

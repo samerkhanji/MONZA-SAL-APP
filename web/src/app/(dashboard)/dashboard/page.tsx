@@ -333,10 +333,19 @@ export default function DashboardPage() {
     isHoussam ||
     isOwner;
 
+  // "In stock" = anything not yet sold/delivered. Derived from the same
+  // cars_display status query that feeds the "Cars by Status" widget, so
+  // we don't pay for an extra round-trip. Matches Reports' "Cars in Stock"
+  // figure (report_inventory_aging view excludes sold + delivered too).
+  const inStockCount = Object.entries(statusCounts)
+    .filter(([s]) => s !== "sold" && s !== "delivered")
+    .reduce((sum, [, n]) => sum + n, 0);
+
   const kpiCards = [
     {
       label: "Total Cars",
       value: totalCars,
+      hint: `${inStockCount} in stock`,
       icon: Car,
       href: "/cars",
       color: "text-blue-600 dark:text-blue-400",
@@ -472,6 +481,9 @@ export default function DashboardPage() {
                 <div className="min-w-0 flex-1">
                   <p className="text-xl font-bold sm:text-2xl">{loading ? "—" : card.value}</p>
                   <p className="text-xs text-muted-foreground sm:text-sm">{card.label}</p>
+                  {!loading && "hint" in card && card.hint ? (
+                    <p className="text-[10px] text-muted-foreground sm:text-xs">{card.hint}</p>
+                  ) : null}
                 </div>
                 <ChevronRight className="size-4 shrink-0 text-muted-foreground max-sm:hidden" />
               </CardContent>
