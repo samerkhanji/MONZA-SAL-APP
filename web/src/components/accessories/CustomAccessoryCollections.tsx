@@ -279,8 +279,7 @@ export function CustomAccessoryCollections() {
         <CardHeader>
           <CardTitle className="text-lg">Custom collections</CardTitle>
           <CardDescription className="text-amber-900 dark:text-amber-100">
-            Could not load from Supabase: {loadError}. Apply migration{" "}
-            <code className="rounded bg-muted px-1">035_accessory_custom_tables</code> if missing.
+            Could not load custom collections: {loadError}
           </CardDescription>
         </CardHeader>
       </Card>

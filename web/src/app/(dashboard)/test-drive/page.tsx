@@ -231,8 +231,7 @@ export default function TestDrivePage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Test Drive</h1>
         <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
-          Scan a VIN to start or manage a test drive. Only one active outing per vehicle. Apply migration{" "}
-          <code className="rounded bg-muted px-1 text-xs">034_test_drives</code> in Supabase first.
+          Scan a VIN to start or manage a test drive. Only one active outing per vehicle.
         </p>
       </div>
 

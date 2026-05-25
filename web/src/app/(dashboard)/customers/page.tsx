@@ -346,7 +346,7 @@ export default function CustomersPage() {
                     {fullName || "—"}
                   </td>
                   <td className={CRM_TD}>
-                    {customer.phone_primary ? (
+                    {customer.phone_primary?.trim() ? (
                       <a
                         href={`tel:${customer.phone_primary.replace(/\s/g, "")}`}
                         onClick={(e) => e.stopPropagation()}
@@ -691,7 +691,7 @@ export default function CustomersPage() {
                               )}
                             </td>
                             <td className={CRM_TD}>
-                              {customer?.phone_primary ? (
+                              {customer?.phone_primary?.trim() ? (
                                 <a
                                   href={`tel:${customer.phone_primary}`}
                                   className="block max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-primary hover:underline"

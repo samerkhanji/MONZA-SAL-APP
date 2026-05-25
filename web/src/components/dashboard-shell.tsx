@@ -226,6 +226,8 @@ function getPageTitle(pathname: string): string {
   if (pathname.startsWith("/garage/refunds")) return "Refunds";
   if (pathname.startsWith("/garage")) return "Garage";
   if (pathname.startsWith("/settings")) return "Settings";
+  if (pathname.startsWith("/cash")) return "Cash Register";
+  if (pathname.startsWith("/reports")) return "Reports";
   return "Monza S.A.L.";
 }
 
