@@ -35,7 +35,11 @@ export default function RootLayout({
       <head>
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#F59E0B" />
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+        {/* Allow pinch-zoom for accessibility (visually impaired staff
+            rely on it). Removed maximum-scale=1 + user-scalable=no — the
+            iOS keyboard-zoom-jump those flags fought is handled by the
+            16px min-font on inputs in globals.css. */}
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />

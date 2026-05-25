@@ -203,7 +203,7 @@ function LoginForm() {
               </p>
             )}
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="login-email">Email</Label>
               <Input
                 id="login-email"
                 name="login-email"
@@ -217,7 +217,7 @@ function LoginForm() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="login-password">Password</Label>
               <Input
                 id="login-password"
                 name="login-password"

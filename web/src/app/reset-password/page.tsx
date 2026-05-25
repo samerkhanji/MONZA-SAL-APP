@@ -392,7 +392,7 @@ function ResetPasswordInner() {
                 </p>
               )}
               <div className="space-y-2">
-                <Label htmlFor="password">New password</Label>
+                <Label htmlFor="reset-password">New password</Label>
                 <Input
                   id="reset-password"
                   name="reset-password"
@@ -409,7 +409,7 @@ function ResetPasswordInner() {
                 </p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="confirm">Confirm password</Label>
+                <Label htmlFor="reset-confirm-password">Confirm password</Label>
                 <Input
                   id="reset-confirm-password"
                   name="reset-confirm-password"
