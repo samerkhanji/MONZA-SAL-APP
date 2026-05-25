@@ -184,6 +184,7 @@ export default function SettingsPage() {
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushStatus, setPushStatus] = useState<string>("");
   const [pushLoading, setPushLoading] = useState(false);
+  const [testPushSending, setTestPushSending] = useState(false);
 
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const [profileLanguage, setProfileLanguage] = useState("en");
@@ -1078,6 +1079,60 @@ export default function SettingsPage() {
                   {pushEnabled ? "Disable" : "Enable"}
                 </Button>
               </div>
+              {pushEnabled && profile?.id && (
+                <div className="flex items-center justify-between rounded-lg border border-dashed p-4">
+                  <div>
+                    <p className="font-medium">Send a test notification</p>
+                    <p className="text-sm text-muted-foreground">
+                      Pushes a sample notification to every device where you&apos;ve enabled push.
+                      Close the app first to confirm it arrives in the background.
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    disabled={testPushSending}
+                    onClick={async () => {
+                      if (!profile?.id) return;
+                      setTestPushSending(true);
+                      try {
+                        const res = await fetch("/api/send-push", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            user_id: profile.id,
+                            title: "Monza App test push",
+                            message: "If you're seeing this on your phone, push notifications are working.",
+                            link: "/settings?tab=notifications",
+                            tag: "test-push",
+                          }),
+                        });
+                        const data = (await res.json().catch(() => null)) as
+                          | { sent?: number; pruned?: number; error?: string }
+                          | null;
+                        if (!res.ok) {
+                          toast.error(data?.error ?? `Server returned ${res.status}`);
+                        } else if ((data?.sent ?? 0) === 0) {
+                          toast.warning(
+                            "No subscriptions reachable. Either the VAPID server keys aren't set on Vercel, or your saved subscription endpoint is dead. Re-toggle Enable, or set VAPID env vars."
+                          );
+                        } else {
+                          toast.success(
+                            `Pushed to ${data?.sent} device${data?.sent === 1 ? "" : "s"}.`
+                          );
+                        }
+                      } catch (err) {
+                        toast.error(
+                          err instanceof Error ? err.message : "Could not reach the push endpoint."
+                        );
+                      } finally {
+                        setTestPushSending(false);
+                      }
+                    }}
+                  >
+                    {testPushSending ? "Sending…" : "Send test"}
+                  </Button>
+                </div>
+              )}
               <p className="text-sm text-muted-foreground">
                 {pushStatus === "denied"
                   ? "Push notifications are blocked by your browser. Go to your browser settings to allow notifications for this site."
