@@ -2,7 +2,7 @@
  * Absolute site origin for Supabase auth redirects.
  * Must match entries under Supabase → Authentication → URL Configuration → Redirect URLs.
  *
- * - Production: set NEXT_PUBLIC_SITE_URL=https://monzacrm.vercel.app on Vercel (production only).
+ * - Production: set NEXT_PUBLIC_SITE_URL=https://monzasal.vercel.app on Vercel (production only).
  * - Preview: leave unset so each deployment uses its own window.location.origin; add
  *   https://*.vercel.app/** (or your team pattern) in Supabase Redirect URLs.
  * - Local: leave unset; uses http://localhost:3000 — allow http://localhost:3000/** in Supabase.
@@ -33,9 +33,9 @@ function browserAuthOrigin(): string | null {
   let o = window.location.origin;
   if (process.env.NODE_ENV === "production" && o.includes("localhost")) {
     console.warn(
-      "[Auth] Detected localhost origin in production; falling back to https://monzacrm.vercel.app"
+      "[Auth] Detected localhost origin in production; falling back to https://monzasal.vercel.app"
     );
-    return "https://monzacrm.vercel.app";
+    return "https://monzasal.vercel.app";
   }
   return o;
 }
@@ -62,7 +62,7 @@ export function getAuthSiteUrl(): string {
   }
 
   if (process.env.NODE_ENV === "production") {
-    return fromEnv || "https://monzacrm.vercel.app";
+    return fromEnv || "https://monzasal.vercel.app";
   }
   return fromEnv || "http://localhost:3000";
 }
@@ -99,7 +99,7 @@ export function getPasswordResetRedirectUrlFromServer(requestOrigin?: string | n
     }
   }
   if (process.env.NODE_ENV === "production") {
-    return "https://monzacrm.vercel.app/reset-password";
+    return "https://monzasal.vercel.app/reset-password";
   }
   return "http://localhost:3000/reset-password";
 }
@@ -133,7 +133,7 @@ export function logPasswordResetClientDebug(
   console.info("[PasswordResetDebug client]", {
     redirectTo,
     isAbsoluteHttpsProduction:
-      redirectTo === "https://monzacrm.vercel.app/reset-password",
+      redirectTo === "https://monzasal.vercel.app/reset-password",
     authSiteUrl: getAuthSiteUrl(),
     nextPublicSiteUrl: process.env.NEXT_PUBLIC_SITE_URL?.trim() || "(unset)",
     windowOrigin: typeof window !== "undefined" ? window.location.origin : null,
@@ -174,6 +174,9 @@ export function isPkceVerifierOrCrossDeviceError(err: { message?: string } | nul
  * `NEXT_PUBLIC_AUTH_REDIRECT_ALLOWED_HOSTS` (comma-separated, exact host[:port]).
  */
 const DEFAULT_ALLOWED_REDIRECT_HOSTS = [
+  "monzasal.vercel.app",
+  // Transitional: old branding URL still has bookmarks in the wild.
+  // Remove once analytics confirm no traffic on this host.
   "monzacrm.vercel.app",
   "localhost:3000",
   "127.0.0.1:3000",

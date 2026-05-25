@@ -1,4 +1,4 @@
-# Monza CRM — RLS security blueprint
+# Monza App — RLS security blueprint
 
 Use this when you (or AI) author **exact SQL** for a full RLS rollout: keep policies **aligned with the app** (`web/src/lib/permissions.ts`) so the UI does not show actions that the database then rejects.
 

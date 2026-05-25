@@ -133,7 +133,7 @@ export default function ChangePasswordPage() {
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background via-muted/30 to-background px-4 py-8">
       <Card className="w-full max-w-md border-border shadow-lg">
         <CardHeader>
-          <CardTitle>Welcome to Monza CRM</CardTitle>
+          <CardTitle>Welcome to Monza App</CardTitle>
           <CardDescription>
             Please set a new password to secure your account. You must complete this step
             before using the app.

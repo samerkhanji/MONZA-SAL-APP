@@ -1,6 +1,6 @@
 # Supabase Migrations
 
-This folder is the source of truth for the Monza CRM database schema. It contains 80 migrations applied to the live project `okxpsvukzjjubinhamek` (region eu-central-1) — numbered `053_*` through `132_*` (plus a few suffixed variants like `056b`, `087a-e`, `090b-d`, `093b`, `096b`, `097b`, `098b/c`, `100b`, `107_fix`, `084a/b`).
+This folder is the source of truth for the Monza App database schema. It contains 80 migrations applied to the live project `okxpsvukzjjubinhamek` (region eu-central-1) — numbered `053_*` through `132_*` (plus a few suffixed variants like `056b`, `087a-e`, `090b-d`, `093b`, `096b`, `097b`, `098b/c`, `100b`, `107_fix`, `084a/b`).
 
 `main` is the canonical history. The `_archive/` folder holds 52 older reference-only SQL files that documented intended schema before the CLI workflow existed; they are kept for historical context only and **must not be imported**.
 

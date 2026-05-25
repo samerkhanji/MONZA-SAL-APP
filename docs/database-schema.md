@@ -1,4 +1,4 @@
-# Monza CRM — Database Schema (Supabase)
+# Monza App — Database Schema (Supabase)
 
 > Source of truth for the application's logical data model. Exact DDL lives in `supabase/migrations/`. Last refreshed after migration `068_lockdown_internal_definer_fns`.
 

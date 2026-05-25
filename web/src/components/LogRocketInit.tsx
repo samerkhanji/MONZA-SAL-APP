@@ -5,7 +5,7 @@ import { useUser } from "@/lib/contexts/UserContext";
 import { createClient } from "@/lib/supabase";
 
 /**
- * LogRocket SDK initialization for Monza CRM.
+ * LogRocket SDK initialization for Monza App.
  *
  * App ID: px16ic/monza-crm
  *
@@ -31,7 +31,9 @@ export function LogRocketInit() {
 
     const host = window.location.hostname;
     const isProdHost =
-      host === "monzacrm.vercel.app" || host === "web-dun-beta-59.vercel.app";
+      host === "monzasal.vercel.app" ||
+      host === "monzacrm.vercel.app" ||
+      host === "web-dun-beta-59.vercel.app";
     if (!isProdHost) return;
 
     // Per-user opt-out (set via DevTools or a future settings toggle).

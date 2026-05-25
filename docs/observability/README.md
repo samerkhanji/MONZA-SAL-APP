@@ -1,4 +1,4 @@
-# MONZA CRM — Grafana Cloud observability
+# MONZA APP — Grafana Cloud observability
 
 Supabase exposes a Prometheus metrics endpoint per project:
 

@@ -105,7 +105,7 @@ async function maybeEmailRepeatedFailureAlert(params: {
   if ((recentAlerts ?? 0) > 0) return;
 
   const sent = await sendOpsAlert(
-    `[Monza CRM] Supabase compute resize failures (${count} in ${windowMins}m)`,
+    `[Monza App] Supabase compute resize failures (${count} in ${windowMins}m)`,
     `<p>Project ref: <code>${params.projectRef}</code></p>
      <p>Recent failure: ${escapeHtml(params.failureMessage)}</p>
      <p>Backoff attempts (last run): ${params.attemptCount}</p>

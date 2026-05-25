@@ -1,4 +1,4 @@
-# Monza CRM – Full Test Report
+# Monza App – Full Test Report
 
 **Date:** February 13, 2025  
 **Scope:** App structure, Supabase, PWA, security, lint, improvements

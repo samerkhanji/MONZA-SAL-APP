@@ -66,6 +66,9 @@ function ResetPasswordInner() {
   const [success, setSuccess] = useState(false);
   const [initializing, setInitializing] = useState(true);
   const [recoveryReady, setRecoveryReady] = useState(false);
+  const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
+  const [mfaCode, setMfaCode] = useState("");
+  const [mfaVerifying, setMfaVerifying] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -124,7 +127,10 @@ function ResetPasswordInner() {
           setInitializing(false);
           return;
         }
-        router.replace("/reset-password", { scroll: false });
+        // Strip URL params silently — using router.replace would trigger a
+        // useEffect re-run that races with the MFA check below.
+        window.history.replaceState({}, "", "/reset-password");
+        await maybePromptMfaThenReady(supabase);
         return;
       }
 
@@ -145,7 +151,8 @@ function ResetPasswordInner() {
           }
         }
 
-        router.replace("/reset-password", { scroll: false });
+        window.history.replaceState({}, "", "/reset-password");
+        await maybePromptMfaThenReady(supabase);
         return;
       }
 
@@ -170,6 +177,23 @@ function ResetPasswordInner() {
         return;
       }
 
+      await maybePromptMfaThenReady(supabase);
+    }
+
+    // Supabase requires AAL2 to update the password when MFA is enabled.
+    // Prompt for the TOTP code after the recovery session is established
+    // and elevate; otherwise updateUser fails with
+    // "AAL2 session is required to update email or password when MFA is enabled".
+    async function maybePromptMfaThenReady(supabase: ReturnType<typeof createClient>) {
+      const { data: factorList } = await supabase.auth.mfa.listFactors();
+      if (cancelled) return;
+      // listFactors().totp only contains verified factors.
+      const verifiedFactor = factorList?.totp?.[0];
+      if (verifiedFactor) {
+        setMfaFactorId(verifiedFactor.id);
+        setInitializing(false);
+        return;
+      }
       setRecoveryReady(true);
       setInitializing(false);
     }
@@ -191,6 +215,40 @@ function ResetPasswordInner() {
     });
     return () => subscription.unsubscribe();
   }, []);
+
+  async function handleMfaSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    if (!mfaFactorId) return;
+    const trimmed = mfaCode.trim();
+    if (!/^\d{6}$/.test(trimmed)) {
+      setError("Enter the 6-digit code from your authenticator app");
+      return;
+    }
+    setMfaVerifying(true);
+    const supabase = createClient();
+    const { data: challenge, error: chErr } = await supabase.auth.mfa.challenge({
+      factorId: mfaFactorId,
+    });
+    if (chErr || !challenge) {
+      setMfaVerifying(false);
+      setError(chErr?.message ?? "Could not start two-factor verification.");
+      return;
+    }
+    const { error: vErr } = await supabase.auth.mfa.verify({
+      factorId: mfaFactorId,
+      challengeId: challenge.id,
+      code: trimmed,
+    });
+    setMfaVerifying(false);
+    if (vErr) {
+      setError(vErr.message);
+      return;
+    }
+    setMfaFactorId(null);
+    setMfaCode("");
+    setRecoveryReady(true);
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -264,6 +322,40 @@ function ResetPasswordInner() {
             <p className="rounded-md bg-primary/10 p-3 text-sm text-foreground">
               Password updated. Redirecting to login…
             </p>
+          ) : mfaFactorId ? (
+            <form onSubmit={handleMfaSubmit} className="space-y-4">
+              {error && (
+                <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+                  {error}
+                </p>
+              )}
+              <div className="space-y-2">
+                <Label htmlFor="mfa-recovery-code">Two-factor code</Label>
+                <Input
+                  id="mfa-recovery-code"
+                  inputMode="numeric"
+                  maxLength={6}
+                  placeholder="123456"
+                  value={mfaCode}
+                  onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, ""))}
+                  autoComplete="one-time-code"
+                  autoFocus
+                  disabled={mfaVerifying}
+                  className="tracking-widest text-center text-lg"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Two-factor auth is on for this account. Enter the 6-digit code
+                  from your authenticator app to continue.
+                </p>
+              </div>
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={mfaVerifying || mfaCode.length !== 6}
+              >
+                {mfaVerifying ? "Verifying…" : "Verify and continue"}
+              </Button>
+            </form>
           ) : error && !recoveryReady ? (
             <div className="space-y-4">
               <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">

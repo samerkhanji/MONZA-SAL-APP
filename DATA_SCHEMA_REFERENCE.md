@@ -1,6 +1,6 @@
-# MONZA CRM — Complete Data Schema Reference
+# MONZA APP — Complete Data Schema Reference
 
-Use this document to translate old data into MONZA CRM, see what’s missing, and fill it in.
+Use this document to translate old data into MONZA APP, see what’s missing, and fill it in.
 
 ---
 

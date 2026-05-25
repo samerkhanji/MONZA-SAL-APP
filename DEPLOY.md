@@ -1,4 +1,4 @@
-# Monza CRM — Deploy & Operate
+# Monza SAL — Deploy & Operate
 
 Single source of truth for the things only a human can do (Supabase Dashboard
 toggles, Vercel env, secret rotation). Code-side instructions live next to
@@ -10,7 +10,7 @@ the code.
 
 | Surface | URL |
 |---|---|
-| App (custom alias) | https://monzacrm.vercel.app |
+| App (custom alias) | https://monzasal.vercel.app |
 | App (Vercel default) | https://web-dun-beta-59.vercel.app |
 | Supabase project | https://supabase.com/dashboard/project/okxpsvukzjjubinhamek |
 | Vercel project | https://vercel.com/samers-projects-222dab7d/web |
@@ -148,7 +148,7 @@ applied to production** and should be discarded.
 
 After every prod deploy, the minimum manual check:
 
-1. Sign in at https://monzacrm.vercel.app
+1. Sign in at https://monzasal.vercel.app
 2. Click **Cars** — list loads with at least 100 rows
 3. Click **Customers** — list loads with at least 150 rows
 4. Open one car detail — fields populate without console errors
