@@ -19,6 +19,34 @@ Sentry.init({
   replaysOnErrorSampleRate: 1.0,
   environment: process.env.VERCEL_ENV || process.env.NODE_ENV,
   release: process.env.VERCEL_GIT_COMMIT_SHA,
+  integrations: [
+    // User feedback widget — lets employees file bug reports from inside
+    // the app. The submitted report carries the active user (set in
+    // LogRocketInit.tsx via Sentry.setUser), any buffered session replay,
+    // and the last few seconds of breadcrumbs.
+    //
+    // `autoInject: false` because we mount the widget manually only on
+    // authenticated dashboard routes via <SentryFeedbackButton />. We
+    // don't want anonymous visitors on /login seeing "Report a problem".
+    Sentry.feedbackIntegration({
+      colorScheme: "system",
+      autoInject: false,
+      buttonLabel: "Report a problem",
+      submitButtonLabel: "Send report",
+      formTitle: "Report a problem",
+      messagePlaceholder: "What happened? Steps to reproduce?",
+      successMessageText: "Thanks — we got it. We'll look into it.",
+      // Pre-fill the email/name fields from the Sentry user we already
+      // identified (see LogRocketInit.tsx → Sentry.setUser). Saves the
+      // employee having to retype their corporate email every report.
+      useSentryUser: {
+        email: "email",
+        name: "username",
+      },
+      // Don't advertise Sentry inside our own product chrome.
+      showBranding: false,
+    }),
+  ],
   // Noise filters — these are not actionable errors:
   // - ResizeObserver loop is a benign browser warning.
   // - "Non-Error promise rejection captured" usually means a string was
