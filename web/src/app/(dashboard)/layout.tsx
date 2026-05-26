@@ -9,6 +9,7 @@ import { SessionEnforcer } from "@/components/auth/SessionEnforcer";
 import { FirstLoginGuard } from "@/components/auth/FirstLoginGuard";
 import { ProfileActivityHeartbeat } from "@/components/ProfileActivityHeartbeat";
 import { LogRocketInit } from "@/components/LogRocketInit";
+import { IOSInstallTooltip } from "@/components/pwa/IOSInstallTooltip";
 import { getSessionUserAndRole } from "@/lib/server/session-app-role";
 
 export default async function DashboardLayout({
@@ -37,6 +38,7 @@ export default async function DashboardLayout({
               </PageAccessGuard>
             </FirstLoginGuard>
           </DashboardShell>
+          <IOSInstallTooltip />
         </InstallProvider>
       </SessionEnforcer>
     </UserProvider>
