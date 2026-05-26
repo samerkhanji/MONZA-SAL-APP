@@ -43,11 +43,18 @@ const SUGGESTIONS: string[] = [
   "Where do I track customer payments?",
 ];
 
+// Monotonic counter for environments without `crypto.randomUUID()` (very old
+// browsers / non-secure contexts). Combined with the wall-clock timestamp this
+// is collision-free without leaning on Math.random, which can spread to other
+// callers thinking it's "safe enough".
+let idCounter = 0;
+
 function newId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();
   }
-  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  idCounter = (idCounter + 1) >>> 0;
+  return `${Date.now()}-${idCounter.toString(36)}`;
 }
 
 export function AIChatWidget() {
