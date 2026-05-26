@@ -1,0 +1,15 @@
+# Global default
+*                                  @samerkhanji
+
+# Database migrations - extra-careful zone
+/supabase/migrations/              @samerkhanji
+/supabase/seed.sql                 @samerkhanji
+
+# Auth and capability logic
+/web/src/lib/auth/                 @samerkhanji
+/web/src/lib/server/session*       @samerkhanji
+
+# CI/CD and security-sensitive config
+/.github/workflows/                @samerkhanji
+/web/next.config.ts                @samerkhanji
+/web/sentry.*.config.ts            @samerkhanji

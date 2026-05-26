@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Quick question
+    url: https://github.com/samerkhanji/MONZA-SAL-APP/discussions
+    about: For things that aren't bugs or features
