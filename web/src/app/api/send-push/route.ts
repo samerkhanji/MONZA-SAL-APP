@@ -20,9 +20,11 @@ const BROADCAST_ROLES = new Set([
   "sales_ops",
 ]);
 
-function configureWebPush():
+type VapidConfigResult =
   | { ok: true }
-  | { ok: false; status: number; error: string } {
+  | { ok: false; status: number; error: string };
+
+function computeVapidConfig(): VapidConfigResult {
   const pub = VAPID_PUBLIC_KEY?.trim();
   const priv = VAPID_PRIVATE_KEY?.trim();
   if (!pub || !priv) {
@@ -49,10 +51,18 @@ function configureWebPush():
   }
 }
 
+// Cache the validation/configure result at module top so we don't re-run
+// `setVapidDetails` on every push send. The keys come from env and don't
+// change inside a process lifetime; on a failure we keep the error result
+// and return it from every POST.
+const VAPID_CONFIG: VapidConfigResult = computeVapidConfig();
+
 export async function POST(request: NextRequest) {
-  const vapid = configureWebPush();
-  if (!vapid.ok) {
-    return NextResponse.json({ error: vapid.error }, { status: vapid.status });
+  if (!VAPID_CONFIG.ok) {
+    return NextResponse.json(
+      { error: VAPID_CONFIG.error },
+      { status: VAPID_CONFIG.status }
+    );
   }
 
   // Require authenticated session.

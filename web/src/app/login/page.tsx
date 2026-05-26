@@ -12,6 +12,7 @@ import {
   markAuthSessionUnlocked,
 } from "@/lib/auth-session";
 import { getAppRoleFromProfile } from "@/lib/permissions";
+import type { UserProfile } from "@/lib/contexts/UserContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -120,7 +121,7 @@ function LoginForm() {
         .select("id, full_name, user_role")
         .eq("id", authUser.id)
         .maybeSingle();
-      const appRole = getAppRoleFromProfile(profile as any);
+      const appRole = getAppRoleFromProfile((profile ?? null) as unknown as UserProfile | null);
       const ROLE_HOME_ROUTES: Record<string, string> = {
         owner: "/dashboard",
         assistant: "/assistant-dashboard",

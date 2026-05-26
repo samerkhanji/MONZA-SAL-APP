@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { ChangePasswordDialog } from "@/components/settings/ChangePasswordDialog";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
@@ -488,9 +489,16 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     <div className="flex h-full w-full min-w-0 flex-col">
       <div className="flex h-14 items-center border-b shrink-0 px-4 pt-safe md:justify-center md:px-0 md:group-hover:justify-start md:group-hover:px-4 lg:justify-start lg:px-4">
         <Link href="/dashboard" className="flex items-center justify-center md:justify-center lg:justify-start">
-          <img
+          {/* Sidebar always renders on first paint of the authenticated app,
+              so `priority` skips the lazy-load placeholder. Sizing is fixed
+              to its rendered box; the `h-10 w-auto` classes keep the visual
+              behaviour identical to the previous `<img>`. */}
+          <Image
             src="/images/sidebar-logo-light.png"
             alt="Monza S.A.L."
+            width={160}
+            height={40}
+            priority
             className="h-10 max-h-10 w-auto object-contain brightness-0 invert"
           />
         </Link>

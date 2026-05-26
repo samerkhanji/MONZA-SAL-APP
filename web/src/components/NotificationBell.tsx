@@ -71,10 +71,17 @@ function severityOf(n: Notification): Severity {
   return (n.severity ?? "info") as Severity;
 }
 
+// Cap on the dropdown's list length — anything past this is reachable via the
+// "See all" link at the top, with a "+N more" footer hint when truncated.
+const NOTIFICATION_LIMIT = 15;
+
 function NotificationBellInner() {
   const { profile, isOwner, isHoussam } = useUser();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  // Total active (not-dismissed, not-snoozed) notifications, used to show a
+  // "+N more" hint when we truncate the dropdown to NOTIFICATION_LIMIT items.
+  const [totalCount, setTotalCount] = useState(0);
   const [open, setOpen] = useState(false);
   const [actioning, setActioning] = useState<string | null>(null);
   const supabase = createClient();
@@ -82,6 +89,7 @@ function NotificationBellInner() {
 
   const fetchNotifications = useCallback(async () => {
     if (!profile?.id) return;
+    const nowIso = new Date().toISOString();
     const { data } = await supabase
       .from("notifications")
       .select(
@@ -89,12 +97,22 @@ function NotificationBellInner() {
       )
       .eq("user_id", profile.id)
       .is("dismissed_at", null)
-      .or("snoozed_until.is.null,snoozed_until.lte." + new Date().toISOString())
+      .or("snoozed_until.is.null,snoozed_until.lte." + nowIso)
       .order("created_at", { ascending: false })
-      .limit(15);
+      .limit(NOTIFICATION_LIMIT);
     const list = (data as Notification[]) ?? [];
     setNotifications(list);
     setUnreadCount(list.filter((n) => !n.is_read).length);
+    // Cheap head request for the total — only the count comes back over the
+    // wire, so this stays well under the dropdown's render budget even with
+    // hundreds of active notifications.
+    const { count } = await supabase
+      .from("notifications")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", profile.id)
+      .is("dismissed_at", null)
+      .or("snoozed_until.is.null,snoozed_until.lte." + nowIso);
+    setTotalCount(typeof count === "number" ? count : list.length);
     initialFetchDone.current = true;
   }, [profile?.id, supabase]);
 
@@ -121,8 +139,9 @@ function NotificationBellInner() {
         (payload) => {
           const row = payload.new as Notification;
           // Add to local state (top of list)
-          setNotifications((prev) => [row, ...prev].slice(0, 15));
+          setNotifications((prev) => [row, ...prev].slice(0, NOTIFICATION_LIMIT));
           setUnreadCount((c) => c + 1);
+          setTotalCount((c) => c + 1);
           // Skip toast on the very first load to avoid replaying old rows
           if (!initialFetchDone.current) return;
           const sev = severityOf(row);
@@ -481,6 +500,17 @@ function NotificationBellInner() {
             })
           )}
         </div>
+        {totalCount > notifications.length && (
+          <div className="border-t bg-muted/30 px-3 py-2 text-center">
+            <Link
+              href="/notifications"
+              className="text-primary text-xs hover:underline"
+              onClick={() => setOpen(false)}
+            >
+              +{totalCount - notifications.length} more →
+            </Link>
+          </div>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

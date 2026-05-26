@@ -1,3 +1,14 @@
+// We deliberately keep TWO xlsx libraries despite the bundle cost:
+//   - `@e965/xlsx` (used in ImportExcelDialog / ImportPartsDialog) is a fork
+//     of SheetJS 0.20.x that ships patches for the proto-pollution + ReDoS
+//     advisories upstream `xlsx` no longer fixes on npm. It's the one that
+//     parses *untrusted* spreadsheets a user just uploaded.
+//   - `xlsx-js-style` (this file) is pinned to SheetJS 0.18.5 but adds the
+//     cell-styling APIs that the styled export output below relies on
+//     (`cell.s`, `!autofilter`, `!freeze`, etc.) — APIs that the security
+//     fork does not expose. It only ever runs over app-controlled data.
+// If a styled-export library based on SheetJS 0.20.x ever exists, this file
+// is the one to migrate so we can drop xlsx-js-style.
 import * as XLSX from "xlsx-js-style";
 
 export interface ExportColumn {
