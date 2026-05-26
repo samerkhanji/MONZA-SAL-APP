@@ -51,6 +51,7 @@ import { ExportButton } from "@/components/ExportButton";
 import type { ExportColumn } from "@/lib/exportToExcel";
 import { canPerform } from "@/lib/permissions";
 import { getCarsDisplay } from "@/lib/data/cars";
+import { formatError } from "@/lib/error-messages";
 import { createClient } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 
@@ -403,7 +404,7 @@ export function CarsInventoryClient({
       .maybeSingle();
 
     if (error) {
-      toast.error(`Could not look up VIN ${vin}: ${error.message}`);
+      toast.error(`Could not look up VIN ${vin}: ${formatError(error)}`);
       return;
     }
     if (!car) {
@@ -478,23 +479,12 @@ export function CarsInventoryClient({
     }
 
     if (error) {
-      const message =
-        (typeof error === "object" && error && "message" in error
-          ? (error as { message?: unknown }).message
-          : null) ??
-        (typeof error === "object" && error && "code" in error
-          ? (error as { code?: unknown }).code
-          : null) ??
-        "Failed to load cars";
-
-      // eslint-disable-next-line no-console
-      console.error("Failed to fetch cars:", message, error);
-      toast.error(String(message));
+      console.error("Failed to fetch cars:", error);
+      toast.error(formatError(error) || "Failed to load cars.");
       setCars([]);
     } else {
       setCars(data);
       if (usedFallback) {
-        // eslint-disable-next-line no-console
         console.warn(
           "[cars] Loaded inventory from public.cars (cars_display unavailable — e.g. schema cache). Apply migration / NOTIFY pgrst reload in Supabase when ready."
         );
