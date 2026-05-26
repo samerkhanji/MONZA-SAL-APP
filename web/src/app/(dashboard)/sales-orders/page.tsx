@@ -323,85 +323,172 @@ export default function SalesOrdersPage() {
               </div>
             )
           ) : (
-            <div className="overflow-x-auto rounded-lg border border-border/50">
-              <Table className="min-w-[900px] w-full">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Car</TableHead>
-                    <TableHead>VIN</TableHead>
-                    <TableHead>Customer</TableHead>
-                    <TableHead>Phone</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Price</TableHead>
-                    <TableHead>Sale Date</TableHead>
-                    <TableHead>Delivery</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filtered.map((so) => {
-                    const car = so.cars;
-                    const name = customerName(so);
-                    return (
-                      <TableRow
-                        key={so.id}
-                        className="cursor-pointer hover:bg-muted/40"
-                        onClick={() => router.push(`/sales-orders/${so.id}`)}
-                      >
-                        <TableCell className="font-medium">
-                          {car
-                            ? `${car.brand} ${car.model}${car.model_year ? ` (${car.model_year})` : ""}`
-                            : "—"}
-                        </TableCell>
-                        <TableCell className="font-mono text-xs text-muted-foreground">
-                          {car?.vin ?? "—"}
-                        </TableCell>
-                        <TableCell>
-                          {so.customer_id ? (
-                            <button
-                              type="button"
-                              className="text-primary hover:underline"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                router.push(`/customers/${so.customer_id}`);
-                              }}
-                            >
-                              {name}
-                            </button>
-                          ) : (
-                            <span className="text-muted-foreground">{name}</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {so.customers?.phone_primary ?? "—"}
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={STATUS_COLORS[so.status] ?? "bg-muted text-muted-foreground"}>
-                            {so.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {so.selling_price != null
-                            ? `${Number(so.selling_price).toLocaleString()} ${so.currency ?? "USD"}`
-                            : "—"}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {so.sale_date
-                            ? new Date(so.sale_date).toLocaleDateString()
-                            : so.date_bought
-                            ? new Date(so.date_bought).toLocaleDateString()
-                            : "—"}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {so.delivery_date
-                            ? new Date(so.delivery_date).toLocaleDateString()
-                            : "—"}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
+            <>
+              {/* Mobile: card list (≤640px) */}
+              <ul className="flex flex-col gap-2 sm:hidden">
+                {filtered.map((so) => {
+                  const car = so.cars;
+                  const name = customerName(so);
+                  return (
+                    <li
+                      key={so.id}
+                      className="cursor-pointer rounded-lg border border-border/50 bg-card p-3 active:bg-muted/40"
+                      onClick={() => router.push(`/sales-orders/${so.id}`)}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-medium">
+                            {car
+                              ? `${car.brand} ${car.model}${car.model_year ? ` (${car.model_year})` : ""}`
+                              : "—"}
+                          </p>
+                          <p className="truncate font-mono text-xs text-muted-foreground">
+                            {car?.vin ?? "—"}
+                          </p>
+                        </div>
+                        <Badge className={STATUS_COLORS[so.status] ?? "bg-muted text-muted-foreground"}>
+                          {so.status}
+                        </Badge>
+                      </div>
+                      <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+                        <div className="min-w-0">
+                          <dt className="text-muted-foreground">Customer</dt>
+                          <dd className="truncate">
+                            {so.customer_id ? (
+                              <button
+                                type="button"
+                                className="text-primary hover:underline"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  router.push(`/customers/${so.customer_id}`);
+                                }}
+                              >
+                                {name}
+                              </button>
+                            ) : (
+                              <span className="text-muted-foreground">{name}</span>
+                            )}
+                          </dd>
+                        </div>
+                        <div className="min-w-0">
+                          <dt className="text-muted-foreground">Phone</dt>
+                          <dd className="truncate text-muted-foreground">
+                            {so.customers?.phone_primary ?? "—"}
+                          </dd>
+                        </div>
+                        <div className="min-w-0">
+                          <dt className="text-muted-foreground">Price</dt>
+                          <dd className="truncate tabular-nums">
+                            {so.selling_price != null
+                              ? `${Number(so.selling_price).toLocaleString()} ${so.currency ?? "USD"}`
+                              : "—"}
+                          </dd>
+                        </div>
+                        <div className="min-w-0">
+                          <dt className="text-muted-foreground">Sale date</dt>
+                          <dd className="truncate text-muted-foreground">
+                            {so.sale_date
+                              ? new Date(so.sale_date).toLocaleDateString()
+                              : so.date_bought
+                              ? new Date(so.date_bought).toLocaleDateString()
+                              : "—"}
+                          </dd>
+                        </div>
+                        <div className="col-span-2 min-w-0">
+                          <dt className="text-muted-foreground">Delivery</dt>
+                          <dd className="truncate text-muted-foreground">
+                            {so.delivery_date
+                              ? new Date(so.delivery_date).toLocaleDateString()
+                              : "—"}
+                          </dd>
+                        </div>
+                      </dl>
+                    </li>
+                  );
+                })}
+              </ul>
+
+              {/* Desktop / tablet: table (>640px) */}
+              <div className="hidden overflow-x-auto rounded-lg border border-border/50 sm:block">
+                <Table className="min-w-[900px] w-full">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Car</TableHead>
+                      <TableHead>VIN</TableHead>
+                      <TableHead>Customer</TableHead>
+                      <TableHead>Phone</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Price</TableHead>
+                      <TableHead>Sale Date</TableHead>
+                      <TableHead>Delivery</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filtered.map((so) => {
+                      const car = so.cars;
+                      const name = customerName(so);
+                      return (
+                        <TableRow
+                          key={so.id}
+                          className="cursor-pointer hover:bg-muted/40"
+                          onClick={() => router.push(`/sales-orders/${so.id}`)}
+                        >
+                          <TableCell className="font-medium">
+                            {car
+                              ? `${car.brand} ${car.model}${car.model_year ? ` (${car.model_year})` : ""}`
+                              : "—"}
+                          </TableCell>
+                          <TableCell className="font-mono text-xs text-muted-foreground">
+                            {car?.vin ?? "—"}
+                          </TableCell>
+                          <TableCell>
+                            {so.customer_id ? (
+                              <button
+                                type="button"
+                                className="text-primary hover:underline"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  router.push(`/customers/${so.customer_id}`);
+                                }}
+                              >
+                                {name}
+                              </button>
+                            ) : (
+                              <span className="text-muted-foreground">{name}</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {so.customers?.phone_primary ?? "—"}
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={STATUS_COLORS[so.status] ?? "bg-muted text-muted-foreground"}>
+                              {so.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {so.selling_price != null
+                              ? `${Number(so.selling_price).toLocaleString()} ${so.currency ?? "USD"}`
+                              : "—"}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {so.sale_date
+                              ? new Date(so.sale_date).toLocaleDateString()
+                              : so.date_bought
+                              ? new Date(so.date_bought).toLocaleDateString()
+                              : "—"}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {so.delivery_date
+                              ? new Date(so.delivery_date).toLocaleDateString()
+                              : "—"}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

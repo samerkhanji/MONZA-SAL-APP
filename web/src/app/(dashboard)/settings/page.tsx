@@ -543,43 +543,51 @@ export default function SettingsPage() {
 
   return (
     <div className="container mx-auto flex flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8 md:px-6 lg:flex-row">
-      {/* Tabs sidebar - horizontally scrollable on mobile, vertical on desktop */}
-      <nav
-        className="flex shrink-0 flex-row flex-nowrap gap-2 overflow-x-auto border-b pb-4 lg:flex-col lg:overflow-visible lg:border-b-0 lg:border-r lg:pb-0 lg:pr-6 max-md:-mx-4 max-md:px-4 max-md:scrollbar-hide"
-        data-tour-id="settings-tabs"
-      >
-        {TABS.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            data-tour={tab.tourAnchor}
-            onClick={() => setActiveTab(tab.id)}
-            className={cn(
-              "flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition-colors min-h-[44px]",
-              activeTab === tab.id
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground"
-            )}
-          >
-            <tab.icon className="size-4 shrink-0" />
-            {tab.label}
-          </button>
-        ))}
-        {canEditApprovalThresholds && (
-          <Link
-            data-tour-id="settings-approval-thresholds-link"
-            data-tour="settings-approval-thresholds"
-            href="/settings/approval-thresholds"
-            className={cn(
-              "flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition-colors min-h-[44px]",
-              "text-muted-foreground hover:bg-muted hover:text-foreground"
-            )}
-          >
-            <SlidersHorizontal className="size-4 shrink-0" />
-            Approval thresholds
-          </Link>
-        )}
-      </nav>
+      {/* Tabs sidebar - horizontally scrollable on narrow viewports
+          (with a right-edge fade hinting that more tabs are available),
+          vertical on desktop. */}
+      <div className="relative shrink-0 lg:contents">
+        <nav
+          className="scrollbar-hide flex flex-row flex-nowrap gap-2 overflow-x-auto border-b pb-4 lg:flex-col lg:overflow-visible lg:border-b-0 lg:border-r lg:pb-0 lg:pr-6 max-md:-mx-4 max-md:px-4"
+          data-tour-id="settings-tabs"
+        >
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              data-tour={tab.tourAnchor}
+              onClick={() => setActiveTab(tab.id)}
+              className={cn(
+                "flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition-colors min-h-[44px]",
+                activeTab === tab.id
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              )}
+            >
+              <tab.icon className="size-4 shrink-0" />
+              {tab.label}
+            </button>
+          ))}
+          {canEditApprovalThresholds && (
+            <Link
+              data-tour-id="settings-approval-thresholds-link"
+              data-tour="settings-approval-thresholds"
+              href="/settings/approval-thresholds"
+              className={cn(
+                "flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition-colors min-h-[44px]",
+                "text-muted-foreground hover:bg-muted hover:text-foreground"
+              )}
+            >
+              <SlidersHorizontal className="size-4 shrink-0" />
+              Approval thresholds
+            </Link>
+          )}
+        </nav>
+        <div
+          aria-hidden
+          className="pointer-events-none absolute right-0 top-0 bottom-4 w-8 bg-gradient-to-l from-background to-transparent lg:hidden"
+        />
+      </div>
 
       {/* Content */}
       <div className="min-w-0 flex-1">
