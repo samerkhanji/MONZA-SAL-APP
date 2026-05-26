@@ -25,7 +25,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { useTheme } from "@/lib/contexts/ThemeContext";
+
+const HERO_LIGHT_SRC = "/images/login-hero-light.png";
+const HERO_DARK_SRC = "/images/login-hero-dark.png";
+// Intrinsic size of the PNGs — providing both dimensions prevents the
+// browser from reserving the wrong layout box before the image decodes
+// (no CLS) and matches the natural 300x95 aspect ratio.
+const HERO_WIDTH = 300;
+const HERO_HEIGHT = 95;
 
 function LoginForm() {
   const searchParams = useSearchParams();
@@ -36,7 +43,6 @@ function LoginForm() {
   const redirectTo = safeRedirectTo(redirectParam, "/dashboard");
   const reason = searchParams.get("reason");
   const resetSuccess = searchParams.get("resetSuccess") === "1";
-  const { theme } = useTheme();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -168,16 +174,56 @@ function LoginForm() {
         ? "Please sign in again to continue."
         : null;
 
+  // Hero src is theme-aware but the previous `theme === "dark" ? ... : ...`
+  // resolved only post-hydration, causing the wrong image to fetch first
+  // and swap (extra request, late LCP). The inline head script in
+  // app/layout.tsx already sets the `.dark` class on <html> before React
+  // mounts, so we render both images server-side and let CSS pick the
+  // visible one — the browser decodes only the visible one for paint.
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-background via-muted/30 to-background p-4">
+      {/* Hoisted into <head> by Next so the LCP image starts downloading
+          alongside the HTML rather than after script-tag discovery. Both
+          themes preload — they're 11-19KB PNGs each, smaller than a single
+          font woff2, and only one is rendered. */}
+      <link
+        rel="preload"
+        as="image"
+        href={HERO_LIGHT_SRC}
+        fetchPriority="high"
+      />
+      <link
+        rel="preload"
+        as="image"
+        href={HERO_DARK_SRC}
+        fetchPriority="high"
+      />
       <div className="absolute right-4 top-4">
         <ThemeToggle />
       </div>
-      <img
-        src={theme === "dark" ? "/images/login-hero-dark.png" : "/images/login-hero-light.png"}
-        alt="Monza S.A.L."
-        className="mb-6 max-w-[300px] w-auto"
-      />
+      <picture className="mb-6 block">
+        <img
+          src={HERO_LIGHT_SRC}
+          alt="Monza S.A.L."
+          width={HERO_WIDTH}
+          height={HERO_HEIGHT}
+          fetchPriority="high"
+          decoding="async"
+          loading="eager"
+          className="block dark:hidden max-w-[300px] w-auto h-auto"
+        />
+        <img
+          src={HERO_DARK_SRC}
+          alt=""
+          aria-hidden="true"
+          width={HERO_WIDTH}
+          height={HERO_HEIGHT}
+          fetchPriority="high"
+          decoding="async"
+          loading="eager"
+          className="hidden dark:block max-w-[300px] w-auto h-auto"
+        />
+      </picture>
       <Card className="w-full max-w-sm border-border shadow-lg">
         <CardHeader className="space-y-1 text-center">
           <CardTitle className="text-2xl font-bold">Monza S.A.L.</CardTitle>

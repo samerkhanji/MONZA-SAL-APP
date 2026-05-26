@@ -2,7 +2,10 @@ import type { Metadata } from "next";
 import type React from "react";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/lib/contexts/ThemeContext";
-import { ThemeToaster } from "@/components/theme-toaster";
+// Sonner has no toasts queued at first paint, so its JS + CSS doesn't belong
+// on the LCP critical path. ThemeToasterLazy wraps it in a `next/dynamic`
+// client boundary so this Server Component layout stays SSR-clean.
+import { ThemeToasterLazy } from "@/components/theme-toaster-lazy";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
 import { AbortErrorHandler } from "@/components/AbortErrorHandler";
 import { DevHostBanner } from "@/components/dev-host-banner";
@@ -15,9 +18,14 @@ const geistSans = Geist({
   subsets: ["latin"],
 });
 
+// Mono is used inside the dashboard (VINs, plate codes, etc.) but never on
+// the login/auth pages. Skipping preload keeps the mono woff2 off the
+// critical request chain for unauthenticated users; it still loads when a
+// `.font-mono` element renders.
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+  preload: false,
 });
 
 export const metadata: Metadata = {
@@ -74,7 +82,7 @@ export default function RootLayout({
           <GlobalKeyboardShortcuts />
           <AbortErrorHandler />
           {children}
-          <ThemeToaster />
+          <ThemeToasterLazy />
           <ServiceWorkerRegistration />
           {process.env.NODE_ENV === "development" ? <DevHostBanner /> : null}
         </ThemeProvider>
