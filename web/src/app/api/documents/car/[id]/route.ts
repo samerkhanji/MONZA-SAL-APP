@@ -34,15 +34,33 @@ export async function DELETE(
       return NextResponse.json({ error: "Missing storage path" }, { status: 400 });
     }
 
-    const { error: storageError } = await gate.supabase.storage.from("car-documents").remove([path]);
-    if (storageError) {
-      return NextResponse.json({ error: toPublicApiError(storageError) }, { status: 500 });
-    }
-
+    // Delete the DB row FIRST. If the row delete fails (e.g. RLS / 42501) the
+    // storage object is still intact and the user can retry. If we removed
+    // storage first and then the DB delete failed, the row would still
+    // reference a missing object — broken viewer/downloader forever, with
+    // no clean recovery from the UI.
+    //
+    // The reverse ordering — orphaning a storage object — is recoverable by
+    // a background janitor sweep that compares storage listings to the
+    // car_documents table (out of scope here; tracked separately).
     const { error: delErr } = await gate.supabase.from("car_documents").delete().eq("id", id);
     if (delErr) {
       const status = delErr.code === "42501" ? 403 : 500;
       return NextResponse.json({ error: toPublicApiError(delErr) }, { status });
+    }
+
+    const { error: storageError } = await gate.supabase.storage.from("car-documents").remove([path]);
+    if (storageError) {
+      // Row is already gone; report storage failure with `ok: true` so the
+      // UI removes the entry and a janitor job can sweep the orphan blob.
+      // Logged for observability rather than surfaced as a 5xx (the user-
+      // facing operation succeeded).
+      // eslint-disable-next-line no-console
+      console.warn(
+        "[documents/car] storage object orphaned after row delete",
+        { id, path, error: storageError.message }
+      );
+      return NextResponse.json({ ok: true, storageOrphaned: true });
     }
 
     return NextResponse.json({ ok: true });
