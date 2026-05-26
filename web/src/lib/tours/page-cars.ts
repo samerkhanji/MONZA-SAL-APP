@@ -15,7 +15,7 @@ export const carsPageTour: Tour = {
   page: "/cars",
   steps: [
     {
-      element: '[data-tour-id="cars-list-add-button"]',
+      element: '[data-tour="add-car-button"]',
       title: "Add a car",
       description:
         "Click here whenever a new vehicle arrives at the dealership. It opens a form where you type in the car's details.",

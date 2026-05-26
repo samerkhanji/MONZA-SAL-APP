@@ -233,6 +233,11 @@ export function OnboardingTour() {
               await waitForElement(tourStep.element, 3000);
               opts.driver.refresh();
             }
+          } else if (tourStep.element && !document.querySelector(tourStep.element)) {
+            // Element not in DOM yet (late hydration / portal). Wait briefly
+            // before driver.js falls back to BODY.
+            await waitForElement(tourStep.element, 1500);
+            opts.driver.refresh();
           }
         },
         onDestroyed: async () => {

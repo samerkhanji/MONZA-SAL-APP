@@ -46,7 +46,7 @@ export const carsAddPageTour: Tour = {
       align: "start",
     },
     {
-      element: '[data-tour-id="cars-add-submit-button"]',
+      element: '[data-tour="save-car-button"]',
       title: "Add the car",
       description:
         "When the form looks right, click here to save the car into your inventory.",

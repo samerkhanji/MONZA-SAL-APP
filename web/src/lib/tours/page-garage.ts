@@ -15,7 +15,7 @@ export const garagePageTour: Tour = {
   page: "/garage",
   steps: [
     {
-      element: '[data-tour-id="garage-new-job"]',
+      element: '[data-tour="new-job-button"]',
       title: "New Job",
       description:
         "Click here when a car comes in for repair or service. It opens a form where you pick the car, say what's wrong, and who will work on it. This starts a brand-new job.",
@@ -23,7 +23,7 @@ export const garagePageTour: Tour = {
       align: "end",
     },
     {
-      element: '[data-tour-id="garage-scan-vin"]',
+      element: '[data-tour="scan-vin-button"]',
       title: "Scan VIN",
       description:
         "In a hurry? Point your camera at the car's VIN barcode (the long code on the windshield). The system finds the car for you, so you don't have to type it. Then it opens a new job for that car.",

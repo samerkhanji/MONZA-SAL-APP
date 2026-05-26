@@ -503,6 +503,7 @@ export default function GarageJobsPage() {
             <>
               <Button
                 data-tour-id="garage-scan-vin"
+                data-tour="scan-vin-button"
                 size="lg"
                 variant="outline"
                 className="h-12 px-6 text-base"
@@ -513,6 +514,7 @@ export default function GarageJobsPage() {
               </Button>
               <Button
                 data-tour-id="garage-new-job"
+                data-tour="new-job-button"
                 size="lg"
                 className="h-12 px-6 text-base"
                 onClick={() => {

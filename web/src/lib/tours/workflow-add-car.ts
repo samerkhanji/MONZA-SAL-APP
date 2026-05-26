@@ -33,7 +33,7 @@ export const addCarWorkflowTour: Tour = {
       align: "start",
     },
     {
-      element: '[data-tour-id="cars-list-add-button"]',
+      element: '[data-tour="add-car-button"]',
       title: "Click 'Add Car'",
       description:
         "This button starts a blank car record. Click it now to open the form.",
@@ -108,7 +108,7 @@ export const addCarWorkflowTour: Tour = {
       align: "start",
     },
     {
-      element: '[data-tour-id="cars-add-submit-button"]',
+      element: '[data-tour="save-car-button"]',
       title: "Save the car",
       description:
         "All set? Click 'Add Car'. The system saves it and takes you back to the inventory list.",
