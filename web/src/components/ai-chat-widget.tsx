@@ -69,6 +69,14 @@ export function AIChatWidget() {
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  // Mirror messages into a ref so `send` doesn't have to depend on `messages`.
+  // Otherwise each streaming `setMessages` rebuilds `send`, then `onSubmit`,
+  // then `onKeyDown` — invalidating the textarea handler many times per second
+  // during streaming.
+  const messagesRef = useRef<ChatMessage[]>([]);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   // Auto-scroll to the bottom when messages change.
   useEffect(() => {
@@ -120,8 +128,10 @@ export function AIChatWidget() {
       };
 
       // Snapshot the history we'll actually send to the API (omit the empty
-      // assistant placeholder) — and append both to local state.
-      const history = [...messages, userMsg].map((m) => ({
+      // assistant placeholder) — and append both to local state. Read from the
+      // ref so this callback's identity doesn't change on every streaming
+      // delta.
+      const history = [...messagesRef.current, userMsg].map((m) => ({
         role: m.role,
         content: m.content,
       }));
@@ -283,7 +293,7 @@ export function AIChatWidget() {
         abortRef.current = null;
       }
     },
-    [messages, pathname, appRole, profile, sending]
+    [pathname, appRole, profile, sending]
   );
 
   const onSubmit = useCallback(
