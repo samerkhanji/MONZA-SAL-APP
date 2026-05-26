@@ -59,7 +59,7 @@ export default async function RootLayout({
   const nonce = (await headers()).get("x-nonce") ?? undefined;
 
   return (
-    <html lang="en" suppressHydrationWarning style={{ overscrollBehaviorX: "none" } as React.CSSProperties}>
+    <html lang="en" suppressHydrationWarning>
       <head>
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#F59E0B" />
@@ -82,15 +82,6 @@ export default async function RootLayout({
                 var saved = localStorage.getItem('monza-theme');
                 var theme = saved === 'light' ? 'light' : 'dark';
                 document.documentElement.classList.toggle('dark', theme === 'dark');
-              })();
-              (function() {
-                window.addEventListener('unhandledrejection', function(e) {
-                  var err = e.reason;
-                  if (err && (err.name === 'AbortError' || (err.message && String(err.message).toLowerCase().indexOf('aborted') !== -1))) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                  }
-                }, true);
               })();
             `,
           }}

@@ -713,7 +713,7 @@ export default function SalesOrderDetailPage() {
             <a
               href={order.signed_contract_url}
               target="_blank"
-              rel="noreferrer"
+              rel="noopener noreferrer"
               className="inline-block text-sm text-primary hover:underline"
             >
               Open contract ↗

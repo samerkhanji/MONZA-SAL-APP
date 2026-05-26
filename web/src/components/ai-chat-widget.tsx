@@ -75,17 +75,19 @@ export function AIChatWidget() {
     if (!open) return;
     const el = scrollRef.current;
     if (!el) return;
-    // Defer to next frame so DOM is painted.
-    requestAnimationFrame(() => {
+    // Defer to next frame so DOM is painted. Cancel on unmount/next-effect
+    // so a pending callback can't fire after we're gone.
+    const raf = requestAnimationFrame(() => {
       el.scrollTop = el.scrollHeight;
     });
+    return () => cancelAnimationFrame(raf);
   }, [messages, open]);
 
   // Focus the input when opening.
   useEffect(() => {
-    if (open) {
-      requestAnimationFrame(() => inputRef.current?.focus());
-    }
+    if (!open) return;
+    const raf = requestAnimationFrame(() => inputRef.current?.focus());
+    return () => cancelAnimationFrame(raf);
   }, [open]);
 
   // Cancel any in-flight request when the widget unmounts.
