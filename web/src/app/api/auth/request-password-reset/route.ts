@@ -18,6 +18,14 @@ function redactEmail(e: string): string {
 }
 
 function passwordResetServerDebug(): boolean {
+  // In production NEVER read NEXT_PUBLIC_* for server-side debug toggles:
+  // the prefix means it's bundled into the client and is therefore observable
+  // (and toggle-able) by anyone who controls the build. Use a server-only
+  // var instead so an attacker can't flip on email-leaking logs by setting
+  // a NEXT_PUBLIC_* env. Dev keeps both for local debugging convenience.
+  if (process.env.NODE_ENV === "production") {
+    return process.env.DEBUG_PASSWORD_RESET === "1";
+  }
   return (
     process.env.NODE_ENV === "development" ||
     process.env.DEBUG_PASSWORD_RESET === "1" ||

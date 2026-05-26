@@ -19,11 +19,13 @@ import { Search, PackageSearch } from "lucide-react";
 
 // Purchase-order statuses that mean "ordered / on the way" — not yet fully
 // received, not draft/cancelled/rejected.
-const OPEN_PO_STATUSES = [
+// Typed as `string[]` so PostgREST `in()` accepts it without `as unknown as`
+// casts at every call site.
+const OPEN_PO_STATUSES: string[] = [
   "approved",
   "sent_to_supplier",
   "partially_received",
-] as const;
+];
 
 const PO_STATUS_LABELS: Record<string, string> = {
   approved: "Approved",
@@ -62,7 +64,7 @@ export default function OrderedPartsPage() {
     const { data: pos, error: poErr } = await supabase
       .from("purchase_orders")
       .select("id, po_number, status, expected_delivery_at, suppliers(name)")
-      .in("status", OPEN_PO_STATUSES as unknown as string[])
+      .in("status", OPEN_PO_STATUSES)
       .is("deleted_at", null);
 
     if (poErr) {
