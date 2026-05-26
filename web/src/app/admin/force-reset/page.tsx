@@ -11,8 +11,35 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { useUser } from "@/lib/contexts/UserContext";
 
 export default function AdminForceResetPage() {
+  // Defense in depth: the underlying API enforces `owner + ADMIN_API_SECRET`,
+  // but the page itself was reachable by any signed-in user (or by anyone if
+  // they could bypass auth) — letting them sit in front of the secret prompt.
+  // Block render unless the viewer's app role is `owner`; show a neutral
+  // "Access Denied" so we don't leak whether the route exists for non-owners
+  // who don't already know it.
+  const { loading, profile, isOwner } = useUser();
+  if (loading) return null;
+  if (!profile || !isOwner) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-muted/30 p-4">
+        <Card className="w-full max-w-md border-border shadow-md">
+          <CardHeader>
+            <CardTitle>Access denied</CardTitle>
+            <CardDescription>
+              You don&apos;t have permission to view this page.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    );
+  }
+  return <ForceResetForm />;
+}
+
+function ForceResetForm() {
   const [email, setEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [adminSecret, setAdminSecret] = useState("");

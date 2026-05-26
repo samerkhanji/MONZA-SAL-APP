@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getAppRoleFromProfile } from "@/lib/permissions";
-import type { UserProfile } from "@/lib/contexts/UserContext";
 import {
   DATA_HEALTH_SECTIONS_BY_ROLE,
   ROLES_WITH_DATA_HEALTH_ACCESS,
@@ -25,7 +24,7 @@ export async function GET() {
     .eq("id", user.id)
     .single();
 
-  const appRole = getAppRoleFromProfile((profile ?? null) as unknown as UserProfile | null);
+  const appRole = getAppRoleFromProfile(profile ?? null);
   if (!appRole || !ROLES_WITH_DATA_HEALTH_ACCESS.includes(appRole)) {
     return NextResponse.json({ count: 0 });
   }

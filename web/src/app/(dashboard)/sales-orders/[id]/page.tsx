@@ -183,7 +183,7 @@ export default function SalesOrderDetailPage() {
       )
       .eq("linked_sales_order_id", id)
       .eq("status", "committed");
-    setCommittedTradeIns((tradeIns ?? []) as unknown as CommittedTradeIn[]);
+    setCommittedTradeIns((tradeIns ?? []) as CommittedTradeIn[]);
 
     setLoading(false);
   }, [id, supabase, router]);
