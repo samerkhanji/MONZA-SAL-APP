@@ -665,19 +665,16 @@ export default function CarProfilePage() {
         }
       }
 
-      toast.success("Saved reservation, delivery, and date bought to public.sales_orders.");
+      toast.success("Saved reservation, delivery, and date bought.");
       await fetchCar();
       await fetchSalesOrderForCar(carId);
       await fetchLegacyCarSnapshot(carId);
       await fetchEvents();
       router.refresh();
     } catch (e: unknown) {
-      const msg =
-        e && typeof e === "object" && "message" in e
-          ? String((e as { message: string }).message)
-          : "Failed to save to sales_orders";
+      const msg = formatError(e) || "Failed to save sale dates.";
       setSaleDatesError(msg);
-      toast.error(msg, { description: "Only public.sales_orders is updated (not cars_display)." });
+      toast.error(msg);
     } finally {
       setSaleDatesSaving(false);
     }
@@ -1778,10 +1775,7 @@ export default function CarProfilePage() {
             <CardHeader>
               <CardTitle>Sales order dates</CardTitle>
               <CardDescription>
-                Loads the latest non-cancelled <span className="font-mono text-[11px]">sales_orders</span> row for
-                this <span className="font-mono text-[11px]">car_id</span>. Saving updates that row or inserts a new
-                one. Do not write to <span className="font-mono text-[11px]">cars_display</span> /{" "}
-                <span className="font-mono text-[11px]">cars_with_sales</span> — they are read-only.
+                Reservation, delivery, and date bought for this car. Saving updates the latest sales order or creates one if none exists yet.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -1997,7 +1991,7 @@ export default function CarProfilePage() {
                   )}
                   <p className="text-muted-foreground border-t border-border pt-4 text-xs">
                     Edit reservation, delivery, and date bought in the <span className="font-medium">Sales order dates</span>{" "}
-                    section above (writes to <span className="font-mono text-[11px]">public.sales_orders</span> only).
+                    section above.
                   </p>
                 </CardContent>
               </Card>
@@ -2016,9 +2010,7 @@ export default function CarProfilePage() {
                         Legacy / car-row reference
                       </CardTitle>
                       <CardDescription>
-                        Raw <span className="font-mono text-[11px]">public.cars</span> fields (read-only in this
-                        UI). Canonical sale dates live on <span className="font-mono text-[11px]">sales_orders</span>{" "}
-                        after you save above.
+                        Legacy customer details kept on the car record (read-only here). The canonical sale dates are managed in the section above.
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="grid gap-2 text-sm sm:grid-cols-2">
