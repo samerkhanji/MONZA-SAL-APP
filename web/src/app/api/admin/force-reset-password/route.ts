@@ -1,18 +1,8 @@
-import { createHash, timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { tryCreateAdminClient } from "@/lib/supabase/admin";
 import { getSessionUserAndRole } from "@/lib/server/session-app-role";
 import { toPublicApiError } from "@/lib/server/api-error";
-
-function constantTimeEqualSecret(a: string, b: string): boolean {
-  try {
-    const ha = createHash("sha256").update(a, "utf8").digest();
-    const hb = createHash("sha256").update(b, "utf8").digest();
-    return timingSafeEqual(ha, hb);
-  } catch {
-    return false;
-  }
-}
+import { constantTimeEqualSecret } from "@/lib/server/constant-time-secret";
 
 /**
  * POST /api/admin/force-reset-password
