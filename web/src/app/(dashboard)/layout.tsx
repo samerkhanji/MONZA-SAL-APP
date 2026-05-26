@@ -10,6 +10,7 @@ import { FirstLoginGuard } from "@/components/auth/FirstLoginGuard";
 import { ProfileActivityHeartbeat } from "@/components/ProfileActivityHeartbeat";
 import { LogRocketInit } from "@/components/LogRocketInit";
 import { IOSInstallTooltip } from "@/components/pwa/IOSInstallTooltip";
+import { OutboxSyncInit } from "@/components/OutboxSyncInit";
 import { getSessionUserAndRole } from "@/lib/server/session-app-role";
 
 export default async function DashboardLayout({
@@ -26,6 +27,7 @@ export default async function DashboardLayout({
   return (
     <UserProvider>
       <LogRocketInit />
+      <OutboxSyncInit />
       <SessionEnforcer>
         <InstallProvider>
           <DashboardShell>

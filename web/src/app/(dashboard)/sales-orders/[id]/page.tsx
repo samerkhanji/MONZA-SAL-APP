@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/select";
 import { ArrowLeft, FileText, CheckCircle2, Truck, Receipt, Loader2, Repeat } from "lucide-react";
 import { formatError } from "@/lib/error-messages";
+import { enqueueSupabaseOp, isLikelyOffline } from "@/lib/pwa/supabase-outbox";
 
 type SaleStatus = "draft" | "reserved" | "confirmed" | "paid" | "delivered" | "cancelled";
 
@@ -193,13 +194,31 @@ export default function SalesOrderDetailPage() {
 
   async function patchOrder(patch: Partial<SalesOrderDetail>) {
     setSaving(true);
-    const { error } = await supabase
-      .from("sales_orders")
-      .update({ ...patch, updated_at: new Date().toISOString() })
-      .eq("id", id);
+    const payload = { ...patch, updated_at: new Date().toISOString() };
+    let result;
+    try {
+      result = await supabase.from("sales_orders").update(payload).eq("id", id);
+    } catch (e) {
+      result = { error: e } as { error: unknown };
+    }
     setSaving(false);
+    const error = (result as { error: unknown }).error;
     if (error) {
-      toast.error(formatError(error));
+      if (isLikelyOffline(error)) {
+        await enqueueSupabaseOp({
+          table: "sales_orders",
+          op: "update",
+          payload: payload as Record<string, unknown>,
+          eqColumn: "id",
+          eqValue: id as string,
+          kind: "sales-order-edit",
+        });
+        toast.success("Saved — will sync when back online");
+        // Optimistic local update so the UI reflects the edit immediately.
+        setOrder((prev) => (prev ? { ...prev, ...patch } : prev));
+        return true;
+      }
+      toast.error(formatError(error as Parameters<typeof formatError>[0]));
       return false;
     }
     await fetchOrder();

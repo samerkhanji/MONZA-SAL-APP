@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
+import { fetchWithOutbox } from "@/lib/pwa/outbox";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -169,13 +170,19 @@ export default function GarageTasksBoardPage() {
   }
 
   async function patchTask(id: string, patch: Record<string, unknown>) {
-    const res = await fetch(`/api/garage/tasks/${id}`, {
+    const res = await fetchWithOutbox(`/api/garage/tasks/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
       body: JSON.stringify(patch),
+      kind: "garage-task-patch",
     });
     const j = await res.json().catch(() => ({}));
+    if (res.status === 202 && j?.queued) {
+      toast.success("Saved — will sync when back online");
+      await refresh();
+      return true;
+    }
     if (!res.ok) {
       toast.error(typeof j?.error === "string" ? j.error : "Update failed");
       return false;
@@ -185,13 +192,19 @@ export default function GarageTasksBoardPage() {
   }
 
   async function startTimer(taskId: string) {
-    const res = await fetch("/api/garage/timers", {
+    const res = await fetchWithOutbox("/api/garage/timers", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
       body: JSON.stringify({ action: "start", taskId }),
+      kind: "garage-timer-start",
     });
     const j = await res.json().catch(() => ({}));
+    if (res.status === 202 && j?.queued) {
+      toast.success("Saved — will sync when back online");
+      await loadTimers();
+      return;
+    }
     if (!res.ok) {
       toast.error(typeof j?.error === "string" ? j.error : "Could not start timer");
       return;
@@ -200,13 +213,19 @@ export default function GarageTasksBoardPage() {
   }
 
   async function stopTimer(taskId: string) {
-    const res = await fetch("/api/garage/timers", {
+    const res = await fetchWithOutbox("/api/garage/timers", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
       body: JSON.stringify({ action: "stop", taskId }),
+      kind: "garage-timer-stop",
     });
     const j = await res.json().catch(() => ({}));
+    if (res.status === 202 && j?.queued) {
+      toast.success("Saved — will sync when back online");
+      await loadTimers();
+      return;
+    }
     if (!res.ok) {
       toast.error(typeof j?.error === "string" ? j.error : "Could not stop timer");
       return;
