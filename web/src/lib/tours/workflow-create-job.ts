@@ -62,13 +62,10 @@ export const createJobWorkflowTour: Tour = {
       waitFor: "click",
     },
     {
-      element: '[data-tour-id="new-job-dialog"]',
       title: "The job form",
       description:
-        "This window is where you describe the job. Pick the car it's for, " +
+        "Clicking 'New Job' opens a window where you describe the job. Pick the car it's for, " +
         "and write down what needs doing.",
-      side: "over",
-      align: "center",
     },
     {
       title: "Fill in the job details",
@@ -77,14 +74,10 @@ export const createJobWorkflowTour: Tour = {
         "and set a priority. The more detail you add, the easier it is for the mechanic.",
     },
     {
-      element: '[data-tour-id="new-job-dialog-submit"]',
       title: "Create the job",
       description:
-        "When the form is filled in, click the submit button to create the job. " +
-        "It appears on the board straight away.",
-      side: "top",
-      align: "end",
-      waitFor: "click",
+        "When the form is filled in, click the submit button at the bottom of the dialog. " +
+        "The new job appears on the board straight away.",
     },
     {
       element: '[data-tour-id="garage-jobs-list"]',
@@ -94,25 +87,18 @@ export const createJobWorkflowTour: Tour = {
         "a mechanic, add parts, or start the timer.",
       side: "top",
       align: "start",
-      waitFor: "click",
     },
     {
-      element: '[data-tour-id="job-detail-timer"]',
       title: "Track the work",
       description:
-        "Inside a job, this timer tracks how long the work takes. " +
+        "Inside a job you'll find a timer that tracks how long the work takes. " +
         "The mechanic starts it when they begin and stops it when they pause.",
-      side: "bottom",
-      align: "start",
     },
     {
-      element: '[data-tour-id="job-detail-add-part"]',
       title: "Add parts as you go",
       description:
-        "Need a part for the job? Click 'Add part' to pull it from inventory. " +
+        "Need a part for the job? Click 'Add part' on the job page to pull it from inventory. " +
         "It gets billed to the job automatically.",
-      side: "bottom",
-      align: "start",
     },
     {
       title: "Job created!",

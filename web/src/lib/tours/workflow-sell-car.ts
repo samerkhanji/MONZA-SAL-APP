@@ -52,14 +52,10 @@ export const sellCarWorkflowTour: Tour = {
       waitFor: "click",
     },
     {
-      element: '[data-tour-id="cars-detail-edit-button"]',
       title: "Edit the car",
       description:
-        "On the car's profile, click 'Edit'. In the edit window you'll change the status " +
+        "On the car's profile, click 'Edit' in the top-right. In the edit window you'll change the status " +
         "to 'reserved' or 'sold' and attach the buyer. Saving that creates the sales order.",
-      side: "bottom",
-      align: "end",
-      waitFor: "click",
     },
     {
       title: "Set the buyer and status",
@@ -95,33 +91,23 @@ export const sellCarWorkflowTour: Tour = {
       waitFor: "click",
     },
     {
-      element: '[data-tour-id="sales-order-detail-stepper"]',
       title: "The deal's progress bar",
       description:
-        "This strip at the top shows every stage of the sale — quote, deposit, delivery. " +
-        "As you complete each step, it lights up. Your job is to move it all the way to the end.",
-      side: "bottom",
-      align: "start",
+        "Inside a sales order you'll see a strip at the top with every stage of the sale — " +
+        "quote, deposit, delivery. As you complete each step, it lights up. " +
+        "Your job is to move it all the way to the end.",
     },
     {
-      element: '[data-tour-id="sales-order-detail-save-quote"]',
       title: "Save the quote",
       description:
-        "First, agree the price with the customer and save the quote. Fill in the numbers above, " +
-        "then click 'Save quote'.",
-      side: "top",
-      align: "start",
-      waitFor: "click",
+        "First, agree the price with the customer and save the quote. " +
+        "Fill in the numbers in the quote section, then click 'Save quote'.",
     },
     {
-      element: '[data-tour-id="sales-order-detail-save-deposit"]',
       title: "Record the deposit",
       description:
-        "When the customer pays a deposit to hold the car, record it here. " +
-        "Enter the amount above and click 'Save deposit'.",
-      side: "top",
-      align: "start",
-      waitFor: "click",
+        "When the customer pays a deposit to hold the car, record it in the deposit section. " +
+        "Enter the amount and click 'Save deposit'.",
     },
     {
       title: "Mark it delivered",
