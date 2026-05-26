@@ -366,7 +366,7 @@ function buildDriveStep(
   _tour: Tour,
   isInteractive: boolean
 ): DriveStep {
-  const popoverDescription = isInteractive && step.element
+  const popoverDescription = isInteractive && step.element && step.waitFor
     ? `${step.description}\n\n→ ${interactiveHint(step.waitFor)}`
     : step.description;
 
@@ -387,14 +387,13 @@ function buildDriveStep(
       side: step.side ?? "right",
       align: step.align ?? "start",
       // For interactive steps with a waitFor, hide the Next button (the user
-      // has to actually do the thing to advance). The "previous" + "close"
-      // buttons remain so they don't get stuck.
+      // has to actually do the thing to advance). Steps without a waitFor —
+      // welcome / closing modals and purely informational steps — keep Next
+      // visible so the user can still advance in interactive mode.
       showButtons:
         isInteractive && step.waitFor
           ? ["previous", "close"]
-          : isInteractive
-            ? ["previous", "close"]
-            : ["next", "previous", "close"],
+          : ["next", "previous", "close"],
       progressText: `${idx + 1} / ${total}`,
     },
   };
