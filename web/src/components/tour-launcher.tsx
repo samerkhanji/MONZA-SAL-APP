@@ -1,13 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import { HelpCircle, MapIcon, BookOpen, Wand2 } from "lucide-react";
 
 import { useUser } from "@/lib/contexts/UserContext";
 import { getAllAvailableTours } from "@/lib/tours/registry";
 import type { Tour, TourMode } from "@/lib/tours/types";
-import { dispatchStartTour } from "@/components/onboarding-tour";
+import { dispatchStartTour, TOUR_ACTIVE_CHANGED_EVENT } from "@/components/onboarding-tour";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -57,8 +57,18 @@ export function TourLauncher() {
   const { profile, appRole } = useUser();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [isTourActive, setIsTourActive] = useState(false);
   // mode toggle per tour id (defaults to "manual"). Welcome stays manual.
   const [modes, setModes] = useState<Record<string, TourMode>>({});
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const ce = e as CustomEvent<{ active: boolean }>;
+      setIsTourActive(Boolean(ce.detail?.active));
+    };
+    window.addEventListener(TOUR_ACTIVE_CHANGED_EVENT, handler);
+    return () => window.removeEventListener(TOUR_ACTIVE_CHANGED_EVENT, handler);
+  }, []);
 
   const tours = useMemo(
     () => getAllAvailableTours(pathname, appRole),
@@ -68,6 +78,7 @@ export function TourLauncher() {
   // Don't render until we know who the user is.
   if (!profile) return null;
   if (tours.length === 0) return null;
+  if (isTourActive) return null;
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
@@ -171,7 +182,10 @@ export function TourLauncher() {
                         size="sm"
                         onClick={() => {
                           setOpen(false);
-                          dispatchStartTour({ tourId: tour.id, mode });
+                          window.setTimeout(
+                            () => dispatchStartTour({ tourId: tour.id, mode }),
+                            0
+                          );
                         }}
                       >
                         Start
