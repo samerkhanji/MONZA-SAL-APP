@@ -482,7 +482,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     appRole && USER_ROLE_LABELS[appRole] ? USER_ROLE_LABELS[appRole] : "Signed in";
   const avatarInitial = (profile?.full_name?.[0] ?? "U").toUpperCase();
 
-  const { showInstallOption, triggerInstall } = useInstall();
+  const { showInstallOption, canInstallNative, triggerInstall } = useInstall();
 
   const renderSidebarContent = () => (
     <div className="flex h-full w-full min-w-0 flex-col">
@@ -697,6 +697,19 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             {getPageTitle(pathname)}
           </h1>
           <div className="flex items-center gap-1">
+            {canInstallNative && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="hidden md:inline-flex"
+                onClick={() => triggerInstall()}
+                aria-label="Install app"
+                data-tour-id="header-install"
+              >
+                <Download className="size-4" />
+                <span className="ml-1.5 hidden lg:inline">Install</span>
+              </Button>
+            )}
             <NotificationBell />
             <ThemeToggle />
             <DropdownMenu>
