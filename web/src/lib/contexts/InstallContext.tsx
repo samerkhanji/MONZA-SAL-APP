@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useMemo,
   useState,
   type ReactNode,
 } from "react";
@@ -40,14 +41,19 @@ export function InstallProvider({ children }: { children: ReactNode }) {
     }
   }, [canInstallNative, install, isIOS]);
 
+  // Memoize the provider value so consumers don't re-render when InstallProvider
+  // re-renders for unrelated reasons (e.g. parent state changes).
+  const contextValue = useMemo<InstallContextValue>(
+    () => ({
+      showInstallOption,
+      canInstallNative,
+      triggerInstall,
+    }),
+    [showInstallOption, canInstallNative, triggerInstall]
+  );
+
   return (
-    <InstallContext.Provider
-      value={{
-        showInstallOption,
-        canInstallNative,
-        triggerInstall,
-      }}
-    >
+    <InstallContext.Provider value={contextValue}>
       {children}
       <IOSInstallDialog open={iosDialogOpen} onOpenChange={setIosDialogOpen} />
       <InstallInstructionsDialog

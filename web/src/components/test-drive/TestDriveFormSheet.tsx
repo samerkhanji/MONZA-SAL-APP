@@ -20,6 +20,16 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Loader2 } from "lucide-react";
 import { formatError } from "@/lib/error-messages";
@@ -149,6 +159,7 @@ export function TestDriveFormSheet({
   const isOut = existing?.status === "out_for_test_drive";
 
   const [saving, setSaving] = useState(false);
+  const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
 
   const [vin, setVin] = useState("");
   const [carId, setCarId] = useState("");
@@ -508,7 +519,6 @@ export function TestDriveFormSheet({
 
   async function handleCancelOut() {
     if (!existing?.id || !carId) return;
-    if (!confirm("Cancel this test drive and restore the vehicle status?")) return;
     setSaving(true);
     const now = isoNow();
     const { error: uErr } = await supabase
@@ -833,7 +843,13 @@ export function TestDriveFormSheet({
         <SheetFooter className="border-border mt-auto shrink-0 flex-col gap-2 border-t p-4 sm:flex-row sm:justify-between">
           <div className="flex flex-wrap gap-2">
             {isOut && (
-              <Button type="button" variant="destructive" size="sm" onClick={handleCancelOut} disabled={saving}>
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                onClick={() => setCancelConfirmOpen(true)}
+                disabled={saving}
+              >
                 Cancel test drive
               </Button>
             )}
@@ -860,6 +876,29 @@ export function TestDriveFormSheet({
           </div>
         </SheetFooter>
       </SheetContent>
+
+      <AlertDialog open={cancelConfirmOpen} onOpenChange={setCancelConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel this test drive?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The test drive will be marked cancelled and the vehicle status
+              will be restored. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep it</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setCancelConfirmOpen(false);
+                void handleCancelOut();
+              }}
+            >
+              Cancel test drive
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Sheet>
   );
 }

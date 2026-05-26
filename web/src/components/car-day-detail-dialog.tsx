@@ -17,6 +17,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
@@ -99,6 +109,7 @@ export function DayDetailDialog({
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadNotes, setUploadNotes] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<DayDoc | null>(null);
 
   const formatDateLabel = (d: string) => {
     const date = new Date(d + "T12:00:00");
@@ -175,7 +186,6 @@ export function DayDetailDialog({
 
   async function handleDelete(doc: DayDoc) {
     if (!canDeleteCarDocs) return;
-    if (!confirm(`Delete "${doc.file_name}"?`)) return;
     const res = await fetch(`/api/documents/car/${doc.id}`, {
       method: "DELETE",
       credentials: "include",
@@ -293,6 +303,7 @@ export function DayDetailDialog({
   );
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
@@ -385,7 +396,7 @@ export function DayDetailDialog({
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => handleDelete(doc)}
+                          onClick={() => setDeleteTarget(doc)}
                           title="Delete"
                         >
                           <Trash2 className="size-4" />
@@ -455,5 +466,35 @@ export function DayDetailDialog({
         </div>
       </DialogContent>
     </Dialog>
+
+    <AlertDialog
+      open={deleteTarget !== null}
+      onOpenChange={(o) => !o && setDeleteTarget(null)}
+    >
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete document?</AlertDialogTitle>
+          <AlertDialogDescription>
+            {deleteTarget
+              ? `"${deleteTarget.file_name}" will be permanently removed.`
+              : ""}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => {
+              if (deleteTarget) {
+                void handleDelete(deleteTarget);
+                setDeleteTarget(null);
+              }
+            }}
+          >
+            Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }
