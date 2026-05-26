@@ -8,6 +8,13 @@ on:
       - ".github/workflows/pr-build-check.yml"
   workflow_dispatch:
 
+# Explicit permissions so the GITHUB_TOKEN has access to check out the repo
+# even if the org default for workflow permissions is "no permissions". The
+# `actions/checkout` step needs `contents: read` to fetch the ref.
+permissions:
+  contents: read
+  pull-requests: read
+
 concurrency:
   group: pr-build-${{ github.ref }}
   cancel-in-progress: true
@@ -24,6 +31,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Explicit token reference helps when the default GITHUB_TOKEN is
+          # rate-limited or has been scoped to read-only by org policy.
+          token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: false
 
       - name: Setup Node
         uses: actions/setup-node@v4
