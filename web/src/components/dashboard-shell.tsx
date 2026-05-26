@@ -765,8 +765,10 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        {/* Main content — bottom padding on phones clears the fixed tab bar. */}
-        <main className="flex-1 bg-background pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0">
+        {/* Main content — bottom padding clears the floating scan button
+            (and on phones, also the fixed bottom tab bar) so the last row
+            of a long table is never hidden behind the FAB. */}
+        <main className="flex-1 bg-background pb-[calc(9.5rem+env(safe-area-inset-bottom))] md:pb-24">
           {children}
         </main>
       </div>

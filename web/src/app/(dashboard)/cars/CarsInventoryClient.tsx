@@ -760,7 +760,63 @@ export function CarsInventoryClient({
               </div>
             )
           ) : (
-            <div className="scrollbar-thick w-full min-w-0 max-h-[min(72vh,calc(100dvh-14rem))] overflow-x-auto overflow-y-auto rounded-md border border-border bg-card [-webkit-overflow-scrolling:touch]">
+            <>
+              {/* Mobile: card list (≤640px). The full table has 20+ columns
+                  that don't fit on phones, so we show a focused summary
+                  card per car here. */}
+              <ul className="flex flex-col gap-2 sm:hidden">
+                {sortedCars.map((car) => {
+                  const locationText = locationDisplayText(car);
+                  const statusLabel = formatCarStatusLabel(car.status);
+                  const statusText = pendingDeletes[car.id]
+                    ? `${statusLabel} · Pending`
+                    : statusLabel;
+                  return (
+                    <li
+                      key={`mobile-${car.id}`}
+                      className="cursor-pointer rounded-lg border border-border bg-card p-3 active:bg-muted/40"
+                      title={pendingDeletes[car.id] ? "Pending delete request" : undefined}
+                      onClick={() => router.push(`/cars/${encodeURIComponent(car.id)}`)}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-medium">
+                            {car.brand ?? "—"} {car.model ?? ""}
+                            {car.model_year ? ` (${car.model_year})` : ""}
+                          </p>
+                          <p className="truncate font-mono text-xs text-muted-foreground">
+                            {car.vin ?? "—"}
+                          </p>
+                        </div>
+                        <span className="shrink-0 whitespace-nowrap rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                          {statusText}
+                        </span>
+                      </div>
+                      <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+                        <div className="min-w-0">
+                          <dt className="text-muted-foreground">Location</dt>
+                          <dd className="truncate">{locationText}</dd>
+                        </div>
+                        <div className="min-w-0">
+                          <dt className="text-muted-foreground">Client</dt>
+                          <dd className="truncate">{car.client_name ?? "—"}</dd>
+                        </div>
+                        <div className="min-w-0">
+                          <dt className="text-muted-foreground">Delivery</dt>
+                          <dd className="truncate tabular-nums">{fmtSheetDate(car.delivery_date)}</dd>
+                        </div>
+                        <div className="min-w-0">
+                          <dt className="text-muted-foreground">Date arrived</dt>
+                          <dd className="truncate tabular-nums">{fmtSheetDate(car.date_arrived)}</dd>
+                        </div>
+                      </dl>
+                    </li>
+                  );
+                })}
+              </ul>
+
+              {/* Desktop / tablet: full inventory table (>640px) */}
+              <div className="scrollbar-thick hidden w-full min-w-0 max-h-[min(72vh,calc(100dvh-14rem))] overflow-x-auto overflow-y-auto rounded-md border border-border bg-card [-webkit-overflow-scrolling:touch] sm:block">
               <table className="w-max min-w-full table-fixed border-collapse">
                 <colgroup>
                   {CARS_TABLE_COL_PX.map((w, i) => (
@@ -1143,6 +1199,7 @@ export function CarsInventoryClient({
                 </tbody>
               </table>
             </div>
+            </>
           )}
         </CardContent>
       </Card>
