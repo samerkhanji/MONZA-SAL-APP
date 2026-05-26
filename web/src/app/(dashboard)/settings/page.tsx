@@ -66,12 +66,12 @@ function formatLastOnline(iso: string | null | undefined): string {
 }
 
 const ALL_TABS = [
-  { id: "profile", label: "Profile", icon: User, everyone: true },
-  { id: "notifications", label: "Notifications", icon: Bell, everyone: true },
-  { id: "team", label: "Team", icon: Users, everyone: false },
-  { id: "company", label: "Company", icon: Building2, everyone: false },
-  { id: "prefs", label: "Preferences", icon: Settings, everyone: false },
-  { id: "audit", label: "Audit Log", icon: FileText, everyone: false },
+  { id: "profile", label: "Profile", icon: User, everyone: true, tourAnchor: "settings-profile-tab" },
+  { id: "notifications", label: "Notifications", icon: Bell, everyone: true, tourAnchor: "settings-notifications-tab" },
+  { id: "team", label: "Team", icon: Users, everyone: false, tourAnchor: "settings-employees-tab" },
+  { id: "company", label: "Company", icon: Building2, everyone: false, tourAnchor: "settings-company-tab" },
+  { id: "prefs", label: "Preferences", icon: Settings, everyone: false, tourAnchor: "settings-prefs-tab" },
+  { id: "audit", label: "Audit Log", icon: FileText, everyone: false, tourAnchor: "settings-audit-log-tab" },
 ] as const;
 
 type TabId = (typeof ALL_TABS)[number]["id"];
@@ -552,6 +552,7 @@ export default function SettingsPage() {
           <button
             key={tab.id}
             type="button"
+            data-tour={tab.tourAnchor}
             onClick={() => setActiveTab(tab.id)}
             className={cn(
               "flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition-colors min-h-[44px]",
@@ -567,6 +568,7 @@ export default function SettingsPage() {
         {canEditApprovalThresholds && (
           <Link
             data-tour-id="settings-approval-thresholds-link"
+            data-tour="settings-approval-thresholds"
             href="/settings/approval-thresholds"
             className={cn(
               "flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition-colors min-h-[44px]",
@@ -701,7 +703,7 @@ export default function SettingsPage() {
                     <SelectItem value="all">All</SelectItem>
                   </SelectContent>
                 </Select>
-                <Button data-tour-id="settings-add-employee-button" onClick={() => setAddOpen(true)}>
+                <Button data-tour-id="settings-add-employee-button" data-tour="settings-add-employee" onClick={() => setAddOpen(true)}>
                   <UserPlus className="mr-2 size-4" />
                   Add Employee
                 </Button>
@@ -793,7 +795,7 @@ export default function SettingsPage() {
                     ))}
                   </div>
                   {/* Desktop: table without capabilities */}
-                  <div className="hidden overflow-x-auto rounded-lg border md:block">
+                  <div className="hidden overflow-x-auto rounded-lg border md:block" data-tour="settings-capability-matrix">
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b bg-muted/50">
