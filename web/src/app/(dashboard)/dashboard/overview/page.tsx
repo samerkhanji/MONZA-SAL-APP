@@ -47,7 +47,10 @@ const SALE_STAGE_LABELS: Record<string, string> = {
   delivered: "Delivered",
 };
 
-const INVENTORY_AGE_ORDER = ["0-30", "31-60", "61-90", "90+"] as const;
+// Bucket strings must match the `age_bucket` values emitted by the
+// public.report_inventory_aging view: '<60' | '60-90' | '90-180' | '>180' |
+// 'unknown'. Mismatched labels here = every bucket renders 0.
+const INVENTORY_AGE_ORDER = ["<60", "60-90", "90-180", ">180"] as const;
 
 /** Number of trailing months (including the current one) shown in the cars-added series. */
 const CARS_OVER_TIME_MONTHS = 6;
@@ -629,9 +632,15 @@ async function fetchOverviewData(supabase: DashboardSupabase): Promise<OwnerOver
     count: b.count,
   }));
 
+  // inStockCars = same definition as Reports / report_inventory_aging
+  // (every non-deleted car except sold + delivered). The view already
+  // applies that filter, so the loaded rows ARE the in-stock fleet.
+  const inStockCars = inventoryAgingRes.data?.length ?? 0;
+
   return {
     summary: {
       totalCars,
+      inStockCars,
       totalCustomers: customersCountRes.count ?? 0,
       activeSalesOrders: salesOrdersCountRes.count ?? 0,
       pendingRequests: pendingQueueTotal,

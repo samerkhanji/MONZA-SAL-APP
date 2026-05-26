@@ -1715,6 +1715,15 @@ export default function CarProfilePage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
+                      {/* Always include the car's current status so the Select
+                          never renders empty for non-editable states like
+                          `service`, `delivered`, `scrapped`. The user can still
+                          only transition TO the curated editable set. */}
+                      {!CAR_STATUS_EDITABLE.includes(car.status) ? (
+                        <SelectItem key={car.status} value={car.status} disabled>
+                          {CAR_STATUS_LABELS[car.status] ?? car.status} (current)
+                        </SelectItem>
+                      ) : null}
                       {CAR_STATUS_EDITABLE.map((s) => (
                         <SelectItem key={s} value={s}>
                           {CAR_STATUS_LABELS[s]}

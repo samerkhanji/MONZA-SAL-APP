@@ -594,7 +594,7 @@ export default function CustomerDetailPage() {
                       </Badge>
                     )}
                   </p>
-                  {customer.phone_primary ? (
+                  {customer.phone_primary?.trim() ? (
                     <a href={`tel:${customer.phone_primary}`} className="text-primary hover:underline">
                       {customer.phone_primary}
                     </a>
@@ -605,7 +605,7 @@ export default function CustomerDetailPage() {
                 <div className="space-y-1">
                   <p className="text-muted-foreground text-sm">Phone 2</p>
                   <p>
-                    {customer.phone_secondary ? (
+                    {customer.phone_secondary?.trim() ? (
                       <a href={`tel:${customer.phone_secondary}`} className="text-primary hover:underline">
                         {customer.phone_secondary}
                       </a>
