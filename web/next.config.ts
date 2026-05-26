@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { withSentryConfig } from "@sentry/nextjs";
 
 // Always anchor Turbopack to this app folder (not C:\Users\User or repo parent).
 const webRoot = path.dirname(fileURLToPath(import.meta.url));
@@ -39,4 +40,19 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// Wrap with Sentry config. When SENTRY_AUTH_TOKEN / SENTRY_ORG / SENTRY_PROJECT
+// are unset (e.g. local dev) the Sentry webpack plugin skips source-map upload
+// and the build still succeeds — combined with an empty DSN this makes the
+// whole integration a no-op until ops sets the env vars on Vercel.
+export default withSentryConfig(nextConfig, {
+  // Suppress noisy Sentry CLI logs in CI output.
+  silent: true,
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  // Upload source maps for client routes that import from outside `app/`.
+  widenClientFileUpload: true,
+  // Proxy Sentry envelope requests through this app's origin so ad-blockers
+  // that hard-block `sentry.io` don't drop error reports from real users.
+  tunnelRoute: "/monitoring",
+});
