@@ -44,7 +44,7 @@ export const createJobWorkflowTour: Tour = {
       align: "start",
     },
     {
-      element: '[data-tour-id="garage-scan-vin"]',
+      element: '[data-tour="scan-vin-button"]',
       title: "Scan a car's VIN",
       description:
         "Fastest way to start a job: scan the car's VIN with your camera. " +
@@ -53,7 +53,7 @@ export const createJobWorkflowTour: Tour = {
       align: "start",
     },
     {
-      element: '[data-tour-id="garage-new-job"]',
+      element: '[data-tour="new-job-button"]',
       title: "Click 'New Job'",
       description:
         "Click 'New Job' to open the job form. This is how you create a job by hand.",

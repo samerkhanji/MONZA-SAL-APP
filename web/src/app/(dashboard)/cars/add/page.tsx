@@ -1107,7 +1107,7 @@ export default function AddCarPage() {
         )}
 
         <div className="flex gap-3">
-          <Button type="submit" disabled={submitting} data-tour-id="cars-add-submit-button">
+          <Button type="submit" disabled={submitting} data-tour-id="cars-add-submit-button" data-tour="save-car-button">
             {submitting ? "Adding..." : "Add Car"}
           </Button>
           <Button type="button" variant="outline" asChild data-tour-id="cars-add-cancel-button">

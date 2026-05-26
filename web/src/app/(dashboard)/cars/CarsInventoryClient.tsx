@@ -631,7 +631,7 @@ export function CarsInventoryClient({
             </Button>
           )}
           {canCreateCar && (
-            <Button asChild data-tour-id="cars-list-add-button">
+            <Button asChild data-tour-id="cars-list-add-button" data-tour="add-car-button">
               <Link href="/cars/add">Add Car</Link>
             </Button>
           )}
