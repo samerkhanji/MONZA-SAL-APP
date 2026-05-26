@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import type React from "react";
+import { headers } from "next/headers";
 import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
 import { ThemeProvider } from "@/lib/contexts/ThemeContext";
@@ -43,11 +44,20 @@ export const metadata: Metadata = {
   description: "Monza S.A.L. - Vehicle & Business Management",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Per-request CSP nonce, set by `src/proxy.ts` on the incoming request
+  // headers. Inline <script> tags below attach `nonce={nonce}` so they are
+  // executable under `script-src 'nonce-...' 'strict-dynamic'` — letting us
+  // drop the previous `'unsafe-inline'` bypass.
+  // `?? undefined` so React serialises the attribute as omitted (rather
+  // than `nonce=""`) when this layout renders during a build-time prerender
+  // that doesn't run the proxy (e.g. `next build`'s metadata pass).
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
+
   return (
     <html lang="en" suppressHydrationWarning style={{ overscrollBehaviorX: "none" } as React.CSSProperties}>
       <head>
@@ -65,6 +75,7 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
         <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
         <script
+          nonce={nonce}
           dangerouslySetInnerHTML={{
             __html: `
               (function() {
@@ -103,6 +114,9 @@ export default function RootLayout({
          * the LCP, and we only render the tag when the deploy is explicitly
          * configured (NEXT_PUBLIC_PLAUSIBLE_DOMAIN). Self-hosters can point
          * at their own script via NEXT_PUBLIC_PLAUSIBLE_SCRIPT_URL.
+         *
+         * `nonce` propagates to the injected <script> tag so it loads even
+         * with `'unsafe-inline'` removed from `script-src`.
          */}
         {PLAUSIBLE_DOMAIN ? (
           <Script
@@ -111,6 +125,7 @@ export default function RootLayout({
             src={PLAUSIBLE_SCRIPT_URL}
             data-domain={PLAUSIBLE_DOMAIN}
             defer
+            nonce={nonce}
           />
         ) : null}
       </body>
