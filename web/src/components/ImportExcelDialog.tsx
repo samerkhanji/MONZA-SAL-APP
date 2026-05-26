@@ -360,9 +360,13 @@ export function ImportExcelDialog({
         <div className="space-y-4">
           <input
             ref={fileInputRef}
+            id="import-excel-file-input"
+            name="import-excel-file"
             type="file"
             accept=".xlsx,.xls"
             className="hidden"
+            aria-label="Excel file"
+            title="Excel file"
             onChange={handleFileSelect}
           />
           <Button
