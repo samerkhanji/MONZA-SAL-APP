@@ -33,6 +33,7 @@ import {
 } from "@/lib/page-access";
 import { useUser } from "@/lib/contexts/UserContext";
 import { formatError } from "@/lib/error-messages";
+import { useAppBadge } from "@/hooks/use-app-badge";
 
 type Severity = "info" | "warning" | "urgent" | "critical";
 
@@ -100,6 +101,9 @@ function NotificationBellInner() {
   useEffect(() => {
     void fetchNotifications();
   }, [fetchNotifications]);
+
+  // Mirror unread count onto the installed PWA's app icon (Chrome/Edge).
+  useAppBadge(unreadCount);
 
   // Realtime: subscribe filtered by user_id. New INSERTs trigger a toast.
   useEffect(() => {
