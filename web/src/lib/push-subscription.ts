@@ -112,6 +112,34 @@ export async function unregisterPushSubscription(userId: string): Promise<boolea
 async function saveSubscription(userId: string, subscription: PushSubscription): Promise<void> {
   const supabase = createClient();
   const json = subscription.toJSON();
+  const endpoint = json.endpoint;
+
+  // The push_subscriptions table doesn't (yet) have a unique key on
+  // (user_id, endpoint), so we can't rely on upsert + onConflict. Instead,
+  // detect an existing row for the same user+endpoint and skip the insert if
+  // present. This avoids surfacing a misleading "could not save subscription"
+  // error when the same device re-subscribes (e.g. after browser cache clear).
+  if (endpoint) {
+    const { data: existing } = await supabase
+      .from("push_subscriptions")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("subscription->>endpoint", endpoint)
+      .limit(1);
+    if (existing && existing.length > 0) {
+      // Already registered for this device — refresh the subscription JSON in
+      // case keys rotated, then we're done.
+      const { error: updateError } = await supabase
+        .from("push_subscriptions")
+        .update({ subscription: json })
+        .eq("id", (existing[0] as { id: string }).id);
+      if (updateError) {
+        throw new Error(`push_subscriptions: ${updateError.message}`);
+      }
+      return;
+    }
+  }
+
   const { error } = await supabase.from("push_subscriptions").insert({
     user_id: userId,
     subscription: json,
