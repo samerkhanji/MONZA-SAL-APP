@@ -279,7 +279,15 @@ export type CrudAction =
   | "view"
   | "mark_paid";
 
-export function getAppRoleFromProfile(profile: UserProfile | null): AppRole | null {
+/**
+ * Narrow input type so callers don't have to cast a partial Supabase select
+ * (e.g. `select("id, full_name, user_role")`) to the full `UserProfile`
+ * shape via `as unknown as UserProfile`. This function only ever reads
+ * `user_role`, so the partial shape is sufficient.
+ */
+export function getAppRoleFromProfile(
+  profile: Pick<UserProfile, "user_role"> | null
+): AppRole | null {
   if (!profile) return null;
   return profile.user_role ?? null;
 }

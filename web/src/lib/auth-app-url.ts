@@ -105,12 +105,17 @@ export function getPasswordResetRedirectUrlFromServer(requestOrigin?: string | n
 }
 
 /**
- * Temporary: set `NEXT_PUBLIC_DEBUG_PASSWORD_RESET=1` in `.env.local` (or use dev) to log `redirectTo` / origin details in the browser console. Remove when finished debugging.
+ * Temporary: set `NEXT_PUBLIC_DEBUG_PASSWORD_RESET=1` in `.env.local` (or use
+ * dev) to log `redirectTo` / origin details in the browser console.
+ * Hard-gated to non-production so the flag can't be flipped on in a live
+ * deploy by anyone who controls a `NEXT_PUBLIC_*` env (which is observable in
+ * client bundles).
  */
 export function logPasswordResetClientDebug(
   redirectTo: string,
   extra?: Record<string, unknown>
 ): void {
+  if (process.env.NODE_ENV === "production") return;
   if (
     process.env.NODE_ENV !== "development" &&
     process.env.NEXT_PUBLIC_DEBUG_PASSWORD_RESET !== "1"

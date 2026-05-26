@@ -4,7 +4,10 @@ import { InstallProvider } from "@/lib/contexts/InstallContext";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { PageAccessGuard } from "@/components/PageAccessGuard";
 import { FloatingScanButton } from "@/components/scanner/FloatingScanButton";
-import { WarrantyNotificationChecker } from "@/components/WarrantyNotificationChecker";
+import { SentryFeedbackButton } from "@/components/sentry-feedback-button";
+// WarrantyNotificationChecker was removed — warranty expiry alerts are
+// produced server-side via the `detect_warranty_expiry` pg_cron job
+// (supabase/migrations/092_test_drive_and_warranty_crons.sql).
 import { SessionEnforcer } from "@/components/auth/SessionEnforcer";
 import { FirstLoginGuard } from "@/components/auth/FirstLoginGuard";
 import { ProfileActivityHeartbeat } from "@/components/ProfileActivityHeartbeat";
@@ -32,11 +35,11 @@ export default async function DashboardLayout({
         <InstallProvider>
           <DashboardShell>
             <ProfileActivityHeartbeat />
-            <WarrantyNotificationChecker />
             <FirstLoginGuard>
               <PageAccessGuard>
                 {children}
                 <FloatingScanButton />
+                <SentryFeedbackButton />
               </PageAccessGuard>
             </FirstLoginGuard>
           </DashboardShell>

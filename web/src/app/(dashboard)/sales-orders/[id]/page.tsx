@@ -183,7 +183,7 @@ export default function SalesOrderDetailPage() {
       )
       .eq("linked_sales_order_id", id)
       .eq("status", "committed");
-    setCommittedTradeIns((tradeIns ?? []) as unknown as CommittedTradeIn[]);
+    setCommittedTradeIns((tradeIns ?? []) as CommittedTradeIn[]);
 
     setLoading(false);
   }, [id, supabase, router]);
@@ -713,7 +713,7 @@ export default function SalesOrderDetailPage() {
             <a
               href={order.signed_contract_url}
               target="_blank"
-              rel="noreferrer"
+              rel="noopener noreferrer"
               className="inline-block text-sm text-primary hover:underline"
             >
               Open contract ↗

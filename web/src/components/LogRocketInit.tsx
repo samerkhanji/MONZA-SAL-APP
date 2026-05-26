@@ -109,11 +109,24 @@ export function LogRocketInit() {
       // Note: v7 typings take no args; LogRocket is imported internally.
       setupLogRocketReact();
 
-      // Surface the session URL once it's known so it appears in any
-      // server-side log we forward later (Sentry, Grafana, etc.).
+      // Surface the session URL so it can be forwarded to Sentry/Grafana.
+      // We attach it to Sentry's scope unconditionally; the console line is
+      // gated behind a debug flag (set `localStorage.lr_debug = "1"`) so it
+      // doesn't appear in prod consoles on every page load.
       LogRocket.getSessionURL((sessionURL: string) => {
-        // eslint-disable-next-line no-console
-        console.info("[LogRocket] session", sessionURL);
+        try {
+          Sentry.setTag("logrocket_session", sessionURL);
+        } catch {
+          /* ignore — Sentry not initialised */
+        }
+        try {
+          if (window.localStorage?.getItem("lr_debug") === "1") {
+            // eslint-disable-next-line no-console
+            console.info("[LogRocket] session", sessionURL);
+          }
+        } catch {
+          /* localStorage may be blocked (private mode / disabled cookies) */
+        }
       });
     })();
 

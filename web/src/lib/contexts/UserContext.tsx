@@ -4,6 +4,8 @@ import {
   createContext,
   useContext,
   useEffect,
+  useMemo,
+  useRef,
   useState,
   useCallback,
 } from "react";
@@ -229,12 +231,17 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     document.documentElement.lang = lang;
   }, [profile?.preferred_language]);
 
+  // Tracks the last-seen user identity (id|email) so we can skip the profile
+  // refetch on plain TOKEN_REFRESHED events (which fire ~every 60 min per tab
+  // and don't change `must_change_password`). USER_UPDATED still always pulls.
+  const lastUserIdentityRef = useRef<string | null>(null);
   useEffect(() => {
     const supabase = createClient();
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_OUT") {
+        lastUserIdentityRef.current = null;
         const path = typeof window !== "undefined" ? window.location.pathname : "";
         const isLoginPage = path === "/login" || path === "/";
         const isAuthEmailFlow =
@@ -247,10 +254,23 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         if (!isLoginPage && !isAuthEmailFlow) {
           window.location.href = "/login";
         }
-      } else if (event === "USER_UPDATED" || event === "TOKEN_REFRESHED") {
+      } else if (event === "USER_UPDATED") {
         // Password / email / metadata change → pull fresh profile
         // so FirstLoginGuard etc. don't act on a stale must_change_password flag.
+        const identity = session?.user
+          ? `${session.user.id}|${session.user.email ?? ""}`
+          : null;
+        lastUserIdentityRef.current = identity;
         void loadProfile();
+      } else if (event === "TOKEN_REFRESHED") {
+        // Skip the profile pull unless the user identity actually changed.
+        const identity = session?.user
+          ? `${session.user.id}|${session.user.email ?? ""}`
+          : null;
+        if (identity !== lastUserIdentityRef.current) {
+          lastUserIdentityRef.current = identity;
+          void loadProfile();
+        }
       }
     });
     return () => subscription.unsubscribe();
@@ -287,18 +307,24 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const isRequestManagement = appRole === "owner";
   const isSamer = false;
   const isKareem = false;
-  // Identifies Houssam (a specific approver). We avoid hard-coding a profile
-  // ID at build time -- prefer matching by full_name, with optional override
-  // via NEXT_PUBLIC_HOUSSAM_PROFILE_ID for environments where the display name
-  // changes. Returns false when neither identifier matches so the gated UI
-  // simply does not render.
+  // Identifies Houssam (a specific approver). Prefer the env-pinned profile
+  // id (NEXT_PUBLIC_HOUSSAM_PROFILE_ID); fall back to a forgiving name match
+  // (case-insensitive, trimmed, matches when "Houssam" appears as the first
+  // word) so a stray casing/typo in `full_name` doesn't silently break the
+  // approval flow. Returns false when neither identifier matches.
+  // TODO: phase this out for a capability flag (e.g. `approve_houssam_workflow`).
   const houssamProfileIdEnv =
     typeof process !== "undefined"
       ? process.env.NEXT_PUBLIC_HOUSSAM_PROFILE_ID
       : undefined;
+  const houssamNameMatches = (() => {
+    const fullName = profile?.full_name?.trim().toLowerCase();
+    if (!fullName) return false;
+    return fullName === "houssam" || fullName.startsWith("houssam ");
+  })();
   const isHoussam =
     (!!houssamProfileIdEnv && profile?.id === houssamProfileIdEnv) ||
-    profile?.full_name === "Houssam";
+    houssamNameMatches;
   const isMark = appRole === "garage_manager";
   const isKhalil = appRole === "hybrid" || appRole === "khalil_hybrid";
   const isOwner = appRole === "owner";
@@ -370,52 +396,95 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     [profile]
   );
 
-  return (
-    <UserContext.Provider
-      value={{
-        profile,
-        loading,
-        connectionError,
-        retryConnection,
-        refreshProfile,
-        hasCapability,
-        hasAnyCapability,
-        canEditInventory,
-        canDelete,
-        canSeeSettings,
-        canSeeProfileSettings,
-        canSeeMyRequests,
-        canSeeAllRequests,
-        canUploadDocuments,
-        canManageParts,
-        canManageGarage,
-        noProfile,
-        isRequestAssistant,
-        isRequestManagement,
-        isSamer,
-        isKareem,
-        isHoussam,
-        isMark,
-        isKhalil,
-        isOwner,
-        isHybrid,
-        canAssistantDashboard,
-        appRole,
-        canSeeDashboard,
-        canSeeCars,
-        canSeeDocuments,
-        canSeePartsInventory,
-        canSeeGarageJobs,
-        canSeeGarageHistory,
-        canEditMonzaWarrantyOnCar: canEditMonzaWarrantyOnCarFlag,
-        canEditDmsWarrantyOnCar: canEditDmsWarrantyOnCarFlag,
-        canEditPdiStatusOnCar: canEditPdiStatusOnCarFlag,
-        canOpenCarEditDialog: canOpenCarEditDialogFlag,
-      }}
-    >
-      {children}
-    </UserContext.Provider>
+  // Memoize the provider value so the ~70 consumers of useUser() only
+  // re-render when an underlying piece of state actually changes. Without
+  // useMemo, every auth event (e.g. TOKEN_REFRESHED) re-renders UserProvider
+  // and forces every consumer to re-render even though their slice is
+  // unchanged.
+  const value = useMemo<UserContextType>(
+    () => ({
+      profile,
+      loading,
+      connectionError,
+      retryConnection,
+      refreshProfile,
+      hasCapability,
+      hasAnyCapability,
+      canEditInventory,
+      canDelete,
+      canSeeSettings,
+      canSeeProfileSettings,
+      canSeeMyRequests,
+      canSeeAllRequests,
+      canUploadDocuments,
+      canManageParts,
+      canManageGarage,
+      noProfile,
+      isRequestAssistant,
+      isRequestManagement,
+      isSamer,
+      isKareem,
+      isHoussam,
+      isMark,
+      isKhalil,
+      isOwner,
+      isHybrid,
+      canAssistantDashboard,
+      appRole,
+      canSeeDashboard,
+      canSeeCars,
+      canSeeDocuments,
+      canSeePartsInventory,
+      canSeeGarageJobs,
+      canSeeGarageHistory,
+      canEditMonzaWarrantyOnCar: canEditMonzaWarrantyOnCarFlag,
+      canEditDmsWarrantyOnCar: canEditDmsWarrantyOnCarFlag,
+      canEditPdiStatusOnCar: canEditPdiStatusOnCarFlag,
+      canOpenCarEditDialog: canOpenCarEditDialogFlag,
+    }),
+    [
+      profile,
+      loading,
+      connectionError,
+      retryConnection,
+      refreshProfile,
+      hasCapability,
+      hasAnyCapability,
+      canEditInventory,
+      canDelete,
+      canSeeSettings,
+      canSeeProfileSettings,
+      canSeeMyRequests,
+      canSeeAllRequests,
+      canUploadDocuments,
+      canManageParts,
+      canManageGarage,
+      noProfile,
+      isRequestAssistant,
+      isRequestManagement,
+      isSamer,
+      isKareem,
+      isHoussam,
+      isMark,
+      isKhalil,
+      isOwner,
+      isHybrid,
+      canAssistantDashboard,
+      appRole,
+      canSeeDashboard,
+      canSeeCars,
+      canSeeDocuments,
+      canSeePartsInventory,
+      canSeeGarageJobs,
+      canSeeGarageHistory,
+      canEditMonzaWarrantyOnCarFlag,
+      canEditDmsWarrantyOnCarFlag,
+      canEditPdiStatusOnCarFlag,
+      canOpenCarEditDialogFlag,
+    ]
   );
+
+  return <UserContext.Provider value={value}>{children}</UserContext.Provider>;
 }
 
 export const useUser = () => useContext(UserContext);

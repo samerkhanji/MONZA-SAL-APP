@@ -11,10 +11,17 @@ import {
   updateLastActivity,
 } from "@/lib/auth-session";
 
+// Minimum time between sessionStorage writes from activity events. Idle timeout
+// granularity is in minutes, so once every few seconds is more than precise enough
+// and avoids hammering sessionStorage on `mousemove` (which fires dozens of times
+// per second on lower-end machines).
+const ACTIVITY_THROTTLE_MS = 5000;
+
 export function SessionEnforcer({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
   const logoutInProgress = useRef(false);
   const lastActiveRef = useRef<number>(0);
+  const lastWriteRef = useRef<number>(0);
   const hiddenAtRef = useRef<number | null>(null);
 
   const forceLogout = async (reason: "reauth" | "inactive") => {
@@ -72,6 +79,7 @@ export function SessionEnforcer({ children }: { children: React.ReactNode }) {
 
       const now = Date.now();
       lastActiveRef.current = now;
+      lastWriteRef.current = now;
       updateLastActivity(now);
 
       if (!cancelled) {
@@ -91,7 +99,11 @@ export function SessionEnforcer({ children }: { children: React.ReactNode }) {
     const markActivity = () => {
       const now = Date.now();
       lastActiveRef.current = now;
-      updateLastActivity(now);
+      // Throttle persistence: avoid sessionStorage writes on every mousemove tick.
+      if (now - lastWriteRef.current >= ACTIVITY_THROTTLE_MS) {
+        lastWriteRef.current = now;
+        updateLastActivity(now);
+      }
     };
 
     const checkIdleTimeout = () => {
@@ -119,7 +131,13 @@ export function SessionEnforcer({ children }: { children: React.ReactNode }) {
       }
 
       hiddenAtRef.current = null;
-      markActivity();
+      // Returning to the tab is a real activity event; force the persisted
+      // timestamp to refresh immediately rather than waiting for the next
+      // throttle window.
+      const now = Date.now();
+      lastActiveRef.current = now;
+      lastWriteRef.current = now;
+      updateLastActivity(now);
     };
 
     const activityEvents: Array<keyof WindowEventMap> = [

@@ -4,6 +4,10 @@ import {
   validatePasswordResetRedirectUrl,
 } from "@/lib/auth-app-url";
 import { getSupabasePublicKey, getSupabaseUrl } from "@/lib/supabase/public-env";
+import {
+  checkEmailFlowLimit,
+  getRequestIp,
+} from "@/lib/rate-limit/email-flow-limiter";
 
 const GOTRUE_API_VERSION = "2024-01-01";
 
@@ -14,6 +18,14 @@ function redactEmail(e: string): string {
 }
 
 function passwordResetServerDebug(): boolean {
+  // In production NEVER read NEXT_PUBLIC_* for server-side debug toggles:
+  // the prefix means it's bundled into the client and is therefore observable
+  // (and toggle-able) by anyone who controls the build. Use a server-only
+  // var instead so an attacker can't flip on email-leaking logs by setting
+  // a NEXT_PUBLIC_* env. Dev keeps both for local debugging convenience.
+  if (process.env.NODE_ENV === "production") {
+    return process.env.DEBUG_PASSWORD_RESET === "1";
+  }
   return (
     process.env.NODE_ENV === "development" ||
     process.env.DEBUG_PASSWORD_RESET === "1" ||
@@ -37,6 +49,21 @@ export async function POST(request: NextRequest) {
   const email = typeof body.email === "string" ? body.email.trim() : "";
   if (!email || !email.includes("@")) {
     return NextResponse.json({ ok: true });
+  }
+
+  // Rate-limit by both target email and caller IP to prevent mail-bombing /
+  // Resend cost abuse. The response intentionally mirrors the success shape so
+  // attackers cannot use 429s as an email-existence oracle.
+  const ip = getRequestIp(request.headers);
+  const limit = checkEmailFlowLimit({ email, ip });
+  if (!limit.allowed) {
+    return NextResponse.json(
+      { ok: true },
+      {
+        status: 429,
+        headers: { "Retry-After": String(limit.retryAfterSeconds) },
+      }
+    );
   }
 
   const origin = request.headers.get("origin");

@@ -276,8 +276,9 @@ describe("canAccessModule", () => {
 });
 
 describe("APP_CAPABILITIES + MODULE_CAPABILITY contracts", () => {
-  it("APP_CAPABILITIES has 11 entries (mirrors DB enum)", () => {
-    expect(APP_CAPABILITIES).toHaveLength(11);
+  it("APP_CAPABILITIES has 12 entries (mirrors DB enum)", () => {
+    // Bumped from 11 → 12 when `view_customer_documents` was added.
+    expect(APP_CAPABILITIES).toHaveLength(12);
   });
 
   it("MODULE_CAPABILITY values are all valid AppCapability", () => {

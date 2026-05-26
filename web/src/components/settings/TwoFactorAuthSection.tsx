@@ -110,7 +110,18 @@ export function TwoFactorAuthSection() {
       toast.error(formatError(error));
       return;
     }
-    setEnrollment(data as unknown as EnrollResult);
+    // The mfa.enroll TOTP response includes `id` + `totp` — the SDK union
+    // type also includes phone-factor variants we don't use here.
+    if (data && "totp" in data && data.totp) {
+      setEnrollment({
+        id: data.id,
+        totp: {
+          qr_code: data.totp.qr_code,
+          secret: data.totp.secret,
+          uri: data.totp.uri,
+        },
+      });
+    }
   }
 
   async function verifyCode() {

@@ -4,6 +4,10 @@ import {
   validatePasswordResetRedirectUrl,
 } from "@/lib/auth-app-url";
 import { tryCreateAdminClient } from "@/lib/supabase/admin";
+import {
+  checkEmailFlowLimit,
+  getRequestIp,
+} from "@/lib/rate-limit/email-flow-limiter";
 
 /**
  * Env (Vercel / server):
@@ -18,7 +22,14 @@ import { tryCreateAdminClient } from "@/lib/supabase/admin";
 const RESEND_SEND_URL = "https://api.resend.com/emails";
 
 function escapeHtmlAttr(url: string): string {
-  return url.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+  // Defense-in-depth: the email template uses double-quoted href attributes,
+  // so `'` is technically safe, but we escape it anyway in case the template
+  // is ever switched to single quotes by a future edit.
+  return url
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;")
+    .replace(/</g, "&lt;");
 }
 
 export async function POST(request: NextRequest) {
@@ -33,6 +44,20 @@ export async function POST(request: NextRequest) {
   const email = raw.toLowerCase();
   if (!email || !email.includes("@")) {
     return NextResponse.json({ ok: true });
+  }
+
+  // Rate-limit per email and per IP to prevent mail-bombing and Resend cost
+  // abuse. Response shape matches the OK path so 429s are not an oracle.
+  const ip = getRequestIp(request.headers);
+  const limit = checkEmailFlowLimit({ email, ip });
+  if (!limit.allowed) {
+    return NextResponse.json(
+      { ok: true },
+      {
+        status: 429,
+        headers: { "Retry-After": String(limit.retryAfterSeconds) },
+      }
+    );
   }
 
   const admin = tryCreateAdminClient();

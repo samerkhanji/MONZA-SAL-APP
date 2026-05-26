@@ -71,6 +71,9 @@ export default function AccessoriesPage() {
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [pendingDelete, setPendingDelete] = useState<AccessoryInventoryRow | null>(null);
   const dirtyIdsRef = useRef<Set<string>>(new Set());
+  // Tracks the pending "reset to idle" timer kicked off after a successful save.
+  // Stored in a ref so the autosave effect cleanup can cancel it on unmount.
+  const idleResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // The public.accessory_inventory table is the single source of truth.
   // No localStorage, no in-app seed — the page only ever reflects the DB.
@@ -99,6 +102,7 @@ export default function AccessoriesPage() {
   // Debounced auto-save: 1s after the last edit, push dirty rows to Supabase.
   useEffect(() => {
     if (!hydrated || dirtyIdsRef.current.size === 0) return;
+    let cancelled = false;
     const timer = setTimeout(async () => {
       const dirtyIds = Array.from(dirtyIdsRef.current);
       dirtyIdsRef.current = new Set();
@@ -108,6 +112,7 @@ export default function AccessoriesPage() {
       const { error } = await supabase
         .from("accessory_inventory")
         .upsert(dirtyRows.map(rowToUpsert));
+      if (cancelled) return;
       if (error) {
         setSaveState("error");
         toast.error(`Could not save changes: ${formatError(error)}`);
@@ -115,11 +120,33 @@ export default function AccessoriesPage() {
         dirtyIds.forEach((id) => dirtyIdsRef.current.add(id));
       } else {
         setSaveState("saved");
-        setTimeout(() => setSaveState("idle"), 1500);
+        // Track the "reset to idle" timer in a ref so unmount cancels it,
+        // avoiding setState-on-unmounted warnings.
+        if (idleResetTimerRef.current !== null) {
+          clearTimeout(idleResetTimerRef.current);
+        }
+        idleResetTimerRef.current = setTimeout(() => {
+          idleResetTimerRef.current = null;
+          setSaveState("idle");
+        }, 1500);
       }
     }, 1000);
-    return () => clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [rows, hydrated, supabase]);
+
+  // Unmount-only cleanup for the "reset to idle" timer, so we don't call
+  // setSaveState after the component unmounts within the 1.5s window.
+  useEffect(() => {
+    return () => {
+      if (idleResetTimerRef.current !== null) {
+        clearTimeout(idleResetTimerRef.current);
+        idleResetTimerRef.current = null;
+      }
+    };
+  }, []);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();

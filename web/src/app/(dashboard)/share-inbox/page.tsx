@@ -32,12 +32,16 @@ function openDb(): Promise<IDBDatabase> {
   });
 }
 
-function loadLatest(): Promise<SharedItem | null> {
-  return new Promise(async (resolve) => {
-    try {
-      const db = await openDb();
-      const tx = db.transaction("items", "readonly");
-      const store = tx.objectStore("items");
+async function loadLatest(): Promise<SharedItem | null> {
+  // Plain `async` function with try/catch — an async executor passed to
+  // `new Promise(async ...)` would swallow any thrown errors before `resolve`,
+  // so we use the awaited callback shape and wrap the IndexedDB callback step
+  // in a small inner Promise instead.
+  try {
+    const db = await openDb();
+    const tx = db.transaction("items", "readonly");
+    const store = tx.objectStore("items");
+    return await new Promise<SharedItem | null>((resolve) => {
       const req = store.getAll();
       req.onsuccess = () => {
         const items = (req.result as SharedItem[]) ?? [];
@@ -46,10 +50,10 @@ function loadLatest(): Promise<SharedItem | null> {
         resolve(items[0]);
       };
       req.onerror = () => resolve(null);
-    } catch {
-      resolve(null);
-    }
-  });
+    });
+  } catch {
+    return null;
+  }
 }
 
 async function clearInbox(): Promise<void> {
@@ -66,18 +70,22 @@ export default function ShareInboxPage() {
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
 
   useEffect(() => {
+    // Capture URLs created inside this effect in a local so the cleanup
+    // function can revoke exactly the URLs it allocated, even after the
+    // setState re-render. Reading `previewUrls` in cleanup would close over
+    // the initial empty array and leak the blobs.
+    let createdUrls: string[] = [];
     void loadLatest().then((it) => {
       setItem(it);
       setLoading(false);
       if (it) {
-        const urls = it.files.map((f) => URL.createObjectURL(f.blob));
-        setPreviewUrls(urls);
+        createdUrls = it.files.map((f) => URL.createObjectURL(f.blob));
+        setPreviewUrls(createdUrls);
       }
     });
     return () => {
-      previewUrls.forEach((u) => URL.revokeObjectURL(u));
+      createdUrls.forEach((u) => URL.revokeObjectURL(u));
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function handleDismiss() {
