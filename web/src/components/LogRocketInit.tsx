@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import * as Sentry from "@sentry/nextjs";
 import { useUser } from "@/lib/contexts/UserContext";
 import { createClient } from "@/lib/supabase";
 
@@ -125,6 +126,14 @@ export function LogRocketInit() {
   // the user signs out and back in as someone else.
   useEffect(() => {
     if (typeof window === "undefined") return;
+
+    // Sentry tagging is environment-agnostic — we want crash reports
+    // attributed to a user in preview/prod alike. Clear the user when
+    // the profile drops to null (logout, session expiry).
+    if (!profile?.id) {
+      Sentry.setUser(null);
+    }
+
     if (process.env.NODE_ENV !== "production") return;
     if (!profile?.id) return;
 
@@ -134,6 +143,16 @@ export function LogRocketInit() {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       const email = user?.email ?? "";
+
+      // Tag the user in Sentry so error reports are attributable. We
+      // include email because employees use real corporate emails and
+      // the app already exposes them in-app (no extra PII surface), but
+      // we keep it minimal — no phone, no full name.
+      Sentry.setUser({
+        id: profile.id,
+        email: email || undefined,
+        role: profile.user_role ?? "unknown",
+      });
 
       const { default: LogRocket } = await import("logrocket");
       LogRocket.identify(profile.id, {
