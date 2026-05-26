@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type React from "react";
 import { Geist, Geist_Mono } from "next/font/google";
+import Script from "next/script";
 import { ThemeProvider } from "@/lib/contexts/ThemeContext";
 // Sonner has no toasts queued at first paint, so its JS + CSS doesn't belong
 // on the LCP critical path. ThemeToasterLazy wraps it in a `next/dynamic`
@@ -12,6 +13,15 @@ import { DevHostBanner } from "@/components/dev-host-banner";
 import { GlobalKeyboardShortcuts } from "@/components/GlobalKeyboardShortcuts";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
+
+// Plausible analytics is gated on `NEXT_PUBLIC_PLAUSIBLE_DOMAIN` being set on
+// the deploy — when unset we render nothing so no third-party request fires.
+// Read at module scope so the value is inlined into the server bundle and the
+// conditional below short-circuits at render time.
+const PLAUSIBLE_DOMAIN = process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN?.trim();
+const PLAUSIBLE_SCRIPT_URL =
+  process.env.NEXT_PUBLIC_PLAUSIBLE_SCRIPT_URL?.trim() ||
+  "https://plausible.io/js/script.js";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -87,6 +97,22 @@ export default function RootLayout({
           {process.env.NODE_ENV === "development" ? <DevHostBanner /> : null}
         </ThemeProvider>
         <SpeedInsights />
+        {/*
+         * Plausible is a privacy-friendly, cookieless analytics script. We
+         * load it via next/script with afterInteractive so it never blocks
+         * the LCP, and we only render the tag when the deploy is explicitly
+         * configured (NEXT_PUBLIC_PLAUSIBLE_DOMAIN). Self-hosters can point
+         * at their own script via NEXT_PUBLIC_PLAUSIBLE_SCRIPT_URL.
+         */}
+        {PLAUSIBLE_DOMAIN ? (
+          <Script
+            id="plausible-analytics"
+            strategy="afterInteractive"
+            src={PLAUSIBLE_SCRIPT_URL}
+            data-domain={PLAUSIBLE_DOMAIN}
+            defer
+          />
+        ) : null}
       </body>
     </html>
   );
