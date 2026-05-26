@@ -11,6 +11,10 @@ on:
         description: 'Version code (integer, must increment each release)'
         required: true
         default: '1'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/build-android-aab.yml'
 
 permissions:
   contents: read
@@ -22,6 +26,8 @@ jobs:
     env:
       KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD || 'monza-android-2026-keystore' }}
       KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD || 'monza-android-2026-key' }}
+      VERSION_NAME: ${{ github.event.inputs.version_name || '1.0.0' }}
+      VERSION_CODE: ${{ github.event.inputs.version_code || '1' }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -53,7 +59,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/twa"
           cd "$RUNNER_TEMP/twa"
 
-          cat > twa-manifest.json <<'MANIFEST_EOF'
+          cat > twa-manifest.json <<MANIFEST_EOF
           {
             "packageId": "com.monzasal.app",
             "host": "monzasal.vercel.app",
@@ -91,9 +97,9 @@ jobs:
               "path": "./android.keystore",
               "alias": "android"
             },
-            "appVersionName": "${{ github.event.inputs.version_name }}",
-            "appVersion": ${{ github.event.inputs.version_code }},
-            "appVersionCode": ${{ github.event.inputs.version_code }}
+            "appVersionName": "$VERSION_NAME",
+            "appVersion": $VERSION_CODE,
+            "appVersionCode": $VERSION_CODE
           }
           MANIFEST_EOF
 
