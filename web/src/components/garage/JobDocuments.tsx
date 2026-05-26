@@ -182,7 +182,9 @@ export function JobDocuments({ jobId, onDocumentsChange }: JobDocumentsProps) {
       }
       return data.signedUrl;
     },
-    []
+    // `supabase` is a module-level singleton (see lib/supabase/client.ts); we
+    // still list it so exhaustive-deps stays honest.
+    [supabase]
   );
 
   async function handleView(filePath: string) {

@@ -141,7 +141,7 @@ export function DayDetailDialog({
       setDocuments((data as DayDoc[]) ?? []);
     }
     setLoadingDocs(false);
-  }, [carId, open]);
+  }, [carId, open, supabase]);
 
   useEffect(() => {
     if (open) fetchDocuments();
@@ -164,7 +164,10 @@ export function DayDetailDialog({
       if (error || !data?.signedUrl) return null;
       return data.signedUrl;
     },
-    []
+    // `supabase` is a module-level singleton (see lib/supabase/client.ts) so
+    // its reference is stable across renders; we still list it for honest
+    // exhaustive-deps compliance.
+    [supabase]
   );
 
   async function handleView(filePath: string) {
