@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import webpush from "web-push";
 import { tryCreateAdminClient } from "@/lib/supabase/admin";
 import { createClient as createServerClient } from "@/lib/supabase/server";
+import { isSafeInternalLink } from "@/lib/url-safety";
 
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
@@ -103,7 +104,11 @@ export async function POST(request: NextRequest) {
     // Cap fields we forward to the browser.
     const safeTitle = String(title).slice(0, 200);
     const safeMessage = String(message).slice(0, 1000);
-    const safeLink = typeof link === "string" && link.startsWith("/") ? link : "/";
+    // Defend against open-redirect: `link.startsWith("/")` would accept
+    // `//attacker.com`, which browsers treat as `https://attacker.com`. The
+    // service worker forwards this directly into `window.location.href`, so we
+    // must reject anything that is not a strict same-origin path.
+    const safeLink = isSafeInternalLink(link) ? (link as string) : "/";
 
     const payload = JSON.stringify({
       title: safeTitle,

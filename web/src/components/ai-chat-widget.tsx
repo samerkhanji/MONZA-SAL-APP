@@ -7,6 +7,7 @@ import { MessageCircle, X, RotateCcw, Send, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/lib/contexts/UserContext";
 import { USER_ROLE_LABELS } from "@/lib/constants/user";
+import { isSafeMarkdownUrl } from "@/lib/url-safety";
 import { cn } from "@/lib/utils";
 
 /**
@@ -664,14 +665,17 @@ function InlineMarkdown({ text }: { text: string }) {
         const closeParen = text.indexOf(")", closeBracket + 2);
         const label = text.slice(i + 1, closeBracket);
         const url = text.slice(closeBracket + 2, closeParen);
-        // Only allow http(s) and root-relative links to avoid javascript: etc.
-        const safe = /^(https?:\/\/|\/)/.test(url);
-        if (safe) {
+        // Only allow http(s) and *single-slash* root-relative links. The old
+        // `/^(https?:\/\/|\/)/` accepted protocol-relative URLs like
+        // `//attacker.com` which browsers treat as off-site, enabling
+        // open-redirects from AI-generated markdown.
+        if (isSafeMarkdownUrl(url)) {
+          const isInternal = url.startsWith("/");
           out.push(
             <a
               key={key++}
               href={url}
-              target={url.startsWith("/") ? undefined : "_blank"}
+              target={isInternal ? undefined : "_blank"}
               rel="noopener noreferrer"
               className="text-primary underline underline-offset-2"
             >

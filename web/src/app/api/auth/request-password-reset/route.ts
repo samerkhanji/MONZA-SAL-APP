@@ -4,6 +4,10 @@ import {
   validatePasswordResetRedirectUrl,
 } from "@/lib/auth-app-url";
 import { getSupabasePublicKey, getSupabaseUrl } from "@/lib/supabase/public-env";
+import {
+  checkEmailFlowLimit,
+  getRequestIp,
+} from "@/lib/rate-limit/email-flow-limiter";
 
 const GOTRUE_API_VERSION = "2024-01-01";
 
@@ -37,6 +41,21 @@ export async function POST(request: NextRequest) {
   const email = typeof body.email === "string" ? body.email.trim() : "";
   if (!email || !email.includes("@")) {
     return NextResponse.json({ ok: true });
+  }
+
+  // Rate-limit by both target email and caller IP to prevent mail-bombing /
+  // Resend cost abuse. The response intentionally mirrors the success shape so
+  // attackers cannot use 429s as an email-existence oracle.
+  const ip = getRequestIp(request.headers);
+  const limit = checkEmailFlowLimit({ email, ip });
+  if (!limit.allowed) {
+    return NextResponse.json(
+      { ok: true },
+      {
+        status: 429,
+        headers: { "Retry-After": String(limit.retryAfterSeconds) },
+      }
+    );
   }
 
   const origin = request.headers.get("origin");

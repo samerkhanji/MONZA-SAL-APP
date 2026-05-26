@@ -4,6 +4,10 @@ import {
   validatePasswordResetRedirectUrl,
 } from "@/lib/auth-app-url";
 import { tryCreateAdminClient } from "@/lib/supabase/admin";
+import {
+  checkEmailFlowLimit,
+  getRequestIp,
+} from "@/lib/rate-limit/email-flow-limiter";
 
 /**
  * Env (Vercel / server):
@@ -33,6 +37,20 @@ export async function POST(request: NextRequest) {
   const email = raw.toLowerCase();
   if (!email || !email.includes("@")) {
     return NextResponse.json({ ok: true });
+  }
+
+  // Rate-limit per email and per IP to prevent mail-bombing and Resend cost
+  // abuse. Response shape matches the OK path so 429s are not an oracle.
+  const ip = getRequestIp(request.headers);
+  const limit = checkEmailFlowLimit({ email, ip });
+  if (!limit.allowed) {
+    return NextResponse.json(
+      { ok: true },
+      {
+        status: 429,
+        headers: { "Retry-After": String(limit.retryAfterSeconds) },
+      }
+    );
   }
 
   const admin = tryCreateAdminClient();
