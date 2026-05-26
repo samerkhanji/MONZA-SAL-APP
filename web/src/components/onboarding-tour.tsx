@@ -25,6 +25,7 @@ import type { Tour, TourMode, TourStep } from "@/lib/tours/types";
 
 const TOUR_REPLAY_EVENT = "monza:tour-replay";
 const TOUR_START_EVENT = "monza:start-tour";
+export const TOUR_ACTIVE_CHANGED_EVENT = "monza:tour-active-changed";
 
 export type StartTourDetail = {
   tourId: string;
@@ -241,6 +242,7 @@ export function OnboardingTour() {
             interactiveCleanupRef.current = null;
           }
           driverRef.current = null;
+          window.dispatchEvent(new CustomEvent(TOUR_ACTIVE_CHANGED_EVENT, { detail: { active: false } }));
           if (!markCompleteAfter || !profile?.id) return;
           try {
             const supabase = createClient();
@@ -259,6 +261,7 @@ export function OnboardingTour() {
 
       const d = driver(config);
       driverRef.current = d;
+      window.dispatchEvent(new CustomEvent(TOUR_ACTIVE_CHANGED_EVENT, { detail: { active: true } }));
 
       // If the first step needs navigation, push first, then drive.
       const firstStep = safeSteps[startAt];
