@@ -1,0 +1,37 @@
+Secret/Credential Scan Metadata
+================================
+
+Date (UTC):              2026-05-26
+Repository:              samerkhanji/monza-sal-app
+Worktree path:           /home/user/MONZA-SAL-APP/.claude/worktrees/agent-a5a754b567d391e49
+Main repo path scanned:  /home/user/MONZA-SAL-APP
+HEAD commit:             ec600a9fcbfe45f287c9caec592cdfde750f734b
+HEAD title:              Post-launch fixes batch: 13 audit findings (auth, RLS, UI clarity, a11y) (#111)
+Total commits scanned:   51 (full git history, all refs)
+Branch:                  claude/chunk-d-secret-scan
+
+Tools
+-----
+trufflehog:  3.95.3   (binary at /tmp/bin/trufflehog)
+gitleaks:    8.21.2   (binary at /tmp/bin/gitleaks)
+
+Commands executed
+-----------------
+trufflehog git file:///home/user/MONZA-SAL-APP --json --no-update
+  -> /tmp/trufflehog-report.json (1 unverified finding)
+
+trufflehog filesystem /home/user/MONZA-SAL-APP --json --no-update
+  -> /tmp/trufflehog-filesystem.json (4 unverified findings; 3 of 4 are duplicates inside
+     .claude/worktrees/, all pointing at the same upstream working-tree match)
+
+gitleaks detect --source . --redact --report-format json --report-path /tmp/gitleaks-report.json
+  -> /tmp/gitleaks-report.json (5 findings, redacted)
+
+Aggregate result
+----------------
+Verified-active secrets:        0
+Suspected-real unverified:      0
+Test / fixture / doc examples:  2 unique findings (file-hash false positive, JWT header example)
+Tooling artifact (permission allowlist with already-literal "REDACTED" placeholder): 1 file, 4 lines
+
+Status: CLEAN — no real secrets in history. See trufflehog-summary.md and gitleaks-summary.md.
