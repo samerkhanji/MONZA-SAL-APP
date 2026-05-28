@@ -122,7 +122,12 @@ export function FinishJobDialog({
         completed_at: new Date().toISOString(),
         work_done: workDone,
         garage_bay_id: null,
-        started_at: null,
+        // Do NOT null `started_at` — the column is NOT NULL at the DB
+        // layer and the original "first work started" timestamp is what
+        // efficiency reports reference to compute job duration. See
+        // `garage/page.tsx::runStatusChange` for the same fix and the
+        // contradictory comment in `JobTimeEntryControls.tsx::handleStartOrResume`
+        // that already documents the intent ("preserve the FIRST started_at").
       })
       .eq("id", job.id);
 

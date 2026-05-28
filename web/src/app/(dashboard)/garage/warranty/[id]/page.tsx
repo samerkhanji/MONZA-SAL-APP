@@ -417,17 +417,29 @@ export default function WarrantyDetailPage() {
               <Button size="sm" onClick={() => void saveResolution()} disabled={savingResolution}>
                 {savingResolution ? "Saving…" : "Save resolution"}
               </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() =>
-                  router.push(
-                    `/garage/refunds?warranty_case=${wc.id}&customer=${wc.customer_id ?? ""}`
-                  )
-                }
-              >
-                Issue refund tied to this case
-              </Button>
+              {/* Refunds.customer_id is NOT NULL, so the deep-link only makes
+                  sense when this warranty case has a customer attached.
+                  Without one, the dialog opens but the customer field is
+                  empty and the user has to pick one by hand — confusing
+                  enough that we just hide the button until the data is
+                  linked, with a hint pointing to the fix. */}
+              {wc.customer_id ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() =>
+                    router.push(
+                      `/garage/refunds?warranty_case=${wc.id}&customer=${wc.customer_id}`
+                    )
+                  }
+                >
+                  Issue refund tied to this case
+                </Button>
+              ) : (
+                <p className="text-muted-foreground text-xs">
+                  Link a customer to this case to issue a tied refund.
+                </p>
+              )}
             </div>
           )}
         </CardContent>
