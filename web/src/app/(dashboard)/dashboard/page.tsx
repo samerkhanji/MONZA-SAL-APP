@@ -224,8 +224,9 @@ export default function DashboardPage() {
     } else {
       const counts: Record<string, number> = {};
       CAR_STATUS_ORDER.forEach((s) => (counts[s] = 0));
-      (carsStatusRes.data ?? []).forEach((row: { status: string }) => {
-        counts[row.status] = (counts[row.status] ?? 0) + 1;
+      (carsStatusRes.data ?? []).forEach((row) => {
+        const status = row.status;
+        if (status) counts[status] = (counts[status] ?? 0) + 1;
       });
       setStatusCounts(counts);
     }

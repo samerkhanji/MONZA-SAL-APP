@@ -5,6 +5,7 @@ import {
 } from "@/lib/auth-app-url";
 import { tryCreateAdminClient } from "@/lib/supabase/admin";
 import { toPublicApiError } from "@/lib/server/api-error";
+import { constantTimeEqualSecret } from "@/lib/server/constant-time-secret";
 
 /**
  * **Does not send email.** Returns GoTrue’s `action_link` for debugging or for a custom mailer /
@@ -15,7 +16,11 @@ import { toPublicApiError } from "@/lib/server/api-error";
  */
 export async function POST(request: NextRequest) {
   const secret = process.env.PASSWORD_RESET_GENERATE_LINK_SECRET?.trim();
-  if (!secret || request.headers.get("x-recovery-link-secret") !== secret) {
+  const provided = request.headers.get("x-recovery-link-secret") ?? "";
+  // Constant-time compare to avoid leaking secret bytes via response-time
+  // differences. `constantTimeEqualSecret` also returns false when `secret`
+  // is missing/empty, so the route stays a 404 when env is unconfigured.
+  if (!constantTimeEqualSecret(provided, secret ?? "")) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 

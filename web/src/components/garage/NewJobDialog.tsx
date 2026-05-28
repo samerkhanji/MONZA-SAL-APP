@@ -274,20 +274,38 @@ export function NewJobDialog({
       }
 
       const jobId = (jobData as { id: string }).id;
+      // Fire all `use_part_on_job` RPCs concurrently rather than sequentially.
+      // A 10-part job used to take 10 round-trips serially; now they overlap.
+      const partResults = await Promise.allSettled(
+        partsToAdd.map((p) =>
+          supabase
+            .rpc("use_part_on_job", {
+              p_job_id: jobId,
+              p_part_id: p.part_id,
+              p_quantity: p.quantity,
+              ...(p.note ? { p_note: p.note } : {}),
+              p_user_id: user.id,
+            })
+            .then((res) => ({ part: p, error: res.error }))
+        )
+      );
       const failedParts: string[] = [];
-      for (const p of partsToAdd) {
-        const { error } = await supabase.rpc("use_part_on_job", {
-          p_job_id: jobId,
-          p_part_id: p.part_id,
-          p_quantity: p.quantity,
-          p_note: p.note || null,
-          p_user_id: user.id,
-        });
-        if (error) {
-          failedParts.push(p.part_name);
-          toast.error(`Failed to add part ${p.part_name}: ${formatError(error)}`);
+      partResults.forEach((result, idx) => {
+        const part = partsToAdd[idx];
+        if (result.status === "rejected") {
+          failedParts.push(part.part_name);
+          toast.error(
+            `Failed to add part ${part.part_name}: ${formatError(result.reason)}`
+          );
+          return;
         }
-      }
+        if (result.value.error) {
+          failedParts.push(part.part_name);
+          toast.error(
+            `Failed to add part ${part.part_name}: ${formatError(result.value.error)}`
+          );
+        }
+      });
 
       const garageIds = await import("@/lib/user-lookup").then((m) =>
         m.getProfileIdsByCapability("garage")

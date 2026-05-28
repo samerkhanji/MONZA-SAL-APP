@@ -63,10 +63,10 @@ export default function PendingRequestsPage() {
     ]);
 
     const userIds = new Set<string>();
-    (delRes.data ?? []).forEach((r: { requested_by: string }) => userIds.add(r.requested_by));
-    (reqRes.data ?? []).forEach((r: { submitted_by: string }) => userIds.add(r.submitted_by));
-    (docRes.data ?? []).forEach((r: { requested_by: string }) => userIds.add(r.requested_by));
-    (pageRes.data ?? []).forEach((r: { requested_by: string }) => userIds.add(r.requested_by));
+    (delRes.data ?? []).forEach((r) => { if (r.requested_by) userIds.add(r.requested_by); });
+    (reqRes.data ?? []).forEach((r) => userIds.add(r.submitted_by));
+    (docRes.data ?? []).forEach((r) => { if (r.requested_by) userIds.add(r.requested_by); });
+    (pageRes.data ?? []).forEach((r) => { if (r.requested_by) userIds.add(r.requested_by); });
 
     let namesMap: Record<string, string> = {};
     if (userIds.size > 0) {
@@ -75,18 +75,16 @@ export default function PendingRequestsPage() {
         .select("id, full_name")
         .in("id", Array.from(userIds));
       namesMap = Object.fromEntries(
-        (profiles ?? []).map((p: { id: string; full_name: string | null }) => [
-          p.id,
-          p.full_name ?? "Unknown",
-        ])
+        (profiles ?? []).map((p) => [p.id, p.full_name ?? "Unknown"])
       );
     }
 
-    (delRes.data ?? []).forEach((r: { id: string; item_type: string; item_id: string; item_details: Record<string, unknown>; requested_by: string; created_at: string }) => {
-      const details = r.item_details ?? {};
+    (delRes.data ?? []).forEach((r) => {
+      const details = (r.item_details ?? {}) as Record<string, unknown>;
       const label = r.item_type === "car"
         ? `${details.brand ?? ""} ${details.model ?? ""} (${details.vin ?? ""})`
         : `${details.part_name ?? ""} (OE: ${details.oe_number ?? "—"})`;
+      const requestedBy = r.requested_by ?? "";
       items.push({
         id: `del-${r.id}`,
         type: "delete",
@@ -94,14 +92,14 @@ export default function PendingRequestsPage() {
         subject: label,
         item_type: r.item_type,
         item_id: r.item_id,
-        item_details: r.item_details,
-        requested_by: r.requested_by,
-        requester_name: namesMap[r.requested_by] ?? "Unknown",
-        created_at: r.created_at,
+        item_details: details,
+        requested_by: requestedBy,
+        requester_name: namesMap[requestedBy] ?? "Unknown",
+        created_at: r.created_at ?? "",
       });
     });
 
-    (reqRes.data ?? []).forEach((r: { id: string; subject: string; submitted_by: string; created_at: string }) => {
+    (reqRes.data ?? []).forEach((r) => {
       items.push({
         id: `req-${r.id}`,
         type: "request",
@@ -114,27 +112,29 @@ export default function PendingRequestsPage() {
       });
     });
 
-    (docRes.data ?? []).forEach((r: { id: string; search_query: string; requested_by: string; created_at: string }) => {
+    (docRes.data ?? []).forEach((r) => {
+      const requestedBy = r.requested_by ?? "";
       items.push({
         id: `doc-${r.id}`,
         type: "document_access",
         typeLabel: "Document Access",
         subject: r.search_query,
-        requested_by: r.requested_by,
-        requester_name: namesMap[r.requested_by] ?? "Unknown",
-        created_at: r.created_at,
+        requested_by: requestedBy,
+        requester_name: namesMap[requestedBy] ?? "Unknown",
+        created_at: r.created_at ?? "",
       });
     });
 
-    (pageRes.data ?? []).forEach((r: { id: string; page_name: string; requested_by: string; created_at: string }) => {
+    (pageRes.data ?? []).forEach((r) => {
+      const requestedBy = r.requested_by ?? "";
       items.push({
         id: `page-${r.id}`,
         type: "page_access",
         typeLabel: "Page Access",
         subject: r.page_name,
-        requested_by: r.requested_by,
-        requester_name: namesMap[r.requested_by] ?? "Unknown",
-        created_at: r.created_at,
+        requested_by: requestedBy,
+        requester_name: namesMap[requestedBy] ?? "Unknown",
+        created_at: r.created_at ?? "",
       });
     });
 

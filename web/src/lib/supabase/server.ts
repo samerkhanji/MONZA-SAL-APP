@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import type { Database } from "./database.types";
 import { getSupabasePublicKey, getSupabaseUrl } from "./public-env";
 
 export async function createClient() {
@@ -12,7 +13,7 @@ export async function createClient() {
     );
   }
 
-  return createServerClient(
+  return createServerClient<Database>(
     url,
     key,
     {

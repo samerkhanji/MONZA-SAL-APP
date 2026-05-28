@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
@@ -127,6 +127,15 @@ export default function NotificationsPage() {
     void load();
   }, [load]);
 
+  // Keep the latest `load` in a ref so the realtime effect can call it without
+  // listing `load` as a dependency. Otherwise — even with the singleton
+  // Supabase client — any future change to `load`'s deps would tear down and
+  // re-subscribe the channel mid-session.
+  const loadRef = useRef(load);
+  useEffect(() => {
+    loadRef.current = load;
+  }, [load]);
+
   // Realtime keeps inbox fresh
   useEffect(() => {
     if (!profile?.id) return;
@@ -141,14 +150,14 @@ export default function NotificationsPage() {
           filter: `user_id=eq.${profile.id}`,
         },
         () => {
-          void load();
+          void loadRef.current();
         }
       )
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [profile?.id, supabase, load]);
+  }, [profile?.id, supabase]);
 
   const filtered = useMemo(() => {
     const now = Date.now();

@@ -3,6 +3,10 @@ import { tryCreateAdminClient } from "@/lib/supabase/admin";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { APP_CAPABILITIES } from "@/lib/permissions";
 import { toPublicApiError } from "@/lib/server/api-error";
+import type { Database } from "@/lib/supabase/database.types";
+
+type UserRole = Database["public"]["Enums"]["user_role"];
+type ProfileUpsert = Database["public"]["Tables"]["profiles"]["Insert"];
 
 export async function POST(request: NextRequest) {
   const adminClient = tryCreateAdminClient();
@@ -34,7 +38,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Roles that can be assigned via this endpoint; owner accounts require manual Supabase promotion.
-  const ASSIGNABLE_ROLES = new Set([
+  const ASSIGNABLE_ROLES = new Set<UserRole>([
     "assistant",
     "sales_ops",
     "garage_manager",
@@ -42,6 +46,9 @@ export async function POST(request: NextRequest) {
     "hybrid",
     "it",
   ]);
+
+  const isAssignableRole = (s: string): s is UserRole =>
+    (ASSIGNABLE_ROLES as Set<string>).has(s);
 
   // Allowlist of capability strings the UI may toggle, derived from the
   // canonical AppCapability enum (mirrors public.user_capability DB enum).
@@ -78,7 +85,7 @@ export async function POST(request: NextRequest) {
 
     // Reject unknown / privilege-escalating roles outright (M2 — was silent
     // downgrade-to-assistant, which masked client bugs and made auditing harder).
-    if (typeof rawRole !== "string" || !ASSIGNABLE_ROLES.has(rawRole)) {
+    if (typeof rawRole !== "string" || !isAssignableRole(rawRole)) {
       return NextResponse.json(
         {
           error: `user_role must be one of: ${[...ASSIGNABLE_ROLES].join(", ")}. Owner accounts must be promoted manually.`,
@@ -86,7 +93,7 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    const user_role: string = rawRole;
+    const user_role: UserRole = rawRole;
 
     // Sanitize capabilities: strip anything not in the allowlist.
     const capabilities: string[] = Array.isArray(rawCapabilities)
@@ -128,7 +135,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const profileData = {
+    const profileData: ProfileUpsert = {
       id: authUser.user.id,
       full_name,
       email,
@@ -136,7 +143,7 @@ export async function POST(request: NextRequest) {
       job_title: job_title || null,
       department: department || null,
       user_role,
-      capabilities,
+      capabilities: capabilities as ProfileUpsert["capabilities"],
       is_active: is_active_bool,
       employment_status,
       created_by: user.id,

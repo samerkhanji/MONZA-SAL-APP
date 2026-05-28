@@ -46,7 +46,9 @@ export function ManageBaysDialog({
       toast.error(formatError(error));
       setBays([]);
     } else {
-      setBays((data as GarageBay[]) ?? []);
+      // TODO(typed-supabase): GarageBay helper uses string ids while generated row
+      // uses number; aligning needs callers that index by bay id to be updated.
+      setBays((data as unknown as GarageBay[]) ?? []);
     }
     setLoading(false);
   }, [supabase]);
@@ -109,7 +111,7 @@ export function ManageBaysDialog({
     const { error } = await supabase
       .from("garage_bays")
       .update({ is_active: false, updated_at: new Date().toISOString() })
-      .eq("id", b.id);
+      .eq("id", Number(b.id));
     setDeactivating(null);
     if (error) {
       toast.error(formatError(error));

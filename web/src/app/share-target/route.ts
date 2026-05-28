@@ -20,12 +20,38 @@ import { type NextRequest, NextResponse } from "next/server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// Multipart POST has no upstream `content-length` cap; an OS share of a huge
+// file gets base64-inlined into the HTML response, doubling the memory
+// footprint on the (cold) serverless invocation. Reject obviously-too-large
+// uploads up front and cap the per-file count.
+const MAX_SHARE_TOTAL_BYTES = 25 * 1024 * 1024; // 25 MB across all files
+const MAX_SHARE_PER_FILE_BYTES = 25 * 1024 * 1024; // 25 MB per file
+const MAX_SHARE_FILE_COUNT = 6;
+
+function tooLargeResponse(): NextResponse {
+  return new NextResponse(
+    "Shared content too large. Save to your device first and upload from the app.",
+    { status: 413, headers: { "content-type": "text/plain; charset=utf-8" } }
+  );
+}
+
 export async function GET(req: NextRequest): Promise<NextResponse> {
   // Some browsers GET-probe the share target; just send them to the inbox.
   return NextResponse.redirect(new URL("/share-inbox", req.url), { status: 303 });
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
+  // Cheap pre-flight: bail on `content-length` before we ever materialize the
+  // body. Some clients omit the header; we still enforce a real cap below as
+  // we walk the form parts.
+  const contentLengthHeader = req.headers.get("content-length");
+  if (contentLengthHeader) {
+    const parsed = Number(contentLengthHeader);
+    if (Number.isFinite(parsed) && parsed > MAX_SHARE_TOTAL_BYTES) {
+      return tooLargeResponse();
+    }
+  }
+
   // The form fields are decoded once below — we then re-encode the file as
   // base64 in a self-contained HTML page so that client JS can put it into
   // IndexedDB before navigating into the authenticated landing page.
@@ -36,9 +62,20 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   // Browsers send files under whatever key the manifest declared (name=file).
   const fileEntries: Array<{ name: string; type: string; b64: string }> = [];
+  let totalBytes = 0;
   if (form) {
     for (const [, value] of form.entries()) {
       if (value instanceof File) {
+        if (fileEntries.length >= MAX_SHARE_FILE_COUNT) {
+          return tooLargeResponse();
+        }
+        if (value.size > MAX_SHARE_PER_FILE_BYTES) {
+          return tooLargeResponse();
+        }
+        totalBytes += value.size;
+        if (totalBytes > MAX_SHARE_TOTAL_BYTES) {
+          return tooLargeResponse();
+        }
         const buf = Buffer.from(await value.arrayBuffer());
         fileEntries.push({
           name: value.name || "shared",

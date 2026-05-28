@@ -59,10 +59,12 @@ export function PartHistoryDialog({
             .eq("part_id", part.id)
             .order("created_at", { ascending: false })
             .then(({ data: d }) => {
-              setMovements((d as PartMovementRow[]) ?? []);
+              setMovements((d as unknown as PartMovementRow[]) ?? []);
             });
         } else {
-          setMovements((data as PartMovementRow[]) ?? []);
+          // created_by → profiles FK not auto-detected by PostgREST type
+          // inference even though the runtime select hint resolves correctly.
+          setMovements((data as unknown as PartMovementRow[]) ?? []);
         }
         setLoading(false);
       });

@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase";
+import type { Json } from "@/lib/supabase/database.types";
 
 export interface SendNotificationParams {
   userId: string;
@@ -20,7 +21,7 @@ export async function sendNotification(
     message: params.message,
     link: params.link ?? null,
     is_read: false,
-    metadata: params.metadata ?? null,
+    metadata: (params.metadata ?? null) as Json | null,
   });
 
   if (typeof window !== "undefined") {
@@ -70,7 +71,7 @@ export async function createNotificationsForUsers(
     message,
     link: link ?? null,
     is_read: false,
-    metadata: metadata ?? null,
+    metadata: (metadata ?? null) as Json | null,
   }));
   if (rows.length > 0) {
     await supabase.from("notifications").insert(rows);

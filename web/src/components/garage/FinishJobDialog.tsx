@@ -166,9 +166,9 @@ export function FinishJobDialog({
       .from("job_parts")
       .select("quantity, parts:part_id(part_name)")
       .eq("job_id", job.id);
-    type PartRow = { quantity?: number; parts?: { part_name?: string }[] | null };
+    type PartRow = { quantity?: number; parts?: { part_name?: string }[] | { part_name?: string } | null };
     const partsList =
-      ((partsData ?? []) as PartRow[])
+      ((partsData ?? []) as unknown as PartRow[])
         .map((p) => {
           const part = Array.isArray(p.parts) ? p.parts[0] : p.parts;
           const name = part?.part_name ?? "";

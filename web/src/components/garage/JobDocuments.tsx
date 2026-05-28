@@ -152,9 +152,10 @@ export function JobDocuments({ jobId, onDocumentsChange }: JobDocumentsProps) {
         .select("*")
         .eq("job_id", jobId)
         .order("created_at", { ascending: false });
-      setDocuments((fallback as JobDocumentRow[]) ?? []);
+      setDocuments((fallback as unknown as JobDocumentRow[]) ?? []);
     } else {
-      setDocuments((data as JobDocumentRow[]) ?? []);
+      // uploaded_by → profiles FK not auto-detected by PostgREST type inference.
+      setDocuments((data as unknown as JobDocumentRow[]) ?? []);
     }
     setLoading(false);
     onDocumentsChange?.();
@@ -182,7 +183,9 @@ export function JobDocuments({ jobId, onDocumentsChange }: JobDocumentsProps) {
       }
       return data.signedUrl;
     },
-    []
+    // `supabase` is a module-level singleton (see lib/supabase/client.ts); we
+    // still list it so exhaustive-deps stays honest.
+    [supabase]
   );
 
   async function handleView(filePath: string) {

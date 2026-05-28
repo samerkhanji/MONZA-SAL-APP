@@ -78,6 +78,12 @@ export async function drainSupabaseOutbox(): Promise<void> {
   const items = await listOps();
   if (items.length === 0) return;
   const supabase = createClient();
+  // The outbox replays arbitrary table ops captured at the time of the failed
+  // write, so the table name and payload are intentionally string/Record-typed.
+  // PostgREST runtime still enforces the schema; the cast here only bypasses
+  // compile-time narrowing on a deliberately generic adapter.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sb = supabase as any;
   for (const item of items) {
     if (item.id == null) continue;
     try {
@@ -86,7 +92,7 @@ export async function drainSupabaseOutbox(): Promise<void> {
           await deleteOne(item.id);
           continue;
         }
-        const { error } = await supabase
+        const { error } = await sb
           .from(item.table)
           .update(item.payload)
           .eq(item.eqColumn, item.eqValue ?? null);
@@ -95,7 +101,7 @@ export async function drainSupabaseOutbox(): Promise<void> {
         }
         // On error, leave it for the next round.
       } else if (item.op === "insert") {
-        const { error } = await supabase.from(item.table).insert(item.payload);
+        const { error } = await sb.from(item.table).insert(item.payload);
         if (!error) {
           await deleteOne(item.id);
         }

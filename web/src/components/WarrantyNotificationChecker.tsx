@@ -1,188 +1,25 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { createClient } from "@/lib/supabase";
-import { getProfileIdsByRole } from "@/lib/user-lookup";
-import { createNotificationsForUsers } from "@/lib/notifications";
-
-const THRESHOLDS = [30, 14, 7];
-const SESSION_KEY = "monza-warranty-check";
-
-function shouldRunWarrantyCheck(): boolean {
-  if (typeof window === "undefined") return true;
-  const today = new Date().toDateString();
-  const stored = sessionStorage.getItem(SESSION_KEY);
-  if (stored === today) return false;
-  sessionStorage.setItem(SESSION_KEY, today);
-  return true;
-}
-
+/**
+ * Deprecated — kept as a no-op render so any leftover imports keep
+ * compiling. Warranty-expiry notifications are now produced exclusively
+ * server-side via the `detect_warranty_expiry` pg_cron job (runs daily
+ * at 06:00 UTC, see supabase/migrations/092_test_drive_and_warranty_crons.sql)
+ * and the `notify_expiring_warranties(int)` cron-callable function
+ * (vehicle + battery warranties, see migration 067).
+ *
+ * The previous client-side implementation ran in every signed-in user's
+ * browser on dashboard load. With N users it produced N concurrent races
+ * fanning out duplicate notifications: each tab fetched the dedupe ledger,
+ * computed a `sentSet` in memory, then INSERTed — the in-memory set was
+ * stale relative to other tabs/users, so the UNIQUE constraint on
+ * `warranty_notifications_sent(car_id, warranty_type, threshold_days)`
+ * would block dupes only at the row level, AFTER notifications had
+ * already been broadcast.
+ *
+ * Server-side cron is the canonical path going forward — single writer,
+ * one schedule, no race window.
+ */
 export function WarrantyNotificationChecker() {
-  const ranRef = useRef(false);
-
-  useEffect(() => {
-    if (ranRef.current || !shouldRunWarrantyCheck()) return;
-    ranRef.current = true;
-
-    const run = async () => {
-      const supabase = createClient();
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      // Customer-service assistants + hybrids handle warranty follow-up.
-      const recipientIds = await getProfileIdsByRole(["assistant", "hybrid"]);
-      if (recipientIds.length === 0) return;
-
-      const { data } = await supabase
-        .from("cars")
-        .select(
-          "id, vin, brand, model, warranty_per_dms, warranty_vehicle_expiry, warranty_battery_expiry, warranty_expiry, warranty_monza_start_date"
-        )
-        .is("deleted_at", null);
-
-      const cars = (data ?? []).map((car: any) => ({
-        id: car.id as string,
-        vin: car.vin as string,
-        brand: car.brand as string,
-        model: car.model as string,
-        warranty_per_dms: car.warranty_per_dms as string | null,
-        warranty_vehicle_expiry: car.warranty_vehicle_expiry as string | null,
-        warranty_battery_expiry: car.warranty_battery_expiry as string | null,
-        warranty_expiry: car.warranty_expiry as string | null,
-        warranty_monza_start_date: car.warranty_monza_start_date as string | null,
-      }));
-
-      if (cars.length === 0) return;
-
-      const carIds = cars.map((car) => car.id);
-      const { data: sentRows, error: sentErr } = await supabase
-        .from("warranty_notifications_sent")
-        .select("car_id, warranty_type, threshold_days")
-        .in("car_id", carIds);
-
-      if (sentErr) {
-        console.warn(
-          "warranty dedupe ledger fetch failed; skipping send to avoid spam",
-          { error: sentErr.message }
-        );
-        return;
-      }
-
-      const sentSet = new Set<string>(
-        (sentRows ?? []).map(
-          (row: any) => `${row.car_id}:${row.warranty_type}:${row.threshold_days}`
-        )
-      );
-
-      for (const car of cars) {
-        const makeModel = `${car.brand} ${car.model}`.trim();
-
-        for (const days of THRESHOLDS) {
-          const targetDate = new Date(today);
-          targetDate.setDate(targetDate.getDate() + days);
-
-          if (car.warranty_per_dms) {
-            const expiry = new Date(car.warranty_per_dms);
-            expiry.setHours(0, 0, 0, 0);
-            const diffDays = Math.round((expiry.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
-            if (diffDays === days) {
-              const key = `${car.id}:dms:${days}`;
-              if (!sentSet.has(key)) {
-                await createNotificationsForUsers(
-                  recipientIds,
-                  "Warranty alert (DMS)",
-                  `Warranty alert (DMS): VIN ${car.vin} — ${makeModel} warranty expires in ${days} days (${car.warranty_per_dms})`,
-                  `/cars/${car.vin}`
-                );
-                const { error: dedupeErr } = await supabase
-                  .from("warranty_notifications_sent")
-                  .insert({
-                    car_id: car.id,
-                    warranty_type: "dms",
-                    threshold_days: days,
-                  });
-                if (dedupeErr) {
-                  console.warn(
-                    "warranty dedupe insert failed (dms)",
-                    { car_id: car.id, days, error: dedupeErr.message }
-                  );
-                }
-                sentSet.add(key);
-              }
-            }
-          }
-
-          const vehicleExpiry =
-            car.warranty_vehicle_expiry ??
-            car.warranty_expiry ??
-            car.warranty_monza_start_date;
-          if (vehicleExpiry) {
-            const expiry = new Date(vehicleExpiry);
-            expiry.setHours(0, 0, 0, 0);
-            const diffDays = Math.round((expiry.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
-            if (diffDays === days) {
-              const key = `${car.id}:vehicle:${days}`;
-              if (!sentSet.has(key)) {
-                await createNotificationsForUsers(
-                  recipientIds,
-                  "Warranty alert (Vehicle)",
-                  `Warranty alert (Vehicle): VIN ${car.vin} — ${makeModel} warranty expires in ${days} days (${vehicleExpiry})`,
-                  `/cars/${car.vin}`
-                );
-                const { error: dedupeErr } = await supabase
-                  .from("warranty_notifications_sent")
-                  .insert({
-                    car_id: car.id,
-                    warranty_type: "vehicle",
-                    threshold_days: days,
-                  });
-                if (dedupeErr) {
-                  console.warn(
-                    "warranty dedupe insert failed (vehicle)",
-                    { car_id: car.id, days, error: dedupeErr.message }
-                  );
-                }
-                sentSet.add(key);
-              }
-            }
-          }
-
-          if (car.warranty_battery_expiry) {
-            const expiry = new Date(car.warranty_battery_expiry);
-            expiry.setHours(0, 0, 0, 0);
-            const diffDays = Math.round((expiry.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
-            if (diffDays === days) {
-              const key = `${car.id}:battery:${days}`;
-              if (!sentSet.has(key)) {
-                await createNotificationsForUsers(
-                  recipientIds,
-                  "Warranty alert (Battery)",
-                  `Warranty alert (Battery): VIN ${car.vin} — ${makeModel} warranty expires in ${days} days (${car.warranty_battery_expiry})`,
-                  `/cars/${car.vin}`
-                );
-                const { error: dedupeErr } = await supabase
-                  .from("warranty_notifications_sent")
-                  .insert({
-                    car_id: car.id,
-                    warranty_type: "battery",
-                    threshold_days: days,
-                  });
-                if (dedupeErr) {
-                  console.warn(
-                    "warranty dedupe insert failed (battery)",
-                    { car_id: car.id, days, error: dedupeErr.message }
-                  );
-                }
-                sentSet.add(key);
-              }
-            }
-          }
-        }
-      }
-    };
-
-    run();
-  }, []);
-
   return null;
 }

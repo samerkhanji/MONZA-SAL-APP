@@ -266,7 +266,29 @@ function QuickFixReservedBy({ carId, onSaved }: { carId: string; onSaved: () => 
       return;
     }
     setSaving(true);
-    const { error } = await supabase.from("cars").update({ reserved_by: trimmed, updated_at: new Date().toISOString() }).eq("id", carId);
+    // reserved_by lives on sales_orders (the latest non-cancelled order for this car), not on
+    // public.cars. Update the most recent matching order.
+    const { data: latestOrder, error: lookupErr } = await supabase
+      .from("sales_orders")
+      .select("id")
+      .eq("car_id", carId)
+      .not("status", "eq", "cancelled")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (lookupErr || !latestOrder) {
+      setSaving(false);
+      toast.error(
+        lookupErr
+          ? `Failed to save: ${formatError(lookupErr)}`
+          : "No active sales order — open the car page and link a customer first."
+      );
+      return;
+    }
+    const { error } = await supabase
+      .from("sales_orders")
+      .update({ reserved_by: trimmed, updated_at: new Date().toISOString() })
+      .eq("id", latestOrder.id);
     setSaving(false);
     if (error) {
       toast.error(`Failed to save: ${formatError(error)}`);

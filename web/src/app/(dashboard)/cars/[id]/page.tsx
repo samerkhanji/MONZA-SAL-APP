@@ -5,7 +5,10 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
+import type { Database } from "@/lib/supabase/database.types";
 import { useUser } from "@/lib/contexts/UserContext";
+
+type CarUpdate = Database["public"]["Tables"]["cars"]["Update"];
 import type {
   CarDisplay,
   CarEvent,
@@ -330,7 +333,9 @@ function validateSaleOrderDateOrdering(
   return null;
 }
 
-/** Raw public.cars columns (not cars_display) for legacy display + date prefill when no sales_orders row */
+/** Raw public.cars columns (not cars_display) for legacy display + date prefill when no sales_orders row.
+ * client_name/client_phone/reserved_by were removed from public.cars and now live only on sales_orders or
+ * cars_display (the view). We keep these in the legacy snapshot shape but read them from cars_display. */
 type LegacyCarFields = {
   customer_id: string | null;
   client_name: string | null;
@@ -457,18 +462,40 @@ export default function CarProfilePage() {
   const supabase = createClient();
 
   async function fetchLegacyCarSnapshot(carId: string) {
-    const { data, error } = await supabase
-      .from("cars")
-      .select(
-        "customer_id, client_name, client_phone, reservation_date, delivery_date, reserved_by, recalled_at, recall_reason, recall_notes"
-      )
-      .eq("id", carId)
-      .maybeSingle();
-    if (error || !data) {
+    // Two-step read: client_name/client_phone/reserved_by/reservation_date/delivery_date/date_bought
+    // are joined columns that only live on cars_display (view), while the recall_* fields are still
+    // on the public.cars base table and not exposed by the view. Merge both into the snapshot used
+    // for legacy display + date prefill when no sales_orders row exists.
+    const [displayResult, recallResult] = await Promise.all([
+      supabase
+        .from("cars_display")
+        .select(
+          "customer_id, client_name, client_phone, reservation_date, delivery_date, reserved_by"
+        )
+        .eq("id", carId)
+        .maybeSingle(),
+      supabase
+        .from("cars")
+        .select("recalled_at, recall_reason, recall_notes")
+        .eq("id", carId)
+        .maybeSingle(),
+    ]);
+    if (displayResult.error || !displayResult.data) {
       setLegacyCarSnapshot(null);
       return;
     }
-    setLegacyCarSnapshot(data as LegacyCarFields);
+    const recall = recallResult.error ? null : recallResult.data;
+    setLegacyCarSnapshot({
+      customer_id: displayResult.data.customer_id,
+      client_name: displayResult.data.client_name,
+      client_phone: displayResult.data.client_phone,
+      reservation_date: displayResult.data.reservation_date,
+      delivery_date: displayResult.data.delivery_date,
+      reserved_by: displayResult.data.reserved_by,
+      recalled_at: recall?.recalled_at ?? null,
+      recall_reason: recall?.recall_reason ?? null,
+      recall_notes: recall?.recall_notes ?? null,
+    });
   }
 
   async function fetchSalesOrderForCar(carId: string) {
@@ -489,39 +516,32 @@ export default function CarProfilePage() {
       return;
     }
 
-    type Row = {
-      id: string;
-      car_id: string;
-      customer_id: string | null;
-      reservation_date?: string | null;
-      delivery_date?: string | null;
-      date_bought?: string | null;
-      created_at: string;
-      status?: string;
-      reserved_by?: string | null;
-      customers: SalesOrderDetail["customer"];
-    };
-
     if (!data) {
       setSalesOrder(null);
       return;
     }
 
-    const row = data as unknown as Row;
-
-    let customer = row.customers;
-    if (Array.isArray(customer)) {
-      customer = customer[0] ?? null;
+    // FK-embed: PostgREST may return customers as an array or a single row depending on inference.
+    // Normalize to a single record for the UI.
+    const customersField = data.customers as
+      | SalesOrderDetail["customer"]
+      | SalesOrderDetail["customer"][]
+      | null;
+    let customer: SalesOrderDetail["customer"] = null;
+    if (Array.isArray(customersField)) {
+      customer = customersField[0] ?? null;
+    } else {
+      customer = customersField ?? null;
     }
     setSalesOrder({
-      id: row.id,
-      customer_id: row.customer_id ?? null,
+      id: data.id,
+      customer_id: data.customer_id ?? null,
       customer,
-      status: row.status,
-      date_bought: row.date_bought ?? null,
-      delivery_date: row.delivery_date ?? null,
-      reservation_date: row.reservation_date ?? null,
-      reserved_by: row.reserved_by ?? null,
+      status: data.status,
+      date_bought: data.date_bought ?? null,
+      delivery_date: data.delivery_date ?? null,
+      reservation_date: data.reservation_date ?? null,
+      reserved_by: data.reserved_by ?? null,
     });
   }
 
@@ -700,7 +720,7 @@ export default function CarProfilePage() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      const updates: Record<string, unknown> = {
+      const updates: CarUpdate = {
         ...patch,
         updated_at: new Date().toISOString(),
       };
@@ -767,7 +787,11 @@ export default function CarProfilePage() {
       setCar(null);
       return;
     }
-    setCar(data as CarDisplay);
+    // TODO(typed-supabase): cars_display row from generated types uses looser
+    // null/string types than our hand-rolled CarDisplay (which requires
+    // CarStatus/CustomsStatus enums and non-null fields). Aligning the two
+    // requires a broader UI-types refactor.
+    setCar(data as unknown as CarDisplay);
   }
 
   async function fetchEvents() {
@@ -784,10 +808,13 @@ export default function CarProfilePage() {
         .select("*")
         .eq("car_id", car.id)
         .order("created_at", { ascending: false });
-      setEvents((fallback as CarEvent[]) ?? []);
+      // TODO(typed-supabase): generated row has `meta: Json | null` while the
+      // CarEvent helper type uses Record<string, unknown> | null. Tightening
+      // the helper would touch many call sites.
+      setEvents((fallback as unknown as CarEvent[]) ?? []);
       return;
     }
-    setEvents((data as CarEvent[]) ?? []);
+    setEvents((data as unknown as CarEvent[]) ?? []);
   }
 
   useEffect(() => {
@@ -865,7 +892,8 @@ export default function CarProfilePage() {
   }, [searchParams, param, router]);
 
   useEffect(() => {
-    if (!car?.created_by) {
+    const createdBy = car?.created_by;
+    if (!createdBy) {
       setCreatedByName(null);
       return;
     }
@@ -873,7 +901,7 @@ export default function CarProfilePage() {
       const { data } = await supabase
         .from("profiles")
         .select("full_name")
-        .eq("id", car.created_by)
+        .eq("id", createdBy)
         .single();
       setCreatedByName(data?.full_name ?? null);
     })();

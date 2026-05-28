@@ -235,9 +235,8 @@ export default function OrderedCarsPage() {
       p_vin: vinTrimmed,
       p_brand: brand,
       p_model: model.trim(),
-      p_model_year: modelYear ? parseInt(modelYear, 10) : null,
+      ...(modelYear ? { p_model_year: parseInt(modelYear, 10) } : {}),
       p_location_type: "storage",
-      p_location_slot: null,
       p_status: "inbound",
       p_user_id: user.id,
     });

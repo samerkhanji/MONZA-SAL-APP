@@ -3,6 +3,7 @@ import webpush from "web-push";
 import { tryCreateAdminClient } from "@/lib/supabase/admin";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { isSafeInternalLink } from "@/lib/url-safety";
+import { isLikelyValidVapidPublicKey } from "@/lib/vapid-validation";
 
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
@@ -19,27 +20,49 @@ const BROADCAST_ROLES = new Set([
   "sales_ops",
 ]);
 
-function configureWebPush(): { ok: true } | { ok: false; error: string } {
-  if (!VAPID_PUBLIC_KEY?.trim() || !VAPID_PRIVATE_KEY?.trim()) {
-    return { ok: false, error: "VAPID keys not configured" };
+type VapidConfigResult =
+  | { ok: true }
+  | { ok: false; status: number; error: string };
+
+function computeVapidConfig(): VapidConfigResult {
+  const pub = VAPID_PUBLIC_KEY?.trim();
+  const priv = VAPID_PRIVATE_KEY?.trim();
+  if (!pub || !priv) {
+    return { ok: false, status: 503, error: "VAPID keys not configured" };
+  }
+  if (!isLikelyValidVapidPublicKey(pub)) {
+    return {
+      ok: false,
+      status: 503,
+      error:
+        "VAPID public key is malformed (expected 87-char URL-safe base64 P-256 key)",
+    };
   }
   try {
     webpush.setVapidDetails(
       process.env.VAPID_SUBJECT?.trim() || "mailto:support@monzasal.com",
-      VAPID_PUBLIC_KEY,
-      VAPID_PRIVATE_KEY
+      pub,
+      priv
     );
     return { ok: true };
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Invalid VAPID keys";
-    return { ok: false, error: msg };
+    return { ok: false, status: 503, error: msg };
   }
 }
 
+// Cache the validation/configure result at module top so we don't re-run
+// `setVapidDetails` on every push send. The keys come from env and don't
+// change inside a process lifetime; on a failure we keep the error result
+// and return it from every POST.
+const VAPID_CONFIG: VapidConfigResult = computeVapidConfig();
+
 export async function POST(request: NextRequest) {
-  const vapid = configureWebPush();
-  if (!vapid.ok) {
-    return NextResponse.json({ error: vapid.error }, { status: 500 });
+  if (!VAPID_CONFIG.ok) {
+    return NextResponse.json(
+      { error: VAPID_CONFIG.error },
+      { status: VAPID_CONFIG.status }
+    );
   }
 
   // Require authenticated session.
@@ -119,7 +142,7 @@ export async function POST(request: NextRequest) {
 
     const results = await Promise.allSettled(
       subs.map((row) => {
-        const sub = row.subscription as webpush.PushSubscription;
+        const sub = row.subscription as unknown as webpush.PushSubscription;
         return webpush.sendNotification(sub, payload);
       })
     );

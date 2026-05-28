@@ -43,11 +43,18 @@ const SUGGESTIONS: string[] = [
   "Where do I track customer payments?",
 ];
 
+// Monotonic counter for environments without `crypto.randomUUID()` (very old
+// browsers / non-secure contexts). Combined with the wall-clock timestamp this
+// is collision-free without leaning on Math.random, which can spread to other
+// callers thinking it's "safe enough".
+let idCounter = 0;
+
 function newId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();
   }
-  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  idCounter = (idCounter + 1) >>> 0;
+  return `${Date.now()}-${idCounter.toString(36)}`;
 }
 
 export function AIChatWidget() {
@@ -62,23 +69,33 @@ export function AIChatWidget() {
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  // Mirror messages into a ref so `send` doesn't have to depend on `messages`.
+  // Otherwise each streaming `setMessages` rebuilds `send`, then `onSubmit`,
+  // then `onKeyDown` — invalidating the textarea handler many times per second
+  // during streaming.
+  const messagesRef = useRef<ChatMessage[]>([]);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   // Auto-scroll to the bottom when messages change.
   useEffect(() => {
     if (!open) return;
     const el = scrollRef.current;
     if (!el) return;
-    // Defer to next frame so DOM is painted.
-    requestAnimationFrame(() => {
+    // Defer to next frame so DOM is painted. Cancel on unmount/next-effect
+    // so a pending callback can't fire after we're gone.
+    const raf = requestAnimationFrame(() => {
       el.scrollTop = el.scrollHeight;
     });
+    return () => cancelAnimationFrame(raf);
   }, [messages, open]);
 
   // Focus the input when opening.
   useEffect(() => {
-    if (open) {
-      requestAnimationFrame(() => inputRef.current?.focus());
-    }
+    if (!open) return;
+    const raf = requestAnimationFrame(() => inputRef.current?.focus());
+    return () => cancelAnimationFrame(raf);
   }, [open]);
 
   // Cancel any in-flight request when the widget unmounts.
@@ -111,8 +128,10 @@ export function AIChatWidget() {
       };
 
       // Snapshot the history we'll actually send to the API (omit the empty
-      // assistant placeholder) — and append both to local state.
-      const history = [...messages, userMsg].map((m) => ({
+      // assistant placeholder) — and append both to local state. Read from the
+      // ref so this callback's identity doesn't change on every streaming
+      // delta.
+      const history = [...messagesRef.current, userMsg].map((m) => ({
         role: m.role,
         content: m.content,
       }));
@@ -274,7 +293,7 @@ export function AIChatWidget() {
         abortRef.current = null;
       }
     },
-    [messages, pathname, appRole, profile, sending]
+    [pathname, appRole, profile, sending]
   );
 
   const onSubmit = useCallback(

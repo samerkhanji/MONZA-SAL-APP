@@ -112,7 +112,7 @@ export default function GarageTasksBoardPage() {
       const { data: prof } = await supabase
         .from("profiles")
         .select("id, full_name, user_role")
-        .in("user_role", ["owner", "garage_manager", "garage_staff"] as string[])
+        .in("user_role", ["owner", "garage_manager", "garage_staff"])
         .order("full_name");
       setProfiles((prof as ProfileOpt[]) ?? []);
 

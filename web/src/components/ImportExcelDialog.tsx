@@ -6,7 +6,11 @@ import { toast } from "sonner";
 // ReDoS advisories upstream xlsx no longer patches on npm.
 import * as XLSX from "@e965/xlsx";
 import { createClient } from "@/lib/supabase";
+import type { Database } from "@/lib/supabase/database.types";
 import { Button } from "@/components/ui/button";
+
+type CarInsert = Database["public"]["Tables"]["cars"]["Insert"];
+type SalesOrderInsert = Database["public"]["Tables"]["sales_orders"]["Insert"];
 import {
   Dialog,
   DialogContent,
@@ -152,7 +156,7 @@ export function ImportExcelDialog({
         let recordsUpdated = 0;
         let failed = 0;
 
-        const carsByVin = new Map<string, Record<string, unknown>>();
+        const carsByVin = new Map<string, CarInsert>();
 
         for (const sheetName of ["Voyah 2023 & 2024 & 2025YM", "Voyah 2026YM", "Sent to Customs"]) {
           const sheet = wb.Sheets[sheetName];
@@ -181,14 +185,14 @@ export function ImportExcelDialog({
 
             const status = mapStatus(arr[statusIdx] as string);
             // Legacy fields client_name/client_phone are read-only fallback; use customers + sales_orders instead
-            const car: Record<string, unknown> = {
+            const car: CarInsert = {
               vin,
               brand: "Voyah",
               model: safeStr(arr[modelIdx]) || "—",
               model_year: safeNum(arr[yearIdx]),
               exterior_color: safeStr(arr[extIdx]) || null,
               interior_color: safeStr(arr[intIdx]) || null,
-              status,
+              status: status as CarInsert["status"],
               location_type: "storage",
               issue: safeStr(arr[issueIdx]) || null,
               engine_number: safeStr(arr[engineIdx]) || null,
@@ -203,10 +207,29 @@ export function ImportExcelDialog({
           }
         }
 
+        // Batch-resolve existing VINs in one round-trip instead of N selects.
+        // A 500-row import used to fire 500 `select … eq vin` calls back-to-back;
+        // now we do a single `in(vin, [...])` and look up locally.
+        const vinList = Array.from(carsByVin.keys());
+        const existingByVin = new Map<string, string>();
+        // PostgREST has a practical URL-length cap for `in(...)`; chunk to be safe.
+        const CAR_VIN_CHUNK = 200;
+        for (let i = 0; i < vinList.length; i += CAR_VIN_CHUNK) {
+          const slice = vinList.slice(i, i + CAR_VIN_CHUNK);
+          if (slice.length === 0) continue;
+          const { data: existingRows } = await supabase
+            .from("cars")
+            .select("id, vin")
+            .in("vin", slice);
+          for (const row of (existingRows ?? []) as { id: string; vin: string }[]) {
+            existingByVin.set(row.vin, row.id);
+          }
+        }
+
         for (const [vin, car] of carsByVin) {
-          const { data: existing } = await supabase.from("cars").select("id").eq("vin", vin).maybeSingle();
-          if (existing) {
-            const { error } = await supabase.from("cars").update(car).eq("id", (existing as { id: string }).id);
+          const existingId = existingByVin.get(vin);
+          if (existingId) {
+            const { error } = await supabase.from("cars").update(car).eq("id", existingId);
             if (!error) recordsUpdated++;
             else failed++;
           } else {
@@ -224,24 +247,48 @@ export function ImportExcelDialog({
           const nameIdx = headers.findIndex((h) => /name/i.test(String(h ?? "")));
           const phoneIdx = headers.findIndex((h) => /phone/i.test(String(h ?? "")));
           const emailIdx = headers.findIndex((h) => /email/i.test(String(h ?? "")));
+
+          // Pre-collect rows so we can batch-check existence with a single `in()`.
+          type ClientRow = { name: string; phone: string; email: string };
+          const clientRows: ClientRow[] = [];
           for (const row of rows) {
             const arr = row as unknown[];
             const name = safeStr(arr[nameIdx]);
             const phone = safeStr(arr[phoneIdx]);
             if (!name && !phone) continue;
             if (!phone) continue;
-            const { data: existing } = await supabase.from("customers").select("id").eq("phone_primary", phone).limit(1).maybeSingle();
-            if (existing) continue;
+            clientRows.push({ name, phone, email: safeStr(arr[emailIdx]) });
+          }
+          const phoneList = Array.from(new Set(clientRows.map((r) => r.phone)));
+          const existingPhones = new Set<string>();
+          const PHONE_CHUNK = 200;
+          for (let i = 0; i < phoneList.length; i += PHONE_CHUNK) {
+            const slice = phoneList.slice(i, i + PHONE_CHUNK);
+            if (slice.length === 0) continue;
+            const { data: existingRows } = await supabase
+              .from("customers")
+              .select("phone_primary")
+              .in("phone_primary", slice);
+            for (const row of (existingRows ?? []) as { phone_primary: string }[]) {
+              existingPhones.add(row.phone_primary);
+            }
+          }
+
+          for (const { name, phone, email } of clientRows) {
+            if (existingPhones.has(phone)) continue;
             const { error: custErr } = await supabase.from("customers").insert({
               first_name: name.split(" ")[0] || name,
               last_name: name.split(" ").slice(1).join(" ") || null,
               phone_primary: phone,
-              email: safeStr(arr[emailIdx]) || null,
+              email: email || null,
               lead_status: "new_lead",
               created_by: user.id,
             });
-            if (!custErr) clientsImported++;
-            else failed++;
+            if (!custErr) {
+              clientsImported++;
+              // Avoid double-insert if the same phone appears twice in the sheet.
+              existingPhones.add(phone);
+            } else failed++;
           }
         }
 
@@ -257,25 +304,107 @@ export function ImportExcelDialog({
           const phoneIdx = headers.findIndex((h) => /phone/i.test(String(h ?? "")));
           const reservedIdx = headers.findIndex((h) => /reserved/i.test(String(h ?? "")));
           const resDateIdx = headers.findIndex((h) => /reservation/i.test(String(h ?? "")));
+
+          // Pre-parse rows so we can batch-fetch cars/customers/sales_orders in
+          // bulk rather than firing three serial selects per row (a 500-row
+          // import used to be 1500+ round-trips taking many minutes).
+          type ReportRow = {
+            vin: string;
+            client: string;
+            phone: string;
+            delivery: string | null;
+            reserved: string;
+            resDate: string | null;
+          };
+          const reportRows: ReportRow[] = [];
           for (const row of rows) {
             const arr = row as unknown[];
             const vin = safeStr(arr[vinIdx]).toUpperCase();
             if (!vin) continue;
             const client = safeStr(arr[clientIdx]);
             const phone = safeStr(arr[phoneIdx]);
-            const delivery = safeDate(arr[deliveryIdx]);
-            const reserved = safeStr(arr[reservedIdx]);
-            const resDate = safeDate(arr[resDateIdx]);
             if (!client && !phone) continue;
+            reportRows.push({
+              vin,
+              client,
+              phone,
+              delivery: safeDate(arr[deliveryIdx]),
+              reserved: safeStr(arr[reservedIdx]),
+              resDate: safeDate(arr[resDateIdx]),
+            });
+          }
 
-            const { data: carRow } = await supabase.from("cars").select("id, price, price_currency").eq("vin", vin).maybeSingle();
+          // 1) Batch-resolve cars by VIN.
+          const reportVins = Array.from(new Set(reportRows.map((r) => r.vin)));
+          type CarLookup = { id: string; price: number | null; price_currency: string | null };
+          const carsByVinLookup = new Map<string, CarLookup>();
+          const REPORT_CAR_CHUNK = 200;
+          for (let i = 0; i < reportVins.length; i += REPORT_CAR_CHUNK) {
+            const slice = reportVins.slice(i, i + REPORT_CAR_CHUNK);
+            if (slice.length === 0) continue;
+            const { data: carRows } = await supabase
+              .from("cars")
+              .select("id, vin, price, price_currency")
+              .in("vin", slice);
+            for (const row of (carRows ?? []) as ({ vin: string } & CarLookup)[]) {
+              carsByVinLookup.set(row.vin, {
+                id: row.id,
+                price: row.price,
+                price_currency: row.price_currency,
+              });
+            }
+          }
+
+          // 2) Batch-resolve customers by phone (only non-empty phones).
+          const reportPhones = Array.from(
+            new Set(reportRows.map((r) => r.phone).filter((p) => p.length > 0))
+          );
+          const custByPhone = new Map<string, string>();
+          const REPORT_PHONE_CHUNK = 200;
+          for (let i = 0; i < reportPhones.length; i += REPORT_PHONE_CHUNK) {
+            const slice = reportPhones.slice(i, i + REPORT_PHONE_CHUNK);
+            if (slice.length === 0) continue;
+            const { data: custRows } = await supabase
+              .from("customers")
+              .select("id, phone_primary")
+              .in("phone_primary", slice);
+            for (const row of (custRows ?? []) as { id: string; phone_primary: string }[]) {
+              custByPhone.set(row.phone_primary, row.id);
+            }
+          }
+
+          // 3) Batch-resolve existing non-cancelled sales orders by car_id.
+          const reportCarIds = Array.from(
+            new Set(
+              reportRows
+                .map((r) => carsByVinLookup.get(r.vin)?.id)
+                .filter((v): v is string => !!v)
+            )
+          );
+          const carsWithOpenSale = new Set<string>();
+          const REPORT_SALE_CHUNK = 200;
+          for (let i = 0; i < reportCarIds.length; i += REPORT_SALE_CHUNK) {
+            const slice = reportCarIds.slice(i, i + REPORT_SALE_CHUNK);
+            if (slice.length === 0) continue;
+            const { data: saleRows } = await supabase
+              .from("sales_orders")
+              .select("car_id")
+              .in("car_id", slice)
+              .not("status", "eq", "cancelled");
+            for (const row of (saleRows ?? []) as { car_id: string }[]) {
+              carsWithOpenSale.add(row.car_id);
+            }
+          }
+
+          for (const { vin, client, phone, delivery, reserved, resDate } of reportRows) {
+            const carRow = carsByVinLookup.get(vin);
             if (!carRow?.id) continue;
 
             let customerId: string | null = null;
             if (phone) {
-              const { data: existingCust } = await supabase.from("customers").select("id").eq("phone_primary", phone).limit(1).maybeSingle();
-              if (existingCust?.id) {
-                customerId = existingCust.id;
+              const cached = custByPhone.get(phone);
+              if (cached) {
+                customerId = cached;
               } else {
                 const parts = client.trim().split(/\s+/);
                 const { data: newCust } = await supabase.from("customers").insert({
@@ -284,7 +413,10 @@ export function ImportExcelDialog({
                   phone_primary: phone,
                   created_by: user.id,
                 }).select("id").single();
-                if (newCust?.id) customerId = newCust.id;
+                if (newCust?.id) {
+                  customerId = newCust.id;
+                  custByPhone.set(phone, newCust.id);
+                }
               }
             } else if (client) {
               const parts = client.trim().split(/\s+/);
@@ -298,10 +430,9 @@ export function ImportExcelDialog({
             }
             if (!customerId) continue;
 
-            const { data: existingSale } = await supabase.from("sales_orders").select("id").eq("car_id", carRow.id).not("status", "eq", "cancelled").limit(1).maybeSingle();
-            if (existingSale) continue;
+            if (carsWithOpenSale.has(carRow.id)) continue;
 
-            const salePayload: Record<string, unknown> = {
+            const salePayload: SalesOrderInsert = {
               car_id: carRow.id,
               customer_id: customerId,
               status: "confirmed",
@@ -315,8 +446,12 @@ export function ImportExcelDialog({
             if (resDate) salePayload.reserved_until = resDate;
 
             const { error: saleErr } = await supabase.from("sales_orders").insert(salePayload);
-            if (!saleErr) recordsUpdated++;
-            else failed++;
+            if (!saleErr) {
+              recordsUpdated++;
+              // Prevent a duplicate insert if the same VIN appears more than
+              // once in the sheet now that we no longer round-trip per row.
+              carsWithOpenSale.add(carRow.id);
+            } else failed++;
           }
         }
 
@@ -360,9 +495,13 @@ export function ImportExcelDialog({
         <div className="space-y-4">
           <input
             ref={fileInputRef}
+            id="import-excel-file-input"
+            name="import-excel-file"
             type="file"
             accept=".xlsx,.xls"
             className="hidden"
+            aria-label="Excel file"
+            title="Excel file"
             onChange={handleFileSelect}
           />
           <Button

@@ -396,18 +396,18 @@ function CreateRefundDialog({
     }
 
     setSubmitting(true);
+    const trimmedNotes = notes.trim();
     const { data, error } = await supabase.rpc("request_refund", {
       p_kind: kind,
       p_customer_id: customerId,
       p_amount: amt,
       p_reason: reason.trim(),
-      p_currency: currency,
-      p_job_id: jobId || null,
-      p_invoice_id: null,
-      p_warranty_case_id: initialWarrantyCaseId ?? null,
-      p_part_id: kind === "parts" ? partId : null,
-      p_quantity: kind === "parts" ? Number(quantity) : null,
-      p_notes: notes.trim() || null,
+      ...(currency ? { p_currency: currency } : {}),
+      ...(jobId ? { p_job_id: jobId } : {}),
+      ...(initialWarrantyCaseId ? { p_warranty_case_id: initialWarrantyCaseId } : {}),
+      ...(kind === "parts" && partId ? { p_part_id: partId } : {}),
+      ...(kind === "parts" ? { p_quantity: Number(quantity) } : {}),
+      ...(trimmedNotes ? { p_notes: trimmedNotes } : {}),
     });
     setSubmitting(false);
     if (error) return toast.error(formatError(error));

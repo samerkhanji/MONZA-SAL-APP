@@ -84,7 +84,7 @@ export default function DocumentsPage() {
             .eq("vin", vinFromUrl.toUpperCase())
             .maybeSingle();
           setLoading(false);
-          setCar(error || !data ? null : (data as CarDisplay));
+          setCar(error || !data ? null : (data as unknown as CarDisplay));
         };
         runSearch();
       }
@@ -127,7 +127,7 @@ export default function DocumentsPage() {
         .maybeSingle();
 
       setLoading(false);
-      setCar(error || !data ? null : (data as CarDisplay));
+      setCar(error || !data ? null : (data as unknown as CarDisplay));
       return;
     }
 
@@ -181,7 +181,7 @@ export default function DocumentsPage() {
       .eq("vin", vin)
       .maybeSingle();
     setLoading(false);
-    setCar(error || !data ? null : (data as CarDisplay));
+    setCar(error || !data ? null : (data as unknown as CarDisplay));
   }
 
   async function handleCustomerSearch(e?: React.FormEvent) {

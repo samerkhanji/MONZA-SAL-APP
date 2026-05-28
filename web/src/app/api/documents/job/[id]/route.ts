@@ -32,15 +32,24 @@ export async function DELETE(
       return NextResponse.json({ error: "Missing file path" }, { status: 400 });
     }
 
-    const { error: storageError } = await gate.supabase.storage.from("job-documents").remove([path]);
-    if (storageError) {
-      return NextResponse.json({ error: toPublicApiError(storageError) }, { status: 500 });
-    }
-
+    // Delete the DB row FIRST. See web/src/app/api/documents/car/[id]/route.ts
+    // for the rationale: a row pointing at a missing storage object is not
+    // recoverable from the UI; an orphan storage object is recoverable by a
+    // background janitor sweep.
     const { error: delErr } = await gate.supabase.from("job_documents").delete().eq("id", id);
     if (delErr) {
       const status = delErr.code === "42501" ? 403 : 500;
       return NextResponse.json({ error: toPublicApiError(delErr) }, { status });
+    }
+
+    const { error: storageError } = await gate.supabase.storage.from("job-documents").remove([path]);
+    if (storageError) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        "[documents/job] storage object orphaned after row delete",
+        { id, path, error: storageError.message }
+      );
+      return NextResponse.json({ ok: true, storageOrphaned: true });
     }
 
     return NextResponse.json({ ok: true });

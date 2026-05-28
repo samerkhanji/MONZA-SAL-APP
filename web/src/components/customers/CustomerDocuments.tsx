@@ -23,6 +23,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -116,6 +126,9 @@ export function CustomerDocuments({ customerId }: CustomerDocumentsProps) {
   const [uploadNotes, setUploadNotes] = useState("");
   const [uploading, setUploading] = useState(false);
   const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [deleteTarget, setDeleteTarget] = useState<CustomerDocumentRow | null>(
+    null
+  );
 
   async function fetchDocuments() {
     setLoading(true);
@@ -131,9 +144,10 @@ export function CustomerDocuments({ customerId }: CustomerDocumentsProps) {
         .select("*")
         .eq("customer_id", customerId)
         .order("created_at", { ascending: false });
-      setDocuments((fallback as CustomerDocumentRow[]) ?? []);
+      setDocuments((fallback as unknown as CustomerDocumentRow[]) ?? []);
     } else {
-      setDocuments((data as CustomerDocumentRow[]) ?? []);
+      // uploaded_by → profiles FK not auto-detected by PostgREST type inference.
+      setDocuments((data as unknown as CustomerDocumentRow[]) ?? []);
     }
     setLoading(false);
   }
@@ -177,7 +191,6 @@ export function CustomerDocuments({ customerId }: CustomerDocumentsProps) {
 
   async function handleDelete(doc: CustomerDocumentRow) {
     if (!canDeleteDocs) return;
-    if (!confirm(`Delete "${doc.file_name}"?`)) return;
 
     const res = await fetch(`/api/documents/customer/${doc.id}`, {
       method: "DELETE",
@@ -378,7 +391,7 @@ export function CustomerDocuments({ customerId }: CustomerDocumentsProps) {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleDelete(doc)}
+                          onClick={() => setDeleteTarget(doc)}
                           className="text-destructive hover:text-destructive"
                         >
                           <Trash2 className="size-4" />
@@ -492,6 +505,35 @@ export function CustomerDocuments({ customerId }: CustomerDocumentsProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={deleteTarget !== null}
+        onOpenChange={(o) => !o && setDeleteTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete document?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget
+                ? `"${deleteTarget.file_name}" will be permanently removed.`
+                : ""}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteTarget) {
+                  void handleDelete(deleteTarget);
+                  setDeleteTarget(null);
+                }
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

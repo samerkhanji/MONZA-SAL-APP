@@ -73,9 +73,12 @@ export function CustomerNotes({ customerId }: CustomerNotesProps) {
         .select("*")
         .eq("customer_id", customerId)
         .order("created_at", { ascending: false });
-      setNotes((fallback as CustomerNoteRow[]) ?? []);
+      setNotes((fallback as unknown as CustomerNoteRow[]) ?? []);
     } else {
-      setNotes((data as CustomerNoteRow[]) ?? []);
+      // The created_by → profiles FK isn't auto-detected by PostgREST type
+      // inference (returns SelectQueryError), but the runtime select hint does
+      // resolve. Cast through unknown.
+      setNotes((data as unknown as CustomerNoteRow[]) ?? []);
     }
     setLoading(false);
   }

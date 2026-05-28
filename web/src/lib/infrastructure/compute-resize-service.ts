@@ -1,6 +1,7 @@
 import { type SupabaseClient } from "@supabase/supabase-js";
 import { withExponentialBackoff } from "@/lib/infrastructure/exponential-backoff";
 import { tryCreateAdminClient } from "@/lib/supabase/admin";
+import type { Json } from "@/lib/supabase/database.types";
 import {
   fetchBillingAddons,
   getSupabaseProjectRef,
@@ -48,7 +49,7 @@ export async function insertSystemEvent(
     event_type,
     severity: opts.severity ?? "info",
     message: opts.message ?? null,
-    metadata: opts.metadata ?? {},
+    metadata: (opts.metadata ?? {}) as Json,
   });
   if (error) {
     console.error("[system_events] insert failed:", error.message);

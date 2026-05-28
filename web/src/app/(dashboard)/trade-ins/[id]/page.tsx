@@ -161,9 +161,10 @@ export default function TradeInDetailPage() {
 
   async function cancel() {
     setActing(true);
+    const trimmedReason = cancelReason.trim();
     const { error } = await supabase.rpc("cancel_trade_in", {
       p_trade_in_id: id,
-      p_reason: cancelReason.trim() || null,
+      ...(trimmedReason ? { p_reason: trimmedReason } : {}),
     });
     setActing(false);
     if (error) return toast.error(formatError(error));
@@ -620,13 +621,14 @@ function InspectDialog({
     const r = Number(recommended);
     if (!Number.isFinite(r) || r < 0) return toast.error("Recommended value must be ≥ 0");
     setBusy(true);
+    const trimmedNotes = notes.trim();
     const { error } = await supabase.rpc("complete_trade_in_inspection", {
       p_trade_in_id: tradeIn.id,
       p_condition: condition,
       p_recommended_value: r,
-      p_mileage_km: mileage ? Number(mileage) : null,
-      p_estimated_repair_cost: repairCost ? Number(repairCost) : null,
-      p_inspection_notes: notes.trim() || null,
+      ...(mileage ? { p_mileage_km: Number(mileage) } : {}),
+      ...(repairCost ? { p_estimated_repair_cost: Number(repairCost) } : {}),
+      ...(trimmedNotes ? { p_inspection_notes: trimmedNotes } : {}),
     });
     setBusy(false);
     if (error) return toast.error(formatError(error));

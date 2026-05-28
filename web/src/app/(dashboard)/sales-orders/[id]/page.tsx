@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
+import type { Database } from "@/lib/supabase/database.types";
 import { useUser } from "@/lib/contexts/UserContext";
 import { Button } from "@/components/ui/button";
 import { FieldHint } from "@/components/ui/field-hint";
@@ -183,7 +184,7 @@ export default function SalesOrderDetailPage() {
       )
       .eq("linked_sales_order_id", id)
       .eq("status", "committed");
-    setCommittedTradeIns((tradeIns ?? []) as unknown as CommittedTradeIn[]);
+    setCommittedTradeIns((tradeIns ?? []) as CommittedTradeIn[]);
 
     setLoading(false);
   }, [id, supabase, router]);
@@ -194,7 +195,12 @@ export default function SalesOrderDetailPage() {
 
   async function patchOrder(patch: Partial<SalesOrderDetail>) {
     setSaving(true);
-    const payload = { ...patch, updated_at: new Date().toISOString() };
+    // Strip FK-embed fields (cars/customers) before sending to UPDATE — they
+    // come from the joined select and aren't columns on sales_orders.
+    const { cars: _cars, customers: _customers, ...rest } = patch;
+    void _cars; void _customers;
+    const payload = { ...rest, updated_at: new Date().toISOString() } as
+      Database["public"]["Tables"]["sales_orders"]["Update"];
     let result;
     try {
       result = await supabase.from("sales_orders").update(payload).eq("id", id);
@@ -332,7 +338,7 @@ export default function SalesOrderDetailPage() {
     try {
       const { error } = await supabase.rpc("complete_delivery", {
         p_sales_order_id: id,
-        p_notes: deliveryNotes || null,
+        ...(deliveryNotes ? { p_notes: deliveryNotes } : {}),
       });
       if (error) {
         toast.error(formatError(error));
@@ -713,7 +719,7 @@ export default function SalesOrderDetailPage() {
             <a
               href={order.signed_contract_url}
               target="_blank"
-              rel="noreferrer"
+              rel="noopener noreferrer"
               className="inline-block text-sm text-primary hover:underline"
             >
               Open contract ↗

@@ -114,7 +114,7 @@ export default function GarageHistoryPage() {
       toast.error(formatError(error));
       setJobs([]);
     } else {
-      const jobsData = (data as JobWithCar[]) ?? [];
+      const jobsData = (data as unknown as JobWithCar[]) ?? [];
       const jobIds = jobsData.map((j) => j.id);
       if (jobIds.length > 0) {
         const { data: partsData } = await supabase

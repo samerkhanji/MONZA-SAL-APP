@@ -23,6 +23,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -177,6 +187,7 @@ export function CarDocuments({ carId, carVin }: CarDocumentsProps) {
   const [uploadNotes, setUploadNotes] = useState("");
   const [uploading, setUploading] = useState(false);
   const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [deleteTarget, setDeleteTarget] = useState<CarDocumentRow | null>(null);
 
   async function fetchDocuments() {
     setLoading(true);
@@ -198,10 +209,11 @@ export function CarDocuments({ carId, carVin }: CarDocumentsProps) {
         toast.error("Failed to load documents");
         setDocuments([]);
       } else {
-        setDocuments((fallbackData as CarDocumentRow[]) ?? []);
+        setDocuments((fallbackData as unknown as CarDocumentRow[]) ?? []);
       }
     } else {
-      setDocuments((data as CarDocumentRow[]) ?? []);
+      // uploaded_by → profiles FK not auto-detected by PostgREST type inference.
+      setDocuments((data as unknown as CarDocumentRow[]) ?? []);
     }
     setLoading(false);
   }
@@ -250,7 +262,6 @@ export function CarDocuments({ carId, carVin }: CarDocumentsProps) {
 
   async function handleDelete(doc: CarDocumentRow) {
     if (!canDeleteCarDocs) return;
-    if (!confirm(`Delete "${doc.file_name}"?`)) return;
 
     const res = await fetch(`/api/documents/car/${doc.id}`, {
       method: "DELETE",
@@ -451,7 +462,7 @@ export function CarDocuments({ carId, carVin }: CarDocumentsProps) {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleDelete(doc)}
+                          onClick={() => setDeleteTarget(doc)}
                           className="text-destructive hover:text-destructive"
                         >
                           <Trash2 className="size-4" />
@@ -571,6 +582,35 @@ export function CarDocuments({ carId, carVin }: CarDocumentsProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={deleteTarget !== null}
+        onOpenChange={(o) => !o && setDeleteTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete document?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget
+                ? `"${deleteTarget.file_name}" will be permanently removed.`
+                : ""}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteTarget) {
+                  void handleDelete(deleteTarget);
+                  setDeleteTarget(null);
+                }
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
