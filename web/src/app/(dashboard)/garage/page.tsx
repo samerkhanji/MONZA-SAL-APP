@@ -339,11 +339,16 @@ export default function GarageJobsPage() {
     if (newStatus === "done") {
       updates.completed_at = new Date().toISOString();
       updates.garage_bay_id = null;
-      updates.started_at = null;
+      // Do NOT null `started_at` — the column is NOT NULL at the DB layer
+      // (see `database.types.ts` Row.started_at: string) and the original
+      // "first work started" timestamp is what efficiency reports
+      // (`garage_job_efficiency`, migration 091) reference to compute
+      // job duration. Wiping it here is both a constraint violation that
+      // silently fails AND data loss.
     }
     if (newStatus === "cancelled") {
       updates.garage_bay_id = null;
-      updates.started_at = null;
+      // Same rationale as above — `started_at` stays.
     }
     if (newStatus === "delivered") {
       updates.delivered_at = new Date().toISOString();

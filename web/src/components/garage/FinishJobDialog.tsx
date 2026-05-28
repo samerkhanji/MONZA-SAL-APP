@@ -3,7 +3,6 @@
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
-import type { Database } from "@/lib/supabase/database.types";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -118,16 +117,18 @@ export function FinishJobDialog({
 
     const { error } = await supabase
       .from("garage_jobs")
-      // started_at is NOT NULL in the generated schema; the prior code passed
-      // null to clear it (silently rejected by Postgres). Local cast widens
-      // the field so the existing intent compiles.
       .update({
         status: "done",
         completed_at: new Date().toISOString(),
         work_done: workDone,
         garage_bay_id: null,
-        started_at: null,
-      } as unknown as Database["public"]["Tables"]["garage_jobs"]["Update"])
+        // Do NOT null `started_at` — the column is NOT NULL at the DB
+        // layer and the original "first work started" timestamp is what
+        // efficiency reports reference to compute job duration. See
+        // `garage/page.tsx::runStatusChange` for the same fix and the
+        // contradictory comment in `JobTimeEntryControls.tsx::handleStartOrResume`
+        // that already documents the intent ("preserve the FIRST started_at").
+      })
       .eq("id", job.id);
 
     if (error) {
