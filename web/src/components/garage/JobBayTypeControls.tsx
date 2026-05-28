@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
+import type { Json } from "@/lib/supabase/database.types";
 import type {
   GarageBayType,
   GarageJobBayContext,
@@ -124,7 +125,7 @@ export function JobBayTypeControls({
         {
           job_id: jobId,
           bay_type: bayType,
-          context: next,
+          context: next as unknown as Json,
           updated_at: new Date().toISOString(),
         },
         { onConflict: "job_id,bay_type" }

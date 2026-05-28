@@ -797,12 +797,12 @@ function ReceiptDialog({
       return;
     }
     setSubmitting(true);
+    const trimmedConditionNote = conditionNote.trim();
     const { error } = await supabase.rpc("record_purchase_order_receipt", {
       p_po_id: po.id,
       p_grn_number: grnNumber.trim(),
       p_received_lines: rl,
-      p_condition_note: conditionNote.trim() || null,
-      p_photos: null,
+      ...(trimmedConditionNote ? { p_condition_note: trimmedConditionNote } : {}),
     });
     setSubmitting(false);
     if (error) {
@@ -944,15 +944,16 @@ function InvoiceDialog({
       return;
     }
     setSubmitting(true);
+    const trimmedFileUrl = fileUrl.trim();
     const { error } = await supabase.rpc("attach_purchase_order_invoice", {
       p_po_id: po.id,
       p_invoice_no: invNo.trim(),
       p_invoice_date: invDate,
       p_amount: Number(amount),
-      p_currency: po.currency,
+      ...(po.currency ? { p_currency: po.currency } : {}),
       p_vat: Number(vat) || 0,
-      p_due_at: dueAt || null,
-      p_file_url: fileUrl.trim() || null,
+      ...(dueAt ? { p_due_at: dueAt } : {}),
+      ...(trimmedFileUrl ? { p_file_url: trimmedFileUrl } : {}),
     });
     setSubmitting(false);
     if (error) {
@@ -1066,14 +1067,16 @@ function PaymentDialog({
       return;
     }
     setSubmitting(true);
+    const trimmedRef = ref.trim();
+    const trimmedNotes = notes.trim();
     const { error } = await supabase.rpc("record_purchase_order_payment", {
       p_po_id: po.id,
       p_invoice_id: invoiceId,
       p_amount: Number(amount),
       p_method: method,
-      p_currency: po.currency,
-      p_reference: ref.trim() || null,
-      p_notes: notes.trim() || null,
+      ...(po.currency ? { p_currency: po.currency } : {}),
+      ...(trimmedRef ? { p_reference: trimmedRef } : {}),
+      ...(trimmedNotes ? { p_notes: trimmedNotes } : {}),
     });
     setSubmitting(false);
     if (error) {
@@ -1172,11 +1175,13 @@ function SendDialog({
 
   async function submit() {
     setSubmitting(true);
+    const trimmedContact = contact.trim();
+    const trimmedRef = ref.trim();
     const { error } = await supabase.rpc("send_purchase_order", {
       p_po_id: poId,
-      p_supplier_contact: contact.trim() || null,
-      p_supplier_reference: ref.trim() || null,
-      p_expected_delivery: eta || null,
+      ...(trimmedContact ? { p_supplier_contact: trimmedContact } : {}),
+      ...(trimmedRef ? { p_supplier_reference: trimmedRef } : {}),
+      ...(eta ? { p_expected_delivery: eta } : {}),
     });
     setSubmitting(false);
     if (error) {

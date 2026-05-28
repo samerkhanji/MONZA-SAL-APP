@@ -142,7 +142,7 @@ export async function POST(request: NextRequest) {
 
     const results = await Promise.allSettled(
       subs.map((row) => {
-        const sub = row.subscription as webpush.PushSubscription;
+        const sub = row.subscription as unknown as webpush.PushSubscription;
         return webpush.sendNotification(sub, payload);
       })
     );

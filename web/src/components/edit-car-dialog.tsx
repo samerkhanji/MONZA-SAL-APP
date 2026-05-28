@@ -3,8 +3,11 @@
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
+import type { Database } from "@/lib/supabase/database.types";
 import { useUser } from "@/lib/contexts/UserContext";
 import type { CarDisplay, PdiStatus, CustomsStatus, CarStatus, LocationType } from "@/types/database";
+
+type CarUpdate = Database["public"]["Tables"]["cars"]["Update"];
 import {
   CAR_STATUS_EDITABLE,
   CAR_STATUS_LABELS,
@@ -198,7 +201,7 @@ export function EditCarDialog({
       warranty_battery_dms: cAny.warranty_battery_dms ?? null,
     };
 
-    let updates: Record<string, unknown>;
+    let updates: CarUpdate;
 
     if (fullInventory) {
       updates = {

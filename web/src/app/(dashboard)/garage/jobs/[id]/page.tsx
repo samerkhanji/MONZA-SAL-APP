@@ -5,9 +5,12 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
+import type { Database } from "@/lib/supabase/database.types";
 import { useUser } from "@/lib/contexts/UserContext";
 import { canPerform } from "@/lib/permissions";
 import type { GarageBay, GarageBayType, GarageJob, JobPart } from "@/types/database";
+
+type GarageJobUpdate = Database["public"]["Tables"]["garage_jobs"]["Update"];
 import {
   JOB_STATUS_COLORS,
   JOB_STATUS_LABELS,
@@ -138,7 +141,10 @@ export default function JobDetailPage() {
       router.push("/garage");
       return;
     }
-    const row = data as JobWithCar;
+    // TODO(typed-supabase): JobWithCar narrows enum fields (e.g. priority: JobPriority)
+    // while the generated row keeps them as the wider DB enum union; aligning them
+    // requires touching every consumer of GarageJob/JobWithCar.
+    const row = data as unknown as JobWithCar;
     const bayJoin = row.garage_bays;
     row.garage_bays = Array.isArray(bayJoin) ? bayJoin[0] ?? null : bayJoin ?? null;
     setJob(row);
@@ -150,7 +156,9 @@ export default function JobDetailPage() {
       .select("*")
       .eq("is_active", true)
       .order("sort_order", { ascending: true });
-    setBays((data as GarageBay[]) ?? []);
+    // TODO(typed-supabase): generated row has bay_number: number while GarageBay/JobBay
+    // helpers vary; align in a dedicated UI-types pass.
+    setBays((data as unknown as GarageBay[]) ?? []);
   }
 
   async function fetchParts() {
@@ -220,12 +228,13 @@ export default function JobDetailPage() {
     setPartSubmitting(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
+      const trimmedPartNote = partNote.trim();
       const { error } = await supabase.rpc("apply_part_to_job", {
         p_job_id: job.id,
         p_part_id: selectedPartId,
         p_quantity: qty,
-        p_note: partNote.trim() || null,
-        p_user_id: user?.id ?? null,
+        ...(trimmedPartNote ? { p_note: trimmedPartNote } : {}),
+        ...(user?.id ? { p_user_id: user.id } : {}),
       });
       if (error) {
         toast.error(formatError(error));
@@ -282,13 +291,14 @@ export default function JobDetailPage() {
   }
 
   async function handleUpdateField(
-    field: keyof GarageJob,
+    field: keyof GarageJobUpdate,
     value: string | number | null
   ) {
     if (!job) return;
+    const update: GarageJobUpdate = { [field]: value } as GarageJobUpdate;
     const { error } = await supabase
       .from("garage_jobs")
-      .update({ [field]: value })
+      .update(update)
       .eq("id", job.id);
     if (error) toast.error(formatError(error));
     else fetchJob();
@@ -450,9 +460,9 @@ export default function JobDetailPage() {
           <CardContent className="space-y-2">
             <Label>Assign bay</Label>
             <Select
-              value={job.garage_bay_id ?? "__none__"}
+              value={job.garage_bay_id != null ? String(job.garage_bay_id) : "__none__"}
               onValueChange={async (v) => {
-                const bayId = v === "__none__" ? null : v;
+                const bayId = v === "__none__" ? null : Number(v);
                 const { error } = await supabase
                   .from("garage_jobs")
                   .update({

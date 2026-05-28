@@ -442,7 +442,8 @@ function SupplierDialog({
     const { data: u } = await supabase.auth.getUser();
     const payload = {
       name: name.trim(),
-      kind: kind || null,
+      // kind is NOT NULL in the schema; only set it when a value was picked.
+      ...(kind ? { kind } : {}),
       contact_person: contactPerson.trim() || null,
       email: email.trim() || null,
       phone: phone.trim() || null,

@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase";
+import type { Json } from "@/lib/supabase/database.types";
 
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 
@@ -131,8 +132,8 @@ async function saveSubscription(userId: string, subscription: PushSubscription):
       // case keys rotated, then we're done.
       const { error: updateError } = await supabase
         .from("push_subscriptions")
-        .update({ subscription: json })
-        .eq("id", (existing[0] as { id: string }).id);
+        .update({ subscription: json as unknown as Json })
+        .eq("id", existing[0].id);
       if (updateError) {
         throw new Error(`push_subscriptions: ${updateError.message}`);
       }
@@ -142,7 +143,7 @@ async function saveSubscription(userId: string, subscription: PushSubscription):
 
   const { error } = await supabase.from("push_subscriptions").insert({
     user_id: userId,
-    subscription: json,
+    subscription: json as unknown as Json,
   });
   if (error) {
     throw new Error(`push_subscriptions: ${error.message}`);

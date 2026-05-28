@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
+import type { Database } from "@/lib/supabase/database.types";
 import { useUser } from "@/lib/contexts/UserContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -219,14 +220,17 @@ function Body() {
   async function handleAddEvent(rule: Omit<NotifEventRule, "id">) {
     const { data, error } = await supabase
       .from("notification_event_rules")
-      .insert(rule)
+      // TODO(typed-supabase): NotifEventRule keeps category/severity as plain
+      // strings while the table uses generated enums. Aligning requires
+      // exposing those enum types to all NotifEventRule consumers.
+      .insert(rule as unknown as Database["public"]["Tables"]["notification_event_rules"]["Insert"])
       .select("*")
       .single();
     if (error) {
       toast.error(formatError(error));
       return;
     }
-    setEventRules((prev) => [...prev, data as NotifEventRule]);
+    setEventRules((prev) => [...prev, data as unknown as NotifEventRule]);
     toast.success("Recipient added");
   }
 

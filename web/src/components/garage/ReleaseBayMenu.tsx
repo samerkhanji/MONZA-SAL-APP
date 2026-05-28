@@ -68,9 +68,9 @@ export function ReleaseBayMenu({
   async function release(action: Action) {
     setBusy(true);
     const { error } = await supabase.rpc("release_bay", {
-      p_bay_id: bayId,
-      p_new_job_status: action.newJobStatus,
-      p_set_bay_status: action.setBayStatus,
+      p_bay_id: Number(bayId),
+      ...(action.newJobStatus ? { p_new_job_status: action.newJobStatus } : {}),
+      ...(action.setBayStatus ? { p_set_bay_status: action.setBayStatus } : {}),
     });
     setBusy(false);
     if (error) {

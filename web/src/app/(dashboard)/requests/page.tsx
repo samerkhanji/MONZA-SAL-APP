@@ -5,8 +5,11 @@ import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
+import type { Database } from "@/lib/supabase/database.types";
 import { useUser } from "@/lib/contexts/UserContext";
 import type { Request } from "@/types/database";
+
+type RequestUpdate = Database["public"]["Tables"]["requests"]["Update"];
 import {
   REQUEST_STATUS_LABELS,
   REQUEST_PRIORITY_LABELS,
@@ -522,7 +525,7 @@ export default function RequestCenterPage() {
       appRole === "assistant" ||
       appRole === "hybrid" ||
       appRole === "khalil_hybrid";
-    const updatePayload: Record<string, unknown> = {
+    const updatePayload: RequestUpdate & { priority?: RequestUpdate["priority"] | null } = {
       status: "approved",
       management_comments: (isAssistant ? assistantNotes : managementComments).trim() || null,
       resolved_at: new Date().toISOString(),
@@ -570,7 +573,7 @@ export default function RequestCenterPage() {
       appRole === "assistant" ||
       appRole === "hybrid" ||
       appRole === "khalil_hybrid";
-    const updatePayload: Record<string, unknown> = {
+    const updatePayload: RequestUpdate & { priority?: RequestUpdate["priority"] | null } = {
       status: "rejected",
       management_comments: (isAssistant ? assistantNotes : managementComments).trim() || null,
       resolved_at: new Date().toISOString(),

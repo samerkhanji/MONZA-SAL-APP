@@ -108,14 +108,16 @@ export function StockMovementDialog({
     setSubmitting(true);
     const { data: { user } } = await supabase.auth.getUser();
 
+    const trimmedJobDescription = jobDescription.trim();
+    const trimmedNote = note.trim();
     const { error } = await supabase.rpc("move_part_stock", {
       p_part_id: part.id,
       p_movement_type: movementType,
       p_quantity: qty,
-      p_car_id: carId || null,
-      p_job_description: jobDescription.trim() || null,
-      p_note: note.trim() || null,
-      p_user_id: user?.id ?? null,
+      ...(carId ? { p_car_id: carId } : {}),
+      ...(trimmedJobDescription ? { p_job_description: trimmedJobDescription } : {}),
+      ...(trimmedNote ? { p_note: trimmedNote } : {}),
+      ...(user?.id ? { p_user_id: user.id } : {}),
     });
 
     setSubmitting(false);

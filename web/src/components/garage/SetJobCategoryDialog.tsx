@@ -89,7 +89,7 @@ export function SetJobCategoryDialog({
     const { data, error } = await supabase.rpc("set_garage_job_category", {
       p_job_id: jobId,
       p_category_id: selectedId,
-      p_current_km: kmNum,
+      ...(kmNum != null ? { p_current_km: kmNum } : {}),
     });
     setSubmitting(false);
     if (error) {

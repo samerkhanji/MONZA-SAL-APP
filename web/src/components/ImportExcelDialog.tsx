@@ -6,7 +6,11 @@ import { toast } from "sonner";
 // ReDoS advisories upstream xlsx no longer patches on npm.
 import * as XLSX from "@e965/xlsx";
 import { createClient } from "@/lib/supabase";
+import type { Database } from "@/lib/supabase/database.types";
 import { Button } from "@/components/ui/button";
+
+type CarInsert = Database["public"]["Tables"]["cars"]["Insert"];
+type SalesOrderInsert = Database["public"]["Tables"]["sales_orders"]["Insert"];
 import {
   Dialog,
   DialogContent,
@@ -152,7 +156,7 @@ export function ImportExcelDialog({
         let recordsUpdated = 0;
         let failed = 0;
 
-        const carsByVin = new Map<string, Record<string, unknown>>();
+        const carsByVin = new Map<string, CarInsert>();
 
         for (const sheetName of ["Voyah 2023 & 2024 & 2025YM", "Voyah 2026YM", "Sent to Customs"]) {
           const sheet = wb.Sheets[sheetName];
@@ -181,14 +185,14 @@ export function ImportExcelDialog({
 
             const status = mapStatus(arr[statusIdx] as string);
             // Legacy fields client_name/client_phone are read-only fallback; use customers + sales_orders instead
-            const car: Record<string, unknown> = {
+            const car: CarInsert = {
               vin,
               brand: "Voyah",
               model: safeStr(arr[modelIdx]) || "—",
               model_year: safeNum(arr[yearIdx]),
               exterior_color: safeStr(arr[extIdx]) || null,
               interior_color: safeStr(arr[intIdx]) || null,
-              status,
+              status: status as CarInsert["status"],
               location_type: "storage",
               issue: safeStr(arr[issueIdx]) || null,
               engine_number: safeStr(arr[engineIdx]) || null,
@@ -428,7 +432,7 @@ export function ImportExcelDialog({
 
             if (carsWithOpenSale.has(carRow.id)) continue;
 
-            const salePayload: Record<string, unknown> = {
+            const salePayload: SalesOrderInsert = {
               car_id: carRow.id,
               customer_id: customerId,
               status: "confirmed",

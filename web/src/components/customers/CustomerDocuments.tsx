@@ -144,9 +144,10 @@ export function CustomerDocuments({ customerId }: CustomerDocumentsProps) {
         .select("*")
         .eq("customer_id", customerId)
         .order("created_at", { ascending: false });
-      setDocuments((fallback as CustomerDocumentRow[]) ?? []);
+      setDocuments((fallback as unknown as CustomerDocumentRow[]) ?? []);
     } else {
-      setDocuments((data as CustomerDocumentRow[]) ?? []);
+      // uploaded_by → profiles FK not auto-detected by PostgREST type inference.
+      setDocuments((data as unknown as CustomerDocumentRow[]) ?? []);
     }
     setLoading(false);
   }

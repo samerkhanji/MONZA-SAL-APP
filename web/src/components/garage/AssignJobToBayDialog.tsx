@@ -55,7 +55,10 @@ export function AssignJobToBayDialog({
         toast.error(formatError(error));
         setJobs([]);
       } else {
-        let list = (data as JobRow[]) ?? [];
+        // TODO(typed-supabase): JobRow narrows enum + adds is_battery_only:boolean,
+        // while generated row has it as boolean|null. Aligning requires touching
+        // all JobRow consumers.
+        let list = (data as unknown as JobRow[]) ?? [];
         if (bay.bay_type === "battery_lab") {
           list = list.filter((j) => j.is_battery_only);
         } else {
@@ -75,7 +78,7 @@ export function AssignJobToBayDialog({
     // bay_assignment_history. Server enforces battery-lab routing.
     const { error } = await supabase.rpc("attach_job_to_bay", {
       p_job_id: jobId,
-      p_bay_id: bay.id,
+      p_bay_id: Number(bay.id),
     });
     setAssigning(null);
     if (error) {

@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
+import type { Database } from "@/lib/supabase/database.types";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -117,13 +118,16 @@ export function FinishJobDialog({
 
     const { error } = await supabase
       .from("garage_jobs")
+      // started_at is NOT NULL in the generated schema; the prior code passed
+      // null to clear it (silently rejected by Postgres). Local cast widens
+      // the field so the existing intent compiles.
       .update({
         status: "done",
         completed_at: new Date().toISOString(),
         work_done: workDone,
         garage_bay_id: null,
         started_at: null,
-      })
+      } as unknown as Database["public"]["Tables"]["garage_jobs"]["Update"])
       .eq("id", job.id);
 
     if (error) {
@@ -161,9 +165,9 @@ export function FinishJobDialog({
       .from("job_parts")
       .select("quantity, parts:part_id(part_name)")
       .eq("job_id", job.id);
-    type PartRow = { quantity?: number; parts?: { part_name?: string }[] | null };
+    type PartRow = { quantity?: number; parts?: { part_name?: string }[] | { part_name?: string } | null };
     const partsList =
-      ((partsData ?? []) as PartRow[])
+      ((partsData ?? []) as unknown as PartRow[])
         .map((p) => {
           const part = Array.isArray(p.parts) ? p.parts[0] : p.parts;
           const name = part?.part_name ?? "";

@@ -209,10 +209,11 @@ export function CarDocuments({ carId, carVin }: CarDocumentsProps) {
         toast.error("Failed to load documents");
         setDocuments([]);
       } else {
-        setDocuments((fallbackData as CarDocumentRow[]) ?? []);
+        setDocuments((fallbackData as unknown as CarDocumentRow[]) ?? []);
       }
     } else {
-      setDocuments((data as CarDocumentRow[]) ?? []);
+      // uploaded_by → profiles FK not auto-detected by PostgREST type inference.
+      setDocuments((data as unknown as CarDocumentRow[]) ?? []);
     }
     setLoading(false);
   }

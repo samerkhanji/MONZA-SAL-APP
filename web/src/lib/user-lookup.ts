@@ -1,4 +1,7 @@
 import { createClient } from "@/lib/supabase";
+import type { Database } from "@/lib/supabase/database.types";
+
+type UserRole = Database["public"]["Enums"]["user_role"];
 
 export interface ProfileBasic {
   id: string;
@@ -87,9 +90,9 @@ export async function getProfileIdsByCapability(
  *   await getProfileIdsByRole(["assistant", "hybrid"])  // CS + hybrids
  */
 export async function getProfileIdsByRole(
-  role: string | string[]
+  role: UserRole | UserRole[]
 ): Promise<string[]> {
-  const roles = Array.isArray(role) ? role : [role];
+  const roles: UserRole[] = Array.isArray(role) ? role : [role];
   if (roles.length === 0) return [];
   const supabase = createClient();
   const { data } = await supabase
@@ -97,7 +100,7 @@ export async function getProfileIdsByRole(
     .select("id")
     .eq("is_active", true)
     .in("user_role", roles);
-  return ((data ?? []) as { id: string }[]).map((p) => p.id);
+  return (data ?? []).map((p) => p.id);
 }
 
 /**

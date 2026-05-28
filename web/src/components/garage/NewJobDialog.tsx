@@ -283,7 +283,7 @@ export function NewJobDialog({
               p_job_id: jobId,
               p_part_id: p.part_id,
               p_quantity: p.quantity,
-              p_note: p.note || null,
+              ...(p.note ? { p_note: p.note } : {}),
               p_user_id: user.id,
             })
             .then((res) => ({ part: p, error: res.error }))

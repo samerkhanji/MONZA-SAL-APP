@@ -11,14 +11,22 @@ function isUuid(s: string): boolean {
   );
 }
 
+import type { Database } from "@/lib/supabase/database.types";
+
+type GarageTaskStatus = Database["public"]["Enums"]["garage_task_status"];
+
 // Mirrors ALLOWED_TASK_STATUSES in [id]/route.ts (PATCH).
-const ALLOWED_TASK_STATUSES = new Set([
+const ALLOWED_TASK_STATUSES = new Set<GarageTaskStatus>([
   "pending",
   "in_progress",
   "blocked",
   "done",
   "cancelled",
 ]);
+
+function isAllowedTaskStatus(s: string): s is GarageTaskStatus {
+  return (ALLOWED_TASK_STATUSES as Set<string>).has(s);
+}
 
 /** GET: list tasks (RLS filters by role). Query: car_id, status, assigned_to */
 export async function GET(req: Request) {
@@ -51,7 +59,7 @@ export async function GET(req: Request) {
       q = q.eq("car_id", carId);
     }
     if (status) {
-      if (!ALLOWED_TASK_STATUSES.has(status)) {
+      if (!isAllowedTaskStatus(status)) {
         return NextResponse.json({ error: "Invalid status" }, { status: 400 });
       }
       q = q.eq("status", status);
