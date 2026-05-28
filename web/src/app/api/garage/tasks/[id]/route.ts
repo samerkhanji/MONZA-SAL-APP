@@ -5,6 +5,10 @@ import {
 } from "@/lib/server/session-app-role";
 import { toPublicApiError } from "@/lib/server/api-error";
 import type { AppRole } from "@/lib/permissions";
+import type { Database } from "@/lib/supabase/database.types";
+
+type GarageTaskStatus = Database["public"]["Enums"]["garage_task_status"];
+type GarageTaskUpdate = Database["public"]["Tables"]["garage_tasks"]["Update"];
 
 function isUuid(s: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -12,13 +16,17 @@ function isUuid(s: string): boolean {
   );
 }
 
-const ALLOWED_TASK_STATUSES = new Set([
+const ALLOWED_TASK_STATUSES = new Set<GarageTaskStatus>([
   "pending",
   "in_progress",
   "blocked",
   "done",
   "cancelled",
 ]);
+
+function isAllowedTaskStatus(s: string): s is GarageTaskStatus {
+  return (ALLOWED_TASK_STATUSES as Set<string>).has(s);
+}
 
 const ALLOWED_RESOURCE_TYPES = new Set([
   "bays",
@@ -53,9 +61,9 @@ export async function PATCH(
       resource_type?: string | null;
     } | null;
 
-    const patch: Record<string, unknown> = {};
+    const patch: GarageTaskUpdate = {};
     if (body?.status != null) {
-      if (typeof body.status !== "string" || !ALLOWED_TASK_STATUSES.has(body.status)) {
+      if (typeof body.status !== "string" || !isAllowedTaskStatus(body.status)) {
         return NextResponse.json({ error: "Invalid status value" }, { status: 400 });
       }
       patch.status = body.status;
@@ -74,7 +82,7 @@ export async function PATCH(
       patch.resource_type = rt;
     }
 
-    const bodyKeys = Object.keys(patch).filter((k) => patch[k] !== undefined);
+    const bodyKeys = Object.keys(patch).filter((k) => (patch as Record<string, unknown>)[k] !== undefined);
     if (bodyKeys.length === 0) {
       return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
     }

@@ -70,7 +70,7 @@ export function GarageBaySection({ onRefreshJobs }: { onRefreshJobs: () => void 
       if (!trimmed) return;
       const { error } = await supabase.rpc("scan_vin_to_bay", {
         p_vin: trimmed,
-        p_bay_id: scanBay.id,
+        p_bay_id: Number(scanBay.id),
       });
       if (error) {
         toast.error(formatError(error));
@@ -97,7 +97,10 @@ export function GarageBaySection({ onRefreshJobs }: { onRefreshJobs: () => void 
       setBays([]);
       return;
     }
-    const list = (bayRows as GarageBay[]) ?? [];
+    // TODO(typed-supabase): GarageBay.id is `string` in our hand-rolled type while
+    // generated row gives `number`. Aligning requires updating call sites that
+    // index by bay id as a string key.
+    const list = (bayRows as unknown as GarageBay[]) ?? [];
     setBays(list);
 
     const { data: jobRows, error: jobErr } = await supabase
@@ -115,7 +118,7 @@ export function GarageBaySection({ onRefreshJobs }: { onRefreshJobs: () => void 
     }
     const terminal = new Set(["done", "delivered", "cancelled"]);
     const byBay: Record<string, JobInBay> = {};
-    for (const j of (jobRows as JobInBay[]) ?? []) {
+    for (const j of (jobRows as unknown as JobInBay[]) ?? []) {
       if (terminal.has(j.status)) continue;
       if (j.garage_bay_id) byBay[j.garage_bay_id] = j;
     }

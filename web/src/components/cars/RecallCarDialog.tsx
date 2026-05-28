@@ -3,7 +3,10 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
+import type { Database } from "@/lib/supabase/database.types";
 import { formatError } from "@/lib/error-messages";
+
+type CarUpdate = Database["public"]["Tables"]["cars"]["Update"];
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -66,7 +69,7 @@ export function RecallCarDialog({
 
   async function handleRecall() {
     setSubmitting(true);
-    const updates: Record<string, unknown> = {
+    const updates: CarUpdate = {
       recalled_at: current?.recalled_at ?? new Date().toISOString(),
       recall_reason: reason,
       recall_notes: notes.trim() || null,

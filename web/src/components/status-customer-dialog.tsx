@@ -3,8 +3,13 @@
 import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
+import type { Database } from "@/lib/supabase/database.types";
 import { useUser } from "@/lib/contexts/UserContext";
 import type { CarDisplay, CarStatus } from "@/types/database";
+
+type SalesOrderInsert = Database["public"]["Tables"]["sales_orders"]["Insert"];
+type CarUpdate = Database["public"]["Tables"]["cars"]["Update"];
+type InstallmentInsert = Database["public"]["Tables"]["installment_payments"]["Insert"];
 import { formatCarStatusLabel } from "@/types/database";
 import { installmentDueDateIso } from "@/lib/installment-due-dates";
 import { Button } from "@/components/ui/button";
@@ -183,7 +188,7 @@ export function StatusCustomerDialog({
             if (custData) {
               setFirstName(custData.first_name);
               setLastName(custData.last_name ?? "");
-              setPhone(custData.phone_primary);
+              setPhone(custData.phone_primary ?? "");
               setPhone2(custData.phone_secondary ?? "");
               setEmail(custData.email ?? "");
             }
@@ -391,7 +396,7 @@ export function StatusCustomerDialog({
         }
 
         const saleStatus = newStatus === "sold" ? "confirmed" : "reserved";
-        const salePayload: Record<string, unknown> = {
+        const salePayload: SalesOrderInsert = {
           car_id: car.id,
           customer_id: newCustomer.id,
           status: saleStatus,
@@ -479,7 +484,7 @@ export function StatusCustomerDialog({
             return;
           }
 
-          const installments: Record<string, unknown>[] = [];
+          const installments: InstallmentInsert[] = [];
 
           if (downNum > 0) {
             installments.push({
@@ -545,7 +550,7 @@ export function StatusCustomerDialog({
     }
 
     // Always update the car's status on the cars table
-    const carStatusPayload: Record<string, unknown> = {
+    const carStatusPayload: CarUpdate = {
       status: newStatus,
       sub_dealer_name: null,
     };

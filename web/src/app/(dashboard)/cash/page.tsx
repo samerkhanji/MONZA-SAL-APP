@@ -520,10 +520,11 @@ function OpenSessionDialog({
       return;
     }
     setSubmitting(true);
+    const trimmedNote = note.trim();
     const { error } = await supabase.rpc("open_cash_session", {
       p_opening_balance: v,
-      p_drawer_id: drawerId || null,
-      p_note: note.trim() || null,
+      ...(drawerId ? { p_drawer_id: drawerId } : {}),
+      ...(trimmedNote ? { p_note: trimmedNote } : {}),
     });
     setSubmitting(false);
     if (error) {
@@ -650,11 +651,13 @@ function CloseSessionDialog({
       return;
     }
     setSubmitting(true);
+    const trimmedClosingNote = closingNote.trim();
+    const trimmedVarianceNote = varianceNote.trim();
     const { error } = await supabase.rpc("close_cash_session", {
       p_session_id: session.id,
       p_actual_balance: actualNum,
-      p_closing_note: closingNote.trim() || null,
-      p_variance_note: varianceNote.trim() || null,
+      ...(trimmedClosingNote ? { p_closing_note: trimmedClosingNote } : {}),
+      ...(trimmedVarianceNote ? { p_variance_note: trimmedVarianceNote } : {}),
     });
     setSubmitting(false);
     if (error) {
@@ -806,12 +809,12 @@ function ManualMovementDialog({
       return;
     }
     setSubmitting(true);
+    const trimmedNote = note.trim();
     const { error } = await supabase.rpc("record_manual_cash_movement", {
       p_kind: kind,
       p_direction: direction,
       p_amount: v,
-      p_note: note.trim() || null,
-      p_drawer_id: null,
+      ...(trimmedNote ? { p_note: trimmedNote } : {}),
     });
     setSubmitting(false);
     if (error) {

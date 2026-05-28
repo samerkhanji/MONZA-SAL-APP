@@ -15,16 +15,17 @@
  */
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "./database.types";
 
 /**
  * Returns a service-role Supabase client, or null if env is missing.
  * Caller is responsible for returning a 500 when null is returned.
  */
-export function tryCreateAdminClient(): SupabaseClient | null {
+export function tryCreateAdminClient(): SupabaseClient<Database> | null {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
   if (!url || !key) return null;
-  return createClient(url, key, {
+  return createClient<Database>(url, key, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 }
@@ -33,7 +34,7 @@ export function tryCreateAdminClient(): SupabaseClient | null {
  * Same as tryCreateAdminClient but throws when env is missing. Use this
  * only when the caller cannot meaningfully proceed without the client.
  */
-export function createAdminClient(): SupabaseClient {
+export function createAdminClient(): SupabaseClient<Database> {
   const client = tryCreateAdminClient();
   if (!client) {
     throw new Error(

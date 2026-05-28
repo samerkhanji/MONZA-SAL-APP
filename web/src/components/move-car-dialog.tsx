@@ -54,13 +54,14 @@ export function MoveCarDialog({
     setSubmitting(true);
 
     const { data: { user } } = await supabase.auth.getUser();
+    const trimmedNote = note.trim();
     const { error: rpcError } = await supabase.rpc("move_car", {
       p_car_id: carId,
       p_new_location_type: locationType,
-      p_new_location_slot: null,
-      p_new_status: status || null,
-      p_note: note.trim() || null,
-      p_user_id: user?.id ?? null,
+      p_new_location_slot: "",
+      ...(status ? { p_new_status: status } : {}),
+      ...(trimmedNote ? { p_note: trimmedNote } : {}),
+      ...(user?.id ? { p_user_id: user.id } : {}),
     });
 
     setSubmitting(false);

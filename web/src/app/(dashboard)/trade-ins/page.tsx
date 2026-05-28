@@ -329,19 +329,24 @@ function RequestTradeInDialog({
     const p = Number(provisional);
     if (!Number.isFinite(p) || p < 0) return toast.error("Provisional value must be ≥ 0");
     setSubmitting(true);
+    const trimmedVin = vin.trim();
+    const trimmedPlate = plate.trim();
+    const trimmedColor = color.trim();
+    const trimmedTrim = trim.trim();
+    const trimmedNotes = notes.trim();
     const { data, error } = await supabase.rpc("request_trade_in", {
       p_customer_id: customerId,
       p_vehicle_make: make.trim(),
       p_vehicle_model: model.trim(),
       p_provisional_value: p,
-      p_currency: currency,
-      p_vehicle_year: year ? Number(year) : null,
-      p_vehicle_vin: vin.trim() || null,
-      p_vehicle_plate: plate.trim() || null,
-      p_vehicle_color: color.trim() || null,
-      p_vehicle_trim: trim.trim() || null,
-      p_mileage_km: mileage ? Number(mileage) : null,
-      p_notes: notes.trim() || null,
+      ...(currency ? { p_currency: currency } : {}),
+      ...(year ? { p_vehicle_year: Number(year) } : {}),
+      ...(trimmedVin ? { p_vehicle_vin: trimmedVin } : {}),
+      ...(trimmedPlate ? { p_vehicle_plate: trimmedPlate } : {}),
+      ...(trimmedColor ? { p_vehicle_color: trimmedColor } : {}),
+      ...(trimmedTrim ? { p_vehicle_trim: trimmedTrim } : {}),
+      ...(mileage ? { p_mileage_km: Number(mileage) } : {}),
+      ...(trimmedNotes ? { p_notes: trimmedNotes } : {}),
     });
     setSubmitting(false);
     if (error) return toast.error(formatError(error));

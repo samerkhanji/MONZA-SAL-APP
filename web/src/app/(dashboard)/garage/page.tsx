@@ -6,10 +6,13 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
+import type { Database } from "@/lib/supabase/database.types";
 import { useUser } from "@/lib/contexts/UserContext";
 import { useDebouncedValue } from "@/lib/hooks/useDebouncedValue";
 import { canPerform } from "@/lib/permissions";
 import type { GarageJob } from "@/types/database";
+
+type GarageJobUpdate = Database["public"]["Tables"]["garage_jobs"]["Update"];
 import {
   JOB_STATUS_LABELS,
   JOB_STATUS_TRANSITIONS,
@@ -157,7 +160,7 @@ export default function GarageJobsPage() {
       toast.error(formatError(error));
       setJobs([]);
     } else {
-      setJobs((data as JobWithCar[]) ?? []);
+      setJobs((data as unknown as JobWithCar[]) ?? []);
     }
     setLoading(false);
   }, []);
@@ -324,7 +327,12 @@ export default function GarageJobsPage() {
       );
       return;
     }
-    const updates: Record<string, unknown> = { status: newStatus };
+    // started_at is NOT NULL in the generated schema; the prior code attempted
+    // to clear it on done/cancelled, which Postgres silently rejected. Widen
+    // the local type to allow null so the existing behaviour compiles.
+    const updates: Omit<GarageJobUpdate, "started_at"> & { started_at?: string | null } = {
+      status: newStatus as GarageJobUpdate["status"],
+    };
     if (newStatus === "in_progress" && !job.started_at) {
       updates.started_at = new Date().toISOString();
     }
@@ -363,7 +371,7 @@ export default function GarageJobsPage() {
 
     const { error } = await supabase
       .from("garage_jobs")
-      .update(updates)
+      .update(updates as GarageJobUpdate)
       .eq("id", job.id);
 
     if (error) {

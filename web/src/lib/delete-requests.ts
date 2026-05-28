@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase";
+import type { Json } from "@/lib/supabase/database.types";
 import { createNotification, createNotificationsForUsers } from "./notifications";
 import { getOwnerIds } from "./user-lookup";
 
@@ -42,14 +43,14 @@ export async function createDeleteRequest(
       requested_by: requestedBy,
       item_type: itemType,
       item_id: itemId,
-      item_details: itemDetails,
+      item_details: itemDetails as Json,
       status: "pending",
     })
     .select("id")
     .single();
 
   if (error) return null;
-  const id = (data as { id: string })?.id;
+  const id = data?.id;
   if (!id) return null;
 
   const ownerIds = await getOwnerIds();

@@ -7,7 +7,11 @@ import { toast } from "sonner";
 import { Car, Users, Zap, ScanLine } from "lucide-react";
 import { ScannerDialog } from "@/components/scanner/ScannerDialog";
 import { createClient } from "@/lib/supabase";
+import type { Database } from "@/lib/supabase/database.types";
 import type { CarStatus, LocationType, CustomsStatus } from "@/types/database";
+
+type CarUpdate = Database["public"]["Tables"]["cars"]["Update"];
+type SalesOrderInsert = Database["public"]["Tables"]["sales_orders"]["Insert"];
 import {
   CAR_STATUS_LABELS,
   LOCATION_LABELS,
@@ -202,11 +206,10 @@ export default function AddCarPage() {
       p_vin: vinTrimmed,
       p_brand: brand,
       p_model: model.trim(),
-      p_model_year: modelYear ? parseInt(modelYear, 10) : null,
-      p_exterior_color: exteriorColor.trim() || null,
-      p_interior_color: interiorColor.trim() || null,
+      ...(modelYear ? { p_model_year: parseInt(modelYear, 10) } : {}),
+      ...(exteriorColor.trim() ? { p_exterior_color: exteriorColor.trim() } : {}),
+      ...(interiorColor.trim() ? { p_interior_color: interiorColor.trim() } : {}),
       p_location_type: locationType,
-      p_location_slot: null,
       p_status: status,
       p_user_id: user.id,
     });
@@ -243,32 +246,7 @@ export default function AddCarPage() {
     let hadFailure = false;
 
     // ─── Step 2: Update car with extra fields ───
-    const extraFields: Partial<{
-      plate_number: string;
-      date_arrived: string;
-      notes: string;
-      battery_percent: number;
-      current_km: number;
-      software_version: string;
-      pdi_status: string;
-      is_erev: boolean;
-      motor: string;
-      ev_km: number;
-      motor_km: number;
-      warranty_per_dms: string;
-      warranty_vehicle_expiry: string;
-      warranty_battery_expiry: string;
-      warranty_expiry: string;
-      warranty_monza_start_date: string;
-      customs_status: string;
-      issue: string;
-      software_update: string;
-      dongle: string;
-      sold_marker: string;
-      suffix: string;
-      engine_number: string;
-      reservation_date: string;
-    }> = {};
+    const extraFields: CarUpdate = {};
 
     if (plateNumber.trim()) extraFields.plate_number = plateNumber.trim();
     if (dateArrived) extraFields.date_arrived = dateArrived;
@@ -343,7 +321,7 @@ export default function AddCarPage() {
           `Car created but failed to save customer: ${customerError.message}`
         );
       } else if (customerData?.id) {
-        const saleFields: Record<string, unknown> = {
+        const saleFields: SalesOrderInsert = {
           car_id: carId,
           customer_id: customerData.id,
           status: status === "sold" ? "confirmed" : "reserved",

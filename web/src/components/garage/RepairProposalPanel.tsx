@@ -151,10 +151,22 @@ export function RepairProposalPanel({
       setBusy(false);
       return;
     }
+    // repair_proposals.car_id is NOT NULL; look it up from the parent job.
+    const { data: jobRow, error: jobErr } = await supabase
+      .from("garage_jobs")
+      .select("car_id")
+      .eq("id", jobId)
+      .single();
+    if (jobErr || !jobRow?.car_id) {
+      toast.error("Job has no associated car — cannot create proposal");
+      setBusy(false);
+      return;
+    }
     const { data, error } = await supabase
       .from("repair_proposals")
       .insert({
         job_id: jobId,
+        car_id: jobRow.car_id,
         status: "draft",
         created_by: user.id,
       })
