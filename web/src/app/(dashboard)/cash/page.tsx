@@ -5,6 +5,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
+import { canRecordManualCashMovement } from "@/lib/permissions-client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { FieldHint } from "@/components/ui/field-hint";
@@ -124,8 +125,9 @@ export default function CashPage() {
 
 function Body() {
   const supabase = createClient();
-  const { isOwner, hasCapability } = useUser();
+  const { isOwner, hasCapability, profile } = useUser();
   const canWrite = isOwner || hasCapability("cashier");
+  const canRecordMovement = canRecordManualCashMovement(profile);
 
   const [drawers, setDrawers] = useState<Drawer[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -230,9 +232,11 @@ function Body() {
           )}
           {openSession && canWrite && (
             <>
-              <Button variant="outline" onClick={() => setMovementDialogOpen(true)} data-tour-id="cash-add-movement-button">
-                Add movement
-              </Button>
+              {canRecordMovement && (
+                <Button variant="outline" onClick={() => setMovementDialogOpen(true)} data-tour-id="cash-add-movement-button">
+                  Add movement
+                </Button>
+              )}
               <Button variant="destructive" onClick={() => setCloseDialogOpen(true)} data-tour-id="cash-close-session-button">
                 Close session
               </Button>

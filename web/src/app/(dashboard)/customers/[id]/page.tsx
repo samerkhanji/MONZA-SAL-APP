@@ -8,6 +8,7 @@ import { gdprAnonymizeCustomer } from "@/lib/server/actions/money-mover";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
 import { canPerform } from "@/lib/permissions";
+import { canAnonymizeCustomer } from "@/lib/permissions-client";
 import type { CustomerDisplay } from "@/types/database";
 import { CAR_STATUS_LABELS } from "@/types/database";
 import {
@@ -91,7 +92,8 @@ interface EnrichedSaleOrder {
 export default function CustomerDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { canEditInventory, canDelete, appRole } = useUser();
+  const { canEditInventory, canDelete, appRole, profile } = useUser();
+  const canAnonymize = canAnonymizeCustomer(profile);
   const canDeleteCustomer = canPerform("customers", "delete", appRole ?? null);
   const id = params.id as string;
   const [customer, setCustomer] = useState<CustomerDisplay | null>(null);
@@ -960,7 +962,7 @@ export default function CustomerDetailPage() {
       {/* GDPR / privacy tools — owner-only. Anonymization is irreversible
           and overwrites PII; the export gives the customer a copy of
           everything the dealership stores about them. */}
-      {appRole === "owner" && !customer.anonymized_at && (
+      {canAnonymize && !customer.anonymized_at && (
         <Card className="border-amber-300/50">
           <CardHeader>
             <CardTitle className="text-base">Privacy / GDPR</CardTitle>
