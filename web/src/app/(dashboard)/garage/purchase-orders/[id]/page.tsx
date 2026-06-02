@@ -141,6 +141,10 @@ const STATUS_COLOR: Record<string, string> = {
 const fmt = (n: number, c = "USD") =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: c, maximumFractionDigits: 2 }).format(n);
 
+// Sanity upper bound on a single line / receipt quantity. Guards against typos
+// like 999999999 and keeps values well clear of any integer-overflow territory.
+const MAX_LINE_QTY = 100000;
+
 export default function PurchaseOrderDetailPage() {
   const params = useParams<{ id: string }>();
   const id = params?.id as string;
@@ -165,11 +169,17 @@ export default function PurchaseOrderDetailPage() {
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
+  const [discardOpen, setDiscardOpen] = useState(false);
   const [sendOpen, setSendOpen] = useState(false);
+  const [deleteLineId, setDeleteLineId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!id) return;
-    setLoading(true);
+    // NOTE: do NOT set loading=true here. `loading` starts true for the first
+    // render (initial skeleton), but on every post-mutation refetch flipping it
+    // back to true unmounts the whole page to the skeleton — the "white screen
+    // flash" seen after Add line / GRN / invoice / payment. Leave it false on
+    // refetch so the page updates in place.
     const [p, l, r, inv, pay, allParts] = await Promise.all([
       supabase.from("purchase_orders").select("*").eq("id", id).is("deleted_at", null).maybeSingle(),
       supabase.from("purchase_order_lines").select("*").eq("po_id", id).order("sort_order"),
@@ -329,7 +339,7 @@ export default function PurchaseOrderDetailPage() {
                             size="icon-xs"
                             variant="ghost"
                             className="text-muted-foreground hover:text-destructive"
-                            onClick={() => void deleteLine(supabase, l.id, lines, setLines)}
+                            onClick={() => setDeleteLineId(l.id)}
                           >
                             <Trash2 className="size-3.5" />
                           </Button>
@@ -346,6 +356,9 @@ export default function PurchaseOrderDetailPage() {
             <AddLineForm
               poId={po.id}
               parts={parts}
+              existingPartIds={lines
+                .map((l) => l.part_id)
+                .filter((v): v is string => !!v)}
               onAdded={() => void load()}
             />
           )}
@@ -383,7 +396,7 @@ export default function PurchaseOrderDetailPage() {
               )}
               <Button
                 variant="outline"
-                onClick={() => setCancelOpen(true)}
+                onClick={() => setDiscardOpen(true)}
                 disabled={busy}
               >
                 Cancel draft
@@ -619,6 +632,76 @@ export default function PurchaseOrderDetailPage() {
           void load();
         }}
       />
+
+      {/* Draft discard — lighter than the formal "Cancel PO" flow (no required
+          reason); a draft was never sent to anyone. */}
+      <AlertDialog open={discardOpen} onOpenChange={(v) => !v && setDiscardOpen(false)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Discard this draft?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This draft purchase order will be removed. It was never sent to a
+              supplier, so nothing else is affected.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>Keep draft</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async (e) => {
+                e.preventDefault();
+                setBusy(true);
+                const { error } = await supabase.rpc("cancel_purchase_order", {
+                  p_po_id: po.id,
+                  p_reason: "Draft discarded",
+                });
+                setBusy(false);
+                if (error) {
+                  toast.error(formatError(error));
+                  return;
+                }
+                toast.success("Draft discarded");
+                setDiscardOpen(false);
+                void load();
+              }}
+            >
+              Discard draft
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Line-item delete confirmation (UX: no more instant irreversible delete). */}
+      <AlertDialog
+        open={deleteLineId !== null}
+        onOpenChange={(v) => !v && setDeleteLineId(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove this line item?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {(() => {
+                const ln = lines.find((x) => x.id === deleteLineId);
+                return ln
+                  ? `"${ln.part_name}" (qty ${ln.quantity}) will be removed from this PO.`
+                  : "This line will be removed from this PO.";
+              })()}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                const target = deleteLineId;
+                setDeleteLineId(null);
+                if (target) void deleteLine(supabase, target, lines, setLines);
+              }}
+            >
+              Remove line
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -641,10 +724,12 @@ async function deleteLine(
 function AddLineForm({
   poId,
   parts,
+  existingPartIds,
   onAdded,
 }: {
   poId: string;
   parts: PartOption[];
+  existingPartIds: string[];
   onAdded: () => void;
 }) {
   const supabase = createClient();
@@ -660,10 +745,18 @@ function AddLineForm({
       toast.error("Pick a part");
       return;
     }
+    if (existingPartIds.includes(p.id)) {
+      toast.error("This part is already on this PO. Remove that line first to change its quantity.");
+      return;
+    }
     const qty = Number(quantity);
     const uc = Number(unitCost);
-    if (!qty || qty <= 0) {
-      toast.error("Quantity must be > 0");
+    if (!Number.isInteger(qty) || qty <= 0) {
+      toast.error("Quantity must be a whole number greater than 0");
+      return;
+    }
+    if (qty > MAX_LINE_QTY) {
+      toast.error(`Quantity can't exceed ${MAX_LINE_QTY.toLocaleString()}`);
       return;
     }
     setSubmitting(true);
@@ -714,8 +807,10 @@ function AddLineForm({
           <Label className="text-xs">Quantity *</Label>
           <Input
             type="number"
-            inputMode="decimal"
+            inputMode="numeric"
             min={1}
+            max={MAX_LINE_QTY}
+            step={1}
             value={quantity}
             onChange={(e) => setQuantity(e.target.value)}
           />
@@ -785,15 +880,30 @@ function ReceiptDialog({
   }, [open, lines, received]);
 
   async function submit() {
+    // Validate every entered qty up-front so a bad value surfaces a friendly
+    // message instead of a raw DB check-constraint error (and never reaches the
+    // RPC as a negative/decimal/oversized number).
+    for (const l of lines) {
+      const raw = perLine[l.id]?.qty ?? "";
+      if (raw.trim() === "") continue;
+      const qty = Number(raw);
+      if (!Number.isInteger(qty) || qty < 0) {
+        toast.error(`Received qty for "${l.part_name}" must be a whole number of 0 or more`);
+        return;
+      }
+      if (qty > MAX_LINE_QTY) {
+        toast.error(`Received qty for "${l.part_name}" can't exceed ${MAX_LINE_QTY.toLocaleString()}`);
+        return;
+      }
+    }
     const rl = lines
       .map((l) => {
-        const v = perLine[l.id];
-        const qty = Number(v?.qty ?? 0);
+        const qty = Number(perLine[l.id]?.qty ?? 0);
         if (!qty) return null;
         return {
           po_line_id: l.id,
           quantity_received: qty,
-          condition: v?.cond ?? "good",
+          condition: perLine[l.id]?.cond ?? "good",
         };
       })
       .filter(Boolean);
@@ -862,8 +972,10 @@ function ReceiptDialog({
                     <td className="px-2 py-1">
                       <Input
                         type="number"
-                        inputMode="decimal"
+                        inputMode="numeric"
                         min={0}
+                        max={MAX_LINE_QTY}
+                        step={1}
                         value={v.qty}
                         onChange={(e) =>
                           setPerLine((prev) => ({
@@ -974,6 +1086,9 @@ function InvoiceDialog({
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Attach supplier invoice</DialogTitle>
+          <DialogDescription>
+            Record the supplier&apos;s invoice number, date, and amount against this PO.
+          </DialogDescription>
         </DialogHeader>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1 sm:col-span-2">
@@ -1097,6 +1212,9 @@ function PaymentDialog({
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Record payment</DialogTitle>
+          <DialogDescription>
+            Log a payment made against one of this PO&apos;s invoices.
+          </DialogDescription>
         </DialogHeader>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1 sm:col-span-2">
@@ -1265,6 +1383,11 @@ function ReasonDialog({
         <div className="space-y-1">
           <Label>Reason *</Label>
           <Textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={3} />
+          {!reason.trim() && (
+            <p className="text-muted-foreground text-xs">
+              A reason is required before you can confirm.
+            </p>
+          )}
         </div>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={submitting}>Cancel</AlertDialogCancel>
