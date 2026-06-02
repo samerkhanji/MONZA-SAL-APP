@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { formatError } from "@/lib/error-messages";
+import { gdprAnonymizeCustomer } from "@/lib/server/actions/money-mover";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
 import { canPerform } from "@/lib/permissions";
@@ -1111,14 +1112,13 @@ export default function CustomerDetailPage() {
               onClick={async () => {
                 if (!customer) return;
                 setAnonymizing(true);
-                const supabase = createClient();
-                const { error } = await supabase.rpc("gdpr_anonymize_customer", {
-                  p_customer_id: customer.id,
-                  p_reason: anonymizeReason.trim(),
-                });
+                const result = await gdprAnonymizeCustomer(
+                  customer.id,
+                  anonymizeReason.trim()
+                );
                 setAnonymizing(false);
-                if (error) {
-                  toast.error(formatError(error));
+                if (!result.ok) {
+                  toast.error(result.error);
                   return;
                 }
                 toast.success("Customer anonymized.");

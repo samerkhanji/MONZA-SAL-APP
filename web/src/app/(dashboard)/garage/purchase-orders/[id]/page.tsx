@@ -41,6 +41,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 import { formatError } from "@/lib/error-messages";
+import { submitPurchaseOrder } from "@/lib/server/actions/money-mover";
 import { cn } from "@/lib/utils";
 
 interface PO {
@@ -363,13 +364,13 @@ export default function PurchaseOrderDetailPage() {
                 <Button
                   onClick={async () => {
                     setBusy(true);
-                    const { data, error } = await supabase.rpc("submit_purchase_order", { p_po_id: po.id });
+                    const result = await submitPurchaseOrder(po.id);
                     setBusy(false);
-                    if (error) {
-                      toast.error(formatError(error));
+                    if (!result.ok) {
+                      toast.error(result.error);
                       return;
                     }
-                    const r = data as { status?: string };
+                    const r = (result.data ?? {}) as { status?: string };
                     toast.success(
                       r.status === "approved" ? "Approved (under threshold)" : "Submitted for approval"
                     );

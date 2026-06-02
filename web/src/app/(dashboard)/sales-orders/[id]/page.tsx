@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/select";
 import { ArrowLeft, FileText, CheckCircle2, Truck, Receipt, Loader2, Repeat } from "lucide-react";
 import { formatError } from "@/lib/error-messages";
+import { voidSalesOrder } from "@/lib/server/actions/money-mover";
 import { enqueueSupabaseOp, isLikelyOffline } from "@/lib/pwa/supabase-outbox";
 
 type SaleStatus = "draft" | "reserved" | "confirmed" | "paid" | "delivered" | "cancelled";
@@ -365,12 +366,9 @@ export default function SalesOrderDetailPage() {
     }
     setSaving(true);
     try {
-      const { error } = await supabase.rpc("void_sales_order", {
-        p_sales_order_id: order.id,
-        p_reason: voidReason.trim(),
-      });
-      if (error) {
-        toast.error(formatError(error));
+      const result = await voidSalesOrder(order.id, voidReason.trim());
+      if (!result.ok) {
+        toast.error(result.error);
         return;
       }
       toast.success("Sale voided.");
