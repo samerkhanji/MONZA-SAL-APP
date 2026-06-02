@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -252,6 +253,10 @@ export function ImportPartsDialog({
       <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Import from Excel</DialogTitle>
+          <DialogDescription>
+            Upload an .xlsx, .xls, or .csv file to bulk-add parts. Rows with an
+            OE number that already exists are skipped.
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div>

@@ -18,6 +18,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -57,8 +58,15 @@ export function StockMovementDialog({
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [scanVinOpen, setScanVinOpen] = useState(false);
+  // Retain the last part name so the title doesn't flicker to "Stock In:"
+  // while the dialog animates closed and `part` has already been cleared.
+  const [displayName, setDisplayName] = useState("");
 
   const supabase = createClient();
+
+  useEffect(() => {
+    if (part?.part_name) setDisplayName(part.part_name);
+  }, [part?.part_name]);
 
   useEffect(() => {
     if (open) {
@@ -138,19 +146,20 @@ export function StockMovementDialog({
 
   const title =
     movementType === "stock_in"
-      ? `Stock In: ${part?.part_name ?? ""}`
-      : `Stock Out: ${part?.part_name ?? ""}`;
+      ? `Stock In: ${part?.part_name ?? displayName}`
+      : `Stock Out: ${part?.part_name ?? displayName}`;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
-          {part && (
-            <p className="text-muted-foreground text-sm">
-              Current stock: {part.quantity}
-            </p>
-          )}
+          <DialogDescription>
+            {movementType === "stock_in"
+              ? "Add received units to this part's stock."
+              : "Remove units from stock, optionally linked to a car/job."}
+            {part ? ` Current stock: ${part.quantity}.` : ""}
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>

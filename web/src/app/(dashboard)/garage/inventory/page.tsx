@@ -347,7 +347,7 @@ export default function GarageInventoryPage() {
               value={supplierFilter}
               onValueChange={setSupplierFilter}
             >
-              <SelectTrigger data-tour-id="inventory-supplier-filter" id="parts-supplier-filter" className="w-[180px]">
+              <SelectTrigger data-tour-id="inventory-supplier-filter" id="parts-supplier-filter" aria-label="Filter by supplier" className="w-[180px]">
                 <SelectValue placeholder="Supplier" />
               </SelectTrigger>
               <SelectContent>
@@ -360,7 +360,7 @@ export default function GarageInventoryPage() {
               </SelectContent>
             </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger data-tour-id="inventory-status-filter" id="parts-status-filter" className="w-[160px]">
+              <SelectTrigger data-tour-id="inventory-status-filter" id="parts-status-filter" aria-label="Filter by stock status" className="w-[160px]">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
@@ -436,6 +436,7 @@ export default function GarageInventoryPage() {
                                   Stock In
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
+                                  disabled={p.quantity === 0}
                                   onClick={() => {
                                     setStockDialogPart(p);
                                     setStockDialogType("stock_out");
@@ -610,6 +611,7 @@ export default function GarageInventoryPage() {
                                   Stock In
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
+                                  disabled={p.quantity === 0}
                                   onClick={() => {
                                     setStockDialogPart(p);
                                     setStockDialogType("stock_out");

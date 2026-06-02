@@ -18,6 +18,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -25,6 +26,7 @@ import {
 import { ScanLine } from "lucide-react";
 import { ScannerDialog } from "@/components/scanner/ScannerDialog";
 import { formatError } from "@/lib/error-messages";
+import { oeNumberInUse } from "@/lib/validation/part-oe";
 
 interface EditPartDialogProps {
   part: Part | null;
@@ -86,6 +88,15 @@ export function EditPartDialog({
 
     setSubmitting(true);
 
+    // Block renaming this part's OE number onto one another part already uses.
+    if (oeNumber.trim() && (await oeNumberInUse(oeNumber, part.id))) {
+      toast.error(
+        `A part with OE number "${oeNumber.trim()}" already exists.`
+      );
+      setSubmitting(false);
+      return;
+    }
+
     const { error } = await supabase
       .from("parts")
       .update({
@@ -121,6 +132,9 @@ export function EditPartDialog({
       <DialogContent className="max-h-[90vh] overflow-y-auto max-w-lg" data-tour-id="edit-part-dialog">
         <DialogHeader>
           <DialogTitle>Edit Part</DialogTitle>
+          <DialogDescription>
+            Update this part&apos;s details, location, and cost.
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">

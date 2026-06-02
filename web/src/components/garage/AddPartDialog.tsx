@@ -8,8 +8,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -17,6 +25,7 @@ import {
 import { ScanLine } from "lucide-react";
 import { ScannerDialog } from "@/components/scanner/ScannerDialog";
 import { formatError } from "@/lib/error-messages";
+import { oeNumberInUse } from "@/lib/validation/part-oe";
 
 interface AddPartDialogProps {
   open: boolean;
@@ -37,6 +46,8 @@ export function AddPartDialog({
   const [minQuantity, setMinQuantity] = useState("2");
   const [storageZone, setStorageZone] = useState("");
   const [supplier, setSupplier] = useState("");
+  const [unitCost, setUnitCost] = useState("");
+  const [currency, setCurrency] = useState("USD");
   const [orderDate, setOrderDate] = useState("");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -54,6 +65,8 @@ export function AddPartDialog({
       setMinQuantity("2");
       setStorageZone("");
       setSupplier("");
+      setUnitCost("");
+      setCurrency("USD");
       setOrderDate("");
       setNotes("");
     }
@@ -77,6 +90,17 @@ export function AddPartDialog({
     }
 
     setSubmitting(true);
+
+    // OE numbers identify a part — block creating a second one with the same
+    // OE number (UI-level guard; there is no DB uniqueness constraint yet).
+    if (oeNumber.trim() && (await oeNumberInUse(oeNumber))) {
+      toast.error(
+        `A part with OE number "${oeNumber.trim()}" already exists.`
+      );
+      setSubmitting(false);
+      return;
+    }
+
     const { data: authUser } = await supabase.auth.getUser();
 
     const receivedAt = new Date().toISOString();
@@ -91,8 +115,8 @@ export function AddPartDialog({
         min_quantity: minQty,
         storage_zone: storageZone.trim() || null,
         supplier: supplier.trim() || null,
-        unit_cost: null,
-        currency: "USD",
+        unit_cost: unitCost ? parseFloat(unitCost) : null,
+        currency: currency || "USD",
         order_date: orderDate || null,
         notes: notes.trim() || null,
         created_by: authUser.user?.id ?? null,
@@ -131,6 +155,9 @@ export function AddPartDialog({
       <DialogContent className="max-h-[min(90vh,92dvh)] overflow-y-auto max-w-lg" data-tour-id="add-part-dialog">
         <DialogHeader>
           <DialogTitle>Add New Part</DialogTitle>
+          <DialogDescription>
+            Log a new part into inventory with its stock level and details.
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -238,6 +265,32 @@ export function AddPartDialog({
                 onChange={(e) => setSupplier(e.target.value)}
                 autoComplete="off"
               />
+            </div>
+            <div>
+              <Label htmlFor="unit_cost">Unit Cost</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="part-unit-cost"
+                  name="part-unit-cost"
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  min={0}
+                  value={unitCost}
+                  onChange={(e) => setUnitCost(e.target.value)}
+                  placeholder="e.g. 25.00"
+                  autoComplete="off"
+                />
+                <Select value={currency} onValueChange={setCurrency}>
+                  <SelectTrigger className="w-24">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="USD">USD</SelectItem>
+                    <SelectItem value="LBP">LBP</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div>
               <Label htmlFor="order_date">Arrived Date</Label>
