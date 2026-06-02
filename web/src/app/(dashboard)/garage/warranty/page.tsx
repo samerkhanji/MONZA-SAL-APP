@@ -230,6 +230,7 @@ export default function WarrantyPage() {
                 <thead className="border-b text-left text-xs uppercase text-muted-foreground">
                   <tr>
                     <th className="px-3 py-2">Case</th>
+                    <th className="px-3 py-2">Summary</th>
                     <th className="px-3 py-2">VIN / Vehicle</th>
                     <th className="px-3 py-2">Customer</th>
                     <th className="px-3 py-2">Kind</th>
@@ -249,6 +250,9 @@ export default function WarrantyPage() {
                         onClick={() => router.push(`/garage/warranty/${x.id}`)}
                       >
                         <td className="px-3 py-2 font-mono">{x.case_number}</td>
+                        <td className="max-w-[22rem] truncate px-3 py-2" title={x.summary}>
+                          {x.summary}
+                        </td>
                         <td className="px-3 py-2">
                           <div className="flex flex-col">
                             <span className="font-mono text-xs">{c?.vin ?? "—"}</span>
