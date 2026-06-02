@@ -143,9 +143,13 @@ export default function SalesOrderDetailPage() {
   const [depositMethod, setDepositMethod] = useState("");
   const [contractUrl, setContractUrl] = useState("");
   const [deliveryNotes, setDeliveryNotes] = useState("");
+  const [plannedDelivery, setPlannedDelivery] = useState("");
   const [voidOpen, setVoidOpen] = useState(false);
   const [voidReason, setVoidReason] = useState("");
+  const [voidAttempted, setVoidAttempted] = useState(false);
   const [deliverOpen, setDeliverOpen] = useState(false);
+  const [acceptOpen, setAcceptOpen] = useState(false);
+  const [clearContractOpen, setClearContractOpen] = useState(false);
 
   const fetchOrder = useCallback(async () => {
     setLoading(true);
@@ -159,7 +163,16 @@ export default function SalesOrderDetailPage() {
       .eq("id", id)
       .single();
     if (error || !data) {
-      toast.error(error ? formatError(error) : "Sales order not found");
+      // A missing row comes back as a PostgREST "no rows" error (PGRST116);
+      // surface a clear message rather than the raw constraint text, and only
+      // fall back to formatError for genuine (e.g. network) failures.
+      const code = (error as { code?: string } | null)?.code;
+      const notFound = !data || code === "PGRST116";
+      toast.error(
+        notFound
+          ? "That sales order doesn't exist or was removed."
+          : formatError(error as Parameters<typeof formatError>[0])
+      );
       router.push("/sales-orders");
       return;
     }
@@ -174,6 +187,7 @@ export default function SalesOrderDetailPage() {
     setDepositAmount(row.deposit_amount != null ? String(row.deposit_amount) : "");
     setDepositMethod(row.deposit_method ?? "");
     setContractUrl(row.signed_contract_url ?? "");
+    setPlannedDelivery(row.delivery_date ? row.delivery_date.slice(0, 10) : "");
 
     // Load any committed trade-ins linked to this sales order. We render
     // these under the price card so the user can see what credit was
@@ -240,21 +254,40 @@ export default function SalesOrderDetailPage() {
       toast.error("Enter a positive quote amount");
       return;
     }
+    const wasSent = !!order?.quote_sent_at;
     const ok = await patchOrder({
       quote_amount: amt,
       quote_currency: orderCurrency,
       currency: orderCurrency,
       quote_sent_at: order?.quote_sent_at ?? new Date().toISOString(),
     });
-    if (ok) toast.success("Quote saved");
+    // The button reads "Send quote" / "Update quote"; mirror that in the toast.
+    if (ok) toast.success(wasSent ? "Quote updated" : "Quote sent");
   }
-  async function markQuoteAccepted() {
+  function markQuoteAccepted() {
     if (!order?.quote_sent_at) {
       toast.error("Send the quote first");
       return;
     }
-    const ok = await patchOrder({ quote_accepted_at: new Date().toISOString() });
-    if (ok) toast.success("Quote accepted");
+    // Accepting a quote is a workflow state change — confirm it first.
+    setAcceptOpen(true);
+  }
+  async function confirmQuoteAccepted() {
+    if (!order) return;
+    const patch: Partial<SalesOrderDetail> = {
+      quote_accepted_at: new Date().toISOString(),
+    };
+    // Populate the selling price from the accepted quote when it hasn't been
+    // set yet, so the Selling price card reflects the agreed amount.
+    if (order.selling_price == null && order.quote_amount != null) {
+      patch.selling_price = order.quote_amount;
+      patch.currency = order.currency ?? order.quote_currency ?? orderCurrency;
+    }
+    const ok = await patchOrder(patch);
+    if (ok) {
+      toast.success("Quote accepted");
+      setAcceptOpen(false);
+    }
   }
 
   async function saveDeposit() {
@@ -316,6 +349,17 @@ export default function SalesOrderDetailPage() {
       toast.error("Contract URL must start with http:// or https://");
       return;
     }
+    // Clearing a previously-saved contract wipes the signed-at timestamp — a
+    // destructive action that shouldn't happen on a single misclick. Confirm.
+    if (!trimmed && order.signed_contract_url) {
+      setClearContractOpen(true);
+      return;
+    }
+    await writeContract(trimmed);
+  }
+
+  async function writeContract(trimmed: string) {
+    if (!order) return;
     // Recording a signed contract advances draft/reserved orders to 'confirmed'.
     const willAdvance =
       !!trimmed && (order.status === "draft" || order.status === "reserved");
@@ -334,6 +378,13 @@ export default function SalesOrderDetailPage() {
             : "Contract recorded"
       );
     }
+    setClearContractOpen(false);
+  }
+
+  async function savePlannedDelivery() {
+    if (!order) return;
+    const ok = await patchOrder({ delivery_date: plannedDelivery || null });
+    if (ok) toast.success(plannedDelivery ? "Planned delivery date saved" : "Planned delivery date cleared");
   }
 
   async function markDelivered() {
@@ -361,6 +412,7 @@ export default function SalesOrderDetailPage() {
   async function confirmVoidSale() {
     if (!order) return;
     if (!voidReason.trim()) {
+      setVoidAttempted(true);
       toast.error("A reason is required to void a sale.");
       return;
     }
@@ -458,9 +510,9 @@ export default function SalesOrderDetailPage() {
       {/* Lifecycle stepper */}
       <Card data-tour-id="sales-order-detail-stepper">
         <CardContent className="pt-6">
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch]">
             {steps.map((s, i) => (
-              <div key={s.key} className="flex items-center gap-2">
+              <div key={s.key} className="flex shrink-0 items-center gap-2">
                 <div
                   className={`flex h-8 min-w-32 items-center gap-2 rounded-full border px-3 text-sm ${
                     s.done
@@ -746,6 +798,26 @@ export default function SalesOrderDetailPage() {
           ) : (
             <>
               <div>
+                <Label htmlFor="planned-delivery">Planned delivery date</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="planned-delivery"
+                    type="date"
+                    value={plannedDelivery}
+                    onChange={(e) => setPlannedDelivery(e.target.value)}
+                    disabled={!canEdit}
+                    className="max-w-[200px]"
+                  />
+                  <Button
+                    variant="outline"
+                    onClick={savePlannedDelivery}
+                    disabled={!canEdit || saving || plannedDelivery === (order.delivery_date?.slice(0, 10) ?? "")}
+                  >
+                    Save date
+                  </Button>
+                </div>
+              </div>
+              <div>
                 <Label htmlFor="delivery-notes">Delivery notes (optional)</Label>
                 <Textarea
                   id="delivery-notes"
@@ -759,7 +831,6 @@ export default function SalesOrderDetailPage() {
               <Button
                 onClick={() => setDeliverOpen(true)}
                 disabled={!canEdit || saving}
-                className="bg-green-600 hover:bg-green-700"
               >
                 Mark delivered
               </Button>
@@ -838,7 +909,10 @@ export default function SalesOrderDetailPage() {
         open={voidOpen}
         onOpenChange={(open) => {
           setVoidOpen(open);
-          if (!open) setVoidReason("");
+          if (!open) {
+            setVoidReason("");
+            setVoidAttempted(false);
+          }
         }}
       >
         <DialogContent className="sm:max-w-md">
@@ -863,8 +937,16 @@ export default function SalesOrderDetailPage() {
               rows={3}
               placeholder="e.g. Customer changed their mind; returned within 24h."
               value={voidReason}
-              onChange={(e) => setVoidReason(e.target.value)}
+              onChange={(e) => {
+                setVoidReason(e.target.value);
+                if (e.target.value.trim()) setVoidAttempted(false);
+              }}
+              aria-invalid={voidAttempted && !voidReason.trim()}
+              className={voidAttempted && !voidReason.trim() ? "border-destructive focus-visible:ring-destructive" : undefined}
             />
+            {voidAttempted && !voidReason.trim() && (
+              <p className="text-sm text-destructive">A reason is required to void a sale.</p>
+            )}
           </div>
           <DialogFooter className="gap-2 sm:gap-2">
             <Button
@@ -877,7 +959,7 @@ export default function SalesOrderDetailPage() {
             <Button
               variant="destructive"
               onClick={confirmVoidSale}
-              disabled={saving || !voidReason.trim()}
+              disabled={saving}
             >
               {saving && <Loader2 className="mr-2 size-4 animate-spin" aria-hidden />}
               Void sale
@@ -911,10 +993,55 @@ export default function SalesOrderDetailPage() {
             <Button
               onClick={markDelivered}
               disabled={saving}
-              className="bg-green-600 hover:bg-green-700"
             >
               {saving && <Loader2 className="mr-2 size-4 animate-spin" aria-hidden />}
               Mark delivered
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Mark-accepted confirmation — accepting a quote is a workflow change. */}
+      <Dialog open={acceptOpen} onOpenChange={(o) => !saving && setAcceptOpen(o)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Was this quote accepted by the customer?</DialogTitle>
+            <DialogDescription>
+              This records the acceptance time
+              {order.selling_price == null && order.quote_amount != null
+                ? " and sets the selling price from the quoted amount."
+                : "."}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button variant="outline" onClick={() => setAcceptOpen(false)} disabled={saving}>
+              Cancel
+            </Button>
+            <Button onClick={confirmQuoteAccepted} disabled={saving}>
+              {saving && <Loader2 className="mr-2 size-4 animate-spin" aria-hidden />}
+              Yes, mark accepted
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Clear-contract confirmation — guards against wiping a signed contract. */}
+      <Dialog open={clearContractOpen} onOpenChange={(o) => !saving && setClearContractOpen(o)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Remove the signed contract?</DialogTitle>
+            <DialogDescription>
+              The contract URL is empty, so saving will clear the stored contract
+              link and its signed-at timestamp. This can&apos;t be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button variant="outline" onClick={() => setClearContractOpen(false)} disabled={saving}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={() => writeContract("")} disabled={saving}>
+              {saving && <Loader2 className="mr-2 size-4 animate-spin" aria-hidden />}
+              Clear contract
             </Button>
           </DialogFooter>
         </DialogContent>

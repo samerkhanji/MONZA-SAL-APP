@@ -86,6 +86,26 @@ export function FloatingScanButton() {
       return;
     }
 
+    // On Sales Orders, the relevant destination is the car's sales order — not
+    // the car detail page. Look it up and open it; otherwise say so clearly.
+    if (pathname.startsWith("/sales-orders")) {
+      const { data: so } = await supabase
+        .from("sales_orders")
+        .select("id")
+        .eq("car_id", typedCar.id)
+        .not("status", "eq", "cancelled")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (so) {
+        toast.success(`${typedCar.brand} ${typedCar.model} — opening sales order`);
+        router.push(`/sales-orders/${(so as { id: string }).id}`);
+      } else {
+        toast.error(`No sales order found for VIN: ${typedCar.vin ?? trimmed}`);
+      }
+      return;
+    }
+
     toast.success(`Found: ${typedCar.brand} ${typedCar.model}`);
     router.push(carHref);
   }

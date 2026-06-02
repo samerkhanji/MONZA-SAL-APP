@@ -1,15 +1,28 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
+import type { Database } from "@/lib/supabase/database.types";
 import { useUser } from "@/lib/contexts/UserContext";
-import { useDebouncedValue } from "@/lib/hooks/useDebouncedValue";
+import { canVoidSalesOrder } from "@/lib/permissions-client";
 import { Button } from "@/components/ui/button";
+import { FieldHint } from "@/components/ui/field-hint";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -17,51 +30,75 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Skeleton } from "@/components/ui/skeleton";
-import { ExportButton } from "@/components/ExportButton";
-import type { ExportColumn } from "@/lib/exportToExcel";
-import { RefreshCw } from "lucide-react";
+import { ArrowLeft, FileText, CheckCircle2, Truck, Receipt, Loader2, Repeat } from "lucide-react";
 import { formatError } from "@/lib/error-messages";
+import { voidSalesOrder } from "@/lib/server/actions/money-mover";
+import { enqueueSupabaseOp, isLikelyOffline } from "@/lib/pwa/supabase-outbox";
 
-interface SalesOrderFull {
+type SaleStatus = "draft" | "reserved" | "confirmed" | "paid" | "delivered" | "cancelled";
+
+interface SalesOrderDetail {
   id: string;
-  car_id: string;
+  car_id: string | null;
   customer_id: string | null;
-  status: string;
+  status: SaleStatus;
   selling_price: number | null;
   currency: string | null;
+  notes: string | null;
   sale_date: string | null;
   date_bought: string | null;
-  delivery_date: string | null;
   reservation_date: string | null;
+  reserved_until: string | null;
   reserved_by: string | null;
+  delivery_date: string | null;
+  // Lifecycle (added in migration 056)
+  quote_amount: number | null;
+  quote_currency: string | null;
+  quote_sent_at: string | null;
+  quote_accepted_at: string | null;
+  deposit_amount: number | null;
+  deposit_currency: string | null;
+  deposit_paid_at: string | null;
+  deposit_method: string | null;
+  signed_contract_url: string | null;
+  contract_signed_at: string | null;
+  delivered_at: string | null;
+  delivered_by: string | null;
+  delivery_notes: string | null;
+  // Void / reversal (added in migration 078)
+  void_at: string | null;
+  void_reason: string | null;
+  void_by: string | null;
   created_at: string;
-  cars: {
+  cars?: {
     id: string;
     vin: string;
     brand: string;
     model: string;
     model_year: number | null;
     exterior_color: string | null;
-    status: string;
   } | null;
-  customers: {
+  customers?: {
     id: string;
-    first_name: string | null;
+    first_name: string;
     last_name: string | null;
     phone_primary: string | null;
+    email: string | null;
+    lead_status: string | null;
   } | null;
 }
 
-const STATUS_COLORS: Record<string, string> = {
+interface CommittedTradeIn {
+  id: string;
+  trade_in_number: string;
+  vehicle_make: string | null;
+  vehicle_model: string | null;
+  vehicle_year: number | null;
+  accepted_value: number | null;
+  currency: string | null;
+}
+
+const STATUS_COLORS: Record<SaleStatus, string> = {
   draft:     "bg-slate-100 text-slate-700 dark:bg-slate-900 dark:text-slate-300",
   reserved:  "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300",
   confirmed: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
@@ -70,428 +107,945 @@ const STATUS_COLORS: Record<string, string> = {
   cancelled: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
 };
 
-function customerName(so: SalesOrderFull): string {
-  if (!so.customers) return "—";
-  const full =
-    `${so.customers.first_name ?? ""} ${so.customers.last_name ?? ""}`.trim();
-  return full || "—";
+const CCY_OPTIONS = ["USD", "LBP", "EUR"];
+
+const fmtMoney = (n: number | null | undefined, c: string | null | undefined) =>
+  n == null ? "—" : `${Number(n).toLocaleString()} ${c ?? "USD"}`;
+const fmtDate = (s: string | null | undefined) =>
+  s ? new Date(s).toLocaleDateString() : "—";
+const fmtDT = (s: string | null | undefined) =>
+  s ? new Date(s).toLocaleString() : "—";
+
+function customerName(c: NonNullable<SalesOrderDetail["customers"]>): string {
+  return `${c.first_name}${c.last_name ? ` ${c.last_name}` : ""}`.trim() || "—";
 }
 
-function matchesSearch(so: SalesOrderFull, q: string): boolean {
-  const s = q.trim().toLowerCase();
-  if (!s) return true;
-  return (
-    (so.cars?.vin ?? "").toLowerCase().includes(s) ||
-    (so.cars?.brand ?? "").toLowerCase().includes(s) ||
-    (so.cars?.model ?? "").toLowerCase().includes(s) ||
-    customerName(so).toLowerCase().includes(s) ||
-    (so.customers?.phone_primary ?? "").includes(s)
-  );
-}
-
-export default function SalesOrdersPage() {
+export default function SalesOrderDetailPage() {
+  const params = useParams();
   const router = useRouter();
-  const { appRole } = useUser();
-  const canSeePage =
-    appRole === "owner" || appRole === "assistant" || appRole === "sales_ops";
-
-  const [orders, setOrders] = useState<SalesOrderFull[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const debouncedSearch = useDebouncedValue(search, 250);
-  const [statusFilter, setStatusFilter] = useState("all");
+  const id = params.id as string;
+  const { appRole, profile } = useUser();
+  const canEdit = appRole === "owner" || appRole === "assistant" || appRole === "sales_ops" || appRole === "hybrid";
+  const canVoid = canVoidSalesOrder(profile);
 
   const supabase = createClient();
+  const [order, setOrder] = useState<SalesOrderDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [committedTradeIns, setCommittedTradeIns] = useState<CommittedTradeIn[]>([]);
 
-  async function fetchOrders() {
+  // Editable form state for the lifecycle blocks. Currency is shared
+  // across all amounts on a single order — the DB enforces this with
+  // the sales_orders_currencies_consistent CHECK (migration 078).
+  const [quoteAmount, setQuoteAmount] = useState("");
+  const [orderCurrency, setOrderCurrency] = useState("USD");
+  const [depositAmount, setDepositAmount] = useState("");
+  const [depositMethod, setDepositMethod] = useState("");
+  const [contractUrl, setContractUrl] = useState("");
+  const [deliveryNotes, setDeliveryNotes] = useState("");
+  const [plannedDelivery, setPlannedDelivery] = useState("");
+  const [voidOpen, setVoidOpen] = useState(false);
+  const [voidReason, setVoidReason] = useState("");
+  const [voidAttempted, setVoidAttempted] = useState(false);
+  const [deliverOpen, setDeliverOpen] = useState(false);
+  const [acceptOpen, setAcceptOpen] = useState(false);
+  const [clearContractOpen, setClearContractOpen] = useState(false);
+
+  const fetchOrder = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
       .from("sales_orders")
       .select(
-        `id, car_id, customer_id, status, selling_price, currency,
-         sale_date, date_bought, delivery_date, reservation_date, reserved_by, created_at,
-         cars:car_id (id, vin, brand, model, model_year, exterior_color, status),
-         customers:customer_id (id, first_name, last_name, phone_primary)`
+        `*,
+         cars:car_id (id, vin, brand, model, model_year, exterior_color),
+         customers:customer_id (id, first_name, last_name, phone_primary, email, lead_status)`
       )
-      .order("created_at", { ascending: false })
-      .limit(5000);
-
-    if (error) {
-      toast.error(formatError(error));
-      setOrders([]);
-    } else {
-      // Supabase types FK embeds as arrays by default; cast via unknown.
-      setOrders((data as unknown as SalesOrderFull[]) ?? []);
+      .eq("id", id)
+      .single();
+    if (error || !data) {
+      // A missing row comes back as a PostgREST "no rows" error (PGRST116);
+      // surface a clear message rather than the raw constraint text, and only
+      // fall back to formatError for genuine (e.g. network) failures.
+      const code = (error as { code?: string } | null)?.code;
+      const notFound = !data || code === "PGRST116";
+      toast.error(
+        notFound
+          ? "That sales order doesn't exist or was removed."
+          : formatError(error as Parameters<typeof formatError>[0])
+      );
+      router.push("/sales-orders");
+      return;
     }
+    const row = data as unknown as SalesOrderDetail;
+    setOrder(row);
+    setQuoteAmount(row.quote_amount != null ? String(row.quote_amount) : "");
+    // Single currency for the whole order. Default to whichever is set,
+    // or USD.
+    setOrderCurrency(
+      row.currency ?? row.quote_currency ?? row.deposit_currency ?? "USD"
+    );
+    setDepositAmount(row.deposit_amount != null ? String(row.deposit_amount) : "");
+    setDepositMethod(row.deposit_method ?? "");
+    setContractUrl(row.signed_contract_url ?? "");
+    setPlannedDelivery(row.delivery_date ? row.delivery_date.slice(0, 10) : "");
+
+    // Load any committed trade-ins linked to this sales order. We render
+    // these under the price card so the user can see what credit was
+    // applied. The "where status='committed'" filter is technically
+    // redundant (linked_sales_order_id is only set on commit), but it's
+    // an extra belt-and-suspenders.
+    const { data: tradeIns } = await supabase
+      .from("trade_ins")
+      .select(
+        "id, trade_in_number, vehicle_make, vehicle_model, vehicle_year, accepted_value, currency"
+      )
+      .eq("linked_sales_order_id", id)
+      .eq("status", "committed");
+    setCommittedTradeIns((tradeIns ?? []) as CommittedTradeIn[]);
+
     setLoading(false);
-  }
+  }, [id, supabase, router]);
 
   useEffect(() => {
-    if (canSeePage) fetchOrders();
-  }, [canSeePage]);
+    if (id) void fetchOrder();
+  }, [id, fetchOrder]);
 
-  const filtered = useMemo(() => {
-    return orders.filter((so) => {
-      if (!matchesSearch(so, debouncedSearch)) return false;
-      if (statusFilter !== "all" && so.status !== statusFilter) return false;
-      return true;
-    });
-  }, [orders, debouncedSearch, statusFilter]);
-
-  const totalRevenue = useMemo(
-    () =>
-      filtered
-        .filter((so) => so.status !== "cancelled" && so.selling_price)
-        .reduce((s, so) => s + (so.selling_price ?? 0), 0),
-    [filtered]
-  );
-
-  const exportColumns: ExportColumn[] = [
-    { key: "vin", header: "VIN" },
-    { key: "car", header: "Car" },
-    { key: "customer", header: "Customer" },
-    { key: "phone", header: "Phone" },
-    { key: "status", header: "Status" },
-    { key: "selling_price", header: "Selling Price", type: "number" },
-    { key: "currency", header: "Currency" },
-    { key: "sale_date", header: "Sale Date" },
-    { key: "delivery_date", header: "Delivery Date" },
-  ];
-
-  const exportData = (list: SalesOrderFull[]) =>
-    list.map((so) => ({
-      vin: so.cars?.vin ?? "",
-      car: so.cars ? `${so.cars.brand} ${so.cars.model}${so.cars.model_year ? ` (${so.cars.model_year})` : ""}` : "—",
-      customer: customerName(so),
-      phone: so.customers?.phone_primary ?? "",
-      status: so.status,
-      selling_price: so.selling_price ?? "",
-      currency: so.currency ?? "USD",
-      sale_date: so.sale_date ? new Date(so.sale_date).toLocaleDateString() : "",
-      delivery_date: so.delivery_date ? new Date(so.delivery_date).toLocaleDateString() : "",
-    }));
-
-  if (!canSeePage) {
-    return (
-      <div className="container mx-auto px-4 py-12 text-center text-muted-foreground">
-        Sales orders are restricted to owners, assistants, and sales staff.
-      </div>
-    );
+  async function patchOrder(patch: Partial<SalesOrderDetail>) {
+    setSaving(true);
+    // Strip FK-embed fields (cars/customers) before sending to UPDATE — they
+    // come from the joined select and aren't columns on sales_orders.
+    const { cars: _cars, customers: _customers, ...rest } = patch;
+    void _cars; void _customers;
+    const payload = { ...rest, updated_at: new Date().toISOString() } as
+      Database["public"]["Tables"]["sales_orders"]["Update"];
+    let result;
+    try {
+      result = await supabase.from("sales_orders").update(payload).eq("id", id);
+    } catch (e) {
+      result = { error: e } as { error: unknown };
+    }
+    setSaving(false);
+    const error = (result as { error: unknown }).error;
+    if (error) {
+      if (isLikelyOffline(error)) {
+        await enqueueSupabaseOp({
+          table: "sales_orders",
+          op: "update",
+          payload: payload as Record<string, unknown>,
+          eqColumn: "id",
+          eqValue: id as string,
+          kind: "sales-order-edit",
+        });
+        toast.success("Saved — will sync when back online");
+        // Optimistic local update so the UI reflects the edit immediately.
+        setOrder((prev) => (prev ? { ...prev, ...patch } : prev));
+        return true;
+      }
+      toast.error(formatError(error as Parameters<typeof formatError>[0]));
+      return false;
+    }
+    await fetchOrder();
+    return true;
   }
 
+  async function saveQuote() {
+    const amt = parseFloat(quoteAmount);
+    if (isNaN(amt) || amt <= 0) {
+      toast.error("Enter a positive quote amount");
+      return;
+    }
+    const wasSent = !!order?.quote_sent_at;
+    const ok = await patchOrder({
+      quote_amount: amt,
+      quote_currency: orderCurrency,
+      currency: orderCurrency,
+      quote_sent_at: order?.quote_sent_at ?? new Date().toISOString(),
+    });
+    // The button reads "Send quote" / "Update quote"; mirror that in the toast.
+    if (ok) toast.success(wasSent ? "Quote updated" : "Quote sent");
+  }
+  function markQuoteAccepted() {
+    if (!order?.quote_sent_at) {
+      toast.error("Send the quote first");
+      return;
+    }
+    // Accepting a quote is a workflow state change — confirm it first.
+    setAcceptOpen(true);
+  }
+  async function confirmQuoteAccepted() {
+    if (!order) return;
+    const patch: Partial<SalesOrderDetail> = {
+      quote_accepted_at: new Date().toISOString(),
+    };
+    // Populate the selling price from the accepted quote when it hasn't been
+    // set yet, so the Selling price card reflects the agreed amount.
+    if (order.selling_price == null && order.quote_amount != null) {
+      patch.selling_price = order.quote_amount;
+      patch.currency = order.currency ?? order.quote_currency ?? orderCurrency;
+    }
+    const ok = await patchOrder(patch);
+    if (ok) {
+      toast.success("Quote accepted");
+      setAcceptOpen(false);
+    }
+  }
+
+  async function saveDeposit() {
+    if (!order) return;
+    const amt = parseFloat(depositAmount);
+    if (isNaN(amt) || amt <= 0) {
+      toast.error("Enter a positive deposit amount");
+      return;
+    }
+    // Lifecycle guard: the DB now enforces a CHECK that
+    // deposit_paid_at requires quote_sent_at (migration 132). Show a
+    // friendlier toast here than the raw constraint violation.
+    if (!order?.quote_sent_at) {
+      toast.error("Quote must be sent first");
+      return;
+    }
+    // The quote lifecycle fills quote_amount; selling_price stays null until
+    // the order is finalised. Cap the deposit against whichever price is set,
+    // less any committed trade-in credit applied to this order.
+    const basePrice = order?.selling_price ?? order?.quote_amount ?? null;
+    const tradeInCredit = committedTradeIns.reduce(
+      (sum, t) => sum + (Number(t.accepted_value) || 0),
+      0
+    );
+    const priceCap =
+      basePrice != null && Number.isFinite(basePrice)
+        ? Math.max(0, basePrice - tradeInCredit)
+        : null;
+    if (priceCap != null && amt > priceCap) {
+      toast.error(
+        `Deposit (${amt.toLocaleString()}) cannot exceed the price after trade-in credit (${priceCap.toLocaleString()}).`
+      );
+      return;
+    }
+    // Auto-advance a draft order to 'reserved' once a deposit is recorded.
+    const willAdvance = order.status === "draft";
+    const nextStatus: SaleStatus = willAdvance ? "reserved" : order.status;
+    const ok = await patchOrder({
+      deposit_amount: amt,
+      deposit_currency: orderCurrency,
+      currency: orderCurrency,
+      deposit_method: depositMethod || null,
+      deposit_paid_at: order.deposit_paid_at ?? new Date().toISOString(),
+      status: nextStatus,
+    });
+    if (ok) {
+      toast.success(
+        willAdvance
+          ? 'Deposit recorded — order status advanced to "reserved".'
+          : "Deposit recorded"
+      );
+    }
+  }
+
+  async function saveContract() {
+    if (!order) return;
+    const trimmed = contractUrl.trim();
+    if (trimmed && !/^https?:\/\/[^\s]+$/i.test(trimmed)) {
+      toast.error("Contract URL must start with http:// or https://");
+      return;
+    }
+    // Clearing a previously-saved contract wipes the signed-at timestamp — a
+    // destructive action that shouldn't happen on a single misclick. Confirm.
+    if (!trimmed && order.signed_contract_url) {
+      setClearContractOpen(true);
+      return;
+    }
+    await writeContract(trimmed);
+  }
+
+  async function writeContract(trimmed: string) {
+    if (!order) return;
+    // Recording a signed contract advances draft/reserved orders to 'confirmed'.
+    const willAdvance =
+      !!trimmed && (order.status === "draft" || order.status === "reserved");
+    const nextStatus: SaleStatus = willAdvance ? "confirmed" : order.status;
+    const ok = await patchOrder({
+      signed_contract_url: trimmed || null,
+      contract_signed_at: trimmed ? new Date().toISOString() : null,
+      status: nextStatus,
+    });
+    if (ok) {
+      toast.success(
+        !trimmed
+          ? "Contract cleared"
+          : willAdvance
+            ? 'Contract recorded — order status advanced to "confirmed".'
+            : "Contract recorded"
+      );
+    }
+    setClearContractOpen(false);
+  }
+
+  async function savePlannedDelivery() {
+    if (!order) return;
+    const ok = await patchOrder({ delivery_date: plannedDelivery || null });
+    if (ok) toast.success(plannedDelivery ? "Planned delivery date saved" : "Planned delivery date cleared");
+  }
+
+  async function markDelivered() {
+    setSaving(true);
+    try {
+      const { error } = await supabase.rpc("complete_delivery", {
+        p_sales_order_id: id,
+        ...(deliveryNotes ? { p_notes: deliveryNotes } : {}),
+      });
+      if (error) {
+        toast.error(formatError(error));
+        return;
+      }
+      toast.success("Delivered. Customer marked as converted.");
+      setDeliverOpen(false);
+    } finally {
+      // Always refetch — even on error the RPC may have partially applied
+      // (e.g. updated the order but failed to insert the car_event row).
+      // Refetching keeps the UI honest with the DB.
+      setSaving(false);
+      await fetchOrder();
+    }
+  }
+
+  async function confirmVoidSale() {
+    if (!order) return;
+    if (!voidReason.trim()) {
+      setVoidAttempted(true);
+      toast.error("A reason is required to void a sale.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const result = await voidSalesOrder(order.id, voidReason.trim());
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      toast.success("Sale voided.");
+      setVoidOpen(false);
+      setVoidReason("");
+    } finally {
+      setSaving(false);
+      await fetchOrder();
+    }
+  }
+
+  async function changeStatus(next: SaleStatus) {
+    // Going TO 'delivered' must happen via complete_delivery() — the DB
+    // enforces (status='delivered') = (delivered_at IS NOT NULL), so a plain
+    // patch would either be blocked or leave the row in an inconsistent
+    // state. Route the user to the proper button.
+    if (next === "delivered") {
+      toast.error("Use the 'Mark delivered' button at the bottom — it runs the proper checks.");
+      return;
+    }
+    // Coming FROM 'delivered' is rejected by the DB trigger (migration 131)
+    // unless the caller is owner AND the change goes through the void path.
+    // Force users to the Void button so the audit trail is complete.
+    if (order?.status === "delivered") {
+      toast.error("Delivered sales can only be reversed via the 'Void sale' button.");
+      return;
+    }
+    const ok = await patchOrder({ status: next });
+    if (ok) toast.success(`Status: ${next}`);
+  }
+
+  if (loading || !order) {
+    return <div className="container mx-auto py-12 text-muted-foreground">Loading…</div>;
+  }
+
+  const car = order.cars;
+  const customer = order.customers;
+
+  // Lifecycle stepper state
+  const steps: { key: string; label: string; done: boolean; date?: string | null }[] = [
+    { key: "quote", label: "Quote", done: !!order.quote_sent_at, date: order.quote_sent_at },
+    { key: "accepted", label: "Accepted", done: !!order.quote_accepted_at, date: order.quote_accepted_at },
+    { key: "deposit", label: "Deposit", done: !!order.deposit_paid_at, date: order.deposit_paid_at },
+    { key: "contract", label: "Contract", done: !!order.contract_signed_at, date: order.contract_signed_at },
+    { key: "delivered", label: "Delivered", done: !!order.delivered_at, date: order.delivered_at },
+  ];
+
   return (
-    <div className="container mx-auto max-w-[1800px] space-y-6 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-xl font-semibold sm:text-2xl">Sales Orders</h1>
-          <p className="text-muted-foreground text-sm">
-            All car sales — linked to customers and payment plans
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <ExportButton
-            data={exportData(filtered)}
-            allData={exportData(orders)}
-            columns={exportColumns}
-            filename="Sales_Orders"
-            options={{
-              pageName: "Sales Orders",
-              summary: `Total: ${filtered.length} orders | Revenue (all currencies, not converted): ${totalRevenue.toLocaleString()}`,
-            }}
-            disabled={loading}
-          />
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => fetchOrders()}
-            disabled={loading}
-            data-tour-id="sales-orders-list-refresh-button"
-          >
-            <RefreshCw className={`mr-2 size-4 ${loading ? "animate-spin" : ""}`} />
-            Refresh
+    <div className="container mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
+      {/* Header */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <Button type="button" variant="ghost" size="sm" onClick={() => router.push("/sales-orders")}>
+            <ArrowLeft className="mr-2 size-4" />
+            All orders
           </Button>
+          <div>
+            <h1 className="text-xl font-semibold sm:text-2xl">
+              {car ? `${car.brand} ${car.model}` : "Sales order"}
+              {car?.model_year ? ` (${car.model_year})` : ""}
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              VIN <span className="font-mono">{car?.vin ?? "—"}</span> · created {fmtDate(order.created_at)}
+            </p>
+          </div>
         </div>
-      </div>
-
-      {/* KPI bar */}
-      <div className="grid gap-4 sm:grid-cols-3" data-tour-id="sales-orders-list-kpi-bar">
-        <Card>
-          <CardContent className="pt-4">
-            <p className="text-muted-foreground text-sm">Total orders</p>
-            <p className="text-2xl font-semibold">{filtered.length}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4">
-            <p className="text-muted-foreground text-sm">In progress</p>
-            <p className="text-2xl font-semibold">
-              {filtered.filter((s) =>
-                s.status === "draft" ||
-                s.status === "reserved" ||
-                s.status === "confirmed" ||
-                s.status === "paid"
-              ).length}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4">
-            <p className="text-muted-foreground text-sm">Revenue (USD)</p>
-            <p className="text-2xl font-semibold tabular-nums">
-              ${totalRevenue.toLocaleString()}
-            </p>
-            <p className="text-muted-foreground text-xs">
-              {(() => {
-                const priced = filtered.filter(
-                  (so) => so.status !== "cancelled" && (so.selling_price ?? 0) > 0
-                ).length;
-                const active = filtered.filter((so) => so.status !== "cancelled").length;
-                return active === 0
-                  ? "No active orders in view."
-                  : priced === active
-                  ? `Sum across ${priced} active orders`
-                  : `${priced} of ${active} active orders have a price set`;
-              })()}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card data-tour-id="sales-orders-list-table-panel">
-        <CardHeader>
-          <CardTitle>All orders</CardTitle>
-          <CardDescription>
-            {filtered.length} of {orders.length} orders
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Filters */}
-          <div className="flex flex-wrap gap-3">
-            <Input
-              placeholder="Search VIN, car, customer, phone…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="min-h-11 max-w-xs text-base sm:text-sm"
-              data-tour-id="sales-orders-list-search-input"
-            />
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[160px]" data-tour-id="sales-orders-list-filter-status">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
+        <div className="flex items-center gap-2">
+          <Badge className={STATUS_COLORS[order.status]}>{order.status}</Badge>
+          {canEdit && order.status !== "delivered" && order.status !== "cancelled" && (
+            <Select value={order.status} onValueChange={(v) => changeStatus(v as SaleStatus)}>
+              <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All statuses</SelectItem>
                 <SelectItem value="draft">Draft</SelectItem>
                 <SelectItem value="reserved">Reserved</SelectItem>
                 <SelectItem value="confirmed">Confirmed</SelectItem>
                 <SelectItem value="paid">Paid</SelectItem>
-                <SelectItem value="delivered">Delivered</SelectItem>
+                {/* "Delivered" intentionally NOT a manual option — use the
+                    "Mark delivered" button so complete_delivery() runs its
+                    quote/deposit/contract checks. */}
                 <SelectItem value="cancelled">Cancelled</SelectItem>
               </SelectContent>
             </Select>
-          </div>
+          )}
+        </div>
+      </div>
 
-          {loading ? (
-            <div className="overflow-hidden rounded-lg border border-border/50">
-              <div className="space-y-2 p-4">
-                <Skeleton className="h-8 w-full" />
-                {Array.from({ length: 8 }).map((_, i) => (
-                  <Skeleton key={i} className="h-12 w-full" />
-                ))}
-              </div>
-            </div>
-          ) : filtered.length === 0 ? (
-            orders.length === 0 ? (
-              <div className="flex flex-col items-center gap-2 py-10 text-center">
-                <p className="text-muted-foreground">No sales orders yet.</p>
-                <p className="text-muted-foreground text-xs">
-                  Orders are created when a customer reserves or buys a car.
-                </p>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center gap-3 py-10 text-center">
-                <p className="text-muted-foreground">No sales orders match your filters.</p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setSearch("");
-                    setStatusFilter("all");
-                  }}
+      {/* Lifecycle stepper */}
+      <Card data-tour-id="sales-order-detail-stepper">
+        <CardContent className="pt-6">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch]">
+            {steps.map((s, i) => (
+              <div key={s.key} className="flex shrink-0 items-center gap-2">
+                <div
+                  className={`flex h-8 min-w-32 items-center gap-2 rounded-full border px-3 text-sm ${
+                    s.done
+                      ? "border-green-500/50 bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300"
+                      : "border-border bg-muted text-muted-foreground"
+                  }`}
                 >
-                  Clear filters
-                </Button>
+                  {s.done ? <CheckCircle2 className="size-4" /> : <span className="size-4 rounded-full border border-current" />}
+                  <span className="font-medium">{s.label}</span>
+                  {s.date && <span className="text-xs opacity-70">{fmtDate(s.date)}</span>}
+                </div>
+                {i < steps.length - 1 && <span className="text-muted-foreground">→</span>}
               </div>
-            )
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-6 md:grid-cols-2">
+        {/* Customer */}
+        <Card>
+          <CardHeader><CardTitle className="text-base">Customer</CardTitle></CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            {customer ? (
+              <>
+                <div>
+                  <Link
+                    href={`/customers/${customer.id}`}
+                    className="font-medium text-primary hover:underline"
+                  >
+                    {customerName(customer)}
+                  </Link>
+                </div>
+                {customer.phone_primary && <div className="text-muted-foreground">📞 {customer.phone_primary}</div>}
+                {customer.email && <div className="text-muted-foreground">✉ {customer.email}</div>}
+                {customer.lead_status && (
+                  <div>
+                    <Badge variant="outline" className="text-xs">Lead: {customer.lead_status}</Badge>
+                  </div>
+                )}
+              </>
+            ) : (
+              <p className="text-muted-foreground">No customer linked.</p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Selling price */}
+        <Card>
+          <CardHeader><CardTitle className="text-base">Selling price</CardTitle></CardHeader>
+          <CardContent className="text-sm">
+            <p className="text-2xl font-semibold tabular-nums">
+              {fmtMoney(order.selling_price, order.currency)}
+            </p>
+            {committedTradeIns.length > 0 && (() => {
+              const tradeInTotal = committedTradeIns.reduce(
+                (sum, t) => sum + (Number(t.accepted_value) || 0),
+                0
+              );
+              const net =
+                order.selling_price != null
+                  ? Number(order.selling_price) - tradeInTotal
+                  : null;
+              return (
+                <div className="mt-2 space-y-0.5 border-t pt-2">
+                  <p className="text-muted-foreground">
+                    Trade-in credit:{" "}
+                    <span className="font-medium text-foreground tabular-nums">
+                      −{fmtMoney(tradeInTotal, order.currency)}
+                    </span>
+                  </p>
+                  {net != null && (
+                    <p className="text-sm font-semibold tabular-nums">
+                      Net after trade-in: {fmtMoney(net, order.currency)}
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
+            <p className="mt-2 text-muted-foreground">Sale date: {fmtDate(order.sale_date)}</p>
+            <p className="text-muted-foreground">Planned delivery: {fmtDate(order.delivery_date)}</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Committed trade-ins — what credit is being applied to this sale. */}
+      {committedTradeIns.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Repeat className="size-4" /> Trade-ins applied
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {committedTradeIns.map((t) => {
+              const vehicle =
+                [t.vehicle_year, t.vehicle_make, t.vehicle_model]
+                  .filter(Boolean)
+                  .join(" ") || "—";
+              return (
+                <Link
+                  key={t.id}
+                  href={`/trade-ins/${t.id}`}
+                  className="flex items-center justify-between rounded-md border p-3 text-sm transition hover:bg-muted"
+                >
+                  <div>
+                    <div className="font-medium text-primary">
+                      {t.trade_in_number}
+                    </div>
+                    <div className="text-muted-foreground">{vehicle}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-semibold tabular-nums">
+                      {fmtMoney(t.accepted_value, t.currency)}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      Accepted value
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Quote */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <FileText className="size-4" /> Quote
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div>
+              <Label htmlFor="quote-amount">Amount</Label>
+              <Input
+                id="quote-amount" type="number" inputMode="decimal" min={0} step="any"
+                value={quoteAmount} onChange={(e) => setQuoteAmount(e.target.value)}
+                disabled={!canEdit}
+              />
+            </div>
+            <div>
+              <Label htmlFor="quote-currency">
+                Currency
+                <FieldHint text="The currency for this whole order — picking it here applies to the quote, deposit, and contract." />
+              </Label>
+              <Select value={orderCurrency} onValueChange={setOrderCurrency} disabled={!canEdit}>
+                <SelectTrigger id="quote-currency"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {CCY_OPTIONS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-end gap-2">
+              <Button onClick={saveQuote} disabled={!canEdit || saving} className="flex-1" data-tour-id="sales-order-detail-save-quote">
+                {saving && <Loader2 className="mr-2 size-4 animate-spin" aria-hidden />}
+                {saving ? "Saving…" : order.quote_sent_at ? "Update quote" : "Send quote"}
+              </Button>
+              {order.quote_sent_at && !order.quote_accepted_at && (
+                <Button variant="outline" onClick={markQuoteAccepted} disabled={!canEdit || saving}>
+                  Mark accepted
+                </Button>
+              )}
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Sent: {fmtDT(order.quote_sent_at)} · Accepted: {fmtDT(order.quote_accepted_at)}
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Deposit */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Receipt className="size-4" /> Deposit
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid gap-3 sm:grid-cols-4">
+            <div>
+              <Label htmlFor="deposit-amount">Amount</Label>
+              <Input
+                id="deposit-amount" type="number" inputMode="decimal" min={0} step="any"
+                value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)}
+                disabled={!canEdit}
+              />
+            </div>
+            <div>
+              <Label htmlFor="deposit-currency">Currency</Label>
+              <Select value={orderCurrency} onValueChange={setOrderCurrency} disabled={!canEdit}>
+                <SelectTrigger id="deposit-currency"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {CCY_OPTIONS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="deposit-method">
+                Method
+                <FieldHint text="How the customer paid the deposit — cash, bank wire, or card." />
+              </Label>
+              <Input
+                id="deposit-method" placeholder="cash / wire / card"
+                value={depositMethod} onChange={(e) => setDepositMethod(e.target.value)}
+                disabled={!canEdit}
+              />
+            </div>
+            <div className="flex items-end">
+              <Button onClick={saveDeposit} disabled={!canEdit || saving} className="w-full" data-tour-id="sales-order-detail-save-deposit">
+                {saving && <Loader2 className="mr-2 size-4 animate-spin" aria-hidden />}
+                {saving ? "Saving…" : order.deposit_paid_at ? "Update deposit" : "Mark paid"}
+              </Button>
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Paid at: {fmtDT(order.deposit_paid_at)}
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Contract */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <FileText className="size-4" /> Signed contract
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div>
+            <Label htmlFor="contract-url">
+              Contract URL
+              <FieldHint text="A link to the scanned, signed contract document — stored online so anyone can open it." />
+            </Label>
+            <Input
+              id="contract-url"
+              type="url"
+              inputMode="url"
+              placeholder="https://… (Drive / Dropbox / Supabase storage link)"
+              value={contractUrl}
+              onChange={(e) => setContractUrl(e.target.value)}
+              disabled={!canEdit}
+            />
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs text-muted-foreground">
+              Signed at: {fmtDT(order.contract_signed_at)}
+            </p>
+            <Button onClick={saveContract} disabled={!canEdit || saving} variant="outline">
+              {order.signed_contract_url ? "Update" : "Save"}
+            </Button>
+          </div>
+          {order.signed_contract_url && (
+            <a
+              href={order.signed_contract_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block text-sm text-primary hover:underline"
+            >
+              Open contract ↗
+            </a>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Delivery */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Truck className="size-4" /> Delivery
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {order.delivered_at ? (
+            <div className="rounded-md border border-green-500/30 bg-green-50 p-3 text-sm dark:bg-green-950">
+              ✓ Delivered on {fmtDT(order.delivered_at)}.
+              {order.delivery_notes && (
+                <p className="mt-1 text-muted-foreground">Notes: {order.delivery_notes}</p>
+              )}
+            </div>
           ) : (
             <>
-              {/* Mobile: card list (≤640px) */}
-              <ul className="flex flex-col gap-2 sm:hidden">
-                {filtered.map((so) => {
-                  const car = so.cars;
-                  const name = customerName(so);
-                  return (
-                    <li
-                      key={so.id}
-                      className="cursor-pointer rounded-lg border border-border/50 bg-card p-3 active:bg-muted/40"
-                      onClick={() => router.push(`/sales-orders/${so.id}`)}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate font-medium">
-                            {car
-                              ? `${car.brand} ${car.model}${car.model_year ? ` (${car.model_year})` : ""}`
-                              : "—"}
-                          </p>
-                          <p className="truncate font-mono text-xs text-muted-foreground">
-                            {car?.vin ?? "—"}
-                          </p>
-                        </div>
-                        <Badge className={STATUS_COLORS[so.status] ?? "bg-muted text-muted-foreground"}>
-                          {so.status}
-                        </Badge>
-                      </div>
-                      <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
-                        <div className="min-w-0">
-                          <dt className="text-muted-foreground">Customer</dt>
-                          <dd className="truncate">
-                            {so.customer_id ? (
-                              <button
-                                type="button"
-                                className="text-primary hover:underline"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  router.push(`/customers/${so.customer_id}`);
-                                }}
-                              >
-                                {name}
-                              </button>
-                            ) : (
-                              <span className="text-muted-foreground">{name}</span>
-                            )}
-                          </dd>
-                        </div>
-                        <div className="min-w-0">
-                          <dt className="text-muted-foreground">Phone</dt>
-                          <dd className="truncate text-muted-foreground">
-                            {so.customers?.phone_primary ?? "—"}
-                          </dd>
-                        </div>
-                        <div className="min-w-0">
-                          <dt className="text-muted-foreground">Price</dt>
-                          <dd className="truncate tabular-nums">
-                            {so.selling_price != null
-                              ? `${Number(so.selling_price).toLocaleString()} ${so.currency ?? "USD"}`
-                              : "—"}
-                          </dd>
-                        </div>
-                        <div className="min-w-0">
-                          <dt className="text-muted-foreground">Sale date</dt>
-                          <dd className="truncate text-muted-foreground">
-                            {so.sale_date
-                              ? new Date(so.sale_date).toLocaleDateString()
-                              : so.date_bought
-                              ? new Date(so.date_bought).toLocaleDateString()
-                              : "—"}
-                          </dd>
-                        </div>
-                        <div className="col-span-2 min-w-0">
-                          <dt className="text-muted-foreground">Delivery</dt>
-                          <dd className="truncate text-muted-foreground">
-                            {so.delivery_date
-                              ? new Date(so.delivery_date).toLocaleDateString()
-                              : "—"}
-                          </dd>
-                        </div>
-                      </dl>
-                    </li>
-                  );
-                })}
-              </ul>
-
-              {/* Desktop / tablet: table (>640px) */}
-              <div className="hidden overflow-x-auto rounded-lg border border-border/50 sm:block">
-                <Table className="min-w-[900px] w-full">
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Car</TableHead>
-                      <TableHead>VIN</TableHead>
-                      <TableHead>Customer</TableHead>
-                      <TableHead>Phone</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Price</TableHead>
-                      <TableHead>Sale Date</TableHead>
-                      <TableHead>Delivery</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filtered.map((so) => {
-                      const car = so.cars;
-                      const name = customerName(so);
-                      return (
-                        <TableRow
-                          key={so.id}
-                          className="cursor-pointer hover:bg-muted/40"
-                          onClick={() => router.push(`/sales-orders/${so.id}`)}
-                        >
-                          <TableCell className="font-medium">
-                            {car
-                              ? `${car.brand} ${car.model}${car.model_year ? ` (${car.model_year})` : ""}`
-                              : "—"}
-                          </TableCell>
-                          <TableCell className="font-mono text-xs text-muted-foreground">
-                            {car?.vin ?? "—"}
-                          </TableCell>
-                          <TableCell>
-                            {so.customer_id ? (
-                              <button
-                                type="button"
-                                className="text-primary hover:underline"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  router.push(`/customers/${so.customer_id}`);
-                                }}
-                              >
-                                {name}
-                              </button>
-                            ) : (
-                              <span className="text-muted-foreground">{name}</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {so.customers?.phone_primary ?? "—"}
-                          </TableCell>
-                          <TableCell>
-                            <Badge className={STATUS_COLORS[so.status] ?? "bg-muted text-muted-foreground"}>
-                              {so.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            {so.selling_price != null
-                              ? `${Number(so.selling_price).toLocaleString()} ${so.currency ?? "USD"}`
-                              : "—"}
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {so.sale_date
-                              ? new Date(so.sale_date).toLocaleDateString()
-                              : so.date_bought
-                              ? new Date(so.date_bought).toLocaleDateString()
-                              : "—"}
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {so.delivery_date
-                              ? new Date(so.delivery_date).toLocaleDateString()
-                              : "—"}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
+              <div>
+                <Label htmlFor="planned-delivery">Planned delivery date</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="planned-delivery"
+                    type="date"
+                    value={plannedDelivery}
+                    onChange={(e) => setPlannedDelivery(e.target.value)}
+                    disabled={!canEdit}
+                    className="max-w-[200px]"
+                  />
+                  <Button
+                    variant="outline"
+                    onClick={savePlannedDelivery}
+                    disabled={!canEdit || saving || plannedDelivery === (order.delivery_date?.slice(0, 10) ?? "")}
+                  >
+                    Save date
+                  </Button>
+                </div>
               </div>
+              <div>
+                <Label htmlFor="delivery-notes">Delivery notes (optional)</Label>
+                <Textarea
+                  id="delivery-notes"
+                  placeholder="Plates issued, keys handed over, walkthrough completed…"
+                  value={deliveryNotes}
+                  onChange={(e) => setDeliveryNotes(e.target.value)}
+                  rows={2}
+                  disabled={!canEdit}
+                />
+              </div>
+              <Button
+                onClick={() => setDeliverOpen(true)}
+                disabled={!canEdit || saving}
+              >
+                Mark delivered
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                This stamps delivery time, advances order status to <span className="font-mono">delivered</span>,
+                and sets the customer&apos;s lead status to <span className="font-mono">converted</span>.
+              </p>
             </>
           )}
         </CardContent>
       </Card>
+
+      {/* Void notice — only when the sale was voided */}
+      {order.status === "cancelled" && order.void_at && (
+        <Card className="border-red-300/60 bg-red-50/60 dark:border-red-900/60 dark:bg-red-950/20">
+          <CardHeader>
+            <CardTitle className="text-base text-red-700 dark:text-red-300">Sale voided</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-1 text-sm">
+            <p>Voided on {fmtDT(order.void_at)}.</p>
+            {order.void_reason && (
+              <p className="text-muted-foreground">
+                <span className="font-medium">Reason:</span> {order.void_reason}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Owner-only void action — for delivered or in-progress sales that
+          need to be reversed (return, cancel, error). */}
+      {canVoid && order.status !== "cancelled" && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Reverse this sale</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <p className="text-muted-foreground">
+              Owner-only. Cancels the sale, returns the car to inventory, and
+              reverts the customer&apos;s lead status if they were auto-converted.
+            </p>
+            <Button variant="destructive" onClick={() => setVoidOpen(true)} disabled={saving} data-tour-id="sales-order-detail-void-button">
+              Void sale…
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Notes */}
+      {order.notes && (
+        <Card>
+          <CardHeader><CardTitle className="text-base">Notes</CardTitle></CardHeader>
+          <CardContent className="text-sm whitespace-pre-wrap">{order.notes}</CardContent>
+        </Card>
+      )}
+
+      {/* Payment plan link */}
+      {order.customer_id && (
+        <Card>
+          <CardHeader><CardTitle className="text-base">Payment plan</CardTitle></CardHeader>
+          <CardContent>
+            <Link
+              href={`/installments?customer=${order.customer_id}`}
+              className="text-sm text-primary hover:underline"
+            >
+              View / create payment plan for this customer →
+            </Link>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Void dialog — replaces the old window.prompt(). Owner-only access
+          is still enforced by the void_sales_order RPC; this just gives a
+          properly-styled, accessible modal for the reason. */}
+      <Dialog
+        open={voidOpen}
+        onOpenChange={(open) => {
+          setVoidOpen(open);
+          if (!open) {
+            setVoidReason("");
+            setVoidAttempted(false);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Void this sale?</DialogTitle>
+            <DialogDescription>
+              The car returns to inventory and the customer&apos;s lead status
+              reverts from &quot;converted&quot; back to &quot;interested&quot;. The void is
+              recorded in the audit log. A reason is required.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <label
+              htmlFor="void-reason"
+              className="text-sm font-medium leading-none"
+            >
+              Reason
+            </label>
+            <Textarea
+              id="void-reason"
+              autoFocus
+              rows={3}
+              placeholder="e.g. Customer changed their mind; returned within 24h."
+              value={voidReason}
+              onChange={(e) => {
+                setVoidReason(e.target.value);
+                if (e.target.value.trim()) setVoidAttempted(false);
+              }}
+              aria-invalid={voidAttempted && !voidReason.trim()}
+              className={voidAttempted && !voidReason.trim() ? "border-destructive focus-visible:ring-destructive" : undefined}
+            />
+            {voidAttempted && !voidReason.trim() && (
+              <p className="text-sm text-destructive">A reason is required to void a sale.</p>
+            )}
+          </div>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setVoidOpen(false)}
+              disabled={saving}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmVoidSale}
+              disabled={saving}
+            >
+              {saving && <Loader2 className="mr-2 size-4 animate-spin" aria-hidden />}
+              Void sale
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delivery confirmation — replaces the old window.confirm(). Marking
+          delivered is irreversible and auto-converts the customer. */}
+      <Dialog open={deliverOpen} onOpenChange={(open) => !saving && setDeliverOpen(open)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Mark this sale as delivered?</DialogTitle>
+            <DialogDescription>
+              This is the final step. It stamps the delivery time, advances the
+              order status to <span className="font-mono">delivered</span>, and
+              sets the customer&apos;s lead status to{" "}
+              <span className="font-mono">converted</span>. It can only be
+              reversed via the &quot;Void sale&quot; action.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setDeliverOpen(false)}
+              disabled={saving}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={markDelivered}
+              disabled={saving}
+            >
+              {saving && <Loader2 className="mr-2 size-4 animate-spin" aria-hidden />}
+              Mark delivered
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Mark-accepted confirmation — accepting a quote is a workflow change. */}
+      <Dialog open={acceptOpen} onOpenChange={(o) => !saving && setAcceptOpen(o)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Was this quote accepted by the customer?</DialogTitle>
+            <DialogDescription>
+              This records the acceptance time
+              {order.selling_price == null && order.quote_amount != null
+                ? " and sets the selling price from the quoted amount."
+                : "."}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button variant="outline" onClick={() => setAcceptOpen(false)} disabled={saving}>
+              Cancel
+            </Button>
+            <Button onClick={confirmQuoteAccepted} disabled={saving}>
+              {saving && <Loader2 className="mr-2 size-4 animate-spin" aria-hidden />}
+              Yes, mark accepted
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Clear-contract confirmation — guards against wiping a signed contract. */}
+      <Dialog open={clearContractOpen} onOpenChange={(o) => !saving && setClearContractOpen(o)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Remove the signed contract?</DialogTitle>
+            <DialogDescription>
+              The contract URL is empty, so saving will clear the stored contract
+              link and its signed-at timestamp. This can&apos;t be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button variant="outline" onClick={() => setClearContractOpen(false)} disabled={saving}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={() => writeContract("")} disabled={saving}>
+              {saving && <Loader2 className="mr-2 size-4 animate-spin" aria-hidden />}
+              Clear contract
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
