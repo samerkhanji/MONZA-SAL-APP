@@ -200,9 +200,26 @@ export default function OrderedCarsPage() {
         c.vin.toLowerCase().includes(q) ||
         c.brand.toLowerCase().includes(q) ||
         c.model.toLowerCase().includes(q) ||
+        String(c.model_year ?? "").toLowerCase().includes(q) ||
         (c.shipment_code ?? "").toLowerCase().includes(q)
     );
   }, [cars, query]);
+
+  // Same search input filters the Awaiting PDI section too. Previously the
+  // search only narrowed the "Cars on order" table, which surprised users who
+  // typed a VIN expecting it to find the matching just-arrived car here.
+  const filteredAwaitingPdi = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return awaitingPdi;
+    return awaitingPdi.filter(
+      (c) =>
+        c.vin.toLowerCase().includes(q) ||
+        c.brand.toLowerCase().includes(q) ||
+        c.model.toLowerCase().includes(q) ||
+        String(c.model_year ?? "").toLowerCase().includes(q) ||
+        (c.pdi_status ?? "").toLowerCase().includes(q)
+    );
+  }, [awaitingPdi, query]);
 
   function resetForm() {
     setVin("");
@@ -395,7 +412,10 @@ export default function OrderedCarsPage() {
       <div className="relative">
         <Search className="text-muted-foreground pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2" />
         <Input
-          placeholder="Search by VIN, brand, model, shipment code…"
+          id="ordered-cars-search"
+          name="ordered-cars-search"
+          data-tour-id="ordered-cars-search"
+          placeholder="Search by VIN, brand, model, year, shipment code…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           className="h-10 pl-10"
@@ -497,9 +517,11 @@ export default function OrderedCarsPage() {
                   <Skeleton key={i} className="h-12 w-full" />
                 ))}
               </div>
-            ) : awaitingPdi.length === 0 ? (
+            ) : filteredAwaitingPdi.length === 0 ? (
               <p className="text-muted-foreground p-8 text-center text-sm">
-                No cars are waiting for a PDI check.
+                {awaitingPdi.length === 0
+                  ? "No cars are waiting for a PDI check."
+                  : "No PDI-pending cars match the search."}
               </p>
             ) : (
               <div className="overflow-x-auto">
@@ -514,7 +536,7 @@ export default function OrderedCarsPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-border divide-y">
-                    {awaitingPdi.map((c) => (
+                    {filteredAwaitingPdi.map((c) => (
                       <tr key={c.id} className="hover:bg-muted/50">
                         <td
                           className="cursor-pointer px-3 py-2 font-mono"

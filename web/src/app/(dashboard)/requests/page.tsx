@@ -86,6 +86,29 @@ const OWNER_SEND_TO_MAP: Record<string, string> = {
   samer: "samer",
 };
 
+/**
+ * Normalizes a value coming from an <input type="date"> change event.
+ *
+ * Browsers normally emit either "" or a well-formed "YYYY-MM-DD" string when
+ * the user finishes editing a date input. A handful of mobile keyboards /
+ * IMEs and Safari (in some locales) emit partial strings or, worse, a
+ * year-segment value that's longer than four digits (e.g. typing "2026"
+ * while the input already holds a year produces "22026"). Storing that as
+ * state and then writing it back as `value` keeps the input stuck on the
+ * malformed value. We clamp anything that isn't a valid YYYY-MM-DD back
+ * down to either the four-digit year prefix or empty string so the browser
+ * resets cleanly on the next keystroke.
+ */
+function normalizeDateInputValue(value: string): string {
+  if (!value) return "";
+  // Fully-formed YYYY-MM-DD is the happy path.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  // A leading year on its own is acceptable while the user is still typing.
+  const yearOnly = value.match(/^(\d{4})/);
+  if (yearOnly) return yearOnly[1];
+  return "";
+}
+
 function getSendToLabel(r: RequestWithProfiles): string {
   if (r.send_to_user?.full_name) return r.send_to_user.full_name;
   if (r.send_to && OWNER_SEND_TO_MAP[r.send_to]) {
@@ -787,18 +810,24 @@ export default function RequestCenterPage() {
           </Select>
         )}
         <Input
+          id="request-date-from"
+          name="request-date-from"
           type="date"
           value={dateFromFilter}
-          onChange={(e) => setDateFromFilter(e.target.value)}
+          onChange={(e) => setDateFromFilter(normalizeDateInputValue(e.target.value))}
           className="h-10 w-[140px]"
           placeholder="From"
+          aria-label="Filter from date"
         />
         <Input
+          id="request-date-to"
+          name="request-date-to"
           type="date"
           value={dateToFilter}
-          onChange={(e) => setDateToFilter(e.target.value)}
+          onChange={(e) => setDateToFilter(normalizeDateInputValue(e.target.value))}
           className="h-10 w-[140px]"
           placeholder="To"
+          aria-label="Filter to date"
         />
         <Select value={sortBy} onValueChange={(v) => setSortBy(v as "date" | "priority" | "status")}>
           <SelectTrigger id="request-sort-by" className="h-10 w-[180px]">
@@ -1219,8 +1248,17 @@ export default function RequestCenterPage() {
                   </div>
                 )}
 
-              {(appRole === "owner") &&
-                detailOpen.status === "awaiting_approval" && (
+              {/* Owners can act on any open request — including ones they
+                  themselves submitted. The previous gate only allowed
+                  "awaiting_approval", which silently hid actions when an
+                  owner sent a request to an assistant (status="submitted")
+                  or when the request was bounced back ("needs_more_info"),
+                  leaving the owner without a way to approve / reject /
+                  comment from the same dialog. */}
+              {appRole === "owner" &&
+                (detailOpen.status === "awaiting_approval" ||
+                  detailOpen.status === "submitted" ||
+                  detailOpen.status === "needs_more_info") && (
                   <div className="space-y-4 border-t pt-4">
                     <h4 className="font-medium">Management Actions</h4>
                     <div>
