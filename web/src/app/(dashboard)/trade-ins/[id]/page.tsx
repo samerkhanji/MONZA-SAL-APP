@@ -100,6 +100,15 @@ const fmt = (n: number | null, c = "USD") =>
     ? "—"
     : new Intl.NumberFormat("en-US", { style: "currency", currency: c, maximumFractionDigits: 2 }).format(Number(n));
 
+// Sanity caps — friendly client-side limits, comfortably below the DB numeric
+// overflow. The company operates in USD (migration 158).
+const MAX_TRADE_IN_VALUE = 100_000_000;
+const MAX_ISSUE_COST = 1_000_000;
+
+// Inspection issues are part of the audit trail — only editable while the
+// trade-in is still being worked (before owner approval).
+const ISSUE_EDITABLE_STATUSES = ["provisional", "inspecting"];
+
 export default function TradeInDetailPage() {
   const params = useParams();
   const id = String(params?.id ?? "");
@@ -124,6 +133,8 @@ export default function TradeInDetailPage() {
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [issueToDelete, setIssueToDelete] = useState<Issue | null>(null);
+  const [deletingIssue, setDeletingIssue] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -157,6 +168,26 @@ export default function TradeInDetailPage() {
     if (error) return toast.error(formatError(error));
     toast.success("Inspection started");
     void load();
+  }
+
+  async function confirmDeleteIssue() {
+    if (!issueToDelete) return;
+    setDeletingIssue(true);
+    try {
+      const { error } = await supabase
+        .from("trade_in_issues")
+        .delete()
+        .eq("id", issueToDelete.id);
+      if (error) {
+        toast.error(formatError(error));
+        return;
+      }
+      toast.success("Issue removed");
+      setIssueToDelete(null);
+      await load();
+    } finally {
+      setDeletingIssue(false);
+    }
   }
 
   async function cancel() {
@@ -216,7 +247,9 @@ export default function TradeInDetailPage() {
     void load();
   }
 
-  if (loading) {
+  // Only show the full-page skeleton on the first load. Refetches after an
+  // action keep the existing content on screen (no jarring blank flash).
+  if (loading && !t) {
     return (
       <div className="container space-y-3 py-6">
         <Skeleton className="h-8 w-48" />
@@ -346,16 +379,13 @@ export default function TradeInDetailPage() {
                   </div>
                   <div className="text-right">
                     <span className="font-mono text-xs">{fmt(i.estimated_cost, t.currency)}</span>
-                    {canGarage && (
+                    {canGarage && ISSUE_EDITABLE_STATUSES.includes(t.status) && (
                       <Button
                         size="icon-xs"
                         variant="ghost"
                         className="ml-1"
-                        onClick={async () => {
-                          const { error } = await supabase.from("trade_in_issues").delete().eq("id", i.id);
-                          if (error) return toast.error(formatError(error));
-                          void load();
-                        }}
+                        aria-label="Remove issue"
+                        onClick={() => setIssueToDelete(i)}
                       >
                         <Trash2 className="size-3.5" />
                       </Button>
@@ -540,6 +570,33 @@ export default function TradeInDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete-issue confirmation — destructive, so confirm first. */}
+      <Dialog
+        open={issueToDelete !== null}
+        onOpenChange={(v) => {
+          if (deletingIssue) return;
+          if (!v) setIssueToDelete(null);
+        }}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Remove this inspection issue?</DialogTitle>
+            <DialogDescription>
+              {issueToDelete ? `"${issueToDelete.description}" will be permanently removed. ` : ""}
+              This can&apos;t be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIssueToDelete(null)} disabled={deletingIssue}>
+              Keep issue
+            </Button>
+            <Button variant="destructive" onClick={() => void confirmDeleteIssue()} disabled={deletingIssue}>
+              {deletingIssue ? "Removing…" : "Remove issue"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -550,8 +607,19 @@ function AddIssueForm({ tradeInId, onAdded }: { tradeInId: string; onAdded: () =
   const [severity, setSeverity] = useState("minor");
   const [cost, setCost] = useState("");
   const [busy, setBusy] = useState(false);
+  const [attempted, setAttempted] = useState(false);
+  const missingDescription = !description.trim();
   async function add() {
-    if (!description.trim()) return toast.error("Description required");
+    if (missingDescription) {
+      setAttempted(true);
+      return toast.error("Issue description is required.");
+    }
+    if (cost.trim()) {
+      const cnum = Number(cost);
+      if (!Number.isFinite(cnum) || cnum < 0) return toast.error("Est. cost must be ≥ 0");
+      if (cnum > MAX_ISSUE_COST)
+        return toast.error(`Est. cost can't exceed ${fmt(MAX_ISSUE_COST)}`);
+    }
     setBusy(true);
     const { data: u } = await supabase.auth.getUser();
     const { error } = await supabase.from("trade_in_issues").insert({
@@ -565,11 +633,26 @@ function AddIssueForm({ tradeInId, onAdded }: { tradeInId: string; onAdded: () =
     if (error) return toast.error(formatError(error));
     setDescription("");
     setCost("");
+    setAttempted(false);
     onAdded();
   }
   return (
     <div className="bg-muted/30 grid gap-2 rounded-md border p-3 sm:grid-cols-4">
-      <Input placeholder="Issue description *" value={description} onChange={(e) => setDescription(e.target.value)} className="sm:col-span-2" />
+      <div className="space-y-1 sm:col-span-2">
+        <Input
+          placeholder="Issue description *"
+          value={description}
+          onChange={(e) => {
+            setDescription(e.target.value);
+            if (e.target.value.trim()) setAttempted(false);
+          }}
+          aria-invalid={attempted && missingDescription}
+          className={attempted && missingDescription ? "border-destructive focus-visible:ring-destructive" : undefined}
+        />
+        {attempted && missingDescription && (
+          <p className="text-xs text-destructive">Issue description is required.</p>
+        )}
+      </div>
       <Select value={severity} onValueChange={setSeverity}>
         <SelectTrigger><SelectValue /></SelectTrigger>
         <SelectContent>
@@ -579,9 +662,9 @@ function AddIssueForm({ tradeInId, onAdded }: { tradeInId: string; onAdded: () =
           <SelectItem value="safety">Safety</SelectItem>
         </SelectContent>
       </Select>
-      <Input type="number" placeholder="Est. cost" value={cost} onChange={(e) => setCost(e.target.value)} />
+      <Input type="number" min="0" max={MAX_ISSUE_COST} placeholder="Est. cost" value={cost} onChange={(e) => setCost(e.target.value)} />
       <div className="sm:col-span-4 flex justify-end">
-        <Button size="sm" onClick={() => void add()} disabled={busy || !description.trim()}>
+        <Button size="sm" onClick={() => void add()} disabled={busy}>
           <Plus className="mr-1 size-3.5" /> Add issue
         </Button>
       </div>
@@ -620,6 +703,14 @@ function InspectDialog({
   async function submit() {
     const r = Number(recommended);
     if (!Number.isFinite(r) || r < 0) return toast.error("Recommended value must be ≥ 0");
+    if (r > MAX_TRADE_IN_VALUE)
+      return toast.error(`Recommended value can't exceed ${fmt(MAX_TRADE_IN_VALUE)}`);
+    if (repairCost.trim()) {
+      const rc = Number(repairCost);
+      if (!Number.isFinite(rc) || rc < 0) return toast.error("Estimated repair cost must be ≥ 0");
+      if (rc > MAX_ISSUE_COST)
+        return toast.error(`Estimated repair cost can't exceed ${fmt(MAX_ISSUE_COST)}`);
+    }
     setBusy(true);
     const trimmedNotes = notes.trim();
     const { error } = await supabase.rpc("complete_trade_in_inspection", {
@@ -666,11 +757,11 @@ function InspectDialog({
           </div>
           <div className="space-y-1">
             <Label>Estimated repair cost</Label>
-            <Input type="number" min="0" step="0.01" value={repairCost} onChange={(e) => setRepairCost(e.target.value)} />
+            <Input type="number" min="0" max={MAX_ISSUE_COST} step="0.01" value={repairCost} onChange={(e) => setRepairCost(e.target.value)} />
           </div>
           <div className="space-y-1">
             <Label>Recommended value *</Label>
-            <Input type="number" min="0" step="0.01" value={recommended} onChange={(e) => setRecommended(e.target.value)} />
+            <Input type="number" min="0" max={MAX_TRADE_IN_VALUE} step="0.01" value={recommended} onChange={(e) => setRecommended(e.target.value)} />
           </div>
           <div className="space-y-1 sm:col-span-2">
             <Label>Inspection notes</Label>
@@ -707,8 +798,11 @@ function ApproveDialog({
     setValue(tradeIn.recommended_value != null ? String(tradeIn.recommended_value) : "");
   }, [open, tradeIn]);
   async function submit() {
+    if (!value.trim()) return toast.error("Accepted value is required.");
     const v = Number(value);
-    if (!Number.isFinite(v) || v < 0) return toast.error("Accepted value must be ≥ 0");
+    if (!Number.isFinite(v) || v <= 0) return toast.error("Accepted value must be greater than 0.");
+    if (v > MAX_TRADE_IN_VALUE)
+      return toast.error(`Accepted value can't exceed ${fmt(MAX_TRADE_IN_VALUE)}.`);
     setBusy(true);
     const { error } = await supabase.rpc("approve_trade_in", {
       p_trade_in_id: tradeIn.id,
@@ -742,7 +836,7 @@ function ApproveDialog({
           </div>
           <div className="space-y-1">
             <Label>Accepted value ({tradeIn.currency}) *</Label>
-            <Input type="number" min="0" step="0.01" value={value} onChange={(e) => setValue(e.target.value)} />
+            <Input type="number" min="0" max={MAX_TRADE_IN_VALUE} step="0.01" value={value} onChange={(e) => setValue(e.target.value)} />
           </div>
         </div>
         <DialogFooter>
@@ -770,9 +864,14 @@ function RejectDialog({
   const supabase = createClient();
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
-  useEffect(() => { if (open) setReason(""); }, [open]);
+  const [attempted, setAttempted] = useState(false);
+  useEffect(() => { if (open) { setReason(""); setAttempted(false); } }, [open]);
+  const missingReason = !reason.trim();
   async function submit() {
-    if (!reason.trim()) return toast.error("Reason is required");
+    if (missingReason) {
+      setAttempted(true);
+      return toast.error("A reason is required to reject a trade-in.");
+    }
     setBusy(true);
     const { error } = await supabase.rpc("reject_trade_in", {
       p_trade_in_id: tradeIn.id,
@@ -790,10 +889,26 @@ function RejectDialog({
           <DialogTitle>Reject trade-in</DialogTitle>
           <DialogDescription>The requester is notified.</DialogDescription>
         </DialogHeader>
-        <Textarea rows={4} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Why are you rejecting this trade-in?" />
+        <div className="space-y-1">
+          <Label>Reason *</Label>
+          <Textarea
+            rows={4}
+            value={reason}
+            onChange={(e) => {
+              setReason(e.target.value);
+              if (e.target.value.trim()) setAttempted(false);
+            }}
+            placeholder="Why are you rejecting this trade-in?"
+            aria-invalid={attempted && missingReason}
+            className={attempted && missingReason ? "border-destructive focus-visible:ring-destructive" : undefined}
+          />
+          {attempted && missingReason && (
+            <p className="text-xs text-destructive">A reason is required to reject a trade-in.</p>
+          )}
+        </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
-          <Button onClick={() => void submit()} disabled={busy || !reason.trim()}>
+          <Button onClick={() => void submit()} disabled={busy}>
             {busy ? "Rejecting…" : "Reject"}
           </Button>
         </DialogFooter>
@@ -873,9 +988,9 @@ function CommitDialog({
             <Label>Sales order *</Label>
             {orders.length === 0 ? (
               <p className="text-muted-foreground text-sm">
-                No open sales orders for this customer. Create one in
-                <Link href="/sales-orders" className="ml-1 text-sky-600 hover:underline">Sales Orders</Link>
-                then come back.
+                No open sales orders for this customer. Create one in{" "}
+                <Link href="/sales-orders" className="text-sky-600 hover:underline">Sales Orders</Link>
+                {" "}then come back.
               </p>
             ) : (
               <Select value={salesOrderId} onValueChange={setSalesOrderId}>

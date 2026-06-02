@@ -79,6 +79,11 @@ const fmt = (n: number | null, c = "USD") =>
     ? "—"
     : new Intl.NumberFormat("en-US", { style: "currency", currency: c, maximumFractionDigits: 0 }).format(Number(n));
 
+// Generous upper bound for a vehicle value — well below the DB numeric overflow,
+// but high enough for any realistic trade-in (the company operates in USD).
+const MAX_TRADE_IN_VALUE = 100_000_000;
+const MIN_VEHICLE_YEAR = 1900;
+
 export default function TradeInsPage() {
   const router = useRouter();
   const supabase = createClient();
@@ -326,8 +331,18 @@ function RequestTradeInDialog({
   async function submit() {
     if (!customerId) return toast.error("Pick the customer offering the trade-in");
     if (!make.trim() || !model.trim()) return toast.error("Make and model are required");
+    if (!provisional.trim()) return toast.error("Provisional value is required");
     const p = Number(provisional);
-    if (!Number.isFinite(p) || p < 0) return toast.error("Provisional value must be ≥ 0");
+    if (!Number.isFinite(p) || p <= 0) return toast.error("Provisional value must be greater than 0");
+    if (p > MAX_TRADE_IN_VALUE)
+      return toast.error(`Provisional value can't exceed ${fmt(MAX_TRADE_IN_VALUE)}`);
+    if (year.trim()) {
+      const y = Number(year);
+      const maxYear = new Date().getFullYear() + 1;
+      if (!Number.isInteger(y) || y < MIN_VEHICLE_YEAR || y > maxYear) {
+        return toast.error(`Year must be a whole number between ${MIN_VEHICLE_YEAR} and ${maxYear}`);
+      }
+    }
     setSubmitting(true);
     const trimmedVin = vin.trim();
     const trimmedPlate = plate.trim();
@@ -394,7 +409,7 @@ function RequestTradeInDialog({
           </div>
           <div className="space-y-1">
             <Label>Year</Label>
-            <Input type="number" value={year} onChange={(e) => setYear(e.target.value)} placeholder="2022" />
+            <Input type="number" min={MIN_VEHICLE_YEAR} max={new Date().getFullYear() + 1} step={1} value={year} onChange={(e) => setYear(e.target.value)} placeholder="2022" />
           </div>
           <div className="space-y-1">
             <Label>Trim</Label>
@@ -418,7 +433,7 @@ function RequestTradeInDialog({
           </div>
           <div className="space-y-1">
             <Label>Provisional value *</Label>
-            <Input type="number" min="0" step="0.01" value={provisional} onChange={(e) => setProvisional(e.target.value)} data-tour-id="trade-ins-request-provisional-input" />
+            <Input type="number" min="0" max={MAX_TRADE_IN_VALUE} step="0.01" value={provisional} onChange={(e) => setProvisional(e.target.value)} data-tour-id="trade-ins-request-provisional-input" />
           </div>
           <div className="space-y-1">
             <Label>Currency</Label>
