@@ -58,6 +58,7 @@ import { JobTimeEntryControls } from "@/components/garage/JobTimeEntryControls";
 import { JobBayTypeControls } from "@/components/garage/JobBayTypeControls";
 import { RepairProposalPanel } from "@/components/garage/RepairProposalPanel";
 import { formatError } from "@/lib/error-messages";
+import { BAY_TYPE_GROUP_LABEL } from "@/lib/garage-bays";
 
 interface JobWithCar extends GarageJob {
   cars?: {
@@ -310,8 +311,17 @@ export default function JobDetailPage() {
       .from("garage_jobs")
       .update(update)
       .eq("id", job.id);
-    if (error) toast.error(formatError(error));
-    else fetchJob();
+    if (error) {
+      toast.error(formatError(error));
+    } else {
+      // These two fields auto-save on blur — without a confirmation the user
+      // has no signal the change persisted. Keep it light (no toast spam for
+      // programmatic updates from elsewhere).
+      if (field === "diagnosis" || field === "work_done") {
+        toast.success("Saved");
+      }
+      fetchJob();
+    }
   }
 
   async function handleDelete() {
@@ -498,14 +508,16 @@ export default function JobDetailPage() {
                   )
                   .map((b) => (
                     <SelectItem key={b.id} value={String(b.id)}>
-                      {b.name} ({b.bay_type})
+                      {b.name} ({BAY_TYPE_GROUP_LABEL[b.bay_type as GarageBayType] ?? b.bay_type})
                     </SelectItem>
                   ))}
               </SelectContent>
             </Select>
             {job.garage_bays && (
               <p className="text-muted-foreground text-sm">
-                Current: {job.garage_bays.name} · {job.garage_bays.bay_type}
+                Current: {job.garage_bays.name} ·{" "}
+                {BAY_TYPE_GROUP_LABEL[job.garage_bays.bay_type as GarageBayType] ??
+                  job.garage_bays.bay_type}
               </p>
             )}
           </CardContent>

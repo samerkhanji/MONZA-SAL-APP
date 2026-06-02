@@ -408,7 +408,16 @@ export function NewJobDialog({
                 className="mt-2 flex cursor-pointer items-center justify-between rounded-lg border border-2 border-primary bg-primary/5 p-3"
                 onClick={() => setSelectedCar(null)}
               >
-                <span className="font-mono text-sm">{selectedCar.vin}</span>
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-medium">
+                    {[selectedCar.brand, selectedCar.model, selectedCar.model_year]
+                      .filter(Boolean)
+                      .join(" ") || "Car"}
+                  </span>
+                  <span className="block font-mono text-xs text-muted-foreground">
+                    {selectedCar.vin}
+                  </span>
+                </span>
                 <span className="text-muted-foreground text-xs">Clear</span>
               </div>
             ) : (
@@ -418,14 +427,28 @@ export function NewJobDialog({
                     <button
                       key={c.id}
                       type="button"
-                      className="flex w-full items-center justify-between rounded-lg border p-3 text-left transition-colors hover:bg-muted/50"
+                      className="flex w-full items-center justify-between gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-muted/50"
                       onClick={() => {
                         setSelectedCar(c);
                         setCarSearch("");
                         setCars([]);
                       }}
                     >
-                      <span className="font-mono text-sm">{c.vin}</span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-medium">
+                          {[c.brand, c.model, c.model_year]
+                            .filter(Boolean)
+                            .join(" ") || "Car"}
+                        </span>
+                        <span className="block font-mono text-xs text-muted-foreground">
+                          {c.vin}
+                        </span>
+                      </span>
+                      {c.exterior_color ? (
+                        <span className="shrink-0 text-xs text-muted-foreground">
+                          {c.exterior_color}
+                        </span>
+                      ) : null}
                     </button>
                   ))}
                 </div>

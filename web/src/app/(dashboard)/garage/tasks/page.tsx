@@ -245,8 +245,16 @@ export default function GarageTasksBoardPage() {
   }
 
   async function submitTemplateChecklist() {
-    if (!tplCarId || !tplTemplateId) {
+    if (!tplCarId && !tplTemplateId) {
       toast.error("Choose a car and a template.");
+      return;
+    }
+    if (!tplCarId) {
+      toast.error("Choose a car.");
+      return;
+    }
+    if (!tplTemplateId) {
+      toast.error("Choose a template.");
       return;
     }
     setTplSubmitting(true);
@@ -316,11 +324,18 @@ export default function GarageTasksBoardPage() {
                   <SelectValue placeholder="Select car" />
                 </SelectTrigger>
                 <SelectContent>
-                  {carsPick.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.brand} {c.model} · {c.vin}
-                    </SelectItem>
-                  ))}
+                  {carsPick.length === 0 ? (
+                    <div className="px-2 py-3 text-center text-sm text-muted-foreground">
+                      No cars are in Service status. Set a car to{" "}
+                      <strong>Service</strong> in Inventory first.
+                    </div>
+                  ) : (
+                    carsPick.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.brand} {c.model} · {c.vin}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>
