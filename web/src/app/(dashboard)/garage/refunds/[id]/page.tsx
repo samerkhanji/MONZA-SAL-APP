@@ -29,6 +29,10 @@ import {
 } from "@/components/ui/dialog";
 import { ArrowLeft, Check, X } from "lucide-react";
 import { formatError } from "@/lib/error-messages";
+import {
+  approveRefund,
+  rejectRefund,
+} from "@/lib/server/actions/money-mover";
 import { cn } from "@/lib/utils";
 
 interface Refund {
@@ -162,9 +166,9 @@ export default function RefundDetailPage() {
   async function approve() {
     if (!refund) return;
     setActing(true);
-    const { error } = await supabase.rpc("approve_refund", { p_refund_id: refund.id });
+    const result = await approveRefund(refund.id);
     setActing(false);
-    if (error) return toast.error(formatError(error));
+    if (!result.ok) return toast.error(result.error);
     toast.success("Refund approved");
     void load();
   }
@@ -173,9 +177,9 @@ export default function RefundDetailPage() {
     if (!refund) return;
     if (!rejectReason.trim()) return toast.error("Rejection reason is required");
     setActing(true);
-    const { error } = await supabase.rpc("reject_refund", { p_refund_id: refund.id, p_reason: rejectReason.trim() });
+    const result = await rejectRefund(refund.id, rejectReason.trim());
     setActing(false);
-    if (error) return toast.error(formatError(error));
+    if (!result.ok) return toast.error(result.error);
     toast.success("Refund rejected");
     setRejectOpen(false);
     setRejectReason("");

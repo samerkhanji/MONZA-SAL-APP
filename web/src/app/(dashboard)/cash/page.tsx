@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/dialog";
 import { AlertTriangle, ArrowDown, ArrowUp, Plus, Wallet } from "lucide-react";
 import { formatError } from "@/lib/error-messages";
+import { recordManualCashMovement } from "@/lib/server/actions/money-mover";
 import { cn } from "@/lib/utils";
 
 interface Drawer {
@@ -777,7 +778,6 @@ function ManualMovementDialog({
   onClose: () => void;
   onDone: () => void;
 }) {
-  const supabase = createClient();
   const [kind, setKind] = useState<string>("expense");
   const [direction, setDirection] = useState<"in" | "out">("out");
   const [directionTouched, setDirectionTouched] = useState(false);
@@ -810,15 +810,15 @@ function ManualMovementDialog({
     }
     setSubmitting(true);
     const trimmedNote = note.trim();
-    const { error } = await supabase.rpc("record_manual_cash_movement", {
+    const result = await recordManualCashMovement({
       p_kind: kind,
       p_direction: direction,
       p_amount: v,
       ...(trimmedNote ? { p_note: trimmedNote } : {}),
     });
     setSubmitting(false);
-    if (error) {
-      toast.error(formatError(error));
+    if (!result.ok) {
+      toast.error(result.error);
       return;
     }
     toast.success("Movement recorded");

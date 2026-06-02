@@ -71,6 +71,7 @@ import {
 import { LEAD_SOURCE_LABELS, LANGUAGE_LABELS } from "@/lib/constants/customers";
 import { VinScanButton } from "@/components/scanner/VinScanButton";
 import { formatError } from "@/lib/error-messages";
+import { applyInstallmentPayment } from "@/lib/server/actions/money-mover";
 import { cn } from "@/lib/utils";
 
 interface PlanWithRelations extends PaymentPlan {
@@ -624,7 +625,7 @@ export default function InstallmentsPage() {
 
     // The RPC enforces overpayment → customer_credits and underpayment → 'partial'
     // status with an owner notification. It also handles plan completion server-side.
-    const { data, error } = await supabase.rpc("apply_installment_payment", {
+    const actionResult = await applyInstallmentPayment({
       p_installment_id: selectedInstallment.id,
       p_amount: amount,
       p_payment_method: paymentMethod,
@@ -632,13 +633,13 @@ export default function InstallmentsPage() {
       ...(note ? { p_note: note } : {}),
     });
 
-    if (error) {
+    if (!actionResult.ok) {
       setMarkingPaid(false);
-      toast.error(formatError(error));
+      toast.error(actionResult.error);
       return;
     }
 
-    const result = (data ?? {}) as {
+    const result = (actionResult.data ?? {}) as {
       new_status?: string;
       overage_to_credits?: number;
       shortfall?: number;
