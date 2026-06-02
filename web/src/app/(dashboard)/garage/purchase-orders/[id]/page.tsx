@@ -145,6 +145,29 @@ const fmt = (n: number, c = "USD") =>
 // like 999999999 and keeps values well clear of any integer-overflow territory.
 const MAX_LINE_QTY = 100000;
 
+// Human-readable labels for DB enums (avoid showing raw "bank_transfer" etc.).
+const PAYMENT_METHODS: { value: string; label: string }[] = [
+  { value: "cash", label: "Cash" },
+  { value: "bank_transfer", label: "Bank transfer" },
+  { value: "cheque", label: "Cheque" },
+  { value: "card", label: "Card" },
+  { value: "other", label: "Other" },
+];
+const PAYMENT_METHOD_LABELS: Record<string, string> = Object.fromEntries(
+  PAYMENT_METHODS.map((m) => [m.value, m.label])
+);
+
+const GRN_CONDITIONS: { value: string; label: string }[] = [
+  { value: "good", label: "Good" },
+  { value: "extra", label: "Extra" },
+  { value: "damaged", label: "Damaged" },
+  { value: "wrong_item", label: "Wrong item" },
+  { value: "short", label: "Short" },
+];
+const GRN_CONDITION_LABELS: Record<string, string> = Object.fromEntries(
+  GRN_CONDITIONS.map((c) => [c.value, c.label])
+);
+
 export default function PurchaseOrderDetailPage() {
   const params = useParams<{ id: string }>();
   const id = params?.id as string;
@@ -170,6 +193,7 @@ export default function PurchaseOrderDetailPage() {
   const [rejectOpen, setRejectOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [discardOpen, setDiscardOpen] = useState(false);
+  const [approveOpen, setApproveOpen] = useState(false);
   const [sendOpen, setSendOpen] = useState(false);
   const [deleteLineId, setDeleteLineId] = useState<string | null>(null);
 
@@ -406,20 +430,7 @@ export default function PurchaseOrderDetailPage() {
 
           {isPending && isOwner && (
             <>
-              <Button
-                onClick={async () => {
-                  setBusy(true);
-                  const { error } = await supabase.rpc("approve_purchase_order", { p_po_id: po.id });
-                  setBusy(false);
-                  if (error) {
-                    toast.error(formatError(error));
-                    return;
-                  }
-                  toast.success("Approved");
-                  void load();
-                }}
-                disabled={busy}
-              >
+              <Button onClick={() => setApproveOpen(true)} disabled={busy}>
                 Approve
               </Button>
               <Button
@@ -450,11 +461,14 @@ export default function PurchaseOrderDetailPage() {
             </Button>
           )}
 
-          {invoices.length > 0 && canPay && (
-            <Button variant="secondary" onClick={() => setPaymentOpen(true)} disabled={busy}>
-              Record payment
-            </Button>
-          )}
+          {invoices.length > 0 &&
+            canPay &&
+            po.status !== "paid" &&
+            po.status !== "cancelled" && (
+              <Button variant="secondary" onClick={() => setPaymentOpen(true)} disabled={busy}>
+                Record payment
+              </Button>
+            )}
 
           {!["received", "invoiced", "paid", "cancelled", "rejected"].includes(po.status) && canManage && (
             <Button
@@ -495,7 +509,7 @@ export default function PurchaseOrderDetailPage() {
                         <li key={rl.id}>
                           {ln?.part_name ?? rl.po_line_id} · qty {rl.quantity_received} ·{" "}
                           <span className={rl.condition === "good" ? "" : "text-amber-700"}>
-                            {rl.condition}
+                            {GRN_CONDITION_LABELS[rl.condition] ?? rl.condition}
                           </span>
                           {rl.note ? ` — ${rl.note}` : ""}
                         </li>
@@ -525,8 +539,11 @@ export default function PurchaseOrderDetailPage() {
                 <div>
                   <p className="font-medium">{inv.supplier_invoice_number}</p>
                   <p className="text-muted-foreground text-xs">
-                    {inv.invoice_date} · {fmt(Number(inv.amount), inv.currency)}
-                    {inv.due_at ? ` · due ${inv.due_at}` : ""}
+                    {new Date(inv.invoice_date).toLocaleDateString()} ·{" "}
+                    {fmt(Number(inv.amount), inv.currency)}
+                    {inv.due_at
+                      ? ` · due ${new Date(inv.due_at).toLocaleDateString()}`
+                      : ""}
                   </p>
                 </div>
                 <Badge variant="outline" className="h-5 px-1.5 text-[10px]">
@@ -540,7 +557,8 @@ export default function PurchaseOrderDetailPage() {
                 <ul className="space-y-1 text-sm">
                   {payments.map((p) => (
                     <li key={p.id} className="text-muted-foreground">
-                      {new Date(p.paid_at).toLocaleDateString()} · {p.payment_method} ·{" "}
+                      {new Date(p.paid_at).toLocaleDateString()} ·{" "}
+                      {PAYMENT_METHOD_LABELS[p.payment_method] ?? p.payment_method} ·{" "}
                       {fmt(Number(p.amount), p.currency)}
                       {p.reference ? ` · ref ${p.reference}` : ""}
                     </li>
@@ -632,6 +650,41 @@ export default function PurchaseOrderDetailPage() {
           void load();
         }}
       />
+
+      {/* Approve confirmation — approval is financially binding, so confirm
+          the single click. */}
+      <AlertDialog open={approveOpen} onOpenChange={(v) => !v && setApproveOpen(false)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Approve this purchase order?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {po.po_number} for {fmt(totalEstimate, po.currency)} will be
+              approved and can then be sent to the supplier. This is a binding
+              approval.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async (e) => {
+                e.preventDefault();
+                setBusy(true);
+                const { error } = await supabase.rpc("approve_purchase_order", { p_po_id: po.id });
+                setBusy(false);
+                if (error) {
+                  toast.error(formatError(error));
+                  return;
+                }
+                toast.success("Approved");
+                setApproveOpen(false);
+                void load();
+              }}
+            >
+              Approve PO
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Draft discard — lighter than the formal "Cancel PO" flow (no required
           reason); a draft was never sent to anyone. */}
@@ -895,6 +948,16 @@ function ReceiptDialog({
         toast.error(`Received qty for "${l.part_name}" can't exceed ${MAX_LINE_QTY.toLocaleString()}`);
         return;
       }
+      // Catch over-receipt here with the part name, so the user never sees the
+      // raw "Over-receipt blocked on line <uuid>" database error.
+      const already = received.get(l.id) ?? 0;
+      const remaining = Number(l.quantity) - already;
+      if (qty > remaining) {
+        toast.error(
+          `Can't receive ${qty} of "${l.part_name}" — only ${Math.max(0, remaining)} remaining (ordered ${l.quantity}, already received ${already}).`
+        );
+        return;
+      }
     }
     const rl = lines
       .map((l) => {
@@ -997,11 +1060,11 @@ function ReceiptDialog({
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="good">good</SelectItem>
-                          <SelectItem value="extra">extra</SelectItem>
-                          <SelectItem value="damaged">damaged</SelectItem>
-                          <SelectItem value="wrong_item">wrong item</SelectItem>
-                          <SelectItem value="short">short</SelectItem>
+                          {GRN_CONDITIONS.map((c) => (
+                            <SelectItem key={c.value} value={c.value}>
+                              {c.label}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </td>
@@ -1058,6 +1121,10 @@ function InvoiceDialog({
   async function submit() {
     if (!invNo.trim() || !Number(amount)) {
       toast.error("Invoice number + amount are required");
+      return;
+    }
+    if (!invDate) {
+      toast.error("Invoice date is required");
       return;
     }
     setSubmitting(true);
@@ -1249,11 +1316,11 @@ function PaymentDialog({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="cash">cash</SelectItem>
-                <SelectItem value="bank_transfer">bank transfer</SelectItem>
-                <SelectItem value="cheque">cheque</SelectItem>
-                <SelectItem value="card">card</SelectItem>
-                <SelectItem value="other">other</SelectItem>
+                {PAYMENT_METHODS.map((m) => (
+                  <SelectItem key={m.value} value={m.value}>
+                    {m.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
