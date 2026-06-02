@@ -1098,6 +1098,9 @@ export type Database = {
           created_at: string
           created_by: string | null
           currency: string
+          delete_reason: string | null
+          deleted_at: string | null
+          deleted_by: string | null
           direction: string
           id: string
           kind: string
@@ -1111,6 +1114,9 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           currency?: string
+          delete_reason?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           direction: string
           id?: string
           kind: string
@@ -1124,6 +1130,9 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           currency?: string
+          delete_reason?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           direction?: string
           id?: string
           kind?: string
@@ -1875,7 +1884,9 @@ export type Database = {
           created_at: string
           created_by: string | null
           date_of_birth: string | null
+          delete_reason: string | null
           deleted_at: string | null
+          deleted_by: string | null
           email: string | null
           first_name: string
           id: string
@@ -1897,7 +1908,9 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           date_of_birth?: string | null
+          delete_reason?: string | null
           deleted_at?: string | null
+          deleted_by?: string | null
           email?: string | null
           first_name: string
           id?: string
@@ -1919,7 +1932,9 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           date_of_birth?: string | null
+          delete_reason?: string | null
           deleted_at?: string | null
+          deleted_by?: string | null
           email?: string | null
           first_name?: string
           id?: string
@@ -2213,7 +2228,9 @@ export type Database = {
           created_by: string | null
           current_km: number | null
           customer_id: string | null
+          delete_reason: string | null
           deleted_at: string | null
+          deleted_by: string | null
           delivered_at: string | null
           description: string | null
           diagnosis: string | null
@@ -2247,7 +2264,9 @@ export type Database = {
           created_by?: string | null
           current_km?: number | null
           customer_id?: string | null
+          delete_reason?: string | null
           deleted_at?: string | null
+          deleted_by?: string | null
           delivered_at?: string | null
           description?: string | null
           diagnosis?: string | null
@@ -2281,7 +2300,9 @@ export type Database = {
           created_by?: string | null
           current_km?: number | null
           customer_id?: string | null
+          delete_reason?: string | null
           deleted_at?: string | null
+          deleted_by?: string | null
           delivered_at?: string | null
           description?: string | null
           diagnosis?: string | null
@@ -2626,6 +2647,9 @@ export type Database = {
         Row: {
           amount_due: number
           created_at: string
+          delete_reason: string | null
+          deleted_at: string | null
+          deleted_by: string | null
           due_date: string
           id: string
           installment_no: number
@@ -2642,6 +2666,9 @@ export type Database = {
         Insert: {
           amount_due: number
           created_at?: string
+          delete_reason?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           due_date: string
           id?: string
           installment_no: number
@@ -2658,6 +2685,9 @@ export type Database = {
         Update: {
           amount_due?: number
           created_at?: string
+          delete_reason?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           due_date?: string
           id?: string
           installment_no?: number
@@ -2687,6 +2717,9 @@ export type Database = {
           created_by: string | null
           currency: string
           customer_id: string
+          delete_reason: string | null
+          deleted_at: string | null
+          deleted_by: string | null
           due_at: string | null
           id: string
           invoice_number: string
@@ -2703,6 +2736,9 @@ export type Database = {
           created_by?: string | null
           currency?: string
           customer_id: string
+          delete_reason?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           due_at?: string | null
           id?: string
           invoice_number: string
@@ -2719,6 +2755,9 @@ export type Database = {
           created_by?: string | null
           currency?: string
           customer_id?: string
+          delete_reason?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           due_at?: string | null
           id?: string
           invoice_number?: string
@@ -3904,7 +3943,9 @@ export type Database = {
           created_at: string
           created_by: string | null
           currency: string
+          delete_reason: string | null
           deleted_at: string | null
+          deleted_by: string | null
           estimated_total: number
           expected_delivery_at: string | null
           id: string
@@ -3933,7 +3974,9 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           currency?: string
+          delete_reason?: string | null
           deleted_at?: string | null
+          deleted_by?: string | null
           estimated_total?: number
           expected_delivery_at?: string | null
           id?: string
@@ -3962,7 +4005,9 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           currency?: string
+          delete_reason?: string | null
           deleted_at?: string | null
+          deleted_by?: string | null
           estimated_total?: number
           expected_delivery_at?: string | null
           id?: string
@@ -4346,7 +4391,9 @@ export type Database = {
           created_at: string
           currency: string
           customer_id: string
+          delete_reason: string | null
           deleted_at: string | null
+          deleted_by: string | null
           id: string
           invoice_id: string | null
           job_id: string | null
@@ -4376,7 +4423,9 @@ export type Database = {
           created_at?: string
           currency?: string
           customer_id: string
+          delete_reason?: string | null
           deleted_at?: string | null
+          deleted_by?: string | null
           id?: string
           invoice_id?: string | null
           job_id?: string | null
@@ -4406,7 +4455,9 @@ export type Database = {
           created_at?: string
           currency?: string
           customer_id?: string
+          delete_reason?: string | null
           deleted_at?: string | null
+          deleted_by?: string | null
           id?: string
           invoice_id?: string | null
           job_id?: string | null
@@ -4839,6 +4890,9 @@ export type Database = {
           currency: string | null
           customer_id: string
           date_bought: string | null
+          delete_reason: string | null
+          deleted_at: string | null
+          deleted_by: string | null
           delivered_at: string | null
           delivered_by: string | null
           delivery_date: string | null
@@ -4874,6 +4928,9 @@ export type Database = {
           currency?: string | null
           customer_id: string
           date_bought?: string | null
+          delete_reason?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           delivered_at?: string | null
           delivered_by?: string | null
           delivery_date?: string | null
@@ -4909,6 +4966,9 @@ export type Database = {
           currency?: string | null
           customer_id?: string
           date_bought?: string | null
+          delete_reason?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           delivered_at?: string | null
           delivered_by?: string | null
           delivery_date?: string | null
@@ -5731,7 +5791,9 @@ export type Database = {
           created_by: string | null
           currency: string
           customer_id: string
+          delete_reason: string | null
           deleted_at: string | null
+          deleted_by: string | null
           estimated_repair_cost: number | null
           id: string
           inspected_at: string | null
@@ -5771,7 +5833,9 @@ export type Database = {
           created_by?: string | null
           currency?: string
           customer_id: string
+          delete_reason?: string | null
           deleted_at?: string | null
+          deleted_by?: string | null
           estimated_repair_cost?: number | null
           id?: string
           inspected_at?: string | null
@@ -5811,7 +5875,9 @@ export type Database = {
           created_by?: string | null
           currency?: string
           customer_id?: string
+          delete_reason?: string | null
           deleted_at?: string | null
+          deleted_by?: string | null
           estimated_repair_cost?: number | null
           id?: string
           inspected_at?: string | null
@@ -6878,7 +6944,9 @@ export type Database = {
           created_by: string | null
           current_km: number | null
           customer_id: string | null
+          delete_reason: string | null
           deleted_at: string | null
+          deleted_by: string | null
           delivered_at: string | null
           description: string | null
           diagnosis: string | null
@@ -7409,7 +7477,9 @@ export type Database = {
           created_by: string | null
           current_km: number | null
           customer_id: string | null
+          delete_reason: string | null
           deleted_at: string | null
+          deleted_by: string | null
           delivered_at: string | null
           description: string | null
           diagnosis: string | null
@@ -7518,8 +7588,46 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
       snooze_notification: {
         Args: { p_id: string; p_until: string }
+        Returns: undefined
+      }
+      soft_delete_cash_movements: {
+        Args: { p_id: string; p_reason?: string }
+        Returns: undefined
+      }
+      soft_delete_customers: {
+        Args: { p_id: string; p_reason?: string }
+        Returns: undefined
+      }
+      soft_delete_garage_jobs: {
+        Args: { p_id: string; p_reason?: string }
+        Returns: undefined
+      }
+      soft_delete_installment_payments: {
+        Args: { p_id: string; p_reason?: string }
+        Returns: undefined
+      }
+      soft_delete_invoices: {
+        Args: { p_id: string; p_reason?: string }
+        Returns: undefined
+      }
+      soft_delete_purchase_orders: {
+        Args: { p_id: string; p_reason?: string }
+        Returns: undefined
+      }
+      soft_delete_refunds: {
+        Args: { p_id: string; p_reason?: string }
+        Returns: undefined
+      }
+      soft_delete_sales_orders: {
+        Args: { p_id: string; p_reason?: string }
+        Returns: undefined
+      }
+      soft_delete_trade_ins: {
+        Args: { p_id: string; p_reason?: string }
         Returns: undefined
       }
       start_trade_in_inspection: {
