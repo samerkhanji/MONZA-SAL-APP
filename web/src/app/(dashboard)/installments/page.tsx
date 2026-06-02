@@ -107,6 +107,12 @@ function carTitleAttr(car: Car | null | undefined): string | undefined {
   return `${car.model ?? ""} (${car.vin})`.trim();
 }
 
+// Sanity bounds for new payment plans — guard against typos / accidental DoS
+// (e.g. a 9,999-month plan would create 9,999 installment rows). Generous
+// enough for any real installment plan; tune if the business needs more.
+const MAX_PLAN_TOTAL = 1_000_000_000;
+const MAX_PLAN_MONTHS = 360;
+
 export default function InstallmentsPage() {
   const supabase = createClient();
   const { appRole, profile, hasCapability } = useUser();
@@ -424,6 +430,30 @@ export default function InstallmentsPage() {
       void searchCarsForLinking("");
     }
   }, [newPlanStep, linkCarSearch, linkCarResults.length]);
+
+  // The global barcode scanner (FloatingScanButton) hands off scanned VINs here
+  // rather than navigating away, so the user keeps their Installments context.
+  // If the scanned car already has a payment plan we open it; otherwise we point
+  // the user at the New Plan flow.
+  useEffect(() => {
+    function onScanVin(e: Event) {
+      const detail = (e as CustomEvent<{ vin: string; brand?: string; model?: string }>).detail;
+      const vin = detail?.vin?.trim().toUpperCase();
+      if (!vin) return;
+      const carLabel = [detail?.brand, detail?.model].filter(Boolean).join(" ") || vin;
+      const plan = plans.find(
+        (p) => p.car?.vin?.toUpperCase() === vin
+      );
+      if (plan) {
+        setDetailPlan(plan);
+        toast.success(`Showing payment plan for ${carLabel}`);
+      } else {
+        toast.info(`No payment plan found for ${carLabel}. Use “New plan” to create one.`);
+      }
+    }
+    window.addEventListener("installments-scan-vin", onScanVin);
+    return () => window.removeEventListener("installments-scan-vin", onScanVin);
+  }, [plans]);
 
   function openNewPlan() {
     if (!canCreatePlan) return;
@@ -1411,6 +1441,7 @@ export default function InstallmentsPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Customer</TableHead>
+                    <TableHead>Phone</TableHead>
                     <TableHead>Car</TableHead>
                     <TableHead>Installment</TableHead>
                     <TableHead className="text-center">Due Date</TableHead>
@@ -1430,6 +1461,11 @@ export default function InstallmentsPage() {
                         {i.plan?.customer
                           ? formatName(i.plan.customer as Customer)
                           : "Customer"}
+                      </TableCell>
+                      <TableCell>
+                        {i.plan?.customer
+                          ? (i.plan.customer as Customer).phone_primary
+                          : ""}
                       </TableCell>
                       <TableCell>
                         {i.plan?.car
@@ -1458,7 +1494,7 @@ export default function InstallmentsPage() {
                   ))}
                   {paidInstallments.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={8} className="py-10">
+                      <TableCell colSpan={9} className="py-10">
                         <div className="flex flex-col items-center justify-center text-center text-sm text-muted-foreground">
                           <Inbox className="mb-2 size-6" />
                           <p className="font-medium">No paid installments yet</p>
@@ -1839,40 +1875,39 @@ export default function InstallmentsPage() {
             <DialogTitle>New Payment Plan</DialogTitle>
           </DialogHeader>
           {/* Step indicator — the dialog walks through 3 stages:
-              pick/add customer → pick car → fill plan details. */}
-          <div className="-mt-2 flex items-center gap-2 text-xs text-muted-foreground" aria-label="Progress">
-            <span
-              className={cn(
-                "rounded-full px-2 py-0.5",
-                (newPlanStep === "choose" ||
-                  newPlanStep === "existingCustomer" ||
-                  newPlanStep === "newCustomer") &&
-                  "bg-amber-100 text-amber-800 font-medium dark:bg-amber-900/40 dark:text-amber-200"
-              )}
-            >
-              1. Customer
-            </span>
-            <span aria-hidden>→</span>
-            <span
-              className={cn(
-                "rounded-full px-2 py-0.5",
-                newPlanStep === "linkCar" &&
-                  "bg-amber-100 text-amber-800 font-medium dark:bg-amber-900/40 dark:text-amber-200"
-              )}
-            >
-              2. Car
-            </span>
-            <span aria-hidden>→</span>
-            <span
-              className={cn(
-                "rounded-full px-2 py-0.5",
-                newPlanStep === "planForm" &&
-                  "bg-amber-100 text-amber-800 font-medium dark:bg-amber-900/40 dark:text-amber-200"
-              )}
-            >
-              3. Plan
-            </span>
-          </div>
+              pick/add customer → pick car → fill plan details. Completed steps
+              show a check; the current step is highlighted. */}
+          {(() => {
+            const onCustomer =
+              newPlanStep === "choose" ||
+              newPlanStep === "existingCustomer" ||
+              newPlanStep === "newCustomer";
+            const onCar = newPlanStep === "existingCar" || newPlanStep === "linkCar";
+            const onPlan = newPlanStep === "planForm";
+            const customerDone = onCar || onPlan;
+            const carDone = onPlan;
+            const stepClass = (active: boolean, done: boolean) =>
+              cn(
+                "flex items-center gap-1 rounded-full px-2 py-0.5",
+                active && "bg-amber-100 text-amber-800 font-medium dark:bg-amber-900/40 dark:text-amber-200",
+                done && "bg-emerald-100 text-emerald-800 font-medium dark:bg-emerald-900/40 dark:text-emerald-200"
+              );
+            return (
+              <div className="-mt-2 flex items-center gap-2 text-xs text-muted-foreground" aria-label="Progress">
+                <span className={stepClass(onCustomer, customerDone)}>
+                  {customerDone && <CheckCircle2 className="size-3" aria-hidden />}
+                  1. Customer
+                </span>
+                <span aria-hidden>→</span>
+                <span className={stepClass(onCar, carDone)}>
+                  {carDone && <CheckCircle2 className="size-3" aria-hidden />}
+                  2. Car
+                </span>
+                <span aria-hidden>→</span>
+                <span className={stepClass(onPlan, false)}>3. Plan</span>
+              </div>
+            );
+          })()}
           <div className="space-y-4">
             {newPlanStep === "choose" && (
               <div className="space-y-4">
@@ -1933,15 +1968,24 @@ export default function InstallmentsPage() {
                   onChange={(e) => setCustomerSearch(e.target.value)}
                 />
                 <div className="max-h-64 overflow-y-auto rounded-md border">
-                  {customers
-                    .filter((c) => {
+                  {(() => {
+                    const filtered = customers.filter((c) => {
                       if (!customerSearch.trim()) return true;
                       const q = customerSearch.toLowerCase();
                       const name = formatName(c).toLowerCase();
                       const phone = (c.phone_primary ?? "").toLowerCase();
                       return name.includes(q) || phone.includes(q);
-                    })
-                    .map((c) => {
+                    });
+                    if (filtered.length === 0) {
+                      return (
+                        <div className="px-3 py-4 text-sm text-muted-foreground">
+                          {customers.length === 0
+                            ? "No customers found."
+                            : `No customers match “${customerSearch.trim()}”.`}
+                        </div>
+                      );
+                    }
+                    return filtered.map((c) => {
                       const carCount = plans.filter((p) => p.customer_id === c.id).length;
                       return (
                         <button
@@ -1966,12 +2010,8 @@ export default function InstallmentsPage() {
                           </div>
                         </button>
                       );
-                    })}
-                  {customers.length === 0 && (
-                    <div className="px-3 py-4 text-sm text-muted-foreground">
-                      No customers found.
-                    </div>
-                  )}
+                    });
+                  })()}
                 </div>
               </div>
             )}
@@ -2459,6 +2499,7 @@ export default function InstallmentsPage() {
                       onChange={(e) => setNewPlanTotal(e.target.value)}
                       type="number" inputMode="decimal"
                       min={0}
+                      max={MAX_PLAN_TOTAL}
                       step="0.01"
                     />
                   </div>
@@ -2497,6 +2538,7 @@ export default function InstallmentsPage() {
                       onChange={(e) => setNewPlanMonths(e.target.value)}
                       type="number" inputMode="decimal"
                       min={1}
+                      max={MAX_PLAN_MONTHS}
                       step={1}
                     />
                   </div>
@@ -2601,6 +2643,13 @@ export default function InstallmentsPage() {
                         toast.error("Customer is required.");
                         return;
                       }
+                      // A payment plan must be tied to a car (payment_plans.car_id
+                      // is NOT NULL). Block submission here with a clear message
+                      // instead of sending an invalid car_id that fails server-side.
+                      if (!newPlanCarId) {
+                        toast.error("A linked car is required. Go back and select a car for this plan.");
+                        return;
+                      }
                       const totalNum = Number(newPlanTotal);
                       const downNum = Number(newPlanDown || "0");
                       const monthsNum = Number(newPlanMonths);
@@ -2611,6 +2660,12 @@ export default function InstallmentsPage() {
                         toast.error("Total amount must be greater than 0.");
                         return;
                       }
+                      if (totalNum > MAX_PLAN_TOTAL) {
+                        toast.error(
+                          `Total amount looks too large. Enter a value up to ${currencyFormatter.format(MAX_PLAN_TOTAL)}.`
+                        );
+                        return;
+                      }
                       if (downNum < 0 || downNum > totalNum) {
                         toast.error(
                           "Down payment must be between 0 and total amount."
@@ -2619,6 +2674,12 @@ export default function InstallmentsPage() {
                       }
                       if (!(monthsNum > 0)) {
                         toast.error("Number of months must be greater than 0.");
+                        return;
+                      }
+                      if (!Number.isInteger(monthsNum) || monthsNum > MAX_PLAN_MONTHS) {
+                        toast.error(
+                          `Number of months must be a whole number between 1 and ${MAX_PLAN_MONTHS}.`
+                        );
                         return;
                       }
                       if (!(monthlyNum > 0)) {
@@ -2644,188 +2705,202 @@ export default function InstallmentsPage() {
                       }
 
                       setSavingNewPlan(true);
+                      try {
+                        const { data: authData } = await supabase.auth.getUser();
+                        const creatorId = authData?.user?.id || profile?.id || null;
+                        const interestPct = newPlanInterestRate.trim()
+                          ? Number(newPlanInterestRate)
+                          : 0;
+                        const interestRate =
+                          Number.isFinite(interestPct) && interestPct >= 0 ? interestPct : 0;
 
-                      const { data: authData } = await supabase.auth.getUser();
-                      const creatorId = authData?.user?.id || profile?.id || null;
-                      const interestPct = newPlanInterestRate.trim()
-                        ? Number(newPlanInterestRate)
-                        : 0;
-                      const interestRate =
-                        Number.isFinite(interestPct) && interestPct >= 0 ? interestPct : 0;
-
-                      // C-9: build the monthly due-date array client-side so the
-                      // server doesn't need to re-implement the day-clamp logic.
-                      const dueDates: string[] = [];
-                      for (let i = 0; i < monthsNum; i += 1) {
-                        dueDates.push(installmentDueDateIso(newPlanStartDate, i, dueDayNum));
-                      }
-
-                      // Single RPC: creates plan + installments + applies the
-                      // down payment via apply_installment_payment so the cash
-                      // trigger / credits ledger / audit all fire correctly.
-                      const { data: rpcData, error: planError } = await supabase.rpc(
-                        "create_payment_plan",
-                        {
-                          p_customer_id: newPlanCustomerId,
-                          // RPC requires a non-null car_id; pass empty string sentinel
-                          // when none is selected (server treats this as "no car").
-                          p_car_id: newPlanCarId || "",
-                          p_total_amount: totalNum,
-                          p_down_payment: downNum,
-                          p_monthly_amount: monthlyNum,
-                          p_months: monthsNum,
-                          p_start_date: newPlanStartDate,
-                          p_due_day: dueDayNum,
-                          p_due_dates: dueDates,
-                          p_interest_rate: interestRate,
-                          ...(downNum > 0 && newPlanDownPaymentMethod
-                            ? { p_down_payment_method: newPlanDownPaymentMethod }
-                            : {}),
-                        }
-                      );
-
-                      if (planError) {
-                        setSavingNewPlan(false);
-                        toast.error(`Failed to create plan: ${formatError(planError)}`);
-                        return;
-                      }
-
-                      const planData = { id: (rpcData as { plan_id?: string } | null)?.plan_id ?? "" };
-                      if (!planData.id) {
-                        setSavingNewPlan(false);
-                        toast.error("Plan created but server returned no id");
-                        return;
-                      }
-
-                      const customer =
-                        selectedCustomer && selectedCustomer.id === newPlanCustomerId
-                          ? selectedCustomer
-                          : null;
-                      const customerName = customer
-                        ? formatName(customer)
-                        : "Customer";
-                      const carLabel = selectedCar
-                        ? `${selectedCar.model} (${selectedCar.vin})`
-                        : "No car linked";
-
-                      // Link car and sales order if we have both customer and car.
-                      if (customer && newPlanCarId) {
-                        // Read the car's current state so we can (a) decide
-                        // whether the status transition to 'sold' is safe and
-                        // (b) seed the auto-created sales_order with real
-                        // price/currency instead of the financed total + USD.
-                        const { data: carRow } = await supabase
-                          .from("cars")
-                          .select("status, price, price_currency")
-                          .eq("id", newPlanCarId)
-                          .maybeSingle();
-
-                        // Only flip to 'sold' from a pre-sale state. Don't
-                        // clobber delivered / service / recalled / etc.
-                        const carStatus = (carRow?.status ?? null) as string | null;
-                        const transitionable =
-                          carStatus !== null &&
-                          ["available", "inventory", "reserved"].includes(carStatus);
-                        if (transitionable) {
-                          await supabase
-                            .from("cars")
-                            .update({ status: "sold", sold_marker: "X" })
-                            .eq("id", newPlanCarId);
+                        // C-9: build the monthly due-date array client-side so the
+                        // server doesn't need to re-implement the day-clamp logic.
+                        const dueDates: string[] = [];
+                        for (let i = 0; i < monthsNum; i += 1) {
+                          dueDates.push(installmentDueDateIso(newPlanStartDate, i, dueDayNum));
                         }
 
-                        const { data: existingSale } = await supabase
-                          .from("sales_orders")
-                          .select("id")
-                          .eq("car_id", newPlanCarId)
-                          .eq("customer_id", newPlanCustomerId)
-                          .not("status", "eq", "cancelled")
-                          .limit(1)
-                          .maybeSingle();
-
-                        if (!existingSale) {
-                          // 'draft' (not 'confirmed') so the sales-order detail
-                          // page surfaces the incomplete lifecycle and reports
-                          // don't count this as a finalized sale yet.
-                          // selling_price/currency come from the car (the actual
-                          // cash price) rather than the plan's financed total.
-                          await supabase.from("sales_orders").insert({
-                            car_id: newPlanCarId,
-                            customer_id: newPlanCustomerId,
-                            status: "draft",
-                            selling_price:
-                              (carRow?.price as number | null | undefined) ?? totalNum,
-                            currency:
-                              (carRow?.price_currency as string | null | undefined) ?? "USD",
-                            created_by: creatorId,
-                            notes:
-                              "Auto-created from installment plan. Complete quote / deposit / contract lifecycle.",
-                          });
-                        }
-                      }
-
-                      // Ensure customer status is converted
-                      if (newPlanCustomerId) {
-                        await supabase
-                          .from("customers")
-                          .update({ lead_status: "converted" })
-                          .eq("id", newPlanCustomerId);
-                      }
-
-                      const { data: owners } = await supabase
-                        .from("profiles")
-                        .select("id")
-                        .eq("user_role", "owner");
-
-                      if (owners && owners.length > 0) {
-                        const ownerIds = owners.map((o) => o.id as string);
-                        await createNotificationsForUsers(
-                          ownerIds,
-                          "New payment plan created",
-                          `New payment plan created for ${customerName} — ${carLabel} — ${currencyFormatter.format(
-                            totalNum
-                          )}`,
-                          "/installments"
+                        // Single RPC: creates plan + installments + applies the
+                        // down payment via apply_installment_payment so the cash
+                        // trigger / credits ledger / audit all fire correctly.
+                        const { data: rpcData, error: planError } = await supabase.rpc(
+                          "create_payment_plan",
+                          {
+                            p_customer_id: newPlanCustomerId,
+                            p_car_id: newPlanCarId,
+                            p_total_amount: totalNum,
+                            p_down_payment: downNum,
+                            p_monthly_amount: monthlyNum,
+                            p_months: monthsNum,
+                            p_start_date: newPlanStartDate,
+                            p_due_day: dueDayNum,
+                            p_due_dates: dueDates,
+                            p_interest_rate: interestRate,
+                            ...(downNum > 0 && newPlanDownPaymentMethod
+                              ? { p_down_payment_method: newPlanDownPaymentMethod }
+                              : {}),
+                          }
                         );
+
+                        if (planError) {
+                          toast.error(`Failed to create plan: ${formatError(planError)}`);
+                          return;
+                        }
+
+                        const planId = (rpcData as { plan_id?: string } | null)?.plan_id ?? "";
+                        if (!planId) {
+                          toast.error("Plan created but server returned no id. Refresh to confirm.");
+                          return;
+                        }
+
+                        const customer =
+                          selectedCustomer && selectedCustomer.id === newPlanCustomerId
+                            ? selectedCustomer
+                            : null;
+                        const customerName = customer
+                          ? formatName(customer)
+                          : "Customer";
+                        const carLabel = selectedCar
+                          ? `${selectedCar.model} (${selectedCar.vin})`
+                          : "No car linked";
+
+                        // Post-creation bookkeeping (car status, sales order,
+                        // customer conversion, owner notifications) is best-effort:
+                        // the plan already exists, so a failure here must NOT block
+                        // the success confirmation or leave the user without feedback.
+                        try {
+                          if (customer && newPlanCarId) {
+                            // Read the car's current state so we can (a) decide
+                            // whether the status transition to 'sold' is safe and
+                            // (b) seed the auto-created sales_order with real
+                            // price/currency instead of the financed total + USD.
+                            const { data: carRow } = await supabase
+                              .from("cars")
+                              .select("status, price, price_currency")
+                              .eq("id", newPlanCarId)
+                              .maybeSingle();
+
+                            // Only flip to 'sold' from a pre-sale state. Don't
+                            // clobber delivered / service / recalled / etc.
+                            const carStatus = (carRow?.status ?? null) as string | null;
+                            const transitionable =
+                              carStatus !== null &&
+                              ["available", "inventory", "reserved"].includes(carStatus);
+                            if (transitionable) {
+                              await supabase
+                                .from("cars")
+                                .update({ status: "sold", sold_marker: "X" })
+                                .eq("id", newPlanCarId);
+                            }
+
+                            const { data: existingSale } = await supabase
+                              .from("sales_orders")
+                              .select("id")
+                              .eq("car_id", newPlanCarId)
+                              .eq("customer_id", newPlanCustomerId)
+                              .not("status", "eq", "cancelled")
+                              .limit(1)
+                              .maybeSingle();
+
+                            if (!existingSale) {
+                              // 'draft' (not 'confirmed') so the sales-order detail
+                              // page surfaces the incomplete lifecycle and reports
+                              // don't count this as a finalized sale yet.
+                              // selling_price/currency come from the car (the actual
+                              // cash price) rather than the plan's financed total.
+                              await supabase.from("sales_orders").insert({
+                                car_id: newPlanCarId,
+                                customer_id: newPlanCustomerId,
+                                status: "draft",
+                                selling_price:
+                                  (carRow?.price as number | null | undefined) ?? totalNum,
+                                currency:
+                                  (carRow?.price_currency as string | null | undefined) ?? "USD",
+                                created_by: creatorId,
+                                notes:
+                                  "Auto-created from installment plan. Complete quote / deposit / contract lifecycle.",
+                              });
+                            }
+                          }
+
+                          // Ensure customer status is converted
+                          if (newPlanCustomerId) {
+                            await supabase
+                              .from("customers")
+                              .update({ lead_status: "converted" })
+                              .eq("id", newPlanCustomerId);
+                          }
+
+                          const { data: owners } = await supabase
+                            .from("profiles")
+                            .select("id")
+                            .eq("user_role", "owner");
+
+                          if (owners && owners.length > 0) {
+                            const ownerIds = owners.map((o) => o.id as string);
+                            await createNotificationsForUsers(
+                              ownerIds,
+                              "New payment plan created",
+                              `New payment plan created for ${customerName} — ${carLabel} — ${currencyFormatter.format(
+                                totalNum
+                              )}`,
+                              "/installments"
+                            );
+                          }
+                        } catch (sideErr) {
+                          console.error("Plan created, but post-creation steps failed", sideErr);
+                        }
+
+                        toast.success(
+                          `Payment plan created for ${customerName} — ${carLabel}`
+                        );
+                        setNewPlanOpen(false);
+
+                        // Refresh is best-effort: the plan is already created and
+                        // confirmed, so a refresh failure must not be reported as a
+                        // creation failure. Worst case the list updates on next load.
+                        try {
+                          const [
+                            { data: refreshedInstallments },
+                            { data: refreshedPlans },
+                          ] = await Promise.all([
+                            supabase
+                              .from("installment_payments")
+                              .select(
+                                `
+                                *,
+                                plan:payment_plans(
+                                  *,
+                                  customer:customers(*),
+                                  car:cars(*)
+                                )
+                              `
+                              ),
+                            supabase
+                              .from("payment_plans")
+                              .select(
+                                `
+                                *,
+                                customer:customers(*),
+                                car:cars(*),
+                                installments:installment_payments(*)
+                              `
+                              ),
+                          ]);
+
+                          setInstallments(
+                            (refreshedInstallments as unknown as InstallmentWithRelations[]) || []
+                          );
+                          setPlans((refreshedPlans as unknown as PlanWithRelations[]) || []);
+                        } catch (refreshErr) {
+                          console.error("Plan created; list refresh failed", refreshErr);
+                        }
+                      } catch (err) {
+                        toast.error(`Failed to create plan: ${formatError(err)}`);
+                      } finally {
+                        setSavingNewPlan(false);
                       }
-
-                      toast.success(
-                        `Payment plan created for ${customerName} — ${carLabel}`
-                      );
-                      setSavingNewPlan(false);
-                      setNewPlanOpen(false);
-
-                      const [
-                        { data: refreshedInstallments },
-                        { data: refreshedPlans },
-                      ] = await Promise.all([
-                        supabase
-                          .from("installment_payments")
-                          .select(
-                            `
-                            *,
-                            plan:payment_plans(
-                              *,
-                              customer:customers(*),
-                              car:cars(*)
-                            )
-                          `
-                          ),
-                        supabase
-                          .from("payment_plans")
-                          .select(
-                            `
-                            *,
-                            customer:customers(*),
-                            car:cars(*),
-                            installments:installment_payments(*)
-                          `
-                          ),
-                      ]);
-
-                      setInstallments(
-                        (refreshedInstallments as unknown as InstallmentWithRelations[]) || []
-                      );
-                      setPlans((refreshedPlans as unknown as PlanWithRelations[]) || []);
                     }}
                   >
                     {savingNewPlan ? "Creating..." : "Create Plan"}
