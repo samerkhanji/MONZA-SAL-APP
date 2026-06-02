@@ -89,7 +89,16 @@ function matchesSearch(customer: CustomerDisplay, search: string): boolean {
   return fullName.includes(q) || phoneMatches || email.includes(q);
 }
 
-const CUSTOMERS_TABLE_COL_PX = [240, 180, 320, 110, 200, 80, 130, 110] as const;
+// A phone is only "dialable" if it contains at least one digit. This stops
+// placeholder values like "—", "-", or "N/A" from rendering as a broken
+// tel: link (e.g. a customer whose phone was stored literally as "—").
+function dialablePhone(phone: string | null | undefined): string | null {
+  if (!phone) return null;
+  const trimmed = phone.trim();
+  return /\d/.test(trimmed) ? trimmed : null;
+}
+
+const CUSTOMERS_TABLE_COL_PX = [210, 160, 290, 120, 160, 70, 120, 96] as const;
 const SOLD_TABLE_COL_PX = [220, 200, 130, 240, 160, 140, 120, 120, 170, 110] as const;
 
 const CRM_TH =
@@ -255,11 +264,12 @@ export default function CustomersPage() {
     fetchCustomers();
   }
 
+  // Show the same lead-status label the detail page and the Status filter use,
+  // so the list, the filter dropdown, and the detail view all stay consistent
+  // (e.g. "Converted" / "New Lead" — not the old derived "Sold" / "New", which
+  // had no matching option in the Status filter).
   function getStatusLabel(c: CustomerDisplay): string {
-    const orders = c.total_orders ?? 0;
-    if (orders > 0) return "Sold";
-    if (c.lead_status === "new_lead") return "New";
-    return "Lead";
+    return LEAD_STATUS_LABELS[c.lead_status] ?? c.lead_status ?? "—";
   }
 
   function getSourceLabel(c: CustomerDisplay): string {
@@ -346,17 +356,20 @@ export default function CustomersPage() {
                     {fullName || "—"}
                   </td>
                   <td className={CRM_TD}>
-                    {customer.phone_primary?.trim() ? (
-                      <a
-                        href={`tel:${customer.phone_primary.replace(/\s/g, "")}`}
-                        onClick={(e) => e.stopPropagation()}
-                        className="block max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-primary hover:underline"
-                      >
-                        {customer.phone_primary}
-                      </a>
-                    ) : (
-                      "—"
-                    )}
+                    {(() => {
+                      const phone = dialablePhone(customer.phone_primary);
+                      return phone ? (
+                        <a
+                          href={`tel:${phone.replace(/\s/g, "")}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="block max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-primary hover:underline"
+                        >
+                          {phone}
+                        </a>
+                      ) : (
+                        "—"
+                      );
+                    })()}
                   </td>
                   <td title={customer.email ?? undefined} className={CRM_TD}>
                     {customer.email ? (
@@ -404,9 +417,14 @@ export default function CustomersPage() {
                         </DropdownMenuItem>
                         {canEditCustomer && (
                           <DropdownMenuItem
-                            onClick={() => {
+                            onSelect={() => {
                               setEditCustomer(customer);
-                              setEditOpen(true);
+                              // Defer opening until the dropdown has fully closed
+                              // and returned focus. Opening synchronously makes the
+                              // menu's focus handoff collide with the dialog's focus
+                              // trap, which leaves Escape / outside-click unable to
+                              // dismiss the Edit modal.
+                              setTimeout(() => setEditOpen(true), 0);
                             }}
                             data-tour-id="customers-list-row-actions-edit"
                           >
@@ -691,16 +709,19 @@ export default function CustomersPage() {
                               )}
                             </td>
                             <td className={CRM_TD}>
-                              {customer?.phone_primary?.trim() ? (
-                                <a
-                                  href={`tel:${customer.phone_primary}`}
-                                  className="block max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-primary hover:underline"
-                                >
-                                  {customer.phone_primary}
-                                </a>
-                              ) : (
-                                "—"
-                              )}
+                              {(() => {
+                                const phone = dialablePhone(customer?.phone_primary);
+                                return phone ? (
+                                  <a
+                                    href={`tel:${phone.replace(/\s/g, "")}`}
+                                    className="block max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-primary hover:underline"
+                                  >
+                                    {phone}
+                                  </a>
+                                ) : (
+                                  "—"
+                                );
+                              })()}
                             </td>
                             <td className={`${CRM_TD} tabular-nums`}>
                               {so.selling_price != null

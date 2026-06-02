@@ -77,6 +77,15 @@ export function FloatingScanButton() {
       return;
     }
 
+    // On the Cash register, there's no car-specific action and navigating away
+    // would lose an open session's context. Just surface the car info.
+    if (pathname.startsWith("/cash")) {
+      toast.success(
+        `${typedCar.brand} ${typedCar.model} · VIN ${typedCar.vin ?? trimmed}`
+      );
+      return;
+    }
+
     toast.success(`Found: ${typedCar.brand} ${typedCar.model}`);
     router.push(carHref);
   }

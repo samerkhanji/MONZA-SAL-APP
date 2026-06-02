@@ -96,6 +96,17 @@ const KIND_LABEL: Record<string, string> = {
   closing_count: "Closing count",
 };
 
+// Per-entry sanity cap for cash amounts (movements, opening/closing counts).
+// Guards against typos like an extra run of digits; far above any realistic
+// drawer count or petty-cash movement in USD.
+const MAX_CASH_AMOUNT = 1_000_000;
+
+// Today's business date in the same timezone the server stamps sessions with
+// (see migration 118). Used to enforce the "one session per day" rule client-side.
+function beirutBusinessDate(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Beirut" }).format(new Date());
+}
+
 const fmt = (n: number | null | undefined, currency = "USD") =>
   n == null
     ? "—"
@@ -206,6 +217,14 @@ function Body() {
     return { cashIn, cashOut, expected: cashIn - cashOut, otherCurrencyCount };
   }, [openSessionMoves, settings?.currency]);
 
+  // One session per day: if a session for today already exists in history
+  // (closed/flagged/pending_review), a new one must not be opened. The server
+  // enforces this too (open_cash_session), this just disables the entry points.
+  const alreadyClosedToday = useMemo(() => {
+    const today = beirutBusinessDate();
+    return history.some((s) => s.business_date === today);
+  }, [history]);
+
   return (
     <div className="container space-y-6 py-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -226,9 +245,20 @@ function Body() {
         </div>
         <div className="flex gap-2">
           {!openSession && canWrite && (
-            <Button onClick={() => setOpenDialogOpen(true)} data-tour-id="cash-open-session-button">
-              <Plus className="mr-1.5 size-4" /> Open today&apos;s session
-            </Button>
+            alreadyClosedToday ? (
+              <Button
+                disabled
+                variant="outline"
+                title="A session has already been closed today. Only one session per day is allowed."
+                data-tour-id="cash-open-session-button"
+              >
+                <Plus className="mr-1.5 size-4" /> Session already closed today
+              </Button>
+            ) : (
+              <Button onClick={() => setOpenDialogOpen(true)} data-tour-id="cash-open-session-button">
+                <Plus className="mr-1.5 size-4" /> Open today&apos;s session
+              </Button>
+            )
           )}
           {openSession && canWrite && (
             <>
@@ -250,11 +280,20 @@ function Body() {
       ) : !openSession ? (
         <Card>
           <CardContent className="py-10 text-center text-muted-foreground">
-            <p className="text-sm">No open session today.</p>
-            {canWrite && (
-              <Button className="mt-3" onClick={() => setOpenDialogOpen(true)}>
-                <Plus className="mr-1.5 size-4" /> Open one now
-              </Button>
+            {alreadyClosedToday ? (
+              <p className="text-sm">
+                Today&apos;s session has already been closed. Only one session per day
+                is allowed — the next session can be opened tomorrow.
+              </p>
+            ) : (
+              <>
+                <p className="text-sm">No open session today.</p>
+                {canWrite && (
+                  <Button className="mt-3" onClick={() => setOpenDialogOpen(true)}>
+                    <Plus className="mr-1.5 size-4" /> Open one now
+                  </Button>
+                )}
+              </>
             )}
           </CardContent>
         </Card>
@@ -524,6 +563,10 @@ function OpenSessionDialog({
       toast.error("Opening balance must be 0 or greater");
       return;
     }
+    if (v > MAX_CASH_AMOUNT) {
+      toast.error(`Opening balance can't exceed ${fmt(MAX_CASH_AMOUNT)}.`);
+      return;
+    }
     setSubmitting(true);
     const trimmedNote = note.trim();
     const { error } = await supabase.rpc("open_cash_session", {
@@ -583,6 +626,7 @@ function OpenSessionDialog({
               inputMode="decimal"
               step="0.01"
               min={0}
+              max={MAX_CASH_AMOUNT}
               value={opening}
               onChange={(e) => setOpening(e.target.value)}
               placeholder="0.00"
@@ -643,12 +687,24 @@ function CloseSessionDialog({
   }, [open]);
 
   const actualNum = Number(actual);
-  const variance = isNaN(actualNum) ? 0 : actualNum - expected;
-  const overThreshold = Math.abs(variance) > threshold;
+  // Treat an empty / non-numeric field as "no value" rather than 0, so the
+  // variance preview and the required-note gate don't fire before the cashier
+  // has actually entered a count.
+  const hasActual = actual.trim() !== "" && !isNaN(actualNum);
+  const variance = hasActual ? actualNum - expected : 0;
+  const overThreshold = hasActual && Math.abs(variance) > threshold;
 
   async function submit() {
+    if (actual.trim() === "") {
+      toast.error("Enter the counted closing amount");
+      return;
+    }
     if (isNaN(actualNum) || actualNum < 0) {
       toast.error("Counted closing must be 0 or greater");
+      return;
+    }
+    if (actualNum > MAX_CASH_AMOUNT) {
+      toast.error(`Counted closing can't exceed ${fmt(MAX_CASH_AMOUNT, currency)}.`);
       return;
     }
     if (overThreshold && !varianceNote.trim()) {
@@ -698,7 +754,7 @@ function CloseSessionDialog({
               <div className="text-muted-foreground text-xs">Counted</div>
             </div>
           </div>
-          {!isNaN(actualNum) && actual !== "" && (
+          {hasActual && (
             <div
               className={cn(
                 "rounded-md border p-3 text-center text-sm",
@@ -728,6 +784,7 @@ function CloseSessionDialog({
               inputMode="decimal"
               step="0.01"
               min={0}
+              max={MAX_CASH_AMOUNT}
               value={actual}
               onChange={(e) => setActual(e.target.value)}
               data-tour-id="cash-close-actual-input"
@@ -762,7 +819,7 @@ function CloseSessionDialog({
           </Button>
           <Button
             onClick={() => void submit()}
-            disabled={submitting || !actual || (overThreshold && !varianceNote.trim())}
+            disabled={submitting || (overThreshold && !varianceNote.trim())}
             data-tour-id="cash-close-submit"
           >
             {submitting ? "Closing…" : "Close session"}
@@ -809,7 +866,11 @@ function ManualMovementDialog({
   async function submit() {
     const v = Number(amount);
     if (isNaN(v) || v <= 0) {
-      toast.error("Amount must be > 0");
+      toast.error("Amount must be greater than 0");
+      return;
+    }
+    if (v > MAX_CASH_AMOUNT) {
+      toast.error(`Amount can't exceed ${fmt(MAX_CASH_AMOUNT)}.`);
       return;
     }
     setSubmitting(true);
@@ -886,6 +947,7 @@ function ManualMovementDialog({
               inputMode="decimal"
               step="0.01"
               min={0}
+              max={MAX_CASH_AMOUNT}
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               data-tour-id="cash-movement-amount-input"
@@ -904,7 +966,7 @@ function ManualMovementDialog({
           <Button variant="outline" onClick={onClose} disabled={submitting} data-tour-id="cash-movement-cancel">
             Cancel
           </Button>
-          <Button onClick={() => void submit()} disabled={submitting || !amount} data-tour-id="cash-movement-submit">
+          <Button onClick={() => void submit()} disabled={submitting} data-tour-id="cash-movement-submit">
             {submitting ? "Recording…" : "Record"}
           </Button>
         </DialogFooter>
