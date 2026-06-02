@@ -17,12 +17,27 @@ export async function DELETE(
       return NextResponse.json({ error: "Invalid job id" }, { status: 400 });
     }
 
-    const { error } = await gate.supabase
-      .from("garage_jobs")
-      .update({ deleted_at: new Date().toISOString() })
-      .eq("id", id);
+    // Soft-delete via SECURITY DEFINER RPC so deleted_by/delete_reason are
+    // recorded for audit (migration 165).
+    let reason: string | undefined;
+    try {
+      const body = (await _req.json()) as { reason?: unknown };
+      if (typeof body?.reason === "string" && body.reason.trim() !== "") {
+        reason = body.reason.trim();
+      }
+    } catch {
+      // No body — soft-delete without a reason.
+    }
+
+    const { error } = await gate.supabase.rpc("soft_delete_garage_jobs", {
+      p_id: id,
+      p_reason: reason,
+    });
 
     if (error) {
+      if (error.code === "P0002") {
+        return NextResponse.json({ error: error.message }, { status: 404 });
+      }
       const status = error.code === "42501" ? 403 : 500;
       return NextResponse.json({ error: toPublicApiError(error) }, { status });
     }
