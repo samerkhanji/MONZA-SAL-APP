@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import type { Database } from "@/lib/supabase/database.types";
 import { useUser } from "@/lib/contexts/UserContext";
+import { canApplyInstallmentPayment } from "@/lib/permissions-client";
 import type {
   Customer,
   Car,
@@ -132,10 +133,11 @@ export default function InstallmentsPage() {
     appRole === "assistant" ||
     appRole === "sales_ops" ||
     hasCapability("cashier");
-  // mark-paid is now capability-gated (matches the DB-side check in
-  // apply_installment_payment which requires is_owner OR has_capability('cashier')).
-  // We keep canPerform() for the rest of the CRUD actions on installments.
-  const canMarkPaid = isOwner || hasCapability("cashier");
+  // mark-paid is owner-only at the UI layer per the post-PR-157 spec.
+  // Centralized in permissions-client.ts so all the call sites stay in sync.
+  // The DB-side check in apply_installment_payment is still the source of
+  // truth — this is purely a UI affordance.
+  const canMarkPaid = canApplyInstallmentPayment(profile);
   const canCreatePlan = canPerform("installments", "create", appRole);
 
   const [recoverPlanId, setRecoverPlanId] = useState<string | null>(null);

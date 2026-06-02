@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
+import { canSubmitPurchaseOrder } from "@/lib/permissions-client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -144,9 +145,10 @@ export default function PurchaseOrderDetailPage() {
   const id = params?.id as string;
   const router = useRouter();
   const supabase = createClient();
-  const { isOwner, hasCapability } = useUser();
+  const { isOwner, hasCapability, profile } = useUser();
   const canManage = isOwner || hasCapability("inventory");
   const canPay = isOwner || hasCapability("cashier");
+  const canSubmit = canSubmitPurchaseOrder(profile);
 
   const [po, setPo] = useState<PO | null>(null);
   const [lines, setLines] = useState<POLine[]>([]);
@@ -357,25 +359,27 @@ export default function PurchaseOrderDetailPage() {
         <CardContent className="flex flex-wrap items-center gap-2">
           {isDraft && canManage && (
             <>
-              <Button
-                onClick={async () => {
-                  setBusy(true);
-                  const { data, error } = await supabase.rpc("submit_purchase_order", { p_po_id: po.id });
-                  setBusy(false);
-                  if (error) {
-                    toast.error(formatError(error));
-                    return;
-                  }
-                  const r = data as { status?: string };
-                  toast.success(
-                    r.status === "approved" ? "Approved (under threshold)" : "Submitted for approval"
-                  );
-                  void load();
-                }}
-                disabled={busy || lines.length === 0}
-              >
-                Submit for approval
-              </Button>
+              {canSubmit && (
+                <Button
+                  onClick={async () => {
+                    setBusy(true);
+                    const { data, error } = await supabase.rpc("submit_purchase_order", { p_po_id: po.id });
+                    setBusy(false);
+                    if (error) {
+                      toast.error(formatError(error));
+                      return;
+                    }
+                    const r = data as { status?: string };
+                    toast.success(
+                      r.status === "approved" ? "Approved (under threshold)" : "Submitted for approval"
+                    );
+                    void load();
+                  }}
+                  disabled={busy || lines.length === 0}
+                >
+                  Submit for approval
+                </Button>
+              )}
               <Button
                 variant="outline"
                 onClick={() => setCancelOpen(true)}

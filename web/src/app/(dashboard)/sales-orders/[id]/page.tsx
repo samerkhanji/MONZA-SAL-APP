@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 import type { Database } from "@/lib/supabase/database.types";
 import { useUser } from "@/lib/contexts/UserContext";
+import { canVoidSalesOrder } from "@/lib/permissions-client";
 import { Button } from "@/components/ui/button";
 import { FieldHint } from "@/components/ui/field-hint";
 import { Input } from "@/components/ui/input";
@@ -122,8 +123,9 @@ export default function SalesOrderDetailPage() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
-  const { appRole } = useUser();
+  const { appRole, profile } = useUser();
   const canEdit = appRole === "owner" || appRole === "assistant" || appRole === "sales_ops" || appRole === "hybrid";
+  const canVoid = canVoidSalesOrder(profile);
 
   const supabase = createClient();
   const [order, setOrder] = useState<SalesOrderDetail | null>(null);
@@ -791,7 +793,7 @@ export default function SalesOrderDetailPage() {
 
       {/* Owner-only void action — for delivered or in-progress sales that
           need to be reversed (return, cancel, error). */}
-      {appRole === "owner" && order.status !== "cancelled" && (
+      {canVoid && order.status !== "cancelled" && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Reverse this sale</CardTitle>

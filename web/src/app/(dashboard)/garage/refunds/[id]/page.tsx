@@ -6,6 +6,10 @@ import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
+import {
+  canApproveRefund,
+  canRejectRefund,
+} from "@/lib/permissions-client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -76,7 +80,8 @@ export default function RefundDetailPage() {
   const router = useRouter();
   const supabase = createClient();
   const { isOwner, hasCapability, profile } = useUser();
-  const canApproveAny = isOwner || hasCapability("manage_team");
+  const canApprove = canApproveRefund(profile);
+  const canReject = canRejectRefund(profile);
   const canPay = isOwner || hasCapability("cashier");
 
   const [refund, setRefund] = useState<Refund | null>(null);
@@ -152,12 +157,9 @@ export default function RefundDetailPage() {
   const isPending = refund.status === "pending";
   const isApproved = refund.status === "approved";
 
-  // Approve / reject visibility:
-  // - owner-required refunds: only owner sees the action
-  // - manager-required (or auto): owner or manage_team
-  const canActOnApproval =
-    isPending &&
-    (refund.approval_required === "owner" ? isOwner : canApproveAny);
+  // Approve / reject visibility — owner only (mirrors the SECURITY DEFINER
+  // RPC gate after PR #157). Non-owners no longer see the action buttons.
+  const canActOnApproval = isPending && canApprove && canReject;
 
   async function approve() {
     if (!refund) return;
