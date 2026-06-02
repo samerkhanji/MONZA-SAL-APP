@@ -141,7 +141,13 @@ export default function NotificationPreferencesPage() {
   function addMute() {
     if (!prefs) return;
     const key = muteInput.trim();
-    if (!key) return;
+    if (!key) {
+      // Previously this silently returned, so users who tabbed past the
+      // input and hit Enter (or clicked the button via keyboard) got no
+      // feedback that nothing happened. Surface the requirement explicitly.
+      toast.error("Please enter an entity ID (e.g. garage_job:abcd-…) before muting.");
+      return;
+    }
     if (prefs.muted_entity_keys.includes(key)) {
       toast.info("Already muted");
       return;
