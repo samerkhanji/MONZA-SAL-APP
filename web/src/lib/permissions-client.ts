@@ -18,14 +18,23 @@ function isOwner(user: UserProfile | null): boolean {
   return user?.user_role === "owner";
 }
 
-/** Approve a refund. Owner only. */
+/**
+ * Approve a refund. Owner OR `manage_team` capability — managers can act on
+ * sub-threshold refunds. Backend (`approve_refund` RPC + server action)
+ * remains the authority on the actual threshold; this helper only decides
+ * whether to render the button.
+ */
 export function canApproveRefund(user: UserProfile | null): boolean {
-  return isOwner(user);
+  return hasCapability(user, "manage_team");
 }
 
-/** Reject a refund. Owner only. */
+/**
+ * Reject a refund. Owner OR `manage_team` capability — managers can reject
+ * sub-threshold refunds. Backend (`reject_refund` RPC + server action)
+ * remains the authority.
+ */
 export function canRejectRefund(user: UserProfile | null): boolean {
-  return isOwner(user);
+  return hasCapability(user, "manage_team");
 }
 
 /** Void a sales order. Owner only. */
@@ -56,9 +65,10 @@ export function canSubmitPurchaseOrder(user: UserProfile | null): boolean {
 
 /**
  * Apply a payment to an installment.
- * Owner only — matches the SECURITY DEFINER RPC's owner-only enforcement
- * after PR #157. (The legacy capability-gated path is now closed.)
+ * Owner OR `cashier` capability — matches the backend RPC's authorization
+ * (`is_owner() OR has_capability('cashier')`). Cashiers marking installments
+ * as paid is a legitimate workflow.
  */
 export function canApplyInstallmentPayment(user: UserProfile | null): boolean {
-  return isOwner(user);
+  return hasCapability(user, "cashier");
 }
