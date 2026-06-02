@@ -49,6 +49,13 @@ function matchesSearch(row: AccessoryInventoryRow, q: string): boolean {
   );
 }
 
+// Inclusive bounds for the quantity field. Anything outside this range is
+// rejected at edit time with a toast — invalid values used to silently
+// pollute the summary card (negatives clamped to 0, 9-digit numbers passed
+// straight through to the totals row).
+const MIN_QTY = 1;
+const MAX_QTY = 99999;
+
 type SaveState = "idle" | "saving" | "saved" | "error";
 
 /** Editable fields pushed back to public.accessory_inventory on save. */
@@ -70,6 +77,10 @@ export default function AccessoriesPage() {
   const [search, setSearch] = useState("");
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [pendingDelete, setPendingDelete] = useState<AccessoryInventoryRow | null>(null);
+  // Per-row error messages for the Linked plate field. Keyed by row id so
+  // each line owns its own message slot; entries are removed once the row
+  // either matches a real plate or gets cleared.
+  const [linkedPlateErrors, setLinkedPlateErrors] = useState<Record<string, string>>({});
   const dirtyIdsRef = useRef<Set<string>>(new Set());
   // Tracks the pending "reset to idle" timer kicked off after a successful save.
   // Stored in a ref so the autosave effect cleanup can cancel it on unmount.
@@ -170,6 +181,21 @@ export default function AccessoriesPage() {
     () => filtered.reduce((acc, r) => acc + (Number.isFinite(r.quantity) ? r.quantity : 0), 0),
     [filtered]
   );
+
+  // Plates entered in the "plates" category act as the canonical list of
+  // recognized plate identifiers. Linked-plate fields on every other row
+  // must either match one of these (case-insensitive, trimmed) or be empty
+  // — typing a free-form value silently used to stick around with no
+  // feedback, which is what Bug 4 reported.
+  const knownPlates = useMemo(() => {
+    const set = new Set<string>();
+    for (const r of rows) {
+      if (r.category !== "plates") continue;
+      const v = r.label.trim().toLowerCase();
+      if (v) set.add(v);
+    }
+    return set;
+  }, [rows]);
 
   const patchRow = useCallback(
     (id: string, patch: Partial<AccessoryInventoryRow>) => {
@@ -431,15 +457,43 @@ export default function AccessoriesPage() {
                             <TableCell className="align-top">
                               <Input
                                 type="number"
-                                inputMode="decimal"
-                                min={0}
+                                inputMode="numeric"
+                                min={MIN_QTY}
+                                max={MAX_QTY}
                                 step={1}
-                                value={Number.isFinite(row.quantity) ? row.quantity : 0}
+                                value={Number.isFinite(row.quantity) ? row.quantity : MIN_QTY}
                                 onChange={(e) => {
-                                  const v = parseFloat(e.target.value);
-                                  patchRow(row.id, {
-                                    quantity: Number.isFinite(v) ? Math.max(0, Math.floor(v)) : 0,
-                                  });
+                                  const raw = e.target.value;
+                                  // Allow a transient empty input while the
+                                  // user is mid-edit; we only show a toast
+                                  // and clamp once a parseable number lands
+                                  // outside the valid range.
+                                  if (raw === "") {
+                                    patchRow(row.id, { quantity: MIN_QTY });
+                                    return;
+                                  }
+                                  const parsed = parseFloat(raw);
+                                  if (!Number.isFinite(parsed)) {
+                                    toast.error(
+                                      `Quantity must be between ${MIN_QTY} and ${MAX_QTY.toLocaleString()}`
+                                    );
+                                    patchRow(row.id, { quantity: MIN_QTY });
+                                    return;
+                                  }
+                                  const intVal = Math.floor(parsed);
+                                  if (intVal < MIN_QTY) {
+                                    toast.error(`Quantity must be at least ${MIN_QTY}`);
+                                    patchRow(row.id, { quantity: MIN_QTY });
+                                    return;
+                                  }
+                                  if (intVal > MAX_QTY) {
+                                    toast.error(
+                                      `Quantity must be ${MAX_QTY.toLocaleString()} or less`
+                                    );
+                                    patchRow(row.id, { quantity: MAX_QTY });
+                                    return;
+                                  }
+                                  patchRow(row.id, { quantity: intVal });
                                 }}
                                 className="bg-background/80 h-9 w-full min-w-[4.5rem] border-transparent shadow-none focus-visible:border-input"
                               />
@@ -455,16 +509,71 @@ export default function AccessoriesPage() {
                             <TableCell className="align-top">
                               <Input
                                 value={row.linked_plate ?? ""}
-                                onChange={(e) =>
-                                  patchRow(row.id, {
-                                    linked_plate: e.target.value.trim() === "" ? null : e.target.value,
-                                  })
-                                }
+                                onChange={(e) => {
+                                  const v = e.target.value.trim() === "" ? null : e.target.value;
+                                  patchRow(row.id, { linked_plate: v });
+                                  // Clear any stale error message as soon
+                                  // as the user resumes typing — they'll
+                                  // get a fresh verdict on the next blur.
+                                  if (linkedPlateErrors[row.id]) {
+                                    setLinkedPlateErrors((prev) => {
+                                      const next = { ...prev };
+                                      delete next[row.id];
+                                      return next;
+                                    });
+                                  }
+                                }}
+                                onBlur={(e) => {
+                                  // Plates rows mirror their own label, so
+                                  // they always pass — no need to validate.
+                                  if (cat.id === "plates") return;
+                                  const trimmed = e.target.value.trim();
+                                  if (trimmed === "") {
+                                    setLinkedPlateErrors((prev) => {
+                                      if (!prev[row.id]) return prev;
+                                      const next = { ...prev };
+                                      delete next[row.id];
+                                      return next;
+                                    });
+                                    return;
+                                  }
+                                  if (knownPlates.has(trimmed.toLowerCase())) {
+                                    setLinkedPlateErrors((prev) => {
+                                      if (!prev[row.id]) return prev;
+                                      const next = { ...prev };
+                                      delete next[row.id];
+                                      return next;
+                                    });
+                                    return;
+                                  }
+                                  setLinkedPlateErrors((prev) => ({
+                                    ...prev,
+                                    [row.id]:
+                                      "Must match an existing plate, or leave empty",
+                                  }));
+                                }}
                                 placeholder={cat.id === "plates" ? "Same as label" : "Optional"}
                                 disabled={cat.id === "plates"}
                                 title={cat.id === "plates" ? "Kept in sync with label for plates" : undefined}
+                                aria-invalid={
+                                  cat.id !== "plates" && !!linkedPlateErrors[row.id]
+                                }
+                                aria-describedby={
+                                  cat.id !== "plates" && linkedPlateErrors[row.id]
+                                    ? `linked-plate-error-${row.id}`
+                                    : undefined
+                                }
                                 className="bg-background/80 h-9 max-w-xs border-transparent shadow-none focus-visible:border-input disabled:opacity-80"
                               />
+                              {cat.id !== "plates" && linkedPlateErrors[row.id] ? (
+                                <p
+                                  id={`linked-plate-error-${row.id}`}
+                                  role="alert"
+                                  className="text-destructive mt-1 text-xs"
+                                >
+                                  {linkedPlateErrors[row.id]}
+                                </p>
+                              ) : null}
                             </TableCell>
                             <TableCell className="pr-6 text-right align-top">
                               <Button
