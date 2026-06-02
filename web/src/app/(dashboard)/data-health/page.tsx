@@ -210,7 +210,7 @@ function QuickFixCustomerPhone({ customerId, onSaved }: { customerId: string; on
         {saving ? "…" : "Save"}
       </Button>
       <Button variant="ghost" size="sm" asChild>
-        <Link href={`/customers/${customerId}`}>
+        <Link href={`/customers/${customerId}`} target="_blank" rel="noopener noreferrer">
           <ExternalLink className="size-3" />
         </Link>
       </Button>
@@ -246,7 +246,7 @@ function QuickFixJobDiagnosis({ jobId, onSaved }: { jobId: string; onSaved: () =
         {saving ? "…" : "Save"}
       </Button>
       <Button variant="ghost" size="sm" asChild>
-        <Link href={`/garage/jobs/${jobId}`}>
+        <Link href={`/garage/jobs/${jobId}`} target="_blank" rel="noopener noreferrer">
           <ExternalLink className="size-3" />
         </Link>
       </Button>
@@ -304,7 +304,7 @@ function QuickFixReservedBy({ carId, onSaved }: { carId: string; onSaved: () => 
         {saving ? "…" : "Save"}
       </Button>
       <Button variant="ghost" size="sm" asChild>
-        <Link href={`/cars/${carId}`}>
+        <Link href={`/cars/${carId}`} target="_blank" rel="noopener noreferrer">
           <ExternalLink className="size-3" />
         </Link>
       </Button>
@@ -317,21 +317,28 @@ function SectionCard({
   description,
   count,
   icon: Icon,
+  critical = false,
   children,
 }: {
   title: string;
   description: string;
   count: number;
   icon: React.ElementType;
+  /** When true, every issue shown is critical → use the red/critical icon. */
+  critical?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Icon className="size-5 text-amber-500" />
+          {critical ? (
+            <AlertCircle className="size-5 text-destructive" />
+          ) : (
+            <Icon className="size-5 text-amber-500" />
+          )}
           {title}
-          <Badge variant="secondary">{count} issues</Badge>
+          <Badge variant={critical ? "destructive" : "secondary"}>{count} issues</Badge>
         </CardTitle>
         <CardDescription>{description}</CardDescription>
       </CardHeader>
@@ -745,6 +752,18 @@ export default function DataHealthPage() {
     if (severityFilter === "warning") return !critical;
     return true;
   }
+  // A section's header icon is critical (red) only when every issue currently
+  // shown in it is critical — e.g. Broken Relationships, or any section viewed
+  // under the "Critical only" severity filter. Mixed sections stay amber.
+  function sectionShownCritical(
+    sectionId: DataHealthSectionId,
+    ...rowLists: Record<string, unknown>[][]
+  ): boolean {
+    const shown = rowLists
+      .flat()
+      .filter((r) => rowMatchesSearch(sectionId, r, searchQuery) && filterRowBySeverity(sectionId, r));
+    return shown.length > 0 && shown.every((r) => isRowCritical(sectionId, r));
+  }
   const totalVisibleCount = useMemo(
     () => visibleSections.reduce((sum, id) => sum + getSectionCount(id), 0),
     [
@@ -880,7 +899,7 @@ export default function DataHealthPage() {
               </Link>
             </Button>
             <Button variant="ghost" size="sm" asChild>
-              <Link href={`/cars/${carId}`}>
+              <Link href={`/cars/${carId}`} target="_blank" rel="noopener noreferrer">
                 <ExternalLink className="mr-1 size-3" />
                 Open
               </Link>
@@ -896,7 +915,7 @@ export default function DataHealthPage() {
               </Link>
             </Button>
             <Button variant="ghost" size="sm" asChild>
-              <Link href={`/customers/${customerId}`}>
+              <Link href={`/customers/${customerId}`} target="_blank" rel="noopener noreferrer">
                 <ExternalLink className="mr-1 size-3" />
                 Open
               </Link>
@@ -905,7 +924,7 @@ export default function DataHealthPage() {
         )}
         {planId && (
           <Button variant="ghost" size="sm" asChild>
-            <Link href={`/installments?plan=${planId}`}>
+            <Link href={`/installments?plan=${planId}`} target="_blank" rel="noopener noreferrer">
               <ExternalLink className="mr-1 size-3" />
               Open
             </Link>
@@ -914,7 +933,7 @@ export default function DataHealthPage() {
         {isSalesOrder && (
           soCanOpen ? (
             <Button variant="ghost" size="sm" asChild>
-              <Link href={soOpenHref!}>
+              <Link href={soOpenHref!} target="_blank" rel="noopener noreferrer">
                 <ExternalLink className="mr-1 size-3" />
                 Open
               </Link>
@@ -935,7 +954,7 @@ export default function DataHealthPage() {
               </Link>
             </Button>
             <Button variant="ghost" size="sm" asChild>
-              <Link href={`/garage/jobs/${jobId}`}>
+              <Link href={`/garage/jobs/${jobId}`} target="_blank" rel="noopener noreferrer">
                 <ExternalLink className="mr-1 size-3" />
                 Open
               </Link>
@@ -944,7 +963,7 @@ export default function DataHealthPage() {
         )}
         {requestId && (
           <Button variant="ghost" size="sm" asChild>
-            <Link href={`/requests?detail=${requestId}`}>
+            <Link href={`/requests?detail=${requestId}`} target="_blank" rel="noopener noreferrer">
               <ExternalLink className="mr-1 size-3" />
               Open
             </Link>
@@ -971,9 +990,21 @@ export default function DataHealthPage() {
       <div>
         <h1 className="text-2xl font-semibold">Data Health</h1>
         <p className="text-muted-foreground">
-          {isOwner
-            ? "Showing all company data health sections"
-            : `Showing data health for: ${roleLabel}`}
+          {(() => {
+            const parts: string[] = [];
+            if (sectionFilter !== "all") {
+              parts.push(SECTION_LABELS[sectionFilter as DataHealthSectionId] ?? sectionFilter);
+            }
+            if (severityFilter !== "all") {
+              parts.push(severityFilter === "critical" ? "Critical only" : "Warnings only");
+            }
+            if (parts.length > 0) {
+              return `Showing: ${parts.join(" · ")}`;
+            }
+            return isOwner
+              ? "Showing all company data health sections"
+              : `Showing data health for: ${roleLabel}`;
+          })()}
         </p>
       </div>
 
@@ -992,16 +1023,28 @@ export default function DataHealthPage() {
 
       {/* Global Critical / Warning indicator */}
       <div className="flex flex-wrap gap-4" data-tour-id="data-health-severity-totals">
-        <div className="flex items-center gap-2 rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-2">
+        <button
+          type="button"
+          onClick={() => setSeverityFilter((s) => (s === "critical" ? "all" : "critical"))}
+          aria-pressed={severityFilter === "critical"}
+          title={severityFilter === "critical" ? "Clear severity filter" : "Filter to critical issues only"}
+          className={`flex items-center gap-2 rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-2 text-left transition-colors hover:bg-destructive/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive ${severityFilter === "critical" ? "ring-2 ring-destructive" : ""}`}
+        >
           <AlertCircle className="size-5 text-destructive" />
           <span className="text-sm font-medium">Critical Issues:</span>
           <span className="text-lg font-bold text-destructive">{criticalCount}</span>
-        </div>
-        <div className="flex items-center gap-2 rounded-lg border border-amber-500/50 bg-amber-500/10 px-4 py-2">
+        </button>
+        <button
+          type="button"
+          onClick={() => setSeverityFilter((s) => (s === "warning" ? "all" : "warning"))}
+          aria-pressed={severityFilter === "warning"}
+          title={severityFilter === "warning" ? "Clear severity filter" : "Filter to warnings only"}
+          className={`flex items-center gap-2 rounded-lg border border-amber-500/50 bg-amber-500/10 px-4 py-2 text-left transition-colors hover:bg-amber-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${severityFilter === "warning" ? "ring-2 ring-amber-500" : ""}`}
+        >
           <AlertTriangle className="size-5 text-amber-600" />
           <span className="text-sm font-medium">Warnings:</span>
           <span className="text-lg font-bold text-amber-700">{warningCount}</span>
-        </div>
+        </button>
       </div>
 
       {/* Search and filters */}
@@ -1227,6 +1270,7 @@ export default function DataHealthPage() {
                   description="Cars where VIN, model, exterior_color, interior_color, engine_number, location_type, warranty_vehicle_expiry, warranty_battery_expiry, battery_percent, or date_arrived are NULL or empty"
                   count={filtered.length}
                   icon={Car}
+                  critical={sectionShownCritical("cars_missing_data", filtered)}
                 >
                   {filtered.length === 0 ? (
                     <p className="text-sm text-muted-foreground">No issues found.</p>
@@ -1282,6 +1326,7 @@ export default function DataHealthPage() {
                   description="Sales orders where car_id, customer_id, selling_price, currency, or sale_date are NULL"
                   count={filtered.length}
                   icon={FileText}
+                  critical={sectionShownCritical("sales_orders_missing_data", filtered)}
                 >
                   {filtered.length === 0 ? (
                     <p className="text-sm text-muted-foreground">No issues found.</p>
@@ -1306,7 +1351,7 @@ export default function DataHealthPage() {
                           if (empty(so.sale_date)) missing.push("sale_date");
                           return (
                             <TableRow key={so.id} className={getRowSeverityClass("sales_orders_missing_data", so)}>
-                              <TableCell className="font-mono text-sm">{so.id.slice(0, 8)}…</TableCell>
+                              <TableCell className="font-mono text-sm" title={so.id}>{so.id.slice(0, 8)}…</TableCell>
                               <TableCell className="text-xs text-muted-foreground">{missing.join(", ")}</TableCell>
                               <TableCell className="text-xs text-muted-foreground">{formatDate(so.created_at)}</TableCell>
                               <TableCell className="text-xs text-muted-foreground">{formatDate(so.updated_at)}</TableCell>
@@ -1391,6 +1436,7 @@ export default function DataHealthPage() {
               soNoCustomer.filter((so) => rowMatchesSearch("broken_relationships", so, searchQuery) && filterRowBySeverity("broken_relationships", so)).length
             }
             icon={AlertTriangle}
+            critical={sectionShownCritical("broken_relationships", soldCarsNoOrder, soNoCar, soNoCustomer)}
           >
             {(() => {
               const filteredSold = soldCarsNoOrder.filter((c) => rowMatchesSearch("broken_relationships", c, searchQuery) && filterRowBySeverity("broken_relationships", c));
@@ -1438,7 +1484,7 @@ export default function DataHealthPage() {
                       <TableBody>
                         {filteredSoNoCar.map((so) => (
                           <TableRow key={so.id} className={getRowSeverityClass("broken_relationships", so)}>
-                            <TableCell className="font-mono text-sm">{so.id.slice(0, 8)}…</TableCell>
+                            <TableCell className="font-mono text-sm" title={so.id}>{so.id.slice(0, 8)}…</TableCell>
                             <TableCell><ActionButtons isSalesOrder soCarId={so.car_id ?? undefined} soCustomerId={so.customer_id ?? undefined} /></TableCell>
                           </TableRow>
                         ))}
@@ -1459,7 +1505,7 @@ export default function DataHealthPage() {
                       <TableBody>
                         {filteredSoNoCust.map((so) => (
                           <TableRow key={so.id} className={getRowSeverityClass("broken_relationships", so)}>
-                            <TableCell className="font-mono text-sm">{so.id.slice(0, 8)}…</TableCell>
+                            <TableCell className="font-mono text-sm" title={so.id}>{so.id.slice(0, 8)}…</TableCell>
                             <TableCell><ActionButtons isSalesOrder soCarId={so.car_id ?? undefined} soCustomerId={so.customer_id ?? undefined} /></TableCell>
                           </TableRow>
                         ))}
@@ -1623,6 +1669,7 @@ export default function DataHealthPage() {
               (p) => rowMatchesSearch("installment_data_missing", p, searchQuery) && filterRowBySeverity("installment_data_missing", p)
             ).length}
             icon={CreditCard}
+            critical={sectionShownCritical("installment_data_missing", plansMissingInstallments)}
           >
             {(() => {
               const filtered = plansMissingInstallments.filter(
@@ -1647,7 +1694,7 @@ export default function DataHealthPage() {
                     const issue = noRows ? "No installment rows" : noDueDate ? "Missing due_date" : "—";
                     return (
                       <TableRow key={p.id} className={getRowSeverityClass("installment_data_missing", p)}>
-                        <TableCell className="font-mono text-sm">{p.id.slice(0, 8)}…</TableCell>
+                        <TableCell className="font-mono text-sm" title={p.id}>{p.id.slice(0, 8)}…</TableCell>
                         <TableCell><Badge variant="outline">{p.status}</Badge></TableCell>
                         <TableCell className="text-xs text-muted-foreground">{issue}</TableCell>
                         <TableCell><ActionButtons planId={p.id} /></TableCell>
@@ -1849,7 +1896,7 @@ export default function DataHealthPage() {
                         {f1.map((j) => (
                           <TableRow key={j.id} className={getRowSeverityClass("garage_health", j)}>
                             <TableCell>{j.title}</TableCell>
-                            <TableCell className="font-mono text-sm">{j.car_id?.slice(0, 8)}…</TableCell>
+                            <TableCell className="font-mono text-sm" title={j.car_id ?? undefined}>{j.car_id?.slice(0, 8)}…</TableCell>
                             <TableCell><ActionButtons jobId={j.id} /></TableCell>
                           </TableRow>
                         ))}
@@ -1959,6 +2006,7 @@ export default function DataHealthPage() {
               (c) => rowMatchesSearch("cars_missing_technical", c, searchQuery) && filterRowBySeverity("cars_missing_technical", c)
             ).length}
             icon={Car}
+            critical={sectionShownCritical("cars_missing_technical", carsMissingTechnical)}
           >
             {(() => {
               const filtered = carsMissingTechnical.filter(
@@ -2035,7 +2083,7 @@ export default function DataHealthPage() {
                         <TableCell className="text-xs text-muted-foreground">{missing.join(", ")}</TableCell>
                         <TableCell>
                           <Button variant="ghost" size="sm" asChild>
-                            <Link href={`/garage/inventory`}>Open</Link>
+                            <Link href={`/garage/inventory`} target="_blank" rel="noopener noreferrer">Open</Link>
                           </Button>
                         </TableCell>
                       </TableRow>

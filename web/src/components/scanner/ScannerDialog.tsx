@@ -39,9 +39,44 @@ export function ScannerDialog({
   const [manualValue, setManualValue] = useState("");
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [flashOn, setFlashOn] = useState(false);
-  const scannerRef = useRef<{ stop: () => Promise<void> } | null>(null);
+  const scannerRef = useRef<
+    { stop: () => Promise<void>; clear?: () => void } | null
+  >(null);
   const isRunningRef = useRef(false);
   const containerId = "scanner-container";
+
+  // Stop the live camera scanner and clear its rendered UI. Returns a promise so
+  // callers can wait for teardown to finish *before* unmounting the dialog —
+  // otherwise html5-qrcode keeps mutating a `<video>` element that React has
+  // already removed, which leaks the camera stream and corrupts the page layout
+  // (the viewport collapses to a mobile width).
+  const teardownScanner = (): Promise<void> => {
+    const scanner = scannerRef.current;
+    const wasRunning = isRunningRef.current;
+    scannerRef.current = null;
+    isRunningRef.current = false;
+    if (scanner && wasRunning) {
+      return scanner
+        .stop()
+        .then(() => scanner.clear?.())
+        .catch(() => {});
+    }
+    return Promise.resolve();
+  };
+
+  // Emit the scanned/entered value, stopping the camera first, then close.
+  const finishWith = (value: string) => {
+    void teardownScanner().finally(() => {
+      onScan(value);
+      setManualValue("");
+      onClose();
+    });
+  };
+
+  // Close requested via the dialog chrome (X / overlay / Esc): stop, then close.
+  const handleDialogClose = () => {
+    void teardownScanner().finally(onClose);
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -107,8 +142,19 @@ export function ScannerDialog({
               return;
             }
             if (navigator.vibrate) navigator.vibrate(200);
-            onScan(value);
-            onClose();
+            // Stop the camera before closing so the dialog unmounts cleanly.
+            // (Inlined rather than calling teardownScanner so this effect's
+            // dependency list stays limited to refs + stable callbacks.)
+            scannerRef.current = null;
+            isRunningRef.current = false;
+            html5QrCode
+              .stop()
+              .then(() => html5QrCode.clear())
+              .catch(() => {})
+              .finally(() => {
+                onScan(value);
+                onClose();
+              });
           },
           () => {}
         );
@@ -169,13 +215,11 @@ export function ScannerDialog({
       return;
     }
     if (navigator.vibrate) navigator.vibrate(200);
-    onScan(value);
-    setManualValue("");
-    onClose();
+    finishWith(value);
   }
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+    <Dialog open={open} onOpenChange={(o) => !o && handleDialogClose()}>
       <DialogContent className="max-h-[95vh] max-w-[500px] overflow-hidden p-0">
         <DialogHeader className="p-4 pb-0">
           <DialogTitle className="flex items-center gap-2">
@@ -223,7 +267,7 @@ export function ScannerDialog({
                 onKeyDown={(e) => e.key === "Enter" && handleManualSubmit()}
                 className="flex-1"
               />
-              <Button onClick={handleManualSubmit}>Submit</Button>
+              <Button onClick={handleManualSubmit}>Use</Button>
             </div>
           </div>
         </div>
