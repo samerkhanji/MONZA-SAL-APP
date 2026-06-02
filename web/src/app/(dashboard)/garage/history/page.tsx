@@ -17,6 +17,7 @@ import {
   JOB_STATUS_LABELS,
   JOB_PRIORITY_LABELS,
   PRIORITY_BORDERS,
+  formatHours,
 } from "@/lib/constants/jobs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -386,7 +387,7 @@ export default function GarageHistoryPage() {
                     </div>
                     <div>
                       <span className="text-muted-foreground">Est/Act:</span>{" "}
-                      {job.estimated_hours ?? "—"}h / {job.actual_hours ?? "—"}h
+                      {formatHours(job.estimated_hours)}h / {formatHours(job.actual_hours)}h
                     </div>
                     <div>
                       <span className="text-muted-foreground">Parts:</span>{" "}

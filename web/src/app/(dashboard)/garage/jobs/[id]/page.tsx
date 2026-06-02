@@ -16,6 +16,7 @@ import {
   JOB_STATUS_LABELS,
   JOB_PRIORITY_COLORS,
   JOB_PRIORITY_LABELS,
+  formatHours,
 } from "@/lib/constants/jobs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -94,6 +95,7 @@ export default function JobDetailPage() {
   const [loading, setLoading] = useState(true);
   const [addPartOpen, setAddPartOpen] = useState(false);
   const [partSearch, setPartSearch] = useState("");
+  const [partSearching, setPartSearching] = useState(false);
   const [partsList, setPartsList] = useState<{ id: string; part_name: string; oe_number: string | null }[]>([]);
   const [selectedPartId, setSelectedPartId] = useState<string | null>(null);
   const [partQuantity, setPartQuantity] = useState("1");
@@ -202,20 +204,28 @@ export default function JobDetailPage() {
   useEffect(() => {
     if (!addPartOpen || !partSearch.trim() || partSearch.length < 2) {
       setPartsList([]);
+      setPartSearching(false);
       return;
     }
     const q = partSearch.trim();
+    let cancelled = false;
+    setPartSearching(true);
     supabase
       .from("parts")
       .select("id, part_name, oe_number")
       .is("deleted_at", null)
       .or(`part_name.ilike.%${q}%,oe_number.ilike.%${q}%`)
       .limit(10)
-      .then(({ data }) =>
+      .then(({ data }) => {
+        if (cancelled) return;
         setPartsList(
           (data as { id: string; part_name: string; oe_number: string | null }[]) ?? []
-        )
-      );
+        );
+        setPartSearching(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [addPartOpen, partSearch]);
 
   async function handleAddPart() {
@@ -487,7 +497,7 @@ export default function JobDetailPage() {
                     job.is_battery_only ? b.bay_type === "battery_lab" : b.bay_type !== "battery_lab"
                   )
                   .map((b) => (
-                    <SelectItem key={b.id} value={b.id}>
+                    <SelectItem key={b.id} value={String(b.id)}>
                       {b.name} ({b.bay_type})
                     </SelectItem>
                   ))}
@@ -585,7 +595,7 @@ export default function JobDetailPage() {
             <div>
               <Label>Estimated / Actual Hours</Label>
               <p>
-                {job.estimated_hours ?? "—"}h / {job.actual_hours ?? "—"}h
+                {formatHours(job.estimated_hours)}h / {formatHours(job.actual_hours)}h
               </p>
             </div>
             <div>
@@ -781,6 +791,18 @@ export default function JobDetailPage() {
                 ))}
               </div>
             )}
+            {partSearch.trim().length >= 2 &&
+              partSearching &&
+              partsList.length === 0 && (
+                <p className="text-muted-foreground text-sm">Searching…</p>
+              )}
+            {partSearch.trim().length >= 2 &&
+              !partSearching &&
+              partsList.length === 0 && (
+                <p className="text-muted-foreground text-sm">
+                  No parts found for &ldquo;{partSearch.trim()}&rdquo;.
+                </p>
+              )}
             {selectedPartId && (
               <>
                 <div>

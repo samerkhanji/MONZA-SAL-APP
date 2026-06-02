@@ -41,6 +41,19 @@ export const JOB_STATUS_TRANSITIONS: Record<string, string[]> = {
   cancelled: [],
 };
 
+/**
+ * Format a job's estimated/actual hours for display.
+ *
+ * `actual_hours` is accumulated from raw minute-level work sessions, so it can
+ * carry long floating-point tails (e.g. 0.0333333333333…). Round to at most two
+ * decimals and drop trailing zeros so "3" stays "3" and 0.0333… reads "0.03".
+ * Returns an em dash for null/undefined/NaN so callers can render `{fmt}h`.
+ */
+export function formatHours(n: number | null | undefined): string {
+  if (n == null || Number.isNaN(n)) return "—";
+  return String(Math.round(n * 100) / 100);
+}
+
 export const PRIORITY_BORDERS: Record<string, string> = {
   low: "border-l-4 border-l-gray-300",
   normal: "border-l-4 border-l-blue-500",

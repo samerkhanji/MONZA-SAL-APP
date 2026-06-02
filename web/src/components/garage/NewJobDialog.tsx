@@ -20,6 +20,7 @@ import { Trash2, ScanLine, Camera } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScannerDialog } from "@/components/scanner/ScannerDialog";
 import { formatError } from "@/lib/error-messages";
+import { sanitizeText } from "@/lib/validation/sanitize";
 
 interface CarOption {
   id: string;
@@ -204,7 +205,11 @@ export function NewJobDialog({
       toast.error("Please select a car");
       return;
     }
-    if (!title.trim()) {
+    // Strip any HTML/markup from the title before it is persisted, so a
+    // payload like `<script>…</script>` never reaches the database. React
+    // escapes on render, but other consumers (PDF/email exports) may not.
+    const cleanTitle = sanitizeText(title);
+    if (!cleanTitle) {
       toast.error("Reason of visit is required");
       return;
     }
@@ -230,7 +235,7 @@ export function NewJobDialog({
         .insert({
           car_id: batteryOnlyJob ? null : selectedCar!.id,
           is_battery_only: batteryOnlyJob,
-          title: title.trim(),
+          title: cleanTitle,
           description: description.trim() || null,
           priority,
           status: "pending",
@@ -268,7 +273,7 @@ export function NewJobDialog({
           event_type: "status_changed",
           from_value: currentStatus,
           to_value: "service",
-          note: `Garage job created: ${title.trim()}`,
+          note: `Garage job created: ${cleanTitle}`,
           created_by: user.id,
         });
       }
@@ -317,8 +322,8 @@ export function NewJobDialog({
             recipients,
             "New garage job",
             batteryOnlyJob
-              ? `New battery-lab job: ${title.trim()}`
-              : `New garage job created: ${title.trim()} for VIN ${selectedCar?.vin ?? "—"}`,
+              ? `New battery-lab job: ${cleanTitle}`
+              : `New garage job created: ${cleanTitle} for VIN ${selectedCar?.vin ?? "—"}`,
             `/garage/jobs/${jobId}`
           )
         );
