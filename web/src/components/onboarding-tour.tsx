@@ -14,6 +14,7 @@ import {
 import { canViewTourStep } from "@/lib/tours/tourPermissions";
 import { recordTourProgress } from "@/lib/tours/tourProgress";
 import { isSensitiveSelector, isSensitiveText } from "@/lib/tours/sensitive";
+import { MISSING_SELECTOR_FALLBACK } from "@/components/tours/TourStepRenderer";
 import type { Tour, TourMode, TourStep } from "@/lib/tours/types";
 
 function isSensitiveStep(step: TourStep): boolean {
@@ -108,16 +109,36 @@ function buildSafeTourSteps(
   isPageTour: boolean
 ): TourStep[] {
   if (!isPageTour || typeof document === "undefined") return steps;
-  return steps.filter((s) => {
-    if (!s.element) return true; // centered modal step
-    if (s.navigateTo) return true; // element mounts after navigation
-    try {
-      return document.querySelector(s.element) !== null;
-    } catch {
-      // Malformed selector — keep the step rather than crash the tour.
-      return true;
+  const out: TourStep[] = [];
+  for (const s of steps) {
+    if (!s.element || s.navigateTo) {
+      out.push(s); // centered modal, or element that mounts after navigation
+      continue;
     }
-  });
+    let present = true;
+    try {
+      present = document.querySelector(s.element) !== null;
+    } catch {
+      present = true; // malformed selector — keep rather than crash
+    }
+    if (present) {
+      out.push(s);
+      continue;
+    }
+    // Missing target. Per spec: don't crash / highlight nothing — log it and
+    // show a centered fallback explaining what the element does (unless the
+    // step opted into "skip").
+    if (s.fallbackBehavior === "skip") continue;
+    if (typeof console !== "undefined") {
+      console.warn(`[tour] missing selector ${s.element} — showing centered fallback`);
+    }
+    out.push({
+      ...s,
+      element: undefined,
+      description: `${s.description}\n\n${MISSING_SELECTOR_FALLBACK}`,
+    });
+  }
+  return out;
 }
 
 // ============================================================================

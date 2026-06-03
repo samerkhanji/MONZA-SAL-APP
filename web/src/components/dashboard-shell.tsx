@@ -42,8 +42,8 @@ import {
   Receipt,
 } from "lucide-react";
 import { useUser } from "@/lib/contexts/UserContext";
-import { OnboardingTour, dispatchTourReplay } from "@/components/onboarding-tour";
-import { TourLauncher } from "@/components/tour-launcher";
+import { TourProvider, dispatchTourReplay } from "@/components/tours/TourProvider";
+import { TourLauncher } from "@/components/tours/TourLauncher";
 import { AIChatWidget } from "@/components/ai-chat-widget";
 import { getTourForRole } from "@/lib/tours/registry";
 import { USER_ROLE_LABELS } from "@/lib/constants/user";
@@ -611,7 +611,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         onOpenChange={setChangePasswordOpen}
       />
 
-      <OnboardingTour />
+      <TourProvider />
       <TourLauncher />
       <AIChatWidget />
     </div>

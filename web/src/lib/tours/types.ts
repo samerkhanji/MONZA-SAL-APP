@@ -68,6 +68,14 @@ export type TourStep = {
   stepMode?: StepMode;
 
   /**
+   * What to do when the step's target element is missing on a page tour:
+   *   "explain" (default) — keep the step as a centered modal with a "not
+   *                         available on your screen" note, and console.warn.
+   *   "skip"              — drop the step entirely.
+   */
+  fallbackBehavior?: "explain" | "skip";
+
+  /**
    * Interactive mode: wait for the user to actually click / type / navigate
    * before advancing. In manual mode this field is ignored and the Next
    * button shows up like normal.
