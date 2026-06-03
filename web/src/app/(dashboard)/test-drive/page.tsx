@@ -63,15 +63,22 @@ export default function TestDrivePage() {
 
   const loadLists = useCallback(async () => {
     setListLoading(true);
-    const [a, r] = await Promise.all([
-      fetchActiveTestDrives(supabase),
-      fetchRecentReturnedTestDrives(supabase, 30),
-    ]);
-    if (a.error) toast.error(formatError(a.error));
-    if (r.error) toast.error(formatError(r.error));
-    setActiveRows(a.data);
-    setReturnedRows(r.data);
-    setListLoading(false);
+    try {
+      const [a, r] = await Promise.all([
+        fetchActiveTestDrives(supabase),
+        fetchRecentReturnedTestDrives(supabase, 30),
+      ]);
+      if (a.error) toast.error(formatError(a.error));
+      if (r.error) toast.error(formatError(r.error));
+      setActiveRows(a.data);
+      setReturnedRows(r.data);
+    } catch (e) {
+      // A thrown fetch (network / unexpected exception) must not leave the page
+      // stuck on the spinner forever — surface it and clear loading.
+      toast.error(formatError(e));
+    } finally {
+      setListLoading(false);
+    }
   }, [supabase]);
 
   useEffect(() => {

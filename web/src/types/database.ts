@@ -1,13 +1,21 @@
 // Car lifecycle: four operational values + scrapped (migration 051; DB-only soft-remove).
 export type CarStatus = "inventory" | "available" | "reserved" | "sold" | "scrapped";
 
-/** UI label; unknown strings (legacy rows) fall back to formatted text. */
+/**
+ * UI label. Includes the operational statuses plus legacy values still present
+ * in data (in_stock, in_workshop, delivered — e.g. migration 162) so they
+ * render and filter cleanly instead of showing a raw lowercase "in stock".
+ * Unknown strings fall back to Title Case.
+ */
 export const CAR_STATUS_LABELS: Record<string, string> = {
   inventory: "Inventory",
   available: "Available",
   reserved: "Reserved",
   sold: "Sold",
   scrapped: "Scrapped",
+  in_stock: "In Stock",
+  in_workshop: "In Workshop",
+  delivered: "Delivered",
 };
 
 /** Statuses users can assign in normal workflows (not scrapped — use archive/scrap flow). */
@@ -15,7 +23,9 @@ export const CAR_STATUS_EDITABLE: CarStatus[] = ["inventory", "available", "rese
 
 export function formatCarStatusLabel(status: string | null | undefined): string {
   if (status == null || status === "") return "—";
-  return CAR_STATUS_LABELS[status] ?? status.replace(/_/g, " ");
+  if (CAR_STATUS_LABELS[status]) return CAR_STATUS_LABELS[status];
+  // Humanise an unknown enum: "ready_for_pickup" → "Ready For Pickup".
+  return status.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 export type LocationType = "showroom1" | "showroom2" | "garage" | "storage" | "inventory";
