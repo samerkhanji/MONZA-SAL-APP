@@ -440,6 +440,15 @@ function ReportsBody() {
             {(["<60", "60-90", "90-180", ">180", "unknown"] as const).map((b) => (
               <div
                 key={b}
+                data-tour-id={
+                  b === "60-90"
+                    ? "reports-aging-bucket-60"
+                    : b === "90-180"
+                      ? "reports-aging-bucket-90-180"
+                      : b === ">180"
+                        ? "reports-aging-bucket-180-plus"
+                        : undefined
+                }
                 className={cn(
                   "rounded-md border p-3 text-center",
                   b === ">180" && "border-red-500/40 bg-red-50/40 dark:bg-red-950/20",
@@ -458,7 +467,7 @@ function ReportsBody() {
           ) : aging.length === 0 ? (
             <p className="text-muted-foreground text-sm">No cars in stock.</p>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto" data-tour-id="reports-aging-vehicle-table">
               <table className="min-w-full text-sm">
                 <thead className="border-b text-left text-xs uppercase text-muted-foreground">
                   <tr>

@@ -603,6 +603,7 @@ export default function GarageInventoryPage() {
                             {canEditPart && (
                               <>
                                 <DropdownMenuItem
+                                  data-tour-id="parts-inventory-stock-in"
                                   onClick={() => {
                                     setStockDialogPart(p);
                                     setStockDialogType("stock_in");
@@ -611,6 +612,7 @@ export default function GarageInventoryPage() {
                                   Stock In
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
+                                  data-tour-id="parts-inventory-stock-out"
                                   disabled={p.quantity === 0}
                                   onClick={() => {
                                     setStockDialogPart(p);
@@ -620,6 +622,7 @@ export default function GarageInventoryPage() {
                                   Stock Out
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
+                                  data-tour-id="parts-inventory-edit"
                                   onClick={() => setEditPart(p)}
                                 >
                                   Edit
@@ -627,12 +630,14 @@ export default function GarageInventoryPage() {
                               </>
                             )}
                             <DropdownMenuItem
+                              data-tour-id="parts-inventory-view-history"
                               onClick={() => setHistoryPart(p)}
                             >
                               View History
                             </DropdownMenuItem>
                             {canDeletePart && (
                               <DropdownMenuItem
+                                data-tour-id="parts-inventory-delete"
                                 className="text-destructive"
                                 onClick={() => setDeletePart(p)}
                               >

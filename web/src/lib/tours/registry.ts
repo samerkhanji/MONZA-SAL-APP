@@ -71,6 +71,7 @@ import { reportsPageTour } from "./page-reports";
 import { requestsPageTour } from "./page-requests";
 import { requestsPendingPageTour } from "./page-requests-pending";
 import { settingsPageTour } from "./page-settings";
+import { settingsProfilePageTour } from "./page-settings-profile";
 import { settingsPermissionsTour } from "./page-settings-permissions";
 import { settingsApprovalThresholdsPageTour } from "./page-settings-approval-thresholds";
 import { settingsNotificationsPageTour } from "./page-settings-notifications";
@@ -137,7 +138,7 @@ const PAGE_TOURS: Record<string, Tour[]> = {
   "/reports": [reportsPageTour],
   "/requests": [requestsPageTour],
   "/requests/pending": [requestsPendingPageTour],
-  "/settings": [settingsPageTour, settingsPermissionsTour],
+  "/settings": [settingsPageTour, settingsProfilePageTour, settingsPermissionsTour],
   "/settings/approval-thresholds": [settingsApprovalThresholdsPageTour],
   "/settings/notifications": [settingsNotificationsPageTour],
   "/settings/workflow-rules": [settingsWorkflowRulesPageTour],

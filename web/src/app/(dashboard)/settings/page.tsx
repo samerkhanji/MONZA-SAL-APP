@@ -619,7 +619,7 @@ export default function SettingsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-4 px-4 sm:px-6 md:gap-6">
-              <div className="rounded-lg border p-4">
+              <div className="rounded-lg border p-4" data-tour-id="settings-profile-user-card">
                 <p className="font-medium text-base">{profile?.full_name ?? "User"}</p>
                 <p className="text-sm text-muted-foreground">
                   {profile?.phone ?? "No phone"}{" "}
@@ -651,7 +651,7 @@ export default function SettingsPage() {
                     onValueChange={(v) => void saveProfileLanguage(v)}
                     disabled={savingLanguage}
                   >
-                    <SelectTrigger id="profile-preferred-language">
+                    <SelectTrigger id="profile-preferred-language" data-tour-id="settings-profile-language-selector">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -677,6 +677,7 @@ export default function SettingsPage() {
                   </div>
                   <Button
                     variant="outline"
+                    data-tour-id="settings-profile-onboarding-tour-button"
                     className="w-full min-h-[44px] sm:w-auto"
                     onClick={async () => {
                       const { data: { user } } = await supabase.auth.getUser();
