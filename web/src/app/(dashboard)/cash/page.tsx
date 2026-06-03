@@ -105,6 +105,10 @@ const fmt = (n: number | null | undefined, currency = "USD") =>
         maximumFractionDigits: 2,
       }).format(n);
 
+// A real drawer variance is never this large — flag it as a likely data/test
+// entry for the owner to verify (it doesn't hide or change the value).
+const IMPLAUSIBLE_VARIANCE = 100000;
+
 export default function CashPage() {
   const { isOwner, hasCapability } = useUser();
   const allowed = isOwner || hasCapability("cashier") || hasCapability("manage_team");
@@ -413,12 +417,22 @@ function Body() {
                             sev > 0 && (s.status === "flagged" ? "text-red-700" : "text-amber-700")
                           )}
                         >
-                          {s.variance == null
-                            ? "—"
-                            : `${Number(s.variance) >= 0 ? "+" : ""}${fmt(
-                                Number(s.variance),
-                                settings?.currency ?? "USD"
-                              ).replace(/^[+-]?\$?/, "$")}`}
+                          <span className="inline-flex items-center justify-end gap-1.5">
+                            {sev >= IMPLAUSIBLE_VARIANCE && (
+                              <span
+                                title="This variance is implausibly large — likely a test or data-entry error. Please verify."
+                                className="rounded bg-amber-100 px-1 text-[10px] font-semibold text-amber-700 dark:bg-amber-950 dark:text-amber-300"
+                              >
+                                ⚠ Verify
+                              </span>
+                            )}
+                            {s.variance == null
+                              ? "—"
+                              : `${Number(s.variance) >= 0 ? "+" : ""}${fmt(
+                                  Number(s.variance),
+                                  settings?.currency ?? "USD"
+                                ).replace(/^[+-]?\$?/, "$")}`}
+                          </span>
                         </td>
                         <td className="px-2 py-1.5 text-muted-foreground">
                           {s.variance_note ?? s.closing_note ?? "—"}
