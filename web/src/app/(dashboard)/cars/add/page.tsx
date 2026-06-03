@@ -14,6 +14,7 @@ type CarUpdate = Database["public"]["Tables"]["cars"]["Update"];
 type SalesOrderInsert = Database["public"]["Tables"]["sales_orders"]["Insert"];
 import {
   CAR_STATUS_LABELS,
+  CAR_STATUS_EDITABLE,
   LOCATION_LABELS,
   CUSTOMS_STATUS_LABELS,
 } from "@/types/database";
@@ -565,9 +566,11 @@ export default function AddCarPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {Object.entries(CAR_STATUS_LABELS).map(([value, label]) => (
+                    {/* Assignable statuses only — Scrapped is an archive-only
+                        state handled via the scrap/delete flow, not picked here. */}
+                    {CAR_STATUS_EDITABLE.map((value) => (
                       <SelectItem key={value} value={value}>
-                        {label}
+                        {CAR_STATUS_LABELS[value]}
                       </SelectItem>
                     ))}
                   </SelectContent>
