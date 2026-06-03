@@ -194,7 +194,9 @@ export function OnboardingTour() {
         nextBtnText: "Next →",
         prevBtnText: "← Back",
         doneBtnText: "Finish",
-        allowClose: true,
+        // Don't let an overlay click or Esc silently end the tour — the user
+        // must use the explicit Close (×) button. Prevents accidental exits.
+        allowClose: false,
         showButtons: isInteractive
           ? ["previous", "close"]
           : ["next", "previous", "close"],
@@ -370,6 +372,16 @@ function buildDriveStep(
     ? `${step.description}\n\n→ ${interactiveHint(step.waitFor)}`
     : step.description;
 
+  // Buttons for this step. The first step never shows "← Back" (there is
+  // nothing before it). Interactive steps that wait for a real action hide
+  // "Next →" so the user has to do the thing.
+  const baseButtons: Array<"next" | "previous" | "close"> =
+    isInteractive && step.waitFor
+      ? ["previous", "close"]
+      : ["next", "previous", "close"];
+  const stepButtons =
+    idx === 0 ? baseButtons.filter((b) => b !== "previous") : baseButtons;
+
   // We pass the element as a getter so driver.js re-resolves it after a
   // navigation (the DOM may not have existed at config-build time).
   const elementGetter = step.element
@@ -386,14 +398,9 @@ function buildDriveStep(
       description: popoverDescription,
       side: step.side ?? "right",
       align: step.align ?? "start",
-      // For interactive steps with a waitFor, hide the Next button (the user
-      // has to actually do the thing to advance). Steps without a waitFor —
-      // welcome / closing modals and purely informational steps — keep Next
-      // visible so the user can still advance in interactive mode.
-      showButtons:
-        isInteractive && step.waitFor
-          ? ["previous", "close"]
-          : ["next", "previous", "close"],
+      // See `stepButtons` above: first step hides Back; interactive wait-steps
+      // hide Next.
+      showButtons: stepButtons,
       progressText: `${idx + 1} / ${total}`,
     },
   };
@@ -485,10 +492,16 @@ function renderFooterMode(
   wrap.style.cssText =
     "display:flex;align-items:center;gap:6px;margin-right:auto;font-size:11px;color:#64748b;";
 
+  // Mode indicator pill — always visible, including on step 1, so the user
+  // can see at a glance whether they're in a guided (interactive) or
+  // read-along (manual) walkthrough.
   const label = document.createElement("span");
   label.textContent =
-    mode === "interactive" ? "Interactive" : "Manual";
-  label.style.cssText = "font-weight:600;";
+    mode === "interactive" ? "● Interactive" : "● Manual";
+  label.style.cssText =
+    mode === "interactive"
+      ? "font-weight:700;color:#2563eb;background:#eff6ff;border-radius:9999px;padding:1px 8px;"
+      : "font-weight:700;color:#475569;background:#f1f5f9;border-radius:9999px;padding:1px 8px;";
 
   const btn = document.createElement("button");
   btn.type = "button";

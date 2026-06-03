@@ -78,7 +78,7 @@ export const reportsPageTour: Tour = {
     {
       title: "That's the Reports page! ✅",
       description:
-        "These numbers refresh every time you open the page. Replay this tour anytime from your profile menu.",
+        "These numbers refresh every time you open the page. Replay this guide anytime from the ? button in the bottom-right corner.",
     },
   ],
 };

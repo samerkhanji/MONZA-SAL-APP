@@ -64,7 +64,7 @@ export const orderedCarsPageTour: Tour = {
     {
       title: "That's it ✅",
       description:
-        "Add cars when they are ordered, receive them with the full checklist when they land, and clear the Awaiting PDI list by completing each car's PDI. Take your time on the checklist — it is the company's proof of what really arrived. You can replay this tour anytime from your profile menu.",
+        "Add cars when they are ordered, receive them with the full checklist when they land, and clear the Awaiting PDI list by completing each car's PDI. Take your time on the checklist — it is the company's proof of what really arrived. You can replay this guide anytime from the ? button in the bottom-right corner.",
     },
   ],
 };

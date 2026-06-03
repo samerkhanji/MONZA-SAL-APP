@@ -16,7 +16,7 @@
 // element render as full-screen modals (use for "Welcome" / "Done" panes).
 // ============================================================================
 
-import type { AppRole } from "@/lib/permissions";
+import type { AppRole, AppCapability } from "@/lib/permissions";
 
 export type TourMode = "manual" | "interactive";
 
@@ -67,4 +67,11 @@ export type Tour = {
 
   /** Which roles can see / launch this tour. Empty / undefined = all roles. */
   allowedRoles?: AppRole[];
+
+  /**
+   * Extra capability gate. If set, the user must have at least one of these
+   * capabilities (in addition to passing the page-access check). Used by
+   * workflow tours that aren't pinned to a single nav page.
+   */
+  requiredCapabilities?: AppCapability[];
 };

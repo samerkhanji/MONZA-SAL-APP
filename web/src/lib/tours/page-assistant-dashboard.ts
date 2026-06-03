@@ -69,7 +69,7 @@ export const assistantDashboardPageTour: Tour = {
     {
       title: "Restart help anytime",
       description:
-        "You can restart this tour anytime if you forget how the page works. Open your profile menu in the top corner and choose the tour option.",
+        "You can restart this tour anytime if you forget how the page works. Open the ? button in the bottom-right corner and choose this page.s guide.",
     },
   ],
 };
