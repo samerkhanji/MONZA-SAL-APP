@@ -141,6 +141,33 @@ const STATUS_COLOR: Record<string, string> = {
 const fmt = (n: number, c = "USD") =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: c, maximumFractionDigits: 2 }).format(n);
 
+// Sanity upper bound on a single line / receipt quantity. Guards against typos
+// like 999999999 and keeps values well clear of any integer-overflow territory.
+const MAX_LINE_QTY = 100000;
+
+// Human-readable labels for DB enums (avoid showing raw "bank_transfer" etc.).
+const PAYMENT_METHODS: { value: string; label: string }[] = [
+  { value: "cash", label: "Cash" },
+  { value: "bank_transfer", label: "Bank transfer" },
+  { value: "cheque", label: "Cheque" },
+  { value: "card", label: "Card" },
+  { value: "other", label: "Other" },
+];
+const PAYMENT_METHOD_LABELS: Record<string, string> = Object.fromEntries(
+  PAYMENT_METHODS.map((m) => [m.value, m.label])
+);
+
+const GRN_CONDITIONS: { value: string; label: string }[] = [
+  { value: "good", label: "Good" },
+  { value: "extra", label: "Extra" },
+  { value: "damaged", label: "Damaged" },
+  { value: "wrong_item", label: "Wrong item" },
+  { value: "short", label: "Short" },
+];
+const GRN_CONDITION_LABELS: Record<string, string> = Object.fromEntries(
+  GRN_CONDITIONS.map((c) => [c.value, c.label])
+);
+
 export default function PurchaseOrderDetailPage() {
   const params = useParams<{ id: string }>();
   const id = params?.id as string;
@@ -165,11 +192,18 @@ export default function PurchaseOrderDetailPage() {
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
+  const [discardOpen, setDiscardOpen] = useState(false);
+  const [approveOpen, setApproveOpen] = useState(false);
   const [sendOpen, setSendOpen] = useState(false);
+  const [deleteLineId, setDeleteLineId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!id) return;
-    setLoading(true);
+    // NOTE: do NOT set loading=true here. `loading` starts true for the first
+    // render (initial skeleton), but on every post-mutation refetch flipping it
+    // back to true unmounts the whole page to the skeleton — the "white screen
+    // flash" seen after Add line / GRN / invoice / payment. Leave it false on
+    // refetch so the page updates in place.
     const [p, l, r, inv, pay, allParts] = await Promise.all([
       supabase.from("purchase_orders").select("*").eq("id", id).is("deleted_at", null).maybeSingle(),
       supabase.from("purchase_order_lines").select("*").eq("po_id", id).order("sort_order"),
@@ -329,7 +363,7 @@ export default function PurchaseOrderDetailPage() {
                             size="icon-xs"
                             variant="ghost"
                             className="text-muted-foreground hover:text-destructive"
-                            onClick={() => void deleteLine(supabase, l.id, lines, setLines)}
+                            onClick={() => setDeleteLineId(l.id)}
                           >
                             <Trash2 className="size-3.5" />
                           </Button>
@@ -346,6 +380,9 @@ export default function PurchaseOrderDetailPage() {
             <AddLineForm
               poId={po.id}
               parts={parts}
+              existingPartIds={lines
+                .map((l) => l.part_id)
+                .filter((v): v is string => !!v)}
               onAdded={() => void load()}
             />
           )}
@@ -383,7 +420,7 @@ export default function PurchaseOrderDetailPage() {
               )}
               <Button
                 variant="outline"
-                onClick={() => setCancelOpen(true)}
+                onClick={() => setDiscardOpen(true)}
                 disabled={busy}
               >
                 Cancel draft
@@ -393,20 +430,7 @@ export default function PurchaseOrderDetailPage() {
 
           {isPending && isOwner && (
             <>
-              <Button
-                onClick={async () => {
-                  setBusy(true);
-                  const { error } = await supabase.rpc("approve_purchase_order", { p_po_id: po.id });
-                  setBusy(false);
-                  if (error) {
-                    toast.error(formatError(error));
-                    return;
-                  }
-                  toast.success("Approved");
-                  void load();
-                }}
-                disabled={busy}
-              >
+              <Button onClick={() => setApproveOpen(true)} disabled={busy}>
                 Approve
               </Button>
               <Button
@@ -437,11 +461,14 @@ export default function PurchaseOrderDetailPage() {
             </Button>
           )}
 
-          {invoices.length > 0 && canPay && (
-            <Button variant="secondary" onClick={() => setPaymentOpen(true)} disabled={busy}>
-              Record payment
-            </Button>
-          )}
+          {invoices.length > 0 &&
+            canPay &&
+            po.status !== "paid" &&
+            po.status !== "cancelled" && (
+              <Button variant="secondary" onClick={() => setPaymentOpen(true)} disabled={busy}>
+                Record payment
+              </Button>
+            )}
 
           {!["received", "invoiced", "paid", "cancelled", "rejected"].includes(po.status) && canManage && (
             <Button
@@ -482,7 +509,7 @@ export default function PurchaseOrderDetailPage() {
                         <li key={rl.id}>
                           {ln?.part_name ?? rl.po_line_id} · qty {rl.quantity_received} ·{" "}
                           <span className={rl.condition === "good" ? "" : "text-amber-700"}>
-                            {rl.condition}
+                            {GRN_CONDITION_LABELS[rl.condition] ?? rl.condition}
                           </span>
                           {rl.note ? ` — ${rl.note}` : ""}
                         </li>
@@ -512,8 +539,11 @@ export default function PurchaseOrderDetailPage() {
                 <div>
                   <p className="font-medium">{inv.supplier_invoice_number}</p>
                   <p className="text-muted-foreground text-xs">
-                    {inv.invoice_date} · {fmt(Number(inv.amount), inv.currency)}
-                    {inv.due_at ? ` · due ${inv.due_at}` : ""}
+                    {new Date(inv.invoice_date).toLocaleDateString()} ·{" "}
+                    {fmt(Number(inv.amount), inv.currency)}
+                    {inv.due_at
+                      ? ` · due ${new Date(inv.due_at).toLocaleDateString()}`
+                      : ""}
                   </p>
                 </div>
                 <Badge variant="outline" className="h-5 px-1.5 text-[10px]">
@@ -527,7 +557,8 @@ export default function PurchaseOrderDetailPage() {
                 <ul className="space-y-1 text-sm">
                   {payments.map((p) => (
                     <li key={p.id} className="text-muted-foreground">
-                      {new Date(p.paid_at).toLocaleDateString()} · {p.payment_method} ·{" "}
+                      {new Date(p.paid_at).toLocaleDateString()} ·{" "}
+                      {PAYMENT_METHOD_LABELS[p.payment_method] ?? p.payment_method} ·{" "}
                       {fmt(Number(p.amount), p.currency)}
                       {p.reference ? ` · ref ${p.reference}` : ""}
                     </li>
@@ -619,6 +650,111 @@ export default function PurchaseOrderDetailPage() {
           void load();
         }}
       />
+
+      {/* Approve confirmation — approval is financially binding, so confirm
+          the single click. */}
+      <AlertDialog open={approveOpen} onOpenChange={(v) => !v && setApproveOpen(false)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Approve this purchase order?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {po.po_number} for {fmt(totalEstimate, po.currency)} will be
+              approved and can then be sent to the supplier. This is a binding
+              approval.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async (e) => {
+                e.preventDefault();
+                setBusy(true);
+                const { error } = await supabase.rpc("approve_purchase_order", { p_po_id: po.id });
+                setBusy(false);
+                if (error) {
+                  toast.error(formatError(error));
+                  return;
+                }
+                toast.success("Approved");
+                setApproveOpen(false);
+                void load();
+              }}
+            >
+              Approve PO
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Draft discard — lighter than the formal "Cancel PO" flow (no required
+          reason); a draft was never sent to anyone. */}
+      <AlertDialog open={discardOpen} onOpenChange={(v) => !v && setDiscardOpen(false)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Discard this draft?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This draft purchase order will be removed. It was never sent to a
+              supplier, so nothing else is affected.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>Keep draft</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async (e) => {
+                e.preventDefault();
+                setBusy(true);
+                const { error } = await supabase.rpc("cancel_purchase_order", {
+                  p_po_id: po.id,
+                  p_reason: "Draft discarded",
+                });
+                setBusy(false);
+                if (error) {
+                  toast.error(formatError(error));
+                  return;
+                }
+                toast.success("Draft discarded");
+                setDiscardOpen(false);
+                void load();
+              }}
+            >
+              Discard draft
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Line-item delete confirmation (UX: no more instant irreversible delete). */}
+      <AlertDialog
+        open={deleteLineId !== null}
+        onOpenChange={(v) => !v && setDeleteLineId(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove this line item?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {(() => {
+                const ln = lines.find((x) => x.id === deleteLineId);
+                return ln
+                  ? `"${ln.part_name}" (qty ${ln.quantity}) will be removed from this PO.`
+                  : "This line will be removed from this PO.";
+              })()}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                const target = deleteLineId;
+                setDeleteLineId(null);
+                if (target) void deleteLine(supabase, target, lines, setLines);
+              }}
+            >
+              Remove line
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -641,10 +777,12 @@ async function deleteLine(
 function AddLineForm({
   poId,
   parts,
+  existingPartIds,
   onAdded,
 }: {
   poId: string;
   parts: PartOption[];
+  existingPartIds: string[];
   onAdded: () => void;
 }) {
   const supabase = createClient();
@@ -660,10 +798,18 @@ function AddLineForm({
       toast.error("Pick a part");
       return;
     }
+    if (existingPartIds.includes(p.id)) {
+      toast.error("This part is already on this PO. Remove that line first to change its quantity.");
+      return;
+    }
     const qty = Number(quantity);
     const uc = Number(unitCost);
-    if (!qty || qty <= 0) {
-      toast.error("Quantity must be > 0");
+    if (!Number.isInteger(qty) || qty <= 0) {
+      toast.error("Quantity must be a whole number greater than 0");
+      return;
+    }
+    if (qty > MAX_LINE_QTY) {
+      toast.error(`Quantity can't exceed ${MAX_LINE_QTY.toLocaleString()}`);
       return;
     }
     setSubmitting(true);
@@ -714,8 +860,10 @@ function AddLineForm({
           <Label className="text-xs">Quantity *</Label>
           <Input
             type="number"
-            inputMode="decimal"
+            inputMode="numeric"
             min={1}
+            max={MAX_LINE_QTY}
+            step={1}
             value={quantity}
             onChange={(e) => setQuantity(e.target.value)}
           />
@@ -785,15 +933,40 @@ function ReceiptDialog({
   }, [open, lines, received]);
 
   async function submit() {
+    // Validate every entered qty up-front so a bad value surfaces a friendly
+    // message instead of a raw DB check-constraint error (and never reaches the
+    // RPC as a negative/decimal/oversized number).
+    for (const l of lines) {
+      const raw = perLine[l.id]?.qty ?? "";
+      if (raw.trim() === "") continue;
+      const qty = Number(raw);
+      if (!Number.isInteger(qty) || qty < 0) {
+        toast.error(`Received qty for "${l.part_name}" must be a whole number of 0 or more`);
+        return;
+      }
+      if (qty > MAX_LINE_QTY) {
+        toast.error(`Received qty for "${l.part_name}" can't exceed ${MAX_LINE_QTY.toLocaleString()}`);
+        return;
+      }
+      // Catch over-receipt here with the part name, so the user never sees the
+      // raw "Over-receipt blocked on line <uuid>" database error.
+      const already = received.get(l.id) ?? 0;
+      const remaining = Number(l.quantity) - already;
+      if (qty > remaining) {
+        toast.error(
+          `Can't receive ${qty} of "${l.part_name}" — only ${Math.max(0, remaining)} remaining (ordered ${l.quantity}, already received ${already}).`
+        );
+        return;
+      }
+    }
     const rl = lines
       .map((l) => {
-        const v = perLine[l.id];
-        const qty = Number(v?.qty ?? 0);
+        const qty = Number(perLine[l.id]?.qty ?? 0);
         if (!qty) return null;
         return {
           po_line_id: l.id,
           quantity_received: qty,
-          condition: v?.cond ?? "good",
+          condition: perLine[l.id]?.cond ?? "good",
         };
       })
       .filter(Boolean);
@@ -862,8 +1035,10 @@ function ReceiptDialog({
                     <td className="px-2 py-1">
                       <Input
                         type="number"
-                        inputMode="decimal"
+                        inputMode="numeric"
                         min={0}
+                        max={MAX_LINE_QTY}
+                        step={1}
                         value={v.qty}
                         onChange={(e) =>
                           setPerLine((prev) => ({
@@ -885,11 +1060,11 @@ function ReceiptDialog({
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="good">good</SelectItem>
-                          <SelectItem value="extra">extra</SelectItem>
-                          <SelectItem value="damaged">damaged</SelectItem>
-                          <SelectItem value="wrong_item">wrong item</SelectItem>
-                          <SelectItem value="short">short</SelectItem>
+                          {GRN_CONDITIONS.map((c) => (
+                            <SelectItem key={c.value} value={c.value}>
+                              {c.label}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </td>
@@ -948,6 +1123,10 @@ function InvoiceDialog({
       toast.error("Invoice number + amount are required");
       return;
     }
+    if (!invDate) {
+      toast.error("Invoice date is required");
+      return;
+    }
     setSubmitting(true);
     const trimmedFileUrl = fileUrl.trim();
     const { error } = await supabase.rpc("attach_purchase_order_invoice", {
@@ -974,6 +1153,9 @@ function InvoiceDialog({
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Attach supplier invoice</DialogTitle>
+          <DialogDescription>
+            Record the supplier&apos;s invoice number, date, and amount against this PO.
+          </DialogDescription>
         </DialogHeader>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1 sm:col-span-2">
@@ -1097,6 +1279,9 @@ function PaymentDialog({
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Record payment</DialogTitle>
+          <DialogDescription>
+            Log a payment made against one of this PO&apos;s invoices.
+          </DialogDescription>
         </DialogHeader>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1 sm:col-span-2">
@@ -1131,11 +1316,11 @@ function PaymentDialog({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="cash">cash</SelectItem>
-                <SelectItem value="bank_transfer">bank transfer</SelectItem>
-                <SelectItem value="cheque">cheque</SelectItem>
-                <SelectItem value="card">card</SelectItem>
-                <SelectItem value="other">other</SelectItem>
+                {PAYMENT_METHODS.map((m) => (
+                  <SelectItem key={m.value} value={m.value}>
+                    {m.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -1265,6 +1450,11 @@ function ReasonDialog({
         <div className="space-y-1">
           <Label>Reason *</Label>
           <Textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={3} />
+          {!reason.trim() && (
+            <p className="text-muted-foreground text-xs">
+              A reason is required before you can confirm.
+            </p>
+          )}
         </div>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={submitting}>Cancel</AlertDialogCancel>

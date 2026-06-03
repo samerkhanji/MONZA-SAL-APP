@@ -640,7 +640,7 @@ export function CarsInventoryClient({
             <Input
               id="car-inventory-search"
               name="car-inventory-search"
-              placeholder="Search by VIN, plate, brand, model..."
+              placeholder="Search VIN, plate, brand…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="min-h-11 flex-1 text-base sm:text-sm"

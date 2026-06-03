@@ -16,13 +16,27 @@
 // element render as full-screen modals (use for "Welcome" / "Done" panes).
 // ============================================================================
 
-import type { AppRole } from "@/lib/permissions";
+import type { AppRole, AppCapability } from "@/lib/permissions";
 
 export type TourMode = "manual" | "interactive";
 
 export type WaitFor = "click" | "input" | "navigation";
 
+/** Editorial role of a step — drives styling/heuristics, optional. */
+export type TourStepType =
+  | "overview"
+  | "section"
+  | "action"
+  | "warning"
+  | "workflow"
+  | "summary";
+
+/** Whether a step participates in interactive (hands-on) running. */
+export type StepMode = "read-only" | "interactive" | "both";
+
 export type TourStep = {
+  /** Stable id (optional) — used for progress / analytics. */
+  id?: string;
   /** CSS selector for the element to highlight. Omit for a centered modal. */
   element?: string;
   title: string;
@@ -30,6 +44,36 @@ export type TourStep = {
   /** driver.js positioning hints; defaults to "right" / "start". */
   side?: "left" | "right" | "top" | "bottom" | "over";
   align?: "start" | "center" | "end";
+
+  /** Editorial type (overview / section / action / warning / …). */
+  type?: TourStepType;
+
+  /**
+   * Step-level permission gates. A step is skipped (not shown) when the user's
+   * role isn't in `visibleToRoles`, or they hold none of `requiredCapabilities`.
+   * Lets one tour serve several roles, hiding sensitive/owner-only steps.
+   */
+  visibleToRoles?: AppRole[];
+  requiredCapabilities?: AppCapability[];
+
+  /**
+   * Marks a step that explains a sensitive final action (approve / reject /
+   * refund / void / delete / finalize / close-drawer …). In interactive mode
+   * the runner NEVER auto-advances on this element — the user reads a warning
+   * and clicks Next themselves, so a tour can never auto-submit the action.
+   */
+  isSensitive?: boolean;
+
+  /** "read-only" steps never auto-advance even with `waitFor` set. */
+  stepMode?: StepMode;
+
+  /**
+   * What to do when the step's target element is missing on a page tour:
+   *   "explain" (default) — keep the step as a centered modal with a "not
+   *                         available on your screen" note, and console.warn.
+   *   "skip"              — drop the step entirely.
+   */
+  fallbackBehavior?: "explain" | "skip";
 
   /**
    * Interactive mode: wait for the user to actually click / type / navigate
@@ -67,4 +111,11 @@ export type Tour = {
 
   /** Which roles can see / launch this tour. Empty / undefined = all roles. */
   allowedRoles?: AppRole[];
+
+  /**
+   * Extra capability gate. If set, the user must have at least one of these
+   * capabilities (in addition to passing the page-access check). Used by
+   * workflow tours that aren't pinned to a single nav page.
+   */
+  requiredCapabilities?: AppCapability[];
 };

@@ -220,12 +220,13 @@ export function TwoFactorAuthSection() {
           <p className="text-sm text-muted-foreground">Loading…</p>
         ) : verified ? (
           <div className="space-y-3">
-            <div className="rounded-md border border-green-500/30 bg-green-50 p-3 text-sm dark:bg-green-950">
+            <div className="rounded-md border border-green-500/30 bg-green-50 p-3 text-sm dark:bg-green-950" data-tour-id="settings-profile-2fa-status">
               ✓ Two-factor authentication is <span className="font-semibold">enabled</span>.
             </div>
             <Button
               variant="outline"
               size="sm"
+              data-tour-id="settings-profile-disable-2fa"
               onClick={() => setDisableTarget(verified.id)}
             >
               Disable two-factor auth

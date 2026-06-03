@@ -79,7 +79,7 @@ export const overviewPageTour: Tour = {
       title: "That's the owner overview! 🎉",
       description:
         "Scroll down for more — garage tasks, requests by urgency, installments due soon, and low stock parts. " +
-        "Every panel has a link to dig into the details. Replay this tour anytime from your profile menu.",
+        "Every panel has a link to dig into the details. Replay this guide anytime from the ? button in the bottom-right corner.",
     },
   ],
 };

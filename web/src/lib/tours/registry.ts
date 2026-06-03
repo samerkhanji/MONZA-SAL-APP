@@ -71,6 +71,7 @@ import { reportsPageTour } from "./page-reports";
 import { requestsPageTour } from "./page-requests";
 import { requestsPendingPageTour } from "./page-requests-pending";
 import { settingsPageTour } from "./page-settings";
+import { settingsProfilePageTour } from "./page-settings-profile";
 import { settingsPermissionsTour } from "./page-settings-permissions";
 import { settingsApprovalThresholdsPageTour } from "./page-settings-approval-thresholds";
 import { settingsNotificationsPageTour } from "./page-settings-notifications";
@@ -137,7 +138,7 @@ const PAGE_TOURS: Record<string, Tour[]> = {
   "/reports": [reportsPageTour],
   "/requests": [requestsPageTour],
   "/requests/pending": [requestsPendingPageTour],
-  "/settings": [settingsPageTour, settingsPermissionsTour],
+  "/settings": [settingsPageTour, settingsProfilePageTour, settingsPermissionsTour],
   "/settings/approval-thresholds": [settingsApprovalThresholdsPageTour],
   "/settings/notifications": [settingsNotificationsPageTour],
   "/settings/workflow-rules": [settingsWorkflowRulesPageTour],
@@ -172,6 +173,61 @@ const WORKFLOW_TOURS: Tour[] = [
   uploadDocumentsWorkflowTour,
   handleRecallWorkflowTour,
 ];
+
+// ============================================================================
+// Page → related workflow tours. Surfaced under the current page's tour in the
+// launcher. `gatePath`, when set, additionally requires the user to be able to
+// access that path (e.g. "Sell a car" only appears where the user has sales
+// access). Keys may use Next.js dynamic segments.
+// ============================================================================
+type RelatedWorkflow = { id: string; gatePath?: string };
+
+const PAGE_RELATED_WORKFLOWS: Record<string, RelatedWorkflow[]> = {
+  "/cars": [
+    { id: "workflow-add-car-v1" },
+    { id: "workflow-sell-car-v1", gatePath: "/sales-orders" },
+  ],
+  "/cars/add": [{ id: "workflow-add-car-v1" }],
+  "/customers": [{ id: "workflow-add-customer-v1" }],
+  "/customers/add": [{ id: "workflow-add-customer-v1" }],
+  "/sales-orders": [
+    { id: "workflow-sell-car-v1" },
+    { id: "workflow-record-payment-v1" },
+  ],
+  "/installments": [{ id: "workflow-record-payment-v1" }],
+  "/test-drive": [{ id: "workflow-test-drive-v1" }],
+  "/trade-ins": [{ id: "workflow-manage-trade-in-v1" }],
+  "/documents": [{ id: "workflow-upload-documents-v1" }],
+  "/garage": [
+    { id: "workflow-create-job-v1" },
+    { id: "workflow-assign-work-v1" },
+    { id: "workflow-update-job-status-v1" },
+    { id: "workflow-add-parts-to-job-v1" },
+  ],
+  "/garage/jobs/[id]": [
+    { id: "workflow-update-job-status-v1" },
+    { id: "workflow-add-parts-to-job-v1" },
+  ],
+  "/garage/tasks": [{ id: "workflow-assign-work-v1" }],
+  "/garage/inventory": [
+    { id: "workflow-manage-low-stock-v1" },
+    { id: "workflow-receive-parts-v1", gatePath: "/garage/purchase-orders" },
+  ],
+  "/garage/purchase-orders": [
+    { id: "workflow-create-purchase-order-v1" },
+    { id: "workflow-receive-parts-v1" },
+  ],
+  "/garage/purchase-orders/[id]": [{ id: "workflow-receive-parts-v1" }],
+  "/garage/warranty": [{ id: "workflow-warranty-case-v1" }],
+  "/garage/recalls": [{ id: "workflow-handle-recall-v1" }],
+  "/garage/refunds": [{ id: "workflow-process-refund-v1" }],
+  "/requests": [
+    { id: "workflow-submit-request-v1" },
+    { id: "workflow-review-requests-v1", gatePath: "/reports" },
+  ],
+  "/reports": [{ id: "workflow-check-reports-v1" }],
+  "/data-health": [{ id: "workflow-fix-data-health-v1" }],
+};
 
 // ============================================================================
 // Lookup helpers.
@@ -284,4 +340,48 @@ export function getTourById(id: string): Tour | null {
     if (t.id === id) return t;
   }
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// Capability-aware accessors used by tourPermissions.ts. These return the raw
+// (role/capability-unfiltered) data; tourPermissions applies the page-access
+// gate so the same logic the sidebar uses decides visibility.
+// ---------------------------------------------------------------------------
+
+/** Page tours registered for a path (most-specific key wins), unfiltered. */
+export function getRawPageTours(path: string): Tour[] {
+  const matches = Object.keys(PAGE_TOURS).filter((k) => pageKeyMatches(k, path));
+  if (matches.length === 0) return [];
+  matches.sort((a, b) => literalSegmentCount(b) - literalSegmentCount(a));
+  return PAGE_TOURS[matches[0]];
+}
+
+/** All workflow tours (unfiltered). */
+export function getAllWorkflowTours(): Tour[] {
+  return WORKFLOW_TOURS;
+}
+
+/** All page tours across every route (unfiltered) — for an "all tours" view. */
+export function getAllPageTours(): Tour[] {
+  return Object.values(PAGE_TOURS).flat();
+}
+
+/**
+ * Related workflow tours for a path, each paired with the optional gate path
+ * that further restricts who sees it. tourPermissions resolves the gate.
+ */
+export function getRelatedWorkflows(
+  path: string
+): Array<{ tour: Tour; gatePath?: string }> {
+  const matches = Object.keys(PAGE_RELATED_WORKFLOWS).filter((k) =>
+    pageKeyMatches(k, path)
+  );
+  if (matches.length === 0) return [];
+  matches.sort((a, b) => literalSegmentCount(b) - literalSegmentCount(a));
+  const out: Array<{ tour: Tour; gatePath?: string }> = [];
+  for (const rw of PAGE_RELATED_WORKFLOWS[matches[0]]) {
+    const tour = WORKFLOW_TOURS.find((t) => t.id === rw.id);
+    if (tour) out.push({ tour, gatePath: rw.gatePath });
+  }
+  return out;
 }

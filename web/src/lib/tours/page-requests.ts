@@ -85,7 +85,7 @@ export const requestsPageTour: Tour = {
     {
       title: "That's the Request Center! ✅",
       description:
-        "Check it regularly so nobody is left waiting on a decision. Replay this tour anytime from your profile menu.",
+        "Check it regularly so nobody is left waiting on a decision. Replay this guide anytime from the ? button in the bottom-right corner.",
     },
   ],
 };

@@ -465,9 +465,11 @@ export default function OrderedCarsPage() {
                         {c.shipment_code || "—"}
                       </td>
                       <td className="text-muted-foreground px-3 py-2">
-                        {c.incoming_eta
-                          ? new Date(c.incoming_eta).toLocaleDateString()
-                          : "—"}
+                        {c.incoming_eta ? (
+                          new Date(c.incoming_eta).toLocaleDateString()
+                        ) : (
+                          <span title="No ETA recorded yet.">—</span>
+                        )}
                       </td>
                       <td className="px-3 py-2 text-right">
                         <div className="flex justify-end gap-2">
@@ -549,9 +551,11 @@ export default function OrderedCarsPage() {
                           {c.model_year ? ` (${c.model_year})` : ""}
                         </td>
                         <td className="text-muted-foreground px-3 py-2">
-                          {c.date_arrived
-                            ? new Date(c.date_arrived).toLocaleDateString()
-                            : "—"}
+                          {c.date_arrived ? (
+                            new Date(c.date_arrived).toLocaleDateString()
+                          ) : (
+                            <span title="No arrival date recorded yet.">—</span>
+                          )}
                         </td>
                         <td className="px-3 py-2">
                           <div className="flex flex-wrap items-center gap-1.5">

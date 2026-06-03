@@ -98,7 +98,18 @@ export const garageInventoryPageTour: Tour = {
       element: '[data-tour-id="inventory-row-actions"]',
       title: "Row actions menu",
       description:
-        "The three-dots button on each row. Open it to add stock when parts arrive, take stock out when you use a part, edit the part's details, see its history, or delete it.",
+        "Parts don't have their own page — everything happens from this three-dot menu on each row. It gives you five actions: Stock In, Stock Out, Edit, View History, and Delete. Stock In is used when new quantity arrives. Stock Out is used when parts are consumed, damaged, or adjusted. Edit updates the part details. View History shows every movement for that part.",
+      type: "section",
+      side: "left",
+      align: "start",
+    },
+    {
+      element: '[data-tour-id="parts-inventory-delete"]',
+      title: "Delete a part",
+      description:
+        "Delete removes the part and should only be used if the part was added by mistake — not for parts you've simply run out of (use Stock Out for that). This is destructive; the guide will never click it for you.",
+      type: "warning",
+      isSensitive: true,
       side: "left",
       align: "start",
     },

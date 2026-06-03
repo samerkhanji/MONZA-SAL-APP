@@ -143,7 +143,13 @@ export default function GarageWorkflowSettingsPage() {
       toast.error(typeof j?.error === "string" ? j.error : "Save failed");
       return;
     }
-    toast.success("Capacity updated");
+    if (n === 0) {
+      // Setting capacity to 0 effectively disables the resource — make that
+      // explicit rather than letting it save silently.
+      toast.warning("Capacity set to 0 — no new tasks can use this resource until you raise it.");
+    } else {
+      toast.success("Capacity updated");
+    }
     await loadCapacities();
   }
 
@@ -167,7 +173,10 @@ export default function GarageWorkflowSettingsPage() {
 
   async function createTemplate() {
     const name = newTplName.trim();
-    if (!name) return;
+    if (!name) {
+      toast.error("Template name is required");
+      return;
+    }
     const { data: u } = await supabase.auth.getUser();
     const { error } = await supabase.from("garage_task_templates").insert({
       name,
@@ -196,7 +205,10 @@ export default function GarageWorkflowSettingsPage() {
 
   async function addItem(templateId: string) {
     const desc = (newItemDescByTpl[templateId] ?? "").trim();
-    if (!desc) return;
+    if (!desc) {
+      toast.error("Line description is required");
+      return;
+    }
     const list = itemsByTpl[templateId] ?? [];
     const { error } = await supabase.from("garage_task_template_items").insert({
       template_id: templateId,
@@ -248,7 +260,7 @@ export default function GarageWorkflowSettingsPage() {
       <Card data-tour-id="settings-capacities-panel">
         <CardHeader>
           <CardTitle>Resource capacities</CardTitle>
-          <CardDescription>Usage = tasks in pending or in_progress with this resource_type</CardDescription>
+          <CardDescription>Usage = tasks that are pending or in progress for this resource</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {caps.map((c) => {
@@ -353,7 +365,7 @@ export default function GarageWorkflowSettingsPage() {
                 <Button variant="outline" onClick={() => setNewTplOpen(false)}>
                   Cancel
                 </Button>
-                <Button onClick={() => void createTemplate()}>Create</Button>
+                <Button onClick={() => void createTemplate()} disabled={!newTplName.trim()}>Create</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -405,6 +417,7 @@ export default function GarageWorkflowSettingsPage() {
                   type="button"
                   size="sm"
                   onClick={() => void addItem(t.id)}
+                  disabled={!(newItemDescByTpl[t.id] ?? "").trim()}
                 >
                   Add line
                 </Button>

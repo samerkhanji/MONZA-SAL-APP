@@ -93,7 +93,8 @@ export const settingsPageTour: Tour = {
       align: "start",
     },
     {
-      element: '[data-tour-id="settings-audit-panel"]',
+      element: '[data-tour-id="settings-audit-log-panel"]',
+      navigateTo: "/settings?tab=audit-log",
       title: "Audit Log tab",
       description:
         "A history of who did what — every car moved, part used, or note added. " +
@@ -112,7 +113,7 @@ export const settingsPageTour: Tour = {
     {
       title: "That's Settings! ✅",
       description:
-        "This is your control room — only you and people you trust should be in here. Replay this tour anytime from your profile menu.",
+        "This is your control room — only you and people you trust should be in here. Replay this guide anytime from the ? button in the bottom-right corner.",
     },
   ],
 };

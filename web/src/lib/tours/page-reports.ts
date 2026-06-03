@@ -53,8 +53,18 @@ export const reportsPageTour: Tour = {
       element: '[data-tour-id="reports-inventory-aging-panel"]',
       title: "Inventory aging",
       description:
-        "How long cars have been sitting unsold. Cars over 90 days are flagged — old stock ties up your money, so these are the ones to push.",
+        "This section shows how long unsold cars have been sitting in stock. A car in the 90–180 day bucket should trigger a pricing review and proactive sales outreach. A car crossing into >180 days should be discussed with the owner immediately. Holding unsold inventory for more than 6 months significantly impacts company liquidity.",
+      type: "section",
       side: "top",
+      align: "start",
+    },
+    {
+      element: '[data-tour-id="reports-aging-bucket-90-180"]',
+      title: "The 90–180 day bucket",
+      description:
+        "Cars here arrived months ago and still haven't sold. Treat this bucket as your action list: review pricing and call warm leads. Anything that slips past 180 days (the red tile) needs an owner conversation.",
+      type: "warning",
+      side: "bottom",
       align: "start",
     },
     {
@@ -78,7 +88,7 @@ export const reportsPageTour: Tour = {
     {
       title: "That's the Reports page! ✅",
       description:
-        "These numbers refresh every time you open the page. Replay this tour anytime from your profile menu.",
+        "These numbers refresh every time you open the page. Replay this guide anytime from the ? button in the bottom-right corner.",
     },
   ],
 };

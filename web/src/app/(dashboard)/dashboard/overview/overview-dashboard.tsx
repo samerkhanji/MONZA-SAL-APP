@@ -447,6 +447,16 @@ function SalesRevenueCard({ data }: { data: OwnerOverviewData }) {
               ) : (
                 <p className="mt-0.5 text-xs text-muted-foreground">USD only this month</p>
               )}
+              {data.salesMTD.units > 0 && usd + otherCurrencyTotal === 0 ? (
+                <p className="mt-1.5 rounded-md border border-amber-500/40 bg-amber-50/60 px-2 py-1 text-[11px] text-amber-700 dark:bg-amber-950/30 dark:text-amber-300">
+                  Revenue is $0 even though cars were delivered — those sales orders
+                  are missing selling prices.{" "}
+                  <Link href="/data-health" className="font-medium underline">
+                    Fix in Data Health
+                  </Link>
+                  .
+                </p>
+              ) : null}
             </div>
           </div>
           <div>

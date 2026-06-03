@@ -42,8 +42,8 @@ import {
   Receipt,
 } from "lucide-react";
 import { useUser } from "@/lib/contexts/UserContext";
-import { OnboardingTour, dispatchTourReplay } from "@/components/onboarding-tour";
-import { TourLauncher } from "@/components/tour-launcher";
+import { TourProvider, dispatchTourReplay } from "@/components/tours/TourProvider";
+import { TourLauncher } from "@/components/tours/TourLauncher";
 import { AIChatWidget } from "@/components/ai-chat-widget";
 import { getTourForRole } from "@/lib/tours/registry";
 import { USER_ROLE_LABELS } from "@/lib/constants/user";
@@ -62,6 +62,7 @@ import { useInstall } from "@/lib/contexts/InstallContext";
 import { signOut } from "@/lib/auth-session";
 import { cn } from "@/lib/utils";
 import { ROLES_WITH_DATA_HEALTH_ACCESS } from "@/lib/data-health-config";
+import { canAccessNavHref } from "@/lib/nav-access";
 
 const BASE_NAV_ITEMS: Array<{
   href: string;
@@ -118,10 +119,10 @@ const BASE_NAV_ITEMS: Array<{
   { href: "/reports", label: "Reports", icon: BarChart3, tourId: "nav-reports" },
   {
     href: "/garage",
-    label: "Garage",
+    label: "Garage (Jobs)",
     icon: Wrench,
+    tourId: "nav-garage",
     children: [
-      { href: "/garage", label: "Jobs", icon: Wrench, tourId: "nav-garage" },
       {
         href: "/garage/tasks",
         label: "Task board",
@@ -241,14 +242,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     noProfile,
     connectionError,
     retryConnection,
-    canSeeDashboard,
-    canSeeCars,
-    canSeeDocuments,
     canSeePartsInventory,
     canSeeGarageJobs,
     canSeeSettings,
-    isRequestAssistant,
-    isOwner,
     appRole,
     hasCapability,
   } = useUser();
@@ -269,195 +265,21 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     () =>
       BASE_NAV_ITEMS.filter((item) => {
         if (!appRole) return false;
-        if (item.ownerOnly) {
-          return appRole === "owner";
-        }
-        if (item.assistantDashboard) {
+        const user = { appRole, hasCapability };
+        // Garage parent: visible if any of its gated children is accessible.
+        // `/ordered-parts` has no gate of its own, so it does not by itself
+        // make the parent appear (matches prior behaviour).
+        if (item.href === "/garage" && item.children?.length) {
+          // Parent (the Jobs list) visible if the user can open Jobs, or any of
+          // its gated children. `/ordered-parts` has no gate of its own.
           return (
-            appRole === "assistant" ||
-            appRole === "owner" ||
-            appRole === "hybrid" ||
-            appRole === "khalil_hybrid"
-          );
-        }
-        if (item.href === "/dashboard") {
-          return appRole === "owner";
-        }
-        if (item.href === "/data-health") {
-          return appRole && ROLES_WITH_DATA_HEALTH_ACCESS.includes(appRole);
-        }
-        if (item.href === "/reports") {
-          return (
-            appRole === "owner" ||
-            hasCapability("view_reports") ||
-            hasCapability("manage_team")
-          );
-        }
-        if (item.href === "/requests")
-          return [
-            "owner",
-            "assistant",
-            "hybrid",
-            "khalil_hybrid",
-            "it",
-            "garage_manager",
-            "garage_staff",
-            "sales_ops",
-            "sales",
-          ].includes(appRole);
-        if (
-          item.href === "/cars" ||
-          item.href === "/recall-center" ||
-          item.href === "/ordered-cars"
-        )
-          return [
-            "owner",
-            "assistant",
-            "hybrid",
-            "khalil_hybrid",
-            "it",
-            "sales_ops",
-            "sales",
-          ].includes(appRole);
-        if (item.href === "/customers")
-          return [
-            "owner",
-            "assistant",
-            "hybrid",
-            "khalil_hybrid",
-            "sales_ops",
-            "sales",
-          ].includes(appRole);
-        if (item.href === "/installments")
-          return [
-            "owner",
-            "assistant",
-            "hybrid",
-            "khalil_hybrid",
-            "sales_ops",
-            "sales",
-          ].includes(appRole);
-        if (item.href === "/company-costs")
-          return (
-            appRole === "owner" ||
-            hasCapability("view_reports") ||
-            hasCapability("cashier") ||
-            hasCapability("garage") ||
-            hasCapability("manage_team")
-          );
-        if (item.href === "/sales-orders")
-          return [
-            "owner",
-            "assistant",
-            "sales_ops",
-            "sales",
-          ].includes(appRole);
-        if (item.href === "/trade-ins")
-          return (
-            appRole === "owner" ||
-            hasCapability("sales") ||
-            hasCapability("garage") ||
-            hasCapability("manage_team") ||
-            hasCapability("view_reports")
-          );
-        if (item.href === "/documents")
-          return [
-            "owner",
-            "assistant",
-            "hybrid",
-            "khalil_hybrid",
-            "it",
-            "garage_manager",
-            "sales_ops",
-            "sales",
-          ].includes(appRole);
-        if (item.href === "/garage") {
-          // Parent is shown if any child is visible
-          const visibleChildren = item.children?.filter((child) => {
-            if (child.href === "/garage")
-              return [
-                "owner",
-                "assistant",
-                "hybrid",
-                "khalil_hybrid",
-                "garage_manager",
-                "garage_staff",
-              ].includes(appRole);
-            if (child.href === "/garage/inventory")
-              return [
-                "owner",
-                "assistant",
-                "hybrid",
-                "khalil_hybrid",
-                "it",
-                "garage_manager",
-                "garage_staff",
-              ].includes(appRole);
-            if (child.href === "/garage/history")
-              return [
-                "owner",
-                "assistant",
-                "hybrid",
-                "khalil_hybrid",
-                "garage_manager",
-                "sales_ops",
-                "sales",
-              ].includes(appRole);
-            if (child.href === "/garage/efficiency")
-              return [
-                "owner",
-                "assistant",
-                "garage_manager",
-                "hybrid",
-                "khalil_hybrid",
-              ].includes(appRole);
-            if (child.href === "/garage/tasks")
-              return [
-                "owner",
-                "assistant",
-                "hybrid",
-                "khalil_hybrid",
-                "garage_manager",
-                "garage_staff",
-              ].includes(appRole);
-            if (
-              child.href === "/garage/suppliers" ||
-              child.href === "/garage/purchase-orders"
+            canAccessNavHref("/garage", user) ||
+            item.children.some(
+              (c) => c.href !== "/ordered-parts" && canAccessNavHref(c.href, user)
             )
-              return (
-                appRole === "owner" ||
-                hasCapability("inventory") ||
-                hasCapability("cashier") ||
-                hasCapability("manage_team")
-              );
-            if (child.href === "/garage/warranty" || child.href === "/garage/recalls")
-              return (
-                appRole === "owner" ||
-                hasCapability("garage") ||
-                hasCapability("view_reports") ||
-                hasCapability("manage_team")
-              );
-            if (child.href === "/garage/refunds")
-              return (
-                appRole === "owner" ||
-                hasCapability("garage") ||
-                hasCapability("cashier") ||
-                hasCapability("manage_team") ||
-                hasCapability("view_reports")
-              );
-            if (child.href === "/garage/settings")
-              return (
-                appRole === "owner" ||
-                appRole === "garage_manager" ||
-                appRole === "hybrid" ||
-                appRole === "khalil_hybrid"
-              );
-            return false;
-          });
-          return !!visibleChildren && visibleChildren.length > 0;
+          );
         }
-        if (item.href === "/settings") return appRole === "owner";
-        return true;
+        return canAccessNavHref(item.href, user);
       }),
     [appRole, hasCapability]
   );
@@ -794,7 +616,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         onOpenChange={setChangePasswordOpen}
       />
 
-      <OnboardingTour />
+      <TourProvider />
       <TourLauncher />
       <AIChatWidget />
     </div>

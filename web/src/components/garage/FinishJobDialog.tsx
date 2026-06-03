@@ -269,6 +269,12 @@ export function FinishJobDialog({
             </div>
           </div>
         </div>
+        {!canSubmit && (
+          <p className="text-amber-600 dark:text-amber-400 text-sm" role="alert">
+            Add a description of the work done or upload a photo of the job card
+            before completing.
+          </p>
+        )}
         <DialogFooter>
           <Button variant="outline" onClick={() => handleClose(false)}>
             Cancel

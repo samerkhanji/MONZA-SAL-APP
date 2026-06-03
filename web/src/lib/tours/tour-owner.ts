@@ -23,7 +23,7 @@ export const ownerWelcomeTour: Tour = {
       description:
         "Hi! I'm going to walk you through your dealership in about 2 minutes. " +
         "I'll point at each thing on the screen and tell you what it does. " +
-        "Hit 'Next' to start, or close this window to skip — you can replay the tour anytime from your profile menu in the top-right corner.",
+        "Hit 'Next' to start, or close this window to skip — you can replay it anytime from the ? button in the bottom-right corner.",
     },
     {
       element: '[data-tour-id="nav-dashboard"]',

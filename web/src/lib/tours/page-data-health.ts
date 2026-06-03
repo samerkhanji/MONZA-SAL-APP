@@ -71,7 +71,7 @@ export const dataHealthPageTour: Tour = {
       title: "That's Data Health! ✅",
       description:
         "Below this you'll find each section listed out, with a row for every problem and an 'Edit' or 'Open' button to fix it. " +
-        "Try to clear it out regularly. Replay this tour anytime from your profile menu.",
+        "Try to clear it out regularly. Replay this guide anytime from the ? button in the bottom-right corner.",
     },
   ],
 };

@@ -64,7 +64,10 @@ function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
     <tr
       data-slot="table-row"
       className={cn(
-        "border-b border-border transition-colors odd:bg-gray-50 even:bg-white data-[state=selected]:bg-accent",
+        // Zebra striping. The dark: overrides are required — without them the
+        // hardcoded light backgrounds (bg-gray-50 / bg-white) render under the
+        // light `text-foreground` in dark mode, making every cell invisible.
+        "border-b border-border transition-colors odd:bg-gray-50 even:bg-white dark:odd:bg-muted/30 dark:even:bg-transparent data-[state=selected]:bg-accent",
         className
       )}
       {...props}

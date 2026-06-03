@@ -20,6 +20,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 import { formatError } from "@/lib/error-messages";
 import { cn } from "@/lib/utils";
@@ -108,9 +118,12 @@ export default function WarrantyDetailPage() {
 
   const [resolution, setResolution] = useState("");
   const [savingResolution, setSavingResolution] = useState(false);
+  const [deletePartId, setDeletePartId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    setLoading(true);
+    // `loading` starts true for the first render (skeleton). Don't flip it back
+    // on post-mutation refetches — that unmounts the page to the skeleton (the
+    // "white screen flash" after Add part / delete / save).
     const [w, p, d, allParts] = await Promise.all([
       supabase.from("warranty_cases").select("*").eq("id", id).is("deleted_at", null).single(),
       supabase.from("warranty_case_parts").select("*").eq("case_id", id).order("created_at"),
@@ -184,8 +197,13 @@ export default function WarrantyDetailPage() {
 
   async function saveResolution() {
     if (!wc) return;
+    // Guard against clobbering a previously-saved resolution with an empty one.
+    if (!resolution.trim()) {
+      toast.error("Resolution cannot be empty");
+      return;
+    }
     setSavingResolution(true);
-    const { error } = await supabase.from("warranty_cases").update({ resolution: resolution.trim() || null }).eq("id", wc.id);
+    const { error } = await supabase.from("warranty_cases").update({ resolution: resolution.trim() }).eq("id", wc.id);
     setSavingResolution(false);
     if (error) return toast.error(formatError(error));
     toast.success("Resolution saved");
@@ -335,7 +353,7 @@ export default function WarrantyDetailPage() {
                       <td className="py-1.5 text-right tabular-nums">{p.unit_cost != null ? Number(p.unit_cost).toFixed(2) : "—"}</td>
                       <td className="py-1.5 text-right">
                         {canWrite && (
-                          <Button variant="ghost" size="icon-xs" onClick={() => void removePart(p.id)}>
+                          <Button variant="ghost" size="icon-xs" onClick={() => setDeletePartId(p.id)}>
                             <Trash2 className="size-3.5" />
                           </Button>
                         )}
@@ -395,7 +413,7 @@ export default function WarrantyDetailPage() {
               <Label htmlFor="wc-files" className="text-muted-foreground text-xs uppercase">Upload</Label>
               <Input id="wc-files" type="file" multiple onChange={(e) => void uploadDocs(e.target.files)} />
               <p className="text-muted-foreground mt-1 text-xs">
-                Files are stored in the &quot;job-documents&quot; bucket under <code>warranty/{wc.id}/</code>.
+                Photos and PDFs are attached privately to this case.
               </p>
             </div>
           )}
@@ -414,7 +432,7 @@ export default function WarrantyDetailPage() {
           />
           {canWrite && (
             <div className="flex items-center justify-between">
-              <Button size="sm" onClick={() => void saveResolution()} disabled={savingResolution}>
+              <Button size="sm" onClick={() => void saveResolution()} disabled={savingResolution || !resolution.trim()}>
                 {savingResolution ? "Saving…" : "Save resolution"}
               </Button>
               {/* Refunds.customer_id is NOT NULL, so the deep-link only makes
@@ -444,6 +462,38 @@ export default function WarrantyDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      <AlertDialog
+        open={deletePartId !== null}
+        onOpenChange={(v) => !v && setDeletePartId(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove this part from the case?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {(() => {
+                const ln = caseParts.find((x) => x.id === deletePartId);
+                return ln
+                  ? `"${ln.description}" (qty ${ln.quantity}) will be removed from this warranty case.`
+                  : "This part line will be removed from this warranty case.";
+              })()}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                const target = deletePartId;
+                setDeletePartId(null);
+                if (target) void removePart(target);
+              }}
+            >
+              Remove part
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

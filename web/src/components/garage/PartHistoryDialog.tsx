@@ -6,6 +6,7 @@ import type { Part } from "@/types/database";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -38,6 +39,7 @@ export function PartHistoryDialog({
   onOpenChange,
 }: PartHistoryDialogProps) {
   const [movements, setMovements] = useState<PartMovementRow[]>([]);
+  const [authorNames, setAuthorNames] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
 
   const supabase = createClient();
@@ -45,28 +47,39 @@ export function PartHistoryDialog({
   useEffect(() => {
     if (!part?.id || !open) return;
     setLoading(true);
+    setAuthorNames({});
     const client = createClient();
+    // NOTE: `part_movements.created_by` has its FK to `auth.users`, not
+    // `public.profiles`, so a PostgREST embed (`profiles:created_by`) cannot be
+    // resolved and the whole select would fail — which is what made every row
+    // read "By Unknown". Fetch the movements with only the embeds that have a
+    // real FK (cars), then resolve author names with a separate profiles query.
     client
       .from("part_movements")
-      .select("*, profiles:created_by(full_name), cars:car_id(vin, brand, model)")
+      .select("*, cars:car_id(vin, brand, model)")
       .eq("part_id", part.id)
       .order("created_at", { ascending: false })
-      .then(({ data, error }) => {
-        if (error) {
-          client
-            .from("part_movements")
-            .select("*")
-            .eq("part_id", part.id)
-            .order("created_at", { ascending: false })
-            .then(({ data: d }) => {
-              setMovements((d as unknown as PartMovementRow[]) ?? []);
-            });
-        } else {
-          // created_by → profiles FK not auto-detected by PostgREST type
-          // inference even though the runtime select hint resolves correctly.
-          setMovements((data as unknown as PartMovementRow[]) ?? []);
-        }
+      .then(async ({ data }) => {
+        const rows = (data as unknown as PartMovementRow[]) ?? [];
+        setMovements(rows);
         setLoading(false);
+
+        const ids = Array.from(
+          new Set(rows.map((m) => m.created_by).filter((v): v is string => !!v))
+        );
+        if (ids.length > 0) {
+          const { data: profs } = await client
+            .from("profiles")
+            .select("id, full_name")
+            .in("id", ids);
+          const map: Record<string, string> = {};
+          ((profs as { id: string; full_name: string | null }[]) ?? []).forEach(
+            (p) => {
+              if (p.full_name) map[p.id] = p.full_name;
+            }
+          );
+          setAuthorNames(map);
+        }
       });
   }, [part?.id, open]);
 
@@ -74,7 +87,9 @@ export function PartHistoryDialog({
     mov.movement_type === "stock_in" || mov.movement_type === "return"
       ? "+"
       : "-";
-  const by = (mov: PartMovementRow) => getProfileFullName(mov.profiles);
+  const by = (mov: PartMovementRow) =>
+    (mov.created_by && authorNames[mov.created_by]) ||
+    getProfileFullName(mov.profiles);
   const carInfo = (mov: PartMovementRow) => {
     const c = mov.cars as { vin?: string; brand?: string; model?: string } | undefined;
     if (!c) return null;
@@ -87,6 +102,9 @@ export function PartHistoryDialog({
       <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Movement History: {part?.part_name ?? ""}</DialogTitle>
+          <DialogDescription>
+            Every stock-in, stock-out, and return recorded for this part.
+          </DialogDescription>
         </DialogHeader>
         {loading ? (
           <p className="text-muted-foreground py-4">Loading...</p>

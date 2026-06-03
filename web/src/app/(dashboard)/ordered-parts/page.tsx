@@ -17,26 +17,33 @@ import { Search, PackageSearch } from "lucide-react";
  * delivery date. Sourced entirely from the Purchase Orders feature.
  */
 
-// Purchase-order statuses that mean "ordered / on the way" — not yet fully
-// received, not draft/cancelled/rejected.
+// Purchase-order statuses that keep a part "financially open" — from approval
+// through invoiced. A part stays on this list until the PO is Paid or
+// Cancelled/Rejected (an unpaid invoice still means the order is open).
 // Typed as `string[]` so PostgREST `in()` accepts it without `as unknown as`
 // casts at every call site.
 const OPEN_PO_STATUSES: string[] = [
   "approved",
   "sent_to_supplier",
   "partially_received",
+  "received",
+  "invoiced",
 ];
 
 const PO_STATUS_LABELS: Record<string, string> = {
   approved: "Approved",
   sent_to_supplier: "Sent to supplier",
   partially_received: "Partially received",
+  received: "Received",
+  invoiced: "Invoiced",
 };
 
 const PO_STATUS_COLOR: Record<string, string> = {
   approved: "bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300",
   sent_to_supplier: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300",
   partially_received: "bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300",
+  received: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
+  invoiced: "bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300",
 };
 
 interface OrderedPartRow {
@@ -44,12 +51,22 @@ interface OrderedPartRow {
   part_name: string;
   oe_number: string | null;
   quantity: number;
+  unit_cost: number;
+  line_total: number;
+  currency: string;
   po_id: string;
   po_number: string;
   po_status: string;
   supplier_name: string;
   expected_delivery_at: string | null;
 }
+
+const fmtMoney = (n: number, c = "USD") =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: c,
+    maximumFractionDigits: 2,
+  }).format(n);
 
 export default function OrderedPartsPage() {
   const router = useRouter();
@@ -63,7 +80,7 @@ export default function OrderedPartsPage() {
     setLoading(true);
     const { data: pos, error: poErr } = await supabase
       .from("purchase_orders")
-      .select("id, po_number, status, expected_delivery_at, suppliers(name)")
+      .select("id, po_number, status, currency, expected_delivery_at, suppliers(name)")
       .in("status", OPEN_PO_STATUSES)
       .is("deleted_at", null);
 
@@ -78,6 +95,7 @@ export default function OrderedPartsPage() {
       id: string;
       po_number: string;
       status: string;
+      currency: string | null;
       expected_delivery_at: string | null;
       suppliers: { name: string } | { name: string }[] | null;
     };
@@ -92,7 +110,7 @@ export default function OrderedPartsPage() {
 
     const { data: lines, error: lineErr } = await supabase
       .from("purchase_order_lines")
-      .select("id, po_id, part_name, oe_number, quantity")
+      .select("id, po_id, part_name, oe_number, quantity, unit_cost, line_total")
       .in(
         "po_id",
         poList.map((p) => p.id)
@@ -111,6 +129,8 @@ export default function OrderedPartsPage() {
       part_name: string;
       oe_number: string | null;
       quantity: number;
+      unit_cost: number | null;
+      line_total: number | null;
     };
     const built: OrderedPartRow[] = ((lines as LineRow[]) ?? []).flatMap((ln) => {
       const po = poById.get(ln.po_id);
@@ -122,6 +142,9 @@ export default function OrderedPartsPage() {
           part_name: ln.part_name,
           oe_number: ln.oe_number,
           quantity: ln.quantity,
+          unit_cost: Number(ln.unit_cost ?? 0),
+          line_total: Number(ln.line_total ?? 0),
+          currency: po.currency ?? "USD",
           po_id: po.id,
           po_number: po.po_number,
           po_status: po.status,
@@ -188,9 +211,9 @@ export default function OrderedPartsPage() {
             </div>
           ) : filtered.length === 0 ? (
             <p className="text-muted-foreground p-8 text-center text-sm">
-              {rows.length === 0
-                ? "No parts are currently on order. Create a purchase order in the Garage section to order parts."
-                : "No ordered parts match the search."}
+              {query.trim()
+                ? `No ordered parts match "${query.trim()}".`
+                : "No parts are currently on order. Create a purchase order in the Garage section to order parts."}
             </p>
           ) : (
             <div className="overflow-x-auto">
@@ -200,6 +223,8 @@ export default function OrderedPartsPage() {
                     <th className="px-3 py-2">Part</th>
                     <th className="px-3 py-2">OE number</th>
                     <th className="px-3 py-2 text-right">Qty</th>
+                    <th className="px-3 py-2 text-right">Unit price</th>
+                    <th className="px-3 py-2 text-right">Line total</th>
                     <th className="px-3 py-2">Supplier</th>
                     <th className="px-3 py-2">Expected delivery</th>
                     <th className="px-3 py-2">Purchase order</th>
@@ -221,6 +246,12 @@ export default function OrderedPartsPage() {
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums">
                         {r.quantity}
+                      </td>
+                      <td className="px-3 py-2 text-right tabular-nums">
+                        {r.unit_cost ? fmtMoney(r.unit_cost, r.currency) : "—"}
+                      </td>
+                      <td className="px-3 py-2 text-right tabular-nums">
+                        {r.line_total ? fmtMoney(r.line_total, r.currency) : "—"}
                       </td>
                       <td className="px-3 py-2">{r.supplier_name}</td>
                       <td className="text-muted-foreground px-3 py-2">

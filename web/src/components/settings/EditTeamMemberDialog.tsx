@@ -31,7 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { USER_ROLE_LABELS } from "@/lib/constants/user";
+import { USER_ROLE_LABELS, ASSIGNABLE_USER_ROLES } from "@/lib/constants/user";
 import { formatError } from "@/lib/error-messages";
 
 const CAPABILITY_LABELS: Record<UserCapability, string> = {
@@ -294,7 +294,7 @@ export function EditTeamMemberDialog({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {(Object.keys(USER_ROLE_LABELS) as AppRole[]).map((r) => (
+                {ASSIGNABLE_USER_ROLES.map((r) => (
                   <SelectItem key={r} value={r}>
                     {USER_ROLE_LABELS[r]}
                   </SelectItem>

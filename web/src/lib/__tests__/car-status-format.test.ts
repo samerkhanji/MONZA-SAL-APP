@@ -28,11 +28,15 @@ describe("formatCarStatusLabel", () => {
     expect(formatCarStatusLabel("scrapped")).toBe("Scrapped");
   });
 
-  it("humanises an unknown legacy status by replacing underscores", () => {
-    // Catches the regression where unknown values rendered "in_transit"
-    // verbatim in the UI instead of "in transit".
-    expect(formatCarStatusLabel("in_transit")).toBe("in transit");
-    expect(formatCarStatusLabel("ready_for_pickup")).toBe("ready for pickup");
+  it("labels legacy statuses present in data cleanly (no raw 'in stock')", () => {
+    expect(formatCarStatusLabel("in_stock")).toBe("In Stock");
+    expect(formatCarStatusLabel("in_workshop")).toBe("In Workshop");
+    expect(formatCarStatusLabel("delivered")).toBe("Delivered");
+  });
+
+  it("Title-Cases an unknown legacy status", () => {
+    expect(formatCarStatusLabel("in_transit")).toBe("In Transit");
+    expect(formatCarStatusLabel("ready_for_pickup")).toBe("Ready For Pickup");
   });
 });
 

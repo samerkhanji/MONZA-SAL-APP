@@ -11,7 +11,23 @@ import {
   getTourById,
   getWelcomeTourForRole,
 } from "@/lib/tours/registry";
+import { canViewTourStep } from "@/lib/tours/tourPermissions";
+import { recordTourProgress } from "@/lib/tours/tourProgress";
+import { isSensitiveSelector, isSensitiveText } from "@/lib/tours/sensitive";
+import { MISSING_SELECTOR_FALLBACK } from "@/components/tours/TourStepRenderer";
 import type { Tour, TourMode, TourStep } from "@/lib/tours/types";
+
+function isSensitiveStep(step: TourStep): boolean {
+  if (step.isSensitive) return true;
+  return isSensitiveSelector(step.element);
+}
+
+function elementLooksSensitive(el: Element | null): boolean {
+  if (!el) return false;
+  const id = el.getAttribute("data-tour-id") ?? el.id ?? "";
+  const text = (el.textContent ?? "").trim().slice(0, 40);
+  return isSensitiveSelector(id) || isSensitiveText(text);
+}
 
 // ============================================================================
 // Public event API
@@ -93,16 +109,36 @@ function buildSafeTourSteps(
   isPageTour: boolean
 ): TourStep[] {
   if (!isPageTour || typeof document === "undefined") return steps;
-  return steps.filter((s) => {
-    if (!s.element) return true; // centered modal step
-    if (s.navigateTo) return true; // element mounts after navigation
-    try {
-      return document.querySelector(s.element) !== null;
-    } catch {
-      // Malformed selector — keep the step rather than crash the tour.
-      return true;
+  const out: TourStep[] = [];
+  for (const s of steps) {
+    if (!s.element || s.navigateTo) {
+      out.push(s); // centered modal, or element that mounts after navigation
+      continue;
     }
-  });
+    let present = true;
+    try {
+      present = document.querySelector(s.element) !== null;
+    } catch {
+      present = true; // malformed selector — keep rather than crash
+    }
+    if (present) {
+      out.push(s);
+      continue;
+    }
+    // Missing target. Per spec: don't crash / highlight nothing — log it and
+    // show a centered fallback explaining what the element does (unless the
+    // step opted into "skip").
+    if (s.fallbackBehavior === "skip") continue;
+    if (typeof console !== "undefined") {
+      console.warn(`[tour] missing selector ${s.element} — showing centered fallback`);
+    }
+    out.push({
+      ...s,
+      element: undefined,
+      description: `${s.description}\n\n${MISSING_SELECTOR_FALLBACK}`,
+    });
+  }
+  return out;
 }
 
 // ============================================================================
@@ -142,9 +178,11 @@ function buildSafeTourSteps(
  * It renders nothing — driver.js paints its own DOM directly on the page.
  */
 export function OnboardingTour() {
-  const { profile } = useUser();
+  const { profile, appRole, hasCapability } = useUser();
   const router = useRouter();
   const hasAutoFiredRef = useRef(false);
+  // Highest step index reached in the active run, for progress tracking.
+  const progressRef = useRef<{ tourId: string; reached: number; total: number } | null>(null);
 
   // Hold the active driver instance so we can tear it down on mode switch.
   const driverRef = useRef<Driver | null>(null);
@@ -174,12 +212,17 @@ export function OnboardingTour() {
       }
 
       const isInteractive = mode === "interactive";
+      const user = { appRole, hasCapability };
 
-      // Skip steps whose target element is missing so the tour never
-      // highlights nothing. Page tours only — workflow/welcome tours
-      // navigate, so their elements appear later.
-      const safeSteps = buildSafeTourSteps(tour.steps, tour.kind === "page");
+      // 1. Drop steps the user isn't permitted to see (owner-only / sensitive
+      //    steps inside a shared tour). 2. Drop steps whose target element is
+      //    missing so the tour never highlights nothing (page tours only —
+      //    workflow/welcome tours navigate, so their elements appear later).
+      const permittedSteps = tour.steps.filter((s) => canViewTourStep(user, s));
+      const safeSteps = buildSafeTourSteps(permittedSteps, tour.kind === "page");
       if (safeSteps.length === 0) return;
+
+      progressRef.current = { tourId: tour.id, reached: 0, total: safeSteps.length };
 
       // Build the driver.js step list. We resolve elements lazily (via a
       // function) so navigateTo can fire before we read the DOM.
@@ -194,7 +237,9 @@ export function OnboardingTour() {
         nextBtnText: "Next →",
         prevBtnText: "← Back",
         doneBtnText: "Finish",
-        allowClose: true,
+        // Don't let an overlay click or Esc silently end the tour — the user
+        // must use the explicit Close (×) button. Prevents accidental exits.
+        allowClose: false,
         showButtons: isInteractive
           ? ["previous", "close"]
           : ["next", "previous", "close"],
@@ -203,19 +248,25 @@ export function OnboardingTour() {
         // After every step renders, paint mode UI + (re-)wire interactive
         // listeners.
         onHighlighted: (_el, _step, opts) => {
+          const stepIdx = opts.driver.getActiveIndex() ?? 0;
+          if (progressRef.current) {
+            progressRef.current.reached = Math.max(
+              progressRef.current.reached,
+              stepIdx
+            );
+          }
           renderFooterMode(opts.state.popover, mode, () => {
             const newMode: TourMode = isInteractive ? "manual" : "interactive";
             const currentIdx = opts.driver.getActiveIndex() ?? 0;
             runTourRef.current?.(tour, newMode, markCompleteAfter, currentIdx);
           });
 
-          // Wire up interactive auto-advance.
+          // Wire up interactive auto-advance (skipped for sensitive steps).
           if (interactiveCleanupRef.current) {
             interactiveCleanupRef.current();
             interactiveCleanupRef.current = null;
           }
           if (isInteractive) {
-            const stepIdx = opts.driver.getActiveIndex() ?? 0;
             const tourStep = safeSteps[stepIdx];
             interactiveCleanupRef.current = wireInteractiveStep(
               tourStep,
@@ -226,7 +277,8 @@ export function OnboardingTour() {
         // Some steps require navigation before they can render — handle here.
         onHighlightStarted: async (_el, _step, opts) => {
           const stepIdx = opts.driver.getActiveIndex() ?? 0;
-          const tourStep = tour.steps[stepIdx];
+          const tourStep = safeSteps[stepIdx];
+          if (!tourStep) return;
           if (tourStep.navigateTo && tourStep.navigateTo !== window.location.pathname) {
             router.push(tourStep.navigateTo);
             // Wait for the element to mount (if there is one).
@@ -245,6 +297,19 @@ export function OnboardingTour() {
           if (interactiveCleanupRef.current) {
             interactiveCleanupRef.current();
             interactiveCleanupRef.current = null;
+          }
+          // Persist progress (best-effort, localStorage). Completed when the
+          // final step was reached.
+          const p = progressRef.current;
+          if (p) {
+            recordTourProgress(
+              profile?.id ?? null,
+              p.tourId,
+              p.reached,
+              p.total,
+              p.reached >= p.total - 1
+            );
+            progressRef.current = null;
           }
           driverRef.current = null;
           window.dispatchEvent(new CustomEvent(TOUR_ACTIVE_CHANGED_EVENT, { detail: { active: false } }));
@@ -366,9 +431,25 @@ function buildDriveStep(
   _tour: Tour,
   isInteractive: boolean
 ): DriveStep {
-  const popoverDescription = isInteractive && step.element && step.waitFor
-    ? `${step.description}\n\n→ ${interactiveHint(step.waitFor)}`
-    : step.description;
+  const sensitive = isSensitiveStep(step);
+
+  // Sensitive steps are always read-only: a warning, and the user advances
+  // with Next themselves — the tour never auto-performs the action.
+  const popoverDescription = sensitive
+    ? `⚠ Sensitive action — this guide will not do it for you. ${step.description}\n\n→ Read this, then click "Next →" to continue.`
+    : isInteractive && step.element && step.waitFor
+      ? `${step.description}\n\n→ ${interactiveHint(step.waitFor)}`
+      : step.description;
+
+  // Buttons for this step. The first step never shows "← Back" (nothing before
+  // it). Interactive steps that wait for a real action hide "Next →" so the
+  // user has to do the thing — but sensitive steps keep Next (read-only).
+  const baseButtons: Array<"next" | "previous" | "close"> =
+    isInteractive && step.waitFor && !sensitive
+      ? ["previous", "close"]
+      : ["next", "previous", "close"];
+  const stepButtons =
+    idx === 0 ? baseButtons.filter((b) => b !== "previous") : baseButtons;
 
   // We pass the element as a getter so driver.js re-resolves it after a
   // navigation (the DOM may not have existed at config-build time).
@@ -386,14 +467,9 @@ function buildDriveStep(
       description: popoverDescription,
       side: step.side ?? "right",
       align: step.align ?? "start",
-      // For interactive steps with a waitFor, hide the Next button (the user
-      // has to actually do the thing to advance). Steps without a waitFor —
-      // welcome / closing modals and purely informational steps — keep Next
-      // visible so the user can still advance in interactive mode.
-      showButtons:
-        isInteractive && step.waitFor
-          ? ["previous", "close"]
-          : ["next", "previous", "close"],
+      // See `stepButtons` above: first step hides Back; interactive wait-steps
+      // hide Next.
+      showButtons: stepButtons,
       progressText: `${idx + 1} / ${total}`,
     },
   };
@@ -426,6 +502,10 @@ function wireInteractiveStep(step: TourStep, drv: Driver): () => void {
   // Modal steps (no element) can't be "interactive"; just no-op.
   if (!step.element) return () => {};
 
+  // Never auto-advance on a sensitive final action (approve / refund / void /
+  // delete / finalize …). The user reads the warning and clicks Next.
+  if (isSensitiveStep(step) || step.stepMode === "read-only") return () => {};
+
   if (step.waitFor === "navigation") {
     const startPath = window.location.pathname;
     let stopped = false;
@@ -446,6 +526,10 @@ function wireInteractiveStep(step: TourStep, drv: Driver): () => void {
 
   const el = document.querySelector(step.element);
   if (!el) return () => {};
+
+  // Defensive: if the resolved element looks like a sensitive control (its
+  // data-tour-id / text matches), don't auto-advance on it either.
+  if (step.waitFor === "click" && elementLooksSensitive(el)) return () => {};
 
   const eventName = step.waitFor === "click" ? "click" : "input";
   let fired = false;
@@ -485,10 +569,16 @@ function renderFooterMode(
   wrap.style.cssText =
     "display:flex;align-items:center;gap:6px;margin-right:auto;font-size:11px;color:#64748b;";
 
+  // Mode indicator pill — always visible, including on step 1, so the user
+  // can see at a glance whether they're in a guided (interactive) or
+  // read-along (manual) walkthrough.
   const label = document.createElement("span");
   label.textContent =
-    mode === "interactive" ? "Interactive" : "Manual";
-  label.style.cssText = "font-weight:600;";
+    mode === "interactive" ? "● Interactive" : "● Manual";
+  label.style.cssText =
+    mode === "interactive"
+      ? "font-weight:700;color:#2563eb;background:#eff6ff;border-radius:9999px;padding:1px 8px;"
+      : "font-weight:700;color:#475569;background:#f1f5f9;border-radius:9999px;padding:1px 8px;";
 
   const btn = document.createElement("button");
   btn.type = "button";

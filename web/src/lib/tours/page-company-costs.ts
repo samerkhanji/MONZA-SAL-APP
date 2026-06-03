@@ -79,7 +79,7 @@ export const companyCostsPageTour: Tour = {
     {
       title: "Avoid these mistakes ⚠️",
       description:
-        "Don't skip recording small costs — they add up. Don't guess amounts; enter the real figure from the receipt. Don't pick the wrong car or category, or the reports will be wrong. If you're unsure, ask before saving. You can replay this tour anytime from your profile menu.",
+        "Don't skip recording small costs — they add up. Don't guess amounts; enter the real figure from the receipt. Don't pick the wrong car or category, or the reports will be wrong. If you're unsure, ask before saving. You can replay this guide anytime from the ? button in the bottom-right corner.",
     },
   ],
 };

@@ -62,7 +62,7 @@ export const dashboardPageTour: Tour = {
       title: "That's your dashboard! ✅",
       description:
         "Check this page first thing each morning. If a number looks off, click into it to dig deeper. " +
-        "You can replay this tour anytime from your profile menu in the top-right corner.",
+        "You can replay this guide anytime from the ? button in the bottom-right corner.",
     },
   ],
 };

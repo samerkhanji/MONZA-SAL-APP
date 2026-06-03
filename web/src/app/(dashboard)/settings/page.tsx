@@ -71,7 +71,7 @@ const ALL_TABS = [
   { id: "team", label: "Team", icon: Users, everyone: false, tourAnchor: "settings-employees-tab" },
   { id: "company", label: "Company", icon: Building2, everyone: false, tourAnchor: "settings-company-tab" },
   { id: "prefs", label: "Preferences", icon: Settings, everyone: false, tourAnchor: "settings-prefs-tab" },
-  { id: "audit", label: "Audit Log", icon: FileText, everyone: false, tourAnchor: "settings-audit-log-tab" },
+  { id: "audit-log", label: "Audit Log", icon: FileText, everyone: false, tourAnchor: "settings-audit-log-tab" },
 ] as const;
 
 type TabId = (typeof ALL_TABS)[number]["id"];
@@ -126,7 +126,15 @@ export default function SettingsPage() {
   const canEditApprovalThresholds = isOwner || hasCapability("manage_team");
   const tabFromUrl = searchParams.get("tab") as TabId | null;
   const defaultTab: TabId = canSeeSettings ? "team" : "profile";
-  const [activeTab, setActiveTab] = useState<TabId>(tabFromUrl && ALL_TABS.some((t) => t.id === tabFromUrl) ? tabFromUrl : defaultTab);
+  // Only honor ?tab= if the tab exists AND the user is permitted (restricted
+  // tabs like Audit Log require canSeeSettings) — so an unauthorized deep link
+  // never lands on, or flashes, a restricted panel.
+  const initialTab: TabId = (() => {
+    const t = tabFromUrl && ALL_TABS.find((x) => x.id === tabFromUrl);
+    if (t && (t.everyone || canSeeSettings)) return tabFromUrl as TabId;
+    return defaultTab;
+  })();
+  const [activeTab, setActiveTab] = useState<TabId>(initialTab);
 
   const TABS = ALL_TABS.filter((t) => t.everyone || canSeeSettings);
 
@@ -145,6 +153,16 @@ export default function SettingsPage() {
       setActiveTab((TABS[0]?.id ?? "profile") as TabId);
     }
   }, [activeTab, canSeeSettings]);
+
+  // Switch tabs AND reflect it in the URL (?tab=<id>) so tabs are deep-linkable
+  // and Back/Forward navigates between them. `push` keeps history entries.
+  const selectTab = useCallback(
+    (id: TabId) => {
+      setActiveTab(id);
+      router.push(`/settings?tab=${id}`, { scroll: false });
+    },
+    [router]
+  );
   const [profiles, setProfiles] = useState<ProfileRow[]>([]);
   const [profilesLoading, setProfilesLoading] = useState(false);
   const [editProfile, setEditProfile] = useState<ProfileRow | null>(null);
@@ -401,8 +419,8 @@ export default function SettingsPage() {
 
     const carMessages: Record<string, (e: { cars?: { brand?: string; model?: string }; from_value?: string; to_value?: string }) => string> = {
       created: (e) => `Added car ${e.cars?.brand ?? ""} ${e.cars?.model ?? ""}`,
-      moved: (e) => `Moved ${e.cars?.brand ?? ""} ${e.cars?.model ?? ""} from ${e.from_value ?? "?"} to ${e.to_value ?? "?"}`,
-      status_changed: (e) => `Changed ${e.cars?.brand ?? ""} ${e.cars?.model ?? ""} status: ${e.from_value ?? "?"} → ${e.to_value ?? "?"}`,
+      moved: (e) => `Moved ${e.cars?.brand ?? ""} ${e.cars?.model ?? ""} from ${e.from_value || "—"} to ${e.to_value || "—"}`,
+      status_changed: (e) => `Changed ${e.cars?.brand ?? ""} ${e.cars?.model ?? ""} status: ${e.from_value || "—"} → ${e.to_value || "—"}`,
       battery_updated: (e) => `Updated battery on ${e.cars?.brand ?? ""} ${e.cars?.model ?? ""}`,
       pdi_updated: (e) => `Updated PDI on ${e.cars?.brand ?? ""} ${e.cars?.model ?? ""}`,
       details_updated: (e) => `Edited ${e.cars?.brand ?? ""} ${e.cars?.model ?? ""} details`,
@@ -473,7 +491,7 @@ export default function SettingsPage() {
   }, [auditDateFilter]);
 
   useEffect(() => {
-    if (canSeeSettings && activeTab === "audit") {
+    if (canSeeSettings && activeTab === "audit-log") {
       fetchAudit();
     }
   }, [canSeeSettings, activeTab, fetchAudit, auditDateFilter]);
@@ -556,7 +574,8 @@ export default function SettingsPage() {
               key={tab.id}
               type="button"
               data-tour={tab.tourAnchor}
-              onClick={() => setActiveTab(tab.id)}
+              data-tour-id={`settings-sidebar-${tab.id}`}
+              onClick={() => selectTab(tab.id)}
               className={cn(
                 "flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition-colors min-h-[44px]",
                 activeTab === tab.id
@@ -600,7 +619,7 @@ export default function SettingsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-4 px-4 sm:px-6 md:gap-6">
-              <div className="rounded-lg border p-4">
+              <div className="rounded-lg border p-4" data-tour-id="settings-profile-user-card">
                 <p className="font-medium text-base">{profile?.full_name ?? "User"}</p>
                 <p className="text-sm text-muted-foreground">
                   {profile?.phone ?? "No phone"}{" "}
@@ -632,7 +651,7 @@ export default function SettingsPage() {
                     onValueChange={(v) => void saveProfileLanguage(v)}
                     disabled={savingLanguage}
                   >
-                    <SelectTrigger id="profile-preferred-language">
+                    <SelectTrigger id="profile-preferred-language" data-tour-id="settings-profile-language-selector">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -658,6 +677,7 @@ export default function SettingsPage() {
                   </div>
                   <Button
                     variant="outline"
+                    data-tour-id="settings-profile-onboarding-tour-button"
                     className="w-full min-h-[44px] sm:w-auto"
                     onClick={async () => {
                       const { data: { user } } = await supabase.auth.getUser();
@@ -1166,14 +1186,14 @@ export default function SettingsPage() {
           </Card>
         )}
 
-        {activeTab === "audit" && (
-          <Card data-tour-id="settings-audit-panel">
+        {activeTab === "audit-log" && (
+          <Card data-tour-id="settings-audit-log-panel">
             <CardHeader>
               <CardTitle>Audit Log</CardTitle>
               <CardDescription>Track all system activity</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex flex-wrap gap-3">
+              <div className="flex flex-wrap gap-3" data-tour-id="settings-audit-log-filter">
                 <Select
                   value={auditTypeFilter}
                   onValueChange={setAuditTypeFilter}
@@ -1230,10 +1250,11 @@ export default function SettingsPage() {
                   No activity found
                 </p>
               ) : (
-                <div className="space-y-1 rounded-lg border">
+                <div className="space-y-1 rounded-lg border" data-tour-id="settings-audit-log-table">
                   {filteredAudit.map((item) => (
                     <Link
                       key={item.id}
+                      data-tour-id="settings-audit-log-event-row"
                       href={item.link ?? "#"}
                       className="flex items-center gap-4 border-b p-3 text-left transition-colors last:border-0 hover:bg-muted/50"
                     >

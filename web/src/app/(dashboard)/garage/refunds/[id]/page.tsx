@@ -31,6 +31,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { ArrowLeft, Check, X } from "lucide-react";
 import { formatError } from "@/lib/error-messages";
 import {
@@ -96,6 +106,7 @@ export default function RefundDetailPage() {
   const [rejectReason, setRejectReason] = useState("");
   const [payOpen, setPayOpen] = useState(false);
   const [payMethod, setPayMethod] = useState<"cash" | "bank" | "credit" | "other">("cash");
+  const [cancelOpen, setCancelOpen] = useState(false);
   const [acting, setActing] = useState(false);
 
   const load = useCallback(async () => {
@@ -222,9 +233,11 @@ export default function RefundDetailPage() {
           <Badge variant="outline" className={cn("h-6 px-2 text-[11px] uppercase", STATUS_COLOR[refund.status] ?? "")}>
             {refund.status}
           </Badge>
-          <Badge variant="outline" className="h-6 px-2 text-[11px] uppercase">
-            {refund.approval_required} approval
-          </Badge>
+          {refund.status !== "cancelled" && refund.status !== "rejected" && (
+            <Badge variant="outline" className="h-6 px-2 text-[11px] uppercase">
+              {refund.approval_required} approval
+            </Badge>
+          )}
         </div>
       </div>
 
@@ -327,11 +340,35 @@ export default function RefundDetailPage() {
           </Button>
         )}
         {isPending && (isOwner || requesterIsMe) && (
-          <Button data-tour-id="refund-detail-cancel" variant="outline" onClick={() => void cancel()} disabled={acting}>
+          <Button data-tour-id="refund-detail-cancel" variant="outline" onClick={() => setCancelOpen(true)} disabled={acting}>
             Cancel request
           </Button>
         )}
       </div>
+
+      <AlertDialog open={cancelOpen} onOpenChange={(v) => !v && setCancelOpen(false)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel this refund request?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Refund {refund.refund_number} for {fmt(Number(refund.amount), refund.currency)} will be
+              cancelled. This can&apos;t be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={acting}>Keep request</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                setCancelOpen(false);
+                void cancel();
+              }}
+            >
+              Cancel request
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {refund.approval_required === "owner" && isPending && !isOwner && (
         <p className="text-muted-foreground text-xs">

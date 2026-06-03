@@ -75,7 +75,7 @@ export const notificationsPageTour: Tour = {
     {
       title: "That's your inbox! ✅",
       description:
-        "Check it daily so nothing important slips past. Replay this tour anytime from your profile menu.",
+        "Check it daily so nothing important slips past. Replay this guide anytime from the ? button in the bottom-right corner.",
     },
   ],
 };

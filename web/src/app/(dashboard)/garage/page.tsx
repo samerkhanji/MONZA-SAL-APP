@@ -18,6 +18,7 @@ import {
   JOB_STATUS_TRANSITIONS,
   JOB_PRIORITY_LABELS,
   PRIORITY_BORDERS,
+  formatHours,
 } from "@/lib/constants/jobs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -691,8 +692,8 @@ export default function GarageJobsPage() {
                         ) : null;
                       })()}
                       <span className="text-muted-foreground">
-                        Est: {job.estimated_hours ?? "—"}h / Act:{" "}
-                        {job.actual_hours ?? "—"}h
+                        Est: {formatHours(job.estimated_hours)}h / Act:{" "}
+                        {formatHours(job.actual_hours)}h
                       </span>
                       {job.due_date && (
                         <span

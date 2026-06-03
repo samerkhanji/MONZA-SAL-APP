@@ -47,18 +47,31 @@ export function ExportButton<T extends Record<string, unknown>>({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem
-          onClick={() => doExport(data)}
-          disabled={data.length === 0}
-        >
-          Export Filtered ({data.length} rows)
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onClick={() => doExport(allData)}
-          disabled={allData.length === 0}
-        >
-          Export All ({allData.length} rows)
-        </DropdownMenuItem>
+        {data.length === allData.length ? (
+          // No filter is narrowing the data — a single "Export" avoids two
+          // identical-count options ("Filtered" and "All" both showing N rows).
+          <DropdownMenuItem
+            onClick={() => doExport(allData)}
+            disabled={allData.length === 0}
+          >
+            Export ({allData.length} rows)
+          </DropdownMenuItem>
+        ) : (
+          <>
+            <DropdownMenuItem
+              onClick={() => doExport(data)}
+              disabled={data.length === 0}
+            >
+              Export Filtered ({data.length} rows)
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => doExport(allData)}
+              disabled={allData.length === 0}
+            >
+              Export All ({allData.length} rows)
+            </DropdownMenuItem>
+          </>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );
