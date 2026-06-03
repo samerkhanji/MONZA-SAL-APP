@@ -52,6 +52,9 @@ export default function TestDrivePage() {
   const [scanOpen, setScanOpen] = useState(false);
   const [vinInput, setVinInput] = useState("");
   const [lookupLoading, setLookupLoading] = useState(false);
+  // VIN that produced no matching vehicle on the last lookup, so we can show a
+  // persistent inline no-result state (a toast alone is easy to miss).
+  const [notFoundVin, setNotFoundVin] = useState<string | null>(null);
 
   const [activeRows, setActiveRows] = useState<TestDriveWithCar[]>([]);
   const [returnedRows, setReturnedRows] = useState<TestDriveWithCar[]>([]);
@@ -98,6 +101,7 @@ export default function TestDrivePage() {
       }
 
       setLookupLoading(true);
+      setNotFoundVin(null);
       const { data: carRow, error: carErr } = await supabase
         .from("cars")
         .select("id, vin, brand, model, status, current_km, battery_percent")
@@ -106,7 +110,12 @@ export default function TestDrivePage() {
         .maybeSingle();
 
       if (carErr || !carRow) {
-        toast.error(carErr ? formatError(carErr) : "No vehicle found for this VIN.");
+        if (carErr) {
+          toast.error(formatError(carErr));
+        } else {
+          setNotFoundVin(vin);
+          toast.error("No vehicle found for this VIN.");
+        }
         setLookupLoading(false);
         return;
       }
@@ -272,6 +281,18 @@ export default function TestDrivePage() {
             </Button>
           </div>
         </CardContent>
+        {notFoundVin && (
+          <CardContent className="pt-0">
+            <div
+              className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200"
+              data-tour-id="test-drive-no-result"
+            >
+              No test drive or return found for VIN{" "}
+              <span className="font-mono font-medium">{notFoundVin}</span>. Check
+              the VIN and try again, or confirm the vehicle exists in inventory.
+            </div>
+          </CardContent>
+        )}
       </Card>
 
       <Card data-tour-id="test-drive-active-panel">

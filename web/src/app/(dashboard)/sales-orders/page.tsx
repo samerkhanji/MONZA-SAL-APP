@@ -28,7 +28,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { ExportButton } from "@/components/ExportButton";
 import type { ExportColumn } from "@/lib/exportToExcel";
-import { RefreshCw } from "lucide-react";
+import { ChevronRight, RefreshCw } from "lucide-react";
 import { formatError } from "@/lib/error-messages";
 
 interface SalesOrderFull {
@@ -421,6 +421,9 @@ export default function SalesOrdersPage() {
                       <TableHead className="text-right">Price</TableHead>
                       <TableHead>Sale Date</TableHead>
                       <TableHead>Delivery</TableHead>
+                      <TableHead className="w-[1%] text-right">
+                        <span className="sr-only">Open</span>
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -430,7 +433,8 @@ export default function SalesOrdersPage() {
                       return (
                         <TableRow
                           key={so.id}
-                          className="cursor-pointer hover:bg-muted/40"
+                          className="group cursor-pointer hover:bg-muted/40"
+                          title="Open order details"
                           onClick={() => router.push(`/sales-orders/${so.id}`)}
                         >
                           <TableCell className="font-medium">
@@ -481,6 +485,12 @@ export default function SalesOrdersPage() {
                             {so.delivery_date
                               ? new Date(so.delivery_date).toLocaleDateString()
                               : "—"}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <span className="inline-flex items-center gap-1 whitespace-nowrap text-xs text-muted-foreground group-hover:text-foreground">
+                              Open
+                              <ChevronRight className="size-3.5" />
+                            </span>
                           </TableCell>
                         </TableRow>
                       );
