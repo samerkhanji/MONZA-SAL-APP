@@ -11,6 +11,7 @@ import {
   getFullAppTour,
 } from "@/lib/tours/tourPermissions";
 import type { Tour, TourMode } from "@/lib/tours/types";
+import { getTourStatus, type TourStatus } from "@/lib/tours/tourProgress";
 import { dispatchStartTour, TOUR_ACTIVE_CHANGED_EVENT } from "@/components/onboarding-tour";
 import { Button } from "@/components/ui/button";
 import {
@@ -57,14 +58,32 @@ function SectionHeader({ children }: { children: React.ReactNode }) {
   );
 }
 
+function StatusBadge({ status }: { status: TourStatus }) {
+  if (status === "completed")
+    return (
+      <span className="shrink-0 rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-semibold text-green-700 dark:bg-green-950 dark:text-green-300">
+        ✓ Done
+      </span>
+    );
+  if (status === "in-progress")
+    return (
+      <span className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+        In progress
+      </span>
+    );
+  return null;
+}
+
 function TourRow({
   tour,
   mode,
+  status,
   onModeChange,
   onStart,
 }: {
   tour: Tour;
   mode: TourMode;
+  status: TourStatus;
   onModeChange: (mode: TourMode) => void;
   onStart: (mode: TourMode) => void;
 }) {
@@ -76,7 +95,10 @@ function TourRow({
           <TourKindIcon kind={tour.kind} className="size-4" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium">{tour.label}</p>
+          <div className="flex items-center justify-between gap-2">
+            <p className="truncate text-sm font-medium">{tour.label}</p>
+            <StatusBadge status={status} />
+          </div>
           <p className="mt-0.5 text-xs text-muted-foreground">{tourSubtitle(tour)}</p>
           {tour.description && (
             <p className="mt-1 text-xs text-muted-foreground/80">{tour.description}</p>
@@ -170,6 +192,7 @@ export function TourLauncher() {
       key={tour.id}
       tour={tour}
       mode={modeFor(tour)}
+      status={getTourStatus(profile?.id ?? null, tour.id)}
       onModeChange={(m) => setModes((prev) => ({ ...prev, [tour.id]: m }))}
       onStart={(m) => startTour(tour, m)}
     />

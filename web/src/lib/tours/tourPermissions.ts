@@ -18,6 +18,7 @@ import {
   getRelatedWorkflows,
   getWelcomeTourForRole,
 } from "./registry";
+import type { TourStep } from "./types";
 
 /** Everything the permission layer needs about the current user. */
 export type TourUser = NavAccessUser;
@@ -49,6 +50,31 @@ export function canViewTour(user: TourUser, tour: Tour): boolean {
     return false;
   }
   return true;
+}
+
+/**
+ * Step-level gate. A step is hidden when the user's role isn't in
+ * `visibleToRoles`, or they hold none of the step's `requiredCapabilities`.
+ * Used so a single tour can serve several roles while hiding owner-only or
+ * otherwise restricted steps.
+ */
+export function canViewTourStep(user: TourUser, step: TourStep): boolean {
+  if (step.visibleToRoles && step.visibleToRoles.length > 0) {
+    if (!user.appRole || !step.visibleToRoles.includes(user.appRole)) {
+      return false;
+    }
+  }
+  if (step.requiredCapabilities && step.requiredCapabilities.length > 0) {
+    if (!step.requiredCapabilities.some((c) => user.hasCapability(c))) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/** The subset of a tour's steps the user is permitted to see, in order. */
+export function visibleTourSteps(user: TourUser, tour: Tour): TourStep[] {
+  return tour.steps.filter((s) => canViewTourStep(user, s));
 }
 
 /** Page tour(s) for the current path the user is allowed to see. */
