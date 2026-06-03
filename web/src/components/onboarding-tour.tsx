@@ -13,25 +13,19 @@ import {
 } from "@/lib/tours/registry";
 import { canViewTourStep } from "@/lib/tours/tourPermissions";
 import { recordTourProgress } from "@/lib/tours/tourProgress";
+import { isSensitiveSelector, isSensitiveText } from "@/lib/tours/sensitive";
 import type { Tour, TourMode, TourStep } from "@/lib/tours/types";
-
-// Final-action controls a tour must never auto-trigger. Matched against the
-// step's selector and the resolved element's id / data-tour-id / text so a
-// sensitive step is protected even if its `isSensitive` flag was not set.
-const SENSITIVE_HINT =
-  /(approve|reject|void|delete|refund|finalize|deactivate|terminate|close-drawer|mark-paid|markpaid|confirm-paid|remove-|scrap|discard|cancel-po|cancel-request)/i;
 
 function isSensitiveStep(step: TourStep): boolean {
   if (step.isSensitive) return true;
-  if (step.element && SENSITIVE_HINT.test(step.element)) return true;
-  return false;
+  return isSensitiveSelector(step.element);
 }
 
 function elementLooksSensitive(el: Element | null): boolean {
   if (!el) return false;
   const id = el.getAttribute("data-tour-id") ?? el.id ?? "";
   const text = (el.textContent ?? "").trim().slice(0, 40);
-  return SENSITIVE_HINT.test(id) || SENSITIVE_HINT.test(text);
+  return isSensitiveSelector(id) || isSensitiveText(text);
 }
 
 // ============================================================================
