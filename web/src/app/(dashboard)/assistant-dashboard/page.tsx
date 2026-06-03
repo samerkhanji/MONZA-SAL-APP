@@ -114,6 +114,7 @@ export default function AssistantDashboardPage() {
     currency: "USD",
   });
   const [staleJobsCount, setStaleJobsCount] = useState<number>(0);
+  const [overdueJobsCount, setOverdueJobsCount] = useState<number>(0);
   const [overdueInstallments, setOverdueInstallments] = useState<{ count: number; total: number }>({
     count: 0,
     total: 0,
@@ -187,6 +188,7 @@ export default function AssistantDashboardPage() {
       paidDepositsRes,
       staleJobsRes,
       overdueInstallmentsRes,
+      overdueJobsRes,
     ] = await Promise.all([
       supabase
         .from("garage_jobs")
@@ -238,6 +240,17 @@ export default function AssistantDashboardPage() {
         .select("amount_due, paid_amount")
         .neq("status", "paid")
         .neq("status", "waived")
+        .lt("due_date", today),
+      // Overdue jobs: past their promised due date and still open (any active
+      // status, incl. in_progress). The stale KPI above only catches old
+      // pending/waiting_parts jobs by creation age, so an in-progress job
+      // 13 days past due wouldn't show — this counts it.
+      supabase
+        .from("garage_jobs")
+        .select("*", { count: "exact", head: true })
+        .is("deleted_at", null)
+        .in("status", ["pending", "in_progress", "waiting_parts"])
+        .not("due_date", "is", null)
         .lt("due_date", today),
     ]);
 
@@ -390,6 +403,12 @@ export default function AssistantDashboardPage() {
       setStaleJobsCount(staleJobsRes.count ?? 0);
     }
 
+    if (overdueJobsRes.error) {
+      errors.push("Overdue jobs");
+    } else {
+      setOverdueJobsCount(overdueJobsRes.count ?? 0);
+    }
+
     if (overdueInstallmentsRes.error) {
       errors.push("Overdue installments");
     } else {
@@ -446,6 +465,14 @@ export default function AssistantDashboardPage() {
       color: "amber" as const,
       icon: Clock,
       href: "/garage",
+    },
+    {
+      label: "Overdue jobs",
+      value: overdueJobsCount,
+      color: "red" as const,
+      icon: AlertTriangle,
+      href: "/garage",
+      tourId: "assistant-dashboard-overdue-jobs-card",
     },
     {
       label: "Overdue installments",

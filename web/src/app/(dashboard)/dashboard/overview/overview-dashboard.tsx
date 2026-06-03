@@ -538,6 +538,21 @@ function FleetLogisticsCard({ data }: { data: OwnerOverviewData }) {
               );
             })}
           </div>
+          {(() => {
+            const over90 = data.inventoryAging
+              .filter((b) => b.bucket === "90-180" || b.bucket === ">180")
+              .reduce((s, b) => s + b.count, 0);
+            return over90 > 0 ? (
+              <p className="mt-2 rounded-md border border-amber-500/40 bg-amber-50/60 px-2 py-1 text-[11px] text-amber-700 dark:bg-amber-950/30 dark:text-amber-300">
+                {over90} {over90 === 1 ? "car has" : "cars have"} been in stock over
+                90 days — review pricing and push these.{" "}
+                <Link href="/reports" className="font-medium underline">
+                  See aging report
+                </Link>
+                .
+              </p>
+            ) : null;
+          })()}
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">

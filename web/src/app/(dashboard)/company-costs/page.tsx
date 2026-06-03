@@ -177,6 +177,10 @@ const MAX_RECEIPT_BYTES = 10 * 1024 * 1024; // 10 MB
 
 const ALLOWED_CURRENCIES = ["USD", "LBP", "EUR", "AED"] as const;
 
+// Costs at or above this are flagged for owner review (catches fat-finger /
+// test entries like the old $999,999,999 row).
+const LARGE_COST_THRESHOLD = 100000;
+
 const fmt = (n: number | null | undefined, currency = "USD") => {
   if (n == null) return "—";
   try {
@@ -666,7 +670,17 @@ function Body() {
                               </Badge>
                             </td>
                             <td className="px-2 py-1.5 text-right font-mono">
-                              {fmt(Number(c.amount), c.currency)}
+                              <span className="inline-flex items-center justify-end gap-1.5">
+                                {Number(c.amount) >= LARGE_COST_THRESHOLD && (
+                                  <span
+                                    title={`Unusually large cost (over ${fmt(LARGE_COST_THRESHOLD, c.currency)}) — please verify.`}
+                                    className="rounded bg-amber-100 px-1 text-[10px] font-semibold text-amber-700 dark:bg-amber-950 dark:text-amber-300"
+                                  >
+                                    ⚠ Review
+                                  </span>
+                                )}
+                                {fmt(Number(c.amount), c.currency)}
+                              </span>
                             </td>
                             {isOwner && (
                               <td className="px-2 py-1.5 text-right">
