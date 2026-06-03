@@ -69,6 +69,18 @@ interface CarLite {
 
 const VEHICLE_STATUSES = ["pending","customer_notified","scheduled","in_progress","completed","not_applicable","customer_refused"];
 
+const VEHICLE_STATUS_LABELS: Record<string, string> = {
+  pending: "Pending",
+  customer_notified: "Customer notified",
+  scheduled: "Scheduled",
+  in_progress: "In progress",
+  completed: "Completed",
+  not_applicable: "Not applicable",
+  customer_refused: "Customer refused",
+};
+const vehicleStatusLabel = (s: string) =>
+  VEHICLE_STATUS_LABELS[s] ?? s.replace(/_/g, " ");
+
 const RECALL_STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: "open", label: "Open" },
   { value: "active", label: "Active" },
@@ -299,7 +311,7 @@ export default function RecallDetailPage() {
                         </td>
                         <td className="py-1.5">
                           <Badge variant="outline" className={cn("h-5 px-1.5 text-[10px] uppercase", STATUS_COLOR[rv.status] ?? "")}>
-                            {rv.status.replace(/_/g, " ")}
+                            {vehicleStatusLabel(rv.status)}
                           </Badge>
                         </td>
                         <td className="py-1.5 text-muted-foreground text-xs">
@@ -311,7 +323,7 @@ export default function RecallDetailPage() {
                               <SelectTrigger className="h-7 w-40 text-xs"><SelectValue /></SelectTrigger>
                               <SelectContent>
                                 {VEHICLE_STATUSES.map((s) => (
-                                  <SelectItem key={s} value={s}>{s.replace(/_/g, " ")}</SelectItem>
+                                  <SelectItem key={s} value={s}>{vehicleStatusLabel(s)}</SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>

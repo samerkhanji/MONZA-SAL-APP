@@ -401,8 +401,8 @@ export default function SettingsPage() {
 
     const carMessages: Record<string, (e: { cars?: { brand?: string; model?: string }; from_value?: string; to_value?: string }) => string> = {
       created: (e) => `Added car ${e.cars?.brand ?? ""} ${e.cars?.model ?? ""}`,
-      moved: (e) => `Moved ${e.cars?.brand ?? ""} ${e.cars?.model ?? ""} from ${e.from_value ?? "?"} to ${e.to_value ?? "?"}`,
-      status_changed: (e) => `Changed ${e.cars?.brand ?? ""} ${e.cars?.model ?? ""} status: ${e.from_value ?? "?"} → ${e.to_value ?? "?"}`,
+      moved: (e) => `Moved ${e.cars?.brand ?? ""} ${e.cars?.model ?? ""} from ${e.from_value || "—"} to ${e.to_value || "—"}`,
+      status_changed: (e) => `Changed ${e.cars?.brand ?? ""} ${e.cars?.model ?? ""} status: ${e.from_value || "—"} → ${e.to_value || "—"}`,
       battery_updated: (e) => `Updated battery on ${e.cars?.brand ?? ""} ${e.cars?.model ?? ""}`,
       pdi_updated: (e) => `Updated PDI on ${e.cars?.brand ?? ""} ${e.cars?.model ?? ""}`,
       details_updated: (e) => `Edited ${e.cars?.brand ?? ""} ${e.cars?.model ?? ""} details`,
