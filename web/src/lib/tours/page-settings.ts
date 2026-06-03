@@ -93,7 +93,8 @@ export const settingsPageTour: Tour = {
       align: "start",
     },
     {
-      element: '[data-tour-id="settings-audit-panel"]',
+      element: '[data-tour-id="settings-audit-log-panel"]',
+      navigateTo: "/settings?tab=audit-log",
       title: "Audit Log tab",
       description:
         "A history of who did what — every car moved, part used, or note added. " +
