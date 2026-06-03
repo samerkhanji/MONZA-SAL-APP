@@ -76,6 +76,9 @@ export default function RecallsPage() {
   const [recalls, setRecalls] = useState<Recall[]>([]);
   const [agg, setAgg] = useState<Map<string, RecallVehicleAgg>>(new Map());
   const [loading, setLoading] = useState(true);
+  // Only show skeletons if loading runs longer than a beat, so a fast fetch
+  // resolves straight to the list/empty state instead of a jarring flash.
+  const [showSkeleton, setShowSkeleton] = useState(false);
   const [bucket, setBucket] = useState<Bucket>("all");
   const [query, setQuery] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
@@ -83,31 +86,46 @@ export default function RecallsPage() {
   const load = useCallback(async () => {
     if (!canRead) return;
     setLoading(true);
-    const [r, v] = await Promise.all([
-      supabase
-        .from("recalls")
-        .select("id, recall_number, title, status, affected_models, model_year_min, model_year_max, opened_at")
-        .is("deleted_at", null)
-        .order("opened_at", { ascending: false })
-        .limit(5000),
-      supabase.from("recall_vehicles").select("recall_id, status"),
-    ]);
-    if (r.error) toast.error(formatError(r.error));
-    else setRecalls((r.data as Recall[]) ?? []);
-    if (!v.error) {
-      const m = new Map<string, RecallVehicleAgg>();
-      ((v.data as Array<{ recall_id: string; status: string }>) ?? []).forEach((row) => {
-        if (!m.has(row.recall_id)) m.set(row.recall_id, { recall_id: row.recall_id, total: 0, completed: 0 });
-        const x = m.get(row.recall_id)!;
-        x.total += 1;
-        if (row.status === "completed" || row.status === "not_applicable") x.completed += 1;
-      });
-      setAgg(m);
+    try {
+      const [r, v] = await Promise.all([
+        supabase
+          .from("recalls")
+          .select("id, recall_number, title, status, affected_models, model_year_min, model_year_max, opened_at")
+          .is("deleted_at", null)
+          .order("opened_at", { ascending: false })
+          .limit(5000),
+        supabase.from("recall_vehicles").select("recall_id, status"),
+      ]);
+      if (r.error) toast.error(formatError(r.error));
+      else setRecalls((r.data as Recall[]) ?? []);
+      if (!v.error) {
+        const m = new Map<string, RecallVehicleAgg>();
+        ((v.data as Array<{ recall_id: string; status: string }>) ?? []).forEach((row) => {
+          if (!m.has(row.recall_id)) m.set(row.recall_id, { recall_id: row.recall_id, total: 0, completed: 0 });
+          const x = m.get(row.recall_id)!;
+          x.total += 1;
+          if (row.status === "completed" || row.status === "not_applicable") x.completed += 1;
+        });
+        setAgg(m);
+      }
+    } catch (e) {
+      toast.error(formatError(e));
+    } finally {
+      setLoading(false); // never strand on the spinner
     }
-    setLoading(false);
   }, [canRead, supabase]);
 
   useEffect(() => { void load(); }, [load]);
+
+  // Delay the skeleton so a quick fetch doesn't flash it before the empty state.
+  useEffect(() => {
+    if (!loading) {
+      setShowSkeleton(false);
+      return;
+    }
+    const t = window.setTimeout(() => setShowSkeleton(true), 250);
+    return () => window.clearTimeout(t);
+  }, [loading]);
 
   const filtered = useMemo(() => {
     let r = recalls;
@@ -184,12 +202,14 @@ export default function RecallsPage() {
 
       <Card data-tour-id="recalls-table">
         <CardContent className="p-0">
-          {loading ? (
+          {showSkeleton ? (
             <div className="space-y-2 p-4">
               {Array.from({ length: 5 }).map((_, i) => (
                 <Skeleton key={i} className="h-12 w-full" />
               ))}
             </div>
+          ) : loading ? (
+            <div className="p-8" />
           ) : filtered.length === 0 ? (
             <p className="text-muted-foreground p-8 text-center text-sm">
               {recalls.length === 0 ? "No recalls yet." : "No recalls match the filter."}

@@ -43,7 +43,9 @@ export function TourLauncher() {
           aria-label="Tours and help"
           data-tour-id="tour-launcher-button"
           className={cn(
-            "fixed right-4 bottom-20 z-40 size-12 rounded-full shadow-lg",
+            // Sit clearly ABOVE the floating scan button (which occupies the
+            // bottom-right corner up to ~8rem) so the two FABs never overlap.
+            "fixed right-4 bottom-36 z-40 size-12 rounded-full shadow-lg sm:bottom-24",
             "bg-primary text-primary-foreground hover:bg-primary/90"
           )}
         >

@@ -119,10 +119,10 @@ const BASE_NAV_ITEMS: Array<{
   { href: "/reports", label: "Reports", icon: BarChart3, tourId: "nav-reports" },
   {
     href: "/garage",
-    label: "Garage",
+    label: "Garage (Jobs)",
     icon: Wrench,
+    tourId: "nav-garage",
     children: [
-      { href: "/garage", label: "Jobs", icon: Wrench, tourId: "nav-garage" },
       {
         href: "/garage/tasks",
         label: "Task board",
@@ -270,8 +270,13 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         // `/ordered-parts` has no gate of its own, so it does not by itself
         // make the parent appear (matches prior behaviour).
         if (item.href === "/garage" && item.children?.length) {
-          return item.children.some(
-            (c) => c.href !== "/ordered-parts" && canAccessNavHref(c.href, user)
+          // Parent (the Jobs list) visible if the user can open Jobs, or any of
+          // its gated children. `/ordered-parts` has no gate of its own.
+          return (
+            canAccessNavHref("/garage", user) ||
+            item.children.some(
+              (c) => c.href !== "/ordered-parts" && canAccessNavHref(c.href, user)
+            )
           );
         }
         return canAccessNavHref(item.href, user);
