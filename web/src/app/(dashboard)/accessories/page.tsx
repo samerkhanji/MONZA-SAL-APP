@@ -303,11 +303,8 @@ export default function AccessoriesPage() {
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Accessories</h1>
-          <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
-            Every list here is stored on the server — all devices see the same data,
-            and changes save automatically about a second after you stop typing.{" "}
-            <strong>Custom collections</strong> at the bottom are also synced; staff can
-            create them and edit lines; only owners can rename or delete a collection.
+          <p className="text-muted-foreground mt-1 text-sm">
+            Shared lists that sync across all devices and save automatically as you type.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
