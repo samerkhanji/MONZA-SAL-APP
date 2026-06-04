@@ -211,6 +211,10 @@ export default function DocumentsPage() {
 
   return (
     <div className="container mx-auto space-y-6 px-4 py-6 sm:px-6 sm:py-8">
+      <div>
+        <h1 className="text-xl font-semibold sm:text-2xl">Documents</h1>
+        <p className="text-muted-foreground">Find and manage car and customer documents</p>
+      </div>
       <div className="flex flex-wrap gap-2">
         <Button
           variant={mode === "vin" ? "default" : "outline"}
