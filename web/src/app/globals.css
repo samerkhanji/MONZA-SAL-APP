@@ -49,7 +49,7 @@
 :root {
   --radius: 0.5rem;
   /* Brand: Black, Grey, White, Yellow - eye-comfort optimized */
-  --background: #F9FAFB; /* Primary background - soft off-white */
+  --background: #F1F5F9; /* Primary background - cool light slate (lets white cards float) */
   --foreground: #1F2937; /* Primary text - dark charcoal */
   --card: #FFFFFF;
   --card-foreground: #1F2937;
@@ -158,6 +158,16 @@
       font-size: 16px !important;
     }
   }
+}
+
+/* Light mode: lift cards off the slate background for visual depth, so KPI
+   tiles and filter cards read as distinct surfaces rather than flat white
+   boxes. Dark mode keeps its border-based look (shadows are invisible on dark
+   surfaces, where the border separation already reads well). */
+:root:not(.dark) [data-slot="card"] {
+  box-shadow:
+    0 1px 2px rgba(16, 24, 40, 0.04),
+    0 2px 6px rgba(16, 24, 40, 0.06);
 }
 
 /* Hide scrollbars everywhere */
