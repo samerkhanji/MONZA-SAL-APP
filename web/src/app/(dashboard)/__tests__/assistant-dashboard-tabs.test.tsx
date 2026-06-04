@@ -42,6 +42,7 @@ type QueryBuilder = {
   limit: ReturnType<typeof vi.fn>;
   lt: ReturnType<typeof vi.fn>;
   gte: ReturnType<typeof vi.fn>;
+  not: ReturnType<typeof vi.fn>;
   then: (resolve: (v: unknown) => unknown) => unknown;
 };
 
@@ -49,7 +50,7 @@ type QueryBuilder = {
 // interaction we're testing doesn't depend on any of the loaded data.
 function emptyBuilder(): QueryBuilder {
   const builder: Partial<QueryBuilder> = {};
-  const methods = ["select", "eq", "neq", "is", "in", "order", "limit", "lt", "gte"] as const;
+  const methods = ["select", "eq", "neq", "is", "in", "order", "limit", "lt", "gte", "not"] as const;
   for (const m of methods) {
     builder[m] = vi.fn(() => builder as QueryBuilder);
   }

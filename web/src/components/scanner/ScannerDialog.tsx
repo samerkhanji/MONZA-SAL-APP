@@ -89,7 +89,9 @@ export function ScannerDialog({
         const cameraId = backCamera?.id ?? cameras[0]?.id;
 
         if (!cameraId) {
-          setCameraError("No camera found");
+          setCameraError(
+            "No camera was found on this device. You can enter it manually below."
+          );
           return;
         }
 
@@ -116,11 +118,18 @@ export function ScannerDialog({
       } catch (err) {
         const msg =
           err instanceof Error ? err.message : "Camera unavailable";
-        setCameraError(msg);
-        if (
+        const denied =
           msg.toLowerCase().includes("permission") ||
-          msg.toLowerCase().includes("denied")
-        ) {
+          msg.toLowerCase().includes("denied");
+        // Show a friendly, actionable message on the camera surface rather
+        // than a raw browser error string — the manual entry field is always
+        // available just below.
+        setCameraError(
+          denied
+            ? "Camera access was blocked. Allow camera access, or enter it manually below."
+            : "The camera is unavailable on this device. You can enter it manually below."
+        );
+        if (denied) {
           toast.error("Camera permission denied. Use manual entry below.");
         } else {
           toast.error("Camera unavailable. Use manual entry below.");

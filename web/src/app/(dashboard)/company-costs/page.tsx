@@ -1258,7 +1258,12 @@ function AddCostDialog({
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent
+                position="popper"
+                sideOffset={4}
+                collisionPadding={16}
+                className="z-[100] max-h-[40vh]"
+              >
                 {(Object.keys(CATEGORY_LABEL) as CostCategory[]).map((c) => (
                   <SelectItem key={c} value={c}>
                     {CATEGORY_LABEL[c]}
@@ -1298,7 +1303,12 @@ function AddCostDialog({
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent
+                position="popper"
+                sideOffset={4}
+                collisionPadding={16}
+                className="z-[100] max-h-[40vh]"
+              >
                 {ALLOWED_CURRENCIES.map((c) => (
                   <SelectItem key={c} value={c}>
                     {c}
@@ -1325,7 +1335,12 @@ function AddCostDialog({
               <SelectTrigger>
                 <SelectValue placeholder="Not set" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent
+                position="popper"
+                sideOffset={4}
+                collisionPadding={16}
+                className="z-[100] max-h-[40vh]"
+              >
                 <SelectItem value={NONE}>Not set</SelectItem>
                 {(Object.keys(PAYMENT_LABEL) as PaymentMethod[]).map((p) => (
                   <SelectItem key={p} value={p}>
@@ -1356,7 +1371,12 @@ function AddCostDialog({
               <SelectTrigger>
                 <SelectValue placeholder="None" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent
+                position="popper"
+                sideOffset={4}
+                collisionPadding={16}
+                className="z-[100] max-h-[40vh]"
+              >
                 <SelectItem value={NONE}>None</SelectItem>
                 {cars.map((c) => (
                   <SelectItem key={c.id} value={c.id}>
@@ -1372,7 +1392,12 @@ function AddCostDialog({
               <SelectTrigger>
                 <SelectValue placeholder="None" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent
+                position="popper"
+                sideOffset={4}
+                collisionPadding={16}
+                className="z-[100] max-h-[40vh]"
+              >
                 <SelectItem value={NONE}>None</SelectItem>
                 {suppliers.map((s) => (
                   <SelectItem key={s.id} value={s.id}>
@@ -1388,7 +1413,12 @@ function AddCostDialog({
               <SelectTrigger>
                 <SelectValue placeholder="None" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent
+                position="popper"
+                sideOffset={4}
+                collisionPadding={16}
+                className="z-[100] max-h-[40vh]"
+              >
                 <SelectItem value={NONE}>None</SelectItem>
                 {customers.map((c) => (
                   <SelectItem key={c.id} value={c.id}>
@@ -1404,7 +1434,12 @@ function AddCostDialog({
               <SelectTrigger>
                 <SelectValue placeholder="None" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent
+                position="popper"
+                sideOffset={4}
+                collisionPadding={16}
+                className="z-[100] max-h-[40vh]"
+              >
                 <SelectItem value={NONE}>None</SelectItem>
                 {employees.map((e) => (
                   <SelectItem key={e.id} value={e.id}>
@@ -1420,7 +1455,12 @@ function AddCostDialog({
               <SelectTrigger>
                 <SelectValue placeholder="None" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent
+                position="popper"
+                sideOffset={4}
+                collisionPadding={16}
+                className="z-[100] max-h-[40vh]"
+              >
                 <SelectItem value={NONE}>None</SelectItem>
                 {garageJobs.map((j) => (
                   <SelectItem key={j.id} value={j.id}>
@@ -1436,7 +1476,12 @@ function AddCostDialog({
               <SelectTrigger>
                 <SelectValue placeholder="None" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent
+                position="popper"
+                sideOffset={4}
+                collisionPadding={16}
+                className="z-[100] max-h-[40vh]"
+              >
                 <SelectItem value={NONE}>None</SelectItem>
                 {salesOrders.map((o) => (
                   <SelectItem key={o.id} value={o.id}>
@@ -1455,7 +1500,12 @@ function AddCostDialog({
               <SelectTrigger>
                 <SelectValue placeholder="None" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent
+                position="popper"
+                sideOffset={4}
+                collisionPadding={16}
+                className="z-[100] max-h-[40vh]"
+              >
                 <SelectItem value={NONE}>None</SelectItem>
                 {purchaseOrders.map((p) => (
                   <SelectItem key={p.id} value={p.id}>
@@ -1471,7 +1521,12 @@ function AddCostDialog({
               <SelectTrigger>
                 <SelectValue placeholder="None" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent
+                position="popper"
+                sideOffset={4}
+                collisionPadding={16}
+                className="z-[100] max-h-[40vh]"
+              >
                 <SelectItem value={NONE}>None</SelectItem>
                 {campaigns.map((c) => (
                   <SelectItem key={c.id} value={c.id}>

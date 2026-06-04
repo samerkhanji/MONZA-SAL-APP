@@ -354,7 +354,7 @@ export default function DocumentsPage() {
                       {car.brand} {car.model}
                       {car.model_year ? ` (${car.model_year})` : ""}
                     </p>
-                    <Button variant="outline" size="sm" onClick={() => router.push(`/cars/${encodeURIComponent(car.vin)}`)}>
+                    <Button variant="outline" size="sm" onClick={() => router.push(`/cars/${encodeURIComponent(car.id)}`)}>
                       Open full profile →
                     </Button>
                   </div>
