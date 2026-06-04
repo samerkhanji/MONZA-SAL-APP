@@ -579,7 +579,6 @@ export default function DataHealthPage() {
   }, [cars]);
 
   // 11. Parts health (khalil)
-  const partsMissingOeNumber = useMemo(() => parts.filter((p) => empty(p.oe_number)), [parts]);
   const partsMissingData = useMemo(() => parts.filter((p) => empty(p.part_name) || empty(p.oe_number)), [parts]);
 
   // 12. Requests health (khalil)
@@ -639,7 +638,6 @@ export default function DataHealthPage() {
       appRole,
     ]
   );
-  const carsMissingVin = useMemo(() => cars.filter((c) => empty(c.vin)), [cars]);
 
   // Lookup maps for search
   const carById = useMemo(() => new Map(cars.map((c) => [c.id, c])), [cars]);

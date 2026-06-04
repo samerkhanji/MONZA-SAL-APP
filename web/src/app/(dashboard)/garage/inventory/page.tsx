@@ -77,7 +77,7 @@ function matchesSearch(p: Part, q: string): boolean {
 
 export default function GarageInventoryPage() {
   const searchParams = useSearchParams();
-  const { canManageParts, profile, appRole } = useUser();
+  const { profile, appRole } = useUser();
   const [parts, setParts] = useState<Part[]>([]);
   const [pendingDeletes, setPendingDeletes] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);

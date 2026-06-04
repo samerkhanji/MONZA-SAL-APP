@@ -42,9 +42,6 @@ import {
 const BRANDS = ["Voyah", "MHero"] as const;
 type Brand = (typeof BRANDS)[number];
 
-const CURRENCIES = ["USD", "AED", "LBP"] as const;
-type Currency = (typeof CURRENCIES)[number];
-
 const LANGUAGES = [
   { value: "en", label: "English" },
   { value: "ar", label: "Arabic" },

@@ -92,7 +92,7 @@ interface EnrichedSaleOrder {
 export default function CustomerDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { canEditInventory, canDelete, appRole, profile } = useUser();
+  const { appRole, profile } = useUser();
   const canAnonymize = canAnonymizeCustomer(profile);
   const canDeleteCustomer = canPerform("customers", "delete", appRole ?? null);
   const id = params.id as string;
@@ -187,8 +187,8 @@ export default function CustomerDetailPage() {
       created_at: string;
     };
 
-    let movedByCar = new Map<string, EventRow[]>();
-    let maintByCar = new Map<string, number>();
+    const movedByCar = new Map<string, EventRow[]>();
+    const maintByCar = new Map<string, number>();
 
     if (carIds.length > 0) {
       const [movedRes, maintRes] = await Promise.all([

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 import { useUser } from "@/lib/contexts/UserContext";
@@ -91,7 +91,6 @@ const STATUS_COLOR: Record<string, string> = {
 export default function RefundDetailPage() {
   const params = useParams();
   const id = String(params?.id ?? "");
-  const router = useRouter();
   const supabase = createClient();
   const { isOwner, hasCapability, profile } = useUser();
   const canApprove = canApproveRefund(profile);

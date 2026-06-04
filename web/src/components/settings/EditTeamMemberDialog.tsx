@@ -49,19 +49,6 @@ const CAPABILITY_LABELS: Record<UserCapability, string> = {
   view_customer_documents: "View Customer Documents",
 };
 
-const ROLE_COLORS: Record<string, string> = {
-  owner: "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300",
-  assistant: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
-  hybrid:
-    "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
-  it: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900 dark:text-cyan-300",
-  garage_manager:
-    "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300",
-  garage_staff:
-    "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300",
-  sales_ops: "bg-pink-100 text-pink-700 dark:bg-pink-900 dark:text-pink-300",
-};
-
 const CAPABILITIES: UserCapability[] = [
   "garage",
   "vehicle_software",

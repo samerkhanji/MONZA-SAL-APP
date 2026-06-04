@@ -106,7 +106,7 @@ function applyCustomName(customName: string, originalName: string): string {
 }
 
 export function CustomerDocuments({ customerId }: CustomerDocumentsProps) {
-  const { canEditInventory, appRole, profile } = useUser();
+  const { appRole, profile } = useUser();
   // Customer documents carry PII (passport scans, IDs, insurance). Reading
   // and uploading require the explicit `view_customer_documents` capability
   // (owners auto-grant via hasCapability). Migration 155 enforces the same

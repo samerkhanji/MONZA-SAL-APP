@@ -179,7 +179,6 @@ describe("canPerform", () => {
 // ============================================================================
 
 import {
-  type AppCapability,
   APP_CAPABILITIES,
   MODULE_CAPABILITY,
   getCapabilitiesFromProfile,
@@ -283,7 +282,7 @@ describe("APP_CAPABILITIES + MODULE_CAPABILITY contracts", () => {
 
   it("MODULE_CAPABILITY values are all valid AppCapability", () => {
     const caps = new Set<string>(APP_CAPABILITIES);
-    for (const [mod, cap] of Object.entries(MODULE_CAPABILITY)) {
+    for (const [, cap] of Object.entries(MODULE_CAPABILITY)) {
       expect(caps.has(cap)).toBe(true);
     }
   });

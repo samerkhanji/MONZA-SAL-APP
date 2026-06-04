@@ -173,7 +173,6 @@ export function ImportExcelDialog({
           const intIdx = headers.findIndex((h) => /interior/i.test(String(h ?? "")));
           const vinIdx = headers.findIndex((h) => /vin/i.test(String(h ?? "")));
           const engineIdx = headers.findIndex((h) => /engine/i.test(String(h ?? "")));
-          const clientIdx = headers.findIndex((h) => /client/i.test(String(h ?? "")));
           const swIdx = headers.findIndex((h) => /software/i.test(String(h ?? "")));
           const dongleIdx = headers.findIndex((h) => /dongle/i.test(String(h ?? "")));
           const soldIdx = headers.findIndex((h) => /sold/i.test(String(h ?? "")));

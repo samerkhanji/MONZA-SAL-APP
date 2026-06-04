@@ -222,7 +222,7 @@ export function CustomAccessoryCollections() {
       toast.error("You do not have permission to add lines.");
       return;
     }
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from("accessory_custom_items")
       .insert({
         table_id: tableId,

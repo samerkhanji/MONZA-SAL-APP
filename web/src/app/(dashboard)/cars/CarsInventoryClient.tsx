@@ -354,7 +354,7 @@ export function CarsInventoryClient({
   const searchParams = useSearchParams();
   const statusFromUrl = searchParams.get("status");
   const locationFromUrl = searchParams.get("location");
-  const { canEditInventory, canDelete, profile, isOwner, appRole, canOpenCarEditDialog } =
+  const { profile, isOwner, appRole, canOpenCarEditDialog } =
     useUser();
   const [cars, setCars] = useState<CarDisplay[]>(initialCars);
   const [pendingDeletes, setPendingDeletes] = useState<Record<string, boolean>>({});

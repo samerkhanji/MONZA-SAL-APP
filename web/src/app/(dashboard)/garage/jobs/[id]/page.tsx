@@ -90,7 +90,7 @@ export default function JobDetailPage() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
-  const { canManageGarage, canDelete, appRole, profile, isOwner } = useUser();
+  const { canManageGarage, appRole, profile, isOwner } = useUser();
   const [job, setJob] = useState<JobWithCar | null>(null);
   const [parts, setParts] = useState<JobPartWithPart[]>([]);
   const [loading, setLoading] = useState(true);
