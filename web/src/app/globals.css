@@ -170,6 +170,27 @@
     0 2px 6px rgba(16, 24, 40, 0.06);
 }
 
+/* Native-app feel: disable accidental text selection on general UI chrome
+   (sidebar labels, page titles, cards, table cells, badges, buttons) so a
+   click-drag or double-click doesn't highlight text like a web page. */
+body {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Opt selection back in where it genuinely matters: text entry, and anything
+   intentionally copyable (VINs, phone numbers, emails, plates) marked with
+   Tailwind's `select-text` utility. */
+input,
+textarea,
+select,
+[contenteditable]:not([contenteditable="false"]),
+.select-text,
+.select-text * {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 /* Hide scrollbars everywhere */
 ::-webkit-scrollbar {
   display: none;
