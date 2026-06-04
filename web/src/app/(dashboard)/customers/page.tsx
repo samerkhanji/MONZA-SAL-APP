@@ -339,7 +339,7 @@ export default function CustomersPage() {
               return (
                 <tr
                   key={customer.id}
-                  className="cursor-pointer odd:bg-gray-50 even:bg-white"
+                  className="cursor-pointer odd:bg-gray-50 even:bg-white dark:odd:bg-muted/30 dark:even:bg-transparent"
                   onClick={() => router.push(`/customers/${customer.id}`)}
                 >
                   <td title={fullName || undefined} className={`${CRM_TD} font-medium`}>
@@ -661,7 +661,7 @@ export default function CustomersPage() {
                           : "—";
                         const orderStatusText = so.status ?? "—";
                         return (
-                          <tr key={so.id} className="odd:bg-gray-50 even:bg-white">
+                          <tr key={so.id} className="odd:bg-gray-50 even:bg-white dark:odd:bg-muted/30 dark:even:bg-transparent">
                             <td title={vehicleTitle} className={`${CRM_TD} font-medium`}>
                               {vehicleTitle}
                             </td>

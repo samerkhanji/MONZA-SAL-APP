@@ -1040,7 +1040,7 @@ export function CarsInventoryClient({
                     return (
                       <tr
                         key={car.id}
-                        className="cursor-pointer odd:bg-gray-50 even:bg-white"
+                        className="cursor-pointer odd:bg-gray-50 even:bg-white dark:odd:bg-muted/30 dark:even:bg-transparent"
                         title={pendingDeletes[car.id] ? "Pending delete request" : undefined}
                         onClick={() => router.push(`/cars/${encodeURIComponent(car.id)}`)}
                       >
