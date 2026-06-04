@@ -99,7 +99,10 @@
   --secondary: #1F2937;
   --secondary-foreground: #F9FAFB;
   --muted: #1F2937;
-  --muted-foreground: #9CA3AF;
+  /* Secondary/label text. Lifted from #9CA3AF (~5.8:1 on the #1F2937 card,
+     borderline for small uppercase KPI labels) to ~8:1 so muted text on cards
+     meets WCAG AA comfortably while staying visibly dimmer than white values. */
+  --muted-foreground: #B8C0CC;
   --accent: #374151;
   --accent-foreground: #F9FAFB;
   --destructive: #EF4444;
@@ -121,7 +124,7 @@
   --sidebar-ring: #F59E0B;
   --primary-hover: #D97706;
   --table-header: #1F2937;
-  --table-header-text: #9CA3AF;
+  --table-header-text: #B8C0CC;
 }
 
 /* Phone-only: safe area insets (0 on desktop) */
