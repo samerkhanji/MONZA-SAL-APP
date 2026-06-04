@@ -42,8 +42,6 @@ export function PartHistoryDialog({
   const [authorNames, setAuthorNames] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
 
-  const supabase = createClient();
-
   useEffect(() => {
     if (!part?.id || !open) return;
     setLoading(true);

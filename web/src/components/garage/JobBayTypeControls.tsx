@@ -6,7 +6,6 @@ import { createClient } from "@/lib/supabase";
 import type { Json } from "@/lib/supabase/database.types";
 import type {
   GarageBayType,
-  GarageJobBayContext,
   GarageJobBayContextData,
 } from "@/types/database";
 import { Button } from "@/components/ui/button";

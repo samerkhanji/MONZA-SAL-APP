@@ -109,7 +109,6 @@ export default function GarageJobsPage() {
   const [finishJobOpen, setFinishJobOpen] = useState<JobWithCar | null>(null);
   const [cancelJobConfirm, setCancelJobConfirm] = useState<JobWithCar | null>(null);
   const [setCategoryFor, setSetCategoryFor] = useState<JobWithCar | null>(null);
-  const dueTodayNotifiedRef = useRef(false);
   const overtimeNotifiedRef = useRef<Set<string>>(new Set());
   const [preselectedCar, setPreselectedCar] = useState<{
     id: string;

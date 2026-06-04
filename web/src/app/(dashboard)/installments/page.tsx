@@ -187,7 +187,7 @@ export default function InstallmentsPage() {
   const [newPlanDownPaymentMethod, setNewPlanDownPaymentMethod] = useState("cash");
   const [savingNewPlan, setSavingNewPlan] = useState(false);
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [cars, setCars] = useState<Car[]>([]);
+  const [, setCars] = useState<Car[]>([]);
   const [newPlanStep, setNewPlanStep] = useState<
     "choose" | "existingCustomer" | "existingCar" | "newCustomer" | "linkCar" | "planForm"
   >("choose");
@@ -200,7 +200,7 @@ export default function InstallmentsPage() {
     exterior_color: string | null;
   } | null>(null);
   const [customerSearch, setCustomerSearch] = useState("");
-  const [carSearch, setCarSearch] = useState("");
+  const [, setCarSearch] = useState("");
   const [customerCarOptions, setCustomerCarOptions] = useState<
     {
       carId: string;

@@ -30,7 +30,7 @@ function normalizeSiteOrigin(raw: string): string {
 
 function browserAuthOrigin(): string | null {
   if (typeof window === "undefined") return null;
-  let o = window.location.origin;
+  const o = window.location.origin;
   if (process.env.NODE_ENV === "production" && o.includes("localhost")) {
     console.warn(
       "[Auth] Detected localhost origin in production; falling back to https://monzasal.vercel.app"

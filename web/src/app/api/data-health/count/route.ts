@@ -91,13 +91,6 @@ export async function GET() {
     const inst = p.installments ?? [];
     return inst.length === 0 || inst.some((i) => empty(i.due_date));
   });
-  const today = new Date().toISOString().slice(0, 10);
-  let overdueCount = 0;
-  for (const p of plansList) {
-    for (const i of p.installments ?? []) {
-      if (i.due_date && i.due_date < today && i.status !== "paid") overdueCount++;
-    }
-  }
   const carsMissingSoftwareVersion = carsList.filter((c) => empty(c.software_version));
   const carsMissingSoftwareUpdate = carsList.filter((c) => empty(c.software_update));
   const carsMissingDongle = carsList.filter((c) => empty(c.dongle));

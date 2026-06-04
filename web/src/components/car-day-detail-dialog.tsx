@@ -94,7 +94,6 @@ export function DayDetailDialog({
   dateStr,
   dayEvents,
   carId,
-  carVin,
   eventLabels,
   formatEventDisplay,
   onRefresh,

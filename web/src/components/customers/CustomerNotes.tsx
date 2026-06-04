@@ -48,7 +48,7 @@ interface CustomerNotesProps {
 }
 
 export function CustomerNotes({ customerId }: CustomerNotesProps) {
-  const { canEditInventory, appRole } = useUser();
+  const { appRole } = useUser();
   const supabase = createClient();
   const [notes, setNotes] = useState<CustomerNoteRow[]>([]);
   const [loading, setLoading] = useState(true);

@@ -16,7 +16,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 function AuthCallbackInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [message, setMessage] = useState<string | null>(null);
+  const message: string | null = null;
   const [fatal, setFatal] = useState<string | null>(null);
 
   const code = searchParams.get("code");
