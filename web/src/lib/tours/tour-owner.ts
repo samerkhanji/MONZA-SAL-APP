@@ -10,6 +10,10 @@ import type { Tour } from "./types";
  *
  * In v2 this is the owner's "welcome" tour — the one auto-fired on first
  * login. Per-page and workflow tours live in separate files.
+ *
+ * Each section step carries a `navigateTo` so the runner actually opens the
+ * page it's describing (then highlights that page's sidebar entry), instead of
+ * narrating every page while stuck on whichever one you started from.
  */
 export const ownerWelcomeTour: Tour = {
   id: "owner-v1",
@@ -27,12 +31,14 @@ export const ownerWelcomeTour: Tour = {
     },
     {
       element: '[data-tour-id="nav-dashboard"]',
+      navigateTo: "/dashboard",
       title: "Your Dashboard",
       description:
         "This is your home page. The big numbers at a glance — how many cars you have, how many were sold, who's pending payment. Open it first thing in the morning.",
     },
     {
       element: '[data-tour-id="nav-dashboard-overview"]',
+      navigateTo: "/dashboard/overview",
       title: "Owner Overview",
       description:
         "Only you see this page. It's the full picture — sales this month, revenue, the cash drawer, the garage, top sales rep, everything in one screen. " +
@@ -40,6 +46,7 @@ export const ownerWelcomeTour: Tour = {
     },
     {
       element: '[data-tour-id="nav-cars"]',
+      navigateTo: "/cars",
       title: "Inventory",
       description:
         "Every car you own. New arrivals, the ones for sale, the ones already sold, the ones in the garage. " +
@@ -47,6 +54,7 @@ export const ownerWelcomeTour: Tour = {
     },
     {
       element: '[data-tour-id="nav-customers"]',
+      navigateTo: "/customers",
       title: "Customers",
       description:
         "Everyone who's talked to you about buying — and everyone you've sold to. " +
@@ -54,6 +62,7 @@ export const ownerWelcomeTour: Tour = {
     },
     {
       element: '[data-tour-id="nav-test-drive"]',
+      navigateTo: "/test-drive",
       title: "Test Drives",
       description:
         "When a customer wants to drive a car before deciding, book it here. " +
@@ -61,6 +70,7 @@ export const ownerWelcomeTour: Tour = {
     },
     {
       element: '[data-tour-id="nav-sales-orders"]',
+      navigateTo: "/sales-orders",
       title: "Sales Orders",
       description:
         "When a customer commits to buying, you create a sales order. " +
@@ -68,6 +78,7 @@ export const ownerWelcomeTour: Tour = {
     },
     {
       element: '[data-tour-id="nav-installments"]',
+      navigateTo: "/installments",
       title: "Installments",
       description:
         "When a customer pays in pieces (not all at once), every monthly payment is tracked here. " +
@@ -75,6 +86,7 @@ export const ownerWelcomeTour: Tour = {
     },
     {
       element: '[data-tour-id="nav-trade-ins"]',
+      navigateTo: "/trade-ins",
       title: "Trade-ins",
       description:
         "When a customer trades their old car in for a new one, log the appraisal here. " +
@@ -82,6 +94,7 @@ export const ownerWelcomeTour: Tour = {
     },
     {
       element: '[data-tour-id="nav-cash"]',
+      navigateTo: "/cash",
       title: "Cash Register",
       description:
         "Your daily till. Whoever opens the drawer in the morning starts a 'session'. " +
@@ -89,12 +102,14 @@ export const ownerWelcomeTour: Tour = {
     },
     {
       element: '[data-tour-id="nav-accessories"]',
+      navigateTo: "/accessories",
       title: "Accessories",
       description:
         "Mats, dash cams, tinting, ceramic coating — anything you sell on top of the car itself. Track what's in stock and what packages you offer.",
     },
     {
       element: '[data-tour-id="nav-garage"]',
+      navigateTo: "/garage",
       title: "The Garage",
       description:
         "Everything that happens in your service bays. " +
@@ -103,6 +118,7 @@ export const ownerWelcomeTour: Tour = {
     },
     {
       element: '[data-tour-id="nav-documents"]',
+      navigateTo: "/documents",
       title: "Documents",
       description:
         "Need a car's registration, insurance certificate, or warranty paper? Search by VIN and pull it up. " +
@@ -110,6 +126,7 @@ export const ownerWelcomeTour: Tour = {
     },
     {
       element: '[data-tour-id="nav-reports"]',
+      navigateTo: "/reports",
       title: "Reports",
       description:
         "All your numbers, in chart form. Who's selling the most, which car makes the best margin, how fast the garage finishes jobs, who owes you money. " +
@@ -117,6 +134,7 @@ export const ownerWelcomeTour: Tour = {
     },
     {
       element: '[data-tour-id="nav-data-health"]',
+      navigateTo: "/data-health",
       title: "Data Health",
       description:
         "Cars without VINs, customers without phone numbers, jobs with no notes — anything missing or broken in your data shows up here. " +
@@ -124,6 +142,7 @@ export const ownerWelcomeTour: Tour = {
     },
     {
       element: '[data-tour-id="nav-requests"]',
+      navigateTo: "/requests",
       title: "Requests",
       description:
         "If anyone on your team needs approval for something — a refund, deleting a record, an unusual action — it lands here. " +
@@ -131,6 +150,7 @@ export const ownerWelcomeTour: Tour = {
     },
     {
       element: '[data-tour-id="nav-settings"]',
+      navigateTo: "/settings",
       title: "Settings",
       description:
         "Your control panel. Add employees, change someone's role, set approval thresholds (e.g. 'refunds over $500 need my OK'), change company info, view the audit log. " +

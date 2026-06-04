@@ -255,11 +255,16 @@ export function OnboardingTour() {
               stepIdx
             );
           }
-          renderFooterMode(opts.state.popover, mode, () => {
-            const newMode: TourMode = isInteractive ? "manual" : "interactive";
-            const currentIdx = opts.driver.getActiveIndex() ?? 0;
-            runTourRef.current?.(tour, newMode, markCompleteAfter, currentIdx);
-          });
+          // Welcome tours are guided, page-to-page walkthroughs that drive the
+          // user via Next (each step navigates). The manual/interactive toggle
+          // doesn't apply there and only adds noise, so hide it.
+          if (tour.kind !== "welcome") {
+            renderFooterMode(opts.state.popover, mode, () => {
+              const newMode: TourMode = isInteractive ? "manual" : "interactive";
+              const currentIdx = opts.driver.getActiveIndex() ?? 0;
+              runTourRef.current?.(tour, newMode, markCompleteAfter, currentIdx);
+            });
+          }
 
           // Wire up interactive auto-advance (skipped for sensitive steps).
           if (interactiveCleanupRef.current) {
