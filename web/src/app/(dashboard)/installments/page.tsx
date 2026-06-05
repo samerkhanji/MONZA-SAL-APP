@@ -85,6 +85,10 @@ interface InstallmentWithRelations extends InstallmentPayment {
   plan: PlanWithRelations | null;
 }
 
+// Shared id for the New-Plan wizard's error toasts so they can be dismissed on
+// step navigation without affecting the (id-less) success toast.
+const PLAN_ERROR_TOAST_ID = "installments-plan-error";
+
 const currencyFormatter = new Intl.NumberFormat("en-US", {
   style: "currency",
   currency: "USD",
@@ -349,6 +353,14 @@ export default function InstallmentsPage() {
       }
     }
   }, [newPlanTotal, newPlanDown, newPlanMonths, newPlanMonthlyEdited]);
+
+  useEffect(() => {
+    // Clear any lingering plan-creation error toast when the user moves between
+    // wizard steps (Back/Skip/etc.) or closes the dialog, so a failure on one
+    // step doesn't bleed onto the next. Scoped to the error toast id only —
+    // the post-success toast carries no id and is left untouched.
+    toast.dismiss(PLAN_ERROR_TOAST_ID);
+  }, [newPlanStep, newPlanOpen]);
 
   const overview = useMemo(() => {
     const now = new Date();
@@ -2702,14 +2714,18 @@ export default function InstallmentsPage() {
 
                       if (planError) {
                         setSavingNewPlan(false);
-                        toast.error(`Failed to create plan: ${formatError(planError)}`);
+                        toast.error(`Failed to create plan: ${formatError(planError)}`, {
+                          id: PLAN_ERROR_TOAST_ID,
+                        });
                         return;
                       }
 
                       const planData = { id: (rpcData as { plan_id?: string } | null)?.plan_id ?? "" };
                       if (!planData.id) {
                         setSavingNewPlan(false);
-                        toast.error("Plan created but server returned no id");
+                        toast.error("Plan created but server returned no id", {
+                          id: PLAN_ERROR_TOAST_ID,
+                        });
                         return;
                       }
 
