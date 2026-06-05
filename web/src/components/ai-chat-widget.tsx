@@ -57,11 +57,27 @@ function newId(): string {
   return `${Date.now()}-${idCounter.toString(36)}`;
 }
 
-export function AIChatWidget() {
+export function AIChatWidget({
+  open: openProp,
+  onOpenChange,
+  showTrigger = true,
+}: {
+  /** Controlled open state (omit for self-managed). */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  /** Render the floating bubble. Off when driven by a parent menu. */
+  showTrigger?: boolean;
+} = {}) {
   const { profile, appRole, loading } = useUser();
   const pathname = usePathname();
 
-  const [open, setOpen] = useState(false);
+  const [openState, setOpenState] = useState(false);
+  const isControlled = openProp !== undefined;
+  const open = isControlled ? openProp : openState;
+  const setOpen = (next: boolean) => {
+    if (!isControlled) setOpenState(next);
+    onOpenChange?.(next);
+  };
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -327,24 +343,26 @@ export function AIChatWidget() {
 
   return (
     <>
-      {/* Floating launcher button */}
-      <button
-        type="button"
-        aria-label={open ? "Close AI assistant" : "Open AI assistant"}
-        onClick={() => setOpen((v) => !v)}
-        className={cn(
-          "fixed z-50 flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105 active:scale-95",
-          // Mobile: sits above the bottom tab bar, beside the scan button
-          // Desktop: bottom-6 right-20 (left of the scan button)
-          "bottom-[calc(env(safe-area-inset-bottom)+4.75rem)] right-20 sm:bottom-6 sm:right-20"
-        )}
-      >
-        {open ? (
-          <X className="size-5" />
-        ) : (
-          <MessageCircle className="size-5" />
-        )}
-      </button>
+      {/* Floating launcher button (hidden when driven by the action menu) */}
+      {showTrigger && (
+        <button
+          type="button"
+          aria-label={open ? "Close AI assistant" : "Open AI assistant"}
+          onClick={() => setOpen(!open)}
+          className={cn(
+            "fixed z-50 flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105 active:scale-95",
+            // Mobile: sits above the bottom tab bar, beside the scan button
+            // Desktop: bottom-6 right-20 (left of the scan button)
+            "bottom-[calc(env(safe-area-inset-bottom)+4.75rem)] right-20 sm:bottom-6 sm:right-20"
+          )}
+        >
+          {open ? (
+            <X className="size-5" />
+          ) : (
+            <MessageCircle className="size-5" />
+          )}
+        </button>
+      )}
 
       {/* Chat panel */}
       {open && (
