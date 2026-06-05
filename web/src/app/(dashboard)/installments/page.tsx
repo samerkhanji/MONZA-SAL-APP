@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import type { Database } from "@/lib/supabase/database.types";
@@ -110,6 +110,127 @@ function carTitleAttr(car: Car | null | undefined): string | undefined {
   if (!car?.vin) return undefined;
   return `${car.model ?? ""} (${car.vin})`.trim();
 }
+
+function formatName(c: Customer) {
+  return c.last_name ? `${c.first_name} ${c.last_name}` : c.first_name;
+}
+
+function daysLate(dueDate: string) {
+  const due = new Date(dueDate);
+  const now = new Date();
+  const diff = now.getTime() - due.getTime();
+  return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
+}
+
+// Export column definitions + row mappers. Module-scope so they're defined once
+// (stable identities) and usable from the memoized tab-panel components below.
+const dueColumns: ExportColumn[] = [
+  { key: "customer_name", header: "Customer" },
+  { key: "customer_phone", header: "Phone" },
+  { key: "car_label", header: "Car" },
+  { key: "installment_label", header: "Installment" },
+  { key: "due_date", header: "Due Date", type: "date" },
+  { key: "amount_due", header: "Amount Due", type: "currency" },
+  { key: "status", header: "Status" },
+  { key: "days_late", header: "Days Late" },
+];
+
+const mapDueForExport = (rows: InstallmentWithRelations[]) =>
+  rows.map((i) => {
+    const customer = i.plan?.customer as Customer | null;
+    const car = i.plan?.car as Car | null;
+    return {
+      customer_name: customer ? formatName(customer) : "Customer",
+      customer_phone: customer?.phone_primary ?? "",
+      car_label: car ? `${car.model} (${car.vin})` : "—",
+      installment_label: `#${i.installment_no} of ${i.plan?.months ?? ""}`,
+      due_date: i.due_date,
+      amount_due: i.amount_due,
+      status: i.status,
+      days_late: i.status === "overdue" ? daysLate(i.due_date) : 0,
+    };
+  });
+
+const upcomingColumns: ExportColumn[] = [
+  { key: "customer_name", header: "Customer" },
+  { key: "customer_phone", header: "Phone" },
+  { key: "car_label", header: "Car" },
+  { key: "installment_label", header: "Installment" },
+  { key: "due_date", header: "Due Date", type: "date" },
+  { key: "amount_due", header: "Amount", type: "currency" },
+];
+
+const mapUpcomingForExport = (rows: InstallmentWithRelations[]) =>
+  rows.map((i) => {
+    const customer = i.plan?.customer as Customer | null;
+    const car = i.plan?.car as Car | null;
+    return {
+      customer_name: customer ? formatName(customer) : "Customer",
+      customer_phone: customer?.phone_primary ?? "",
+      car_label: car ? `${car.model} (${car.vin})` : "—",
+      installment_label: `#${i.installment_no} of ${i.plan?.months ?? ""}`,
+      due_date: i.due_date,
+      amount_due: i.amount_due,
+    };
+  });
+
+const paidColumns: ExportColumn[] = [
+  { key: "customer_name", header: "Customer" },
+  { key: "car_label", header: "Car" },
+  { key: "installment_label", header: "Installment" },
+  { key: "due_date", header: "Due Date", type: "date" },
+  { key: "paid_date", header: "Paid Date", type: "date" },
+  { key: "amount_paid", header: "Amount Paid", type: "currency" },
+  { key: "payment_method", header: "Payment Method" },
+];
+
+const mapPaidForExport = (rows: InstallmentWithRelations[]) =>
+  rows.map((i) => {
+    const customer = i.plan?.customer as Customer | null;
+    const car = i.plan?.car as Car | null;
+    return {
+      customer_name: customer ? formatName(customer) : "Customer",
+      car_label: car ? `${car.model} (${car.vin})` : "—",
+      installment_label: `#${i.installment_no} of ${i.plan?.months ?? ""}`,
+      due_date: i.due_date,
+      paid_date: i.paid_at,
+      amount_paid: i.paid_amount ?? 0,
+      payment_method: i.payment_method ?? "",
+    };
+  });
+
+const plansColumns: ExportColumn[] = [
+  { key: "customer_name", header: "Customer" },
+  { key: "car_label", header: "Car" },
+  { key: "status", header: "Status" },
+  { key: "total_amount", header: "Total Amount", type: "currency" },
+  { key: "down_payment", header: "Down Payment", type: "currency" },
+  { key: "monthly_amount", header: "Monthly Amount", type: "currency" },
+  { key: "months", header: "Months" },
+  { key: "paid_count", header: "Paid Installments" },
+  { key: "total_count", header: "Total Installments" },
+  { key: "start_date", header: "Start Date", type: "date" },
+  { key: "due_day", header: "Due Day" },
+];
+
+const mapPlansForExport = (rows: PlanWithRelations[]) =>
+  rows.map((p) => {
+    const paidCount = p.installments.filter((i) => i.status === "paid").length;
+    const totalCount = p.installments.length;
+    return {
+      customer_name: p.customer ? formatName(p.customer) : "Customer",
+      car_label: p.car ? `${p.car.model} (${p.car.vin})` : "—",
+      status: p.status,
+      total_amount: p.total_amount,
+      down_payment: p.down_payment,
+      monthly_amount: p.monthly_amount,
+      months: p.months,
+      paid_count: paidCount,
+      total_count: totalCount,
+      start_date: p.start_date,
+      due_day: p.due_day,
+    };
+  });
 
 export default function InstallmentsPage() {
   const supabase = createClient();
@@ -409,17 +530,6 @@ export default function InstallmentsPage() {
     };
   }, [installments, plans]);
 
-  function formatName(c: Customer) {
-    return c.last_name ? `${c.first_name} ${c.last_name}` : c.first_name;
-  }
-
-  function daysLate(dueDate: string) {
-    const due = new Date(dueDate);
-    const now = new Date();
-    const diff = now.getTime() - due.getTime();
-    return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
-  }
-
   const activePlanCarIds = useMemo(
     () =>
       new Set(
@@ -437,7 +547,7 @@ export default function InstallmentsPage() {
     }
   }, [newPlanStep, linkCarSearch, linkCarResults.length]);
 
-  function openNewPlan() {
+  const openNewPlan = useCallback(() => {
     if (!canCreatePlan) return;
     setNewPlanOpen(true);
     setNewPlanStep("choose");
@@ -455,7 +565,7 @@ export default function InstallmentsPage() {
     setNewPlanMonthlyEdited(false);
     setNewPlanStartDate("");
     setNewPlanDueDay("");
-  }
+  }, [canCreatePlan]);
 
   async function loadCustomerCars(customerId: string) {
     setLoadingCustomerCars(true);
@@ -609,15 +719,26 @@ export default function InstallmentsPage() {
   }, [newPlanTotal, newPlanDown, newPlanMonths, newPlanMonthly, newPlanStartDate, newPlanDueDay]);
 
 
-  function onOpenMarkPaid(inst: InstallmentWithRelations) {
-    if (!canMarkPaid) return;
-    setSelectedInstallment(inst);
-    setPaidAmount(inst.amount_due.toString());
-    setPaymentMethod("cash");
-    setReceiptUrl("");
-    setNote("");
-    setMarkPaidOpen(true);
-  }
+  // useCallback so the memoized tab panels that receive this handler don't
+  // re-render every time unrelated page state (dialog inputs, search) changes.
+  const onOpenMarkPaid = useCallback(
+    (inst: InstallmentWithRelations) => {
+      if (!canMarkPaid) return;
+      setSelectedInstallment(inst);
+      setPaidAmount(inst.amount_due.toString());
+      setPaymentMethod("cash");
+      setReceiptUrl("");
+      setNote("");
+      setMarkPaidOpen(true);
+    },
+    [canMarkPaid]
+  );
+
+  // Open the recovery flow for a defaulted plan (Plans tab).
+  const onRecoverPlan = useCallback((planId: string) => {
+    setRecoverPlanId(planId);
+    setRecoverReason("");
+  }, []);
 
   async function handleMarkPaid() {
     if (!selectedInstallment) return;
@@ -729,114 +850,6 @@ export default function InstallmentsPage() {
   }
 
   const defaultTab = searchParams.get("tab") ?? "due";
-
-  const dueColumns: ExportColumn[] = [
-    { key: "customer_name", header: "Customer" },
-    { key: "customer_phone", header: "Phone" },
-    { key: "car_label", header: "Car" },
-    { key: "installment_label", header: "Installment" },
-    { key: "due_date", header: "Due Date", type: "date" },
-    { key: "amount_due", header: "Amount Due", type: "currency" },
-    { key: "status", header: "Status" },
-    { key: "days_late", header: "Days Late" },
-  ];
-
-  const mapDueForExport = (rows: InstallmentWithRelations[]) =>
-    rows.map((i) => {
-      const customer = i.plan?.customer as Customer | null;
-      const car = i.plan?.car as Car | null;
-      return {
-        customer_name: customer ? formatName(customer) : "Customer",
-        customer_phone: customer?.phone_primary ?? "",
-        car_label: car ? `${car.model} (${car.vin})` : "—",
-        installment_label: `#${i.installment_no} of ${i.plan?.months ?? ""}`,
-        due_date: i.due_date,
-        amount_due: i.amount_due,
-        status: i.status,
-        days_late: i.status === "overdue" ? daysLate(i.due_date) : 0,
-      };
-    });
-
-  const upcomingColumns: ExportColumn[] = [
-    { key: "customer_name", header: "Customer" },
-    { key: "customer_phone", header: "Phone" },
-    { key: "car_label", header: "Car" },
-    { key: "installment_label", header: "Installment" },
-    { key: "due_date", header: "Due Date", type: "date" },
-    { key: "amount_due", header: "Amount", type: "currency" },
-  ];
-
-  const mapUpcomingForExport = (rows: InstallmentWithRelations[]) =>
-    rows.map((i) => {
-      const customer = i.plan?.customer as Customer | null;
-      const car = i.plan?.car as Car | null;
-      return {
-        customer_name: customer ? formatName(customer) : "Customer",
-        customer_phone: customer?.phone_primary ?? "",
-        car_label: car ? `${car.model} (${car.vin})` : "—",
-        installment_label: `#${i.installment_no} of ${i.plan?.months ?? ""}`,
-        due_date: i.due_date,
-        amount_due: i.amount_due,
-      };
-    });
-
-  const paidColumns: ExportColumn[] = [
-    { key: "customer_name", header: "Customer" },
-    { key: "car_label", header: "Car" },
-    { key: "installment_label", header: "Installment" },
-    { key: "due_date", header: "Due Date", type: "date" },
-    { key: "paid_date", header: "Paid Date", type: "date" },
-    { key: "amount_paid", header: "Amount Paid", type: "currency" },
-    { key: "payment_method", header: "Payment Method" },
-  ];
-
-  const mapPaidForExport = (rows: InstallmentWithRelations[]) =>
-    rows.map((i) => {
-      const customer = i.plan?.customer as Customer | null;
-      const car = i.plan?.car as Car | null;
-      return {
-        customer_name: customer ? formatName(customer) : "Customer",
-        car_label: car ? `${car.model} (${car.vin})` : "—",
-        installment_label: `#${i.installment_no} of ${i.plan?.months ?? ""}`,
-        due_date: i.due_date,
-        paid_date: i.paid_at,
-        amount_paid: i.paid_amount ?? 0,
-        payment_method: i.payment_method ?? "",
-      };
-    });
-
-  const plansColumns: ExportColumn[] = [
-    { key: "customer_name", header: "Customer" },
-    { key: "car_label", header: "Car" },
-    { key: "status", header: "Status" },
-    { key: "total_amount", header: "Total Amount", type: "currency" },
-    { key: "down_payment", header: "Down Payment", type: "currency" },
-    { key: "monthly_amount", header: "Monthly Amount", type: "currency" },
-    { key: "months", header: "Months" },
-    { key: "paid_count", header: "Paid Installments" },
-    { key: "total_count", header: "Total Installments" },
-    { key: "start_date", header: "Start Date", type: "date" },
-    { key: "due_day", header: "Due Day" },
-  ];
-
-  const mapPlansForExport = (rows: PlanWithRelations[]) =>
-    rows.map((p) => {
-      const paidCount = p.installments.filter((i) => i.status === "paid").length;
-      const totalCount = p.installments.length;
-      return {
-        customer_name: p.customer ? formatName(p.customer) : "Customer",
-        car_label: p.car ? `${p.car.model} (${p.car.vin})` : "—",
-        status: p.status,
-        total_amount: p.total_amount,
-        down_payment: p.down_payment,
-        monthly_amount: p.monthly_amount,
-        months: p.months,
-        paid_count: paidCount,
-        total_count: totalCount,
-        start_date: p.start_date,
-        due_day: p.due_day,
-      };
-    });
 
   const dueCount = dueInstallments.length;
   const upcomingCount = upcomingInstallments.length;
@@ -1017,691 +1030,28 @@ export default function InstallmentsPage() {
           </TabsList>
         </div>
 
-        <TabsContent value="due" className="space-y-4">
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="text-lg font-semibold">Due / Overdue Installments</h2>
-            <ExportButton
-              filename="installments-due"
-              columns={dueColumns}
-              data={mapDueForExport(dueInstallments)}
-              allData={mapDueForExport(dueInstallments)}
-            />
-          </div>
-          <>
-            <div className="space-y-3 pb-6 md:hidden">
-              {dueInstallments.map((i) => {
-                const isOverdue = i.status === "overdue";
-                const customer = i.plan?.customer as Customer | null | undefined;
-                const car = i.plan?.car as Car | null | undefined;
-                const borderClass = isOverdue
-                  ? "border-l-4 border-red-500 bg-red-50/80 dark:bg-red-950/20"
-                  : "border-l-4 border-amber-400 bg-amber-50/50 dark:bg-amber-950/20";
-                return (
-                  <div
-                    key={i.id}
-                    className={`rounded-xl border border-border/50 p-4 shadow-sm ${borderClass}`}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0 flex-1">
-                        <p className="font-semibold">
-                          {customer ? formatName(customer) : "Customer"}
-                        </p>
-                        {customer?.phone_primary && (
-                          <a
-                            href={`tel:${customer.phone_primary.replace(/\s/g, "")}`}
-                            className="mt-1 block text-sm text-primary hover:underline"
-                          >
-                            {customer.phone_primary}
-                          </a>
-                        )}
-                        <p
-                          className="mt-1 text-sm text-muted-foreground"
-                          title={carTitleAttr(car ?? null)}
-                        >
-                          {carLabelShort(car ?? null)}
-                        </p>
-                      </div>
-                      <Badge
-                        className={
-                          isOverdue
-                            ? "shrink-0 bg-red-100 text-red-800"
-                            : "shrink-0 bg-amber-100 text-amber-800"
-                        }
-                      >
-                        {isOverdue ? "Overdue" : "Due"}
-                      </Badge>
-                    </div>
-                    <div className="mt-3 space-y-1 border-t border-border/50 pt-3 text-sm">
-                      <p>
-                        <span className="text-muted-foreground">Installment:</span>{" "}
-                        #{i.installment_no} of {i.plan?.months ?? ""}
-                      </p>
-                      <p>
-                        <span className="text-muted-foreground">Due:</span>{" "}
-                        {format(new Date(i.due_date), "dd/MM/yyyy")}
-                      </p>
-                      <p className="font-medium">
-                        {currencyFormatter.format(i.amount_due)}
-                      </p>
-                      {isOverdue && (
-                        <p className="text-destructive">
-                          {daysLate(i.due_date)} days late
-                        </p>
-                      )}
-                    </div>
-                    {canMarkPaid && (
-                      <Button
-                        className="mt-3 w-full touch-manipulation"
-                        size="sm"
-                        onClick={() => onOpenMarkPaid(i)}
-                      >
-                        Mark Paid
-                      </Button>
-                    )}
-                  </div>
-                );
-              })}
-              {dueInstallments.length === 0 && (
-                <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-10 text-center text-sm text-muted-foreground">
-                  <CheckCircle2 className="mb-2 size-6" />
-                  <p className="font-medium">No due or overdue installments</p>
-                  <p className="text-xs">All payments are up to date.</p>
-                </div>
-              )}
-            </div>
+        <DueTab
+          rows={dueInstallments}
+          canMarkPaid={canMarkPaid}
+          onOpenMarkPaid={onOpenMarkPaid}
+        />
 
-            <div className="hidden overflow-x-auto rounded-lg border bg-card md:block">
-              <Table className="min-w-[920px] w-full">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Customer</TableHead>
-                    <TableHead>Phone</TableHead>
-                    <TableHead>Car</TableHead>
-                    <TableHead>Installment</TableHead>
-                    <TableHead className="text-center">Due Date</TableHead>
-                    <TableHead className="text-right">Amount Due</TableHead>
-                    <TableHead className="text-center">Status</TableHead>
-                    <TableHead className="text-center">Days Late</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {dueInstallments.map((i) => {
-                    const isOverdue = i.status === "overdue";
-                    const rowClass = isOverdue
-                      ? "border-l-4 border-red-400 bg-red-50 odd:bg-red-50"
-                      : "border-l-4 border-amber-300 odd:bg-slate-50";
-                    return (
-                      <TableRow
-                        key={i.id}
-                        className={`${rowClass} hover:bg-slate-100`}
-                      >
-                        <TableCell className="font-medium">
-                          {i.plan?.customer
-                            ? formatName(i.plan.customer as Customer)
-                            : "Customer"}
-                        </TableCell>
-                        <TableCell>
-                          {i.plan?.customer
-                            ? (i.plan.customer as Customer).phone_primary
-                            : ""}
-                        </TableCell>
-                        <TableCell>
-                          {i.plan?.car
-                            ? `${(i.plan.car as Car).model} (${(i.plan.car as Car).vin})`
-                            : "—"}
-                        </TableCell>
-                        <TableCell>
-                          #{i.installment_no} of {i.plan?.months ?? ""}
-                        </TableCell>
-                        <TableCell className="text-center">
-                          {format(new Date(i.due_date), "dd/MM/yyyy")}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {currencyFormatter.format(i.amount_due)}
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Badge
-                            className={
-                              isOverdue
-                                ? "bg-red-100 text-red-800"
-                                : "bg-amber-100 text-amber-800"
-                            }
-                          >
-                            {isOverdue ? "Overdue" : "Due"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          {isOverdue ? daysLate(i.due_date) : 0}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {canMarkPaid && (
-                            <Button size="sm" onClick={() => onOpenMarkPaid(i)} data-tour-id="installments-due-row-mark-paid">
-                              Mark Paid
-                            </Button>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                  {dueInstallments.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={9} className="py-10">
-                        <div className="flex flex-col items-center justify-center text-center text-sm text-muted-foreground">
-                          <CheckCircle2 className="mb-2 size-6" />
-                          <p className="font-medium">No due or overdue installments</p>
-                          <p className="text-xs">
-                            All payments are up to date.
-                          </p>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </>
-        </TabsContent>
+        <UpcomingTab
+          rows={upcomingInstallments}
+          canMarkPaid={canMarkPaid}
+          onOpenMarkPaid={onOpenMarkPaid}
+        />
 
-        <TabsContent value="upcoming" className="space-y-4">
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="text-lg font-semibold">Upcoming Installments</h2>
-            <ExportButton
-              filename="installments-upcoming"
-              columns={upcomingColumns}
-              data={mapUpcomingForExport(upcomingInstallments)}
-              allData={mapUpcomingForExport(upcomingInstallments)}
-            />
-          </div>
-          <>
-            <div className="space-y-3 pb-6 md:hidden">
-              {upcomingInstallments.map((i) => {
-                const customer = i.plan?.customer as Customer | null | undefined;
-                const car = i.plan?.car as Car | null | undefined;
-                return (
-                  <div
-                    key={i.id}
-                    className="rounded-xl border border-border/50 bg-card p-4 shadow-sm"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0 flex-1">
-                        <p className="font-semibold">
-                          {customer ? formatName(customer) : "Customer"}
-                        </p>
-                        {customer?.phone_primary && (
-                          <a
-                            href={`tel:${customer.phone_primary.replace(/\s/g, "")}`}
-                            className="mt-1 block text-sm text-primary hover:underline"
-                          >
-                            {customer.phone_primary}
-                          </a>
-                        )}
-                        <p
-                          className="mt-1 text-sm text-muted-foreground"
-                          title={carTitleAttr(car ?? null)}
-                        >
-                          {carLabelShort(car ?? null)}
-                        </p>
-                      </div>
-                      <Badge className="shrink-0 bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-100">
-                        Upcoming
-                      </Badge>
-                    </div>
-                    <div className="mt-3 space-y-1 border-t border-border/50 pt-3 text-sm">
-                      <p>
-                        #{i.installment_no} of {i.plan?.months ?? ""} · Due{" "}
-                        {format(new Date(i.due_date), "dd/MM/yyyy")}
-                      </p>
-                      <p className="font-medium">
-                        {currencyFormatter.format(i.amount_due)}
-                      </p>
-                    </div>
-                    {canMarkPaid && (
-                      <Button
-                        className="mt-3 w-full touch-manipulation"
-                        size="sm"
-                        onClick={() => onOpenMarkPaid(i)}
-                      >
-                        Mark Paid
-                      </Button>
-                    )}
-                  </div>
-                );
-              })}
-              {upcomingInstallments.length === 0 && (
-                <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-10 text-center text-sm text-muted-foreground">
-                  <Inbox className="mb-2 size-6" />
-                  <p className="font-medium">No upcoming installments</p>
-                  <p className="text-xs">There are no future payments scheduled.</p>
-                </div>
-              )}
-            </div>
+        <PaidTab rows={paidInstallments} profileNames={profileNames} />
 
-            <div className="hidden overflow-x-auto rounded-lg border bg-card md:block">
-              <Table className="min-w-[800px] w-full">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Customer</TableHead>
-                    <TableHead>Phone</TableHead>
-                    <TableHead>Car</TableHead>
-                    <TableHead>Installment</TableHead>
-                    <TableHead className="text-center">Due Date</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                    <TableHead className="text-center">Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {upcomingInstallments.map((i) => (
-                    <TableRow
-                      key={i.id}
-                      className="odd:bg-slate-50 hover:bg-slate-100"
-                    >
-                      <TableCell className="font-medium">
-                        {i.plan?.customer
-                          ? formatName(i.plan.customer as Customer)
-                          : "Customer"}
-                      </TableCell>
-                      <TableCell>
-                        {i.plan?.customer
-                          ? (i.plan.customer as Customer).phone_primary
-                          : ""}
-                      </TableCell>
-                      <TableCell>
-                        {i.plan?.car
-                          ? `${(i.plan.car as Car).model} (${(i.plan.car as Car).vin})`
-                          : "—"}
-                      </TableCell>
-                      <TableCell>
-                        #{i.installment_no} of {i.plan?.months ?? ""}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {format(new Date(i.due_date), "dd/MM/yyyy")}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {currencyFormatter.format(i.amount_due)}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Badge className="bg-slate-100 text-slate-800">
-                          Upcoming
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {canMarkPaid && (
-                          <Button size="sm" onClick={() => onOpenMarkPaid(i)}>
-                            Mark Paid
-                          </Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {upcomingInstallments.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={8} className="py-10">
-                        <div className="flex flex-col items-center justify-center text-center text-sm text-muted-foreground">
-                          <Inbox className="mb-2 size-6" />
-                          <p className="font-medium">No upcoming installments</p>
-                          <p className="text-xs">
-                            There are no future payments scheduled.
-                          </p>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </>
-        </TabsContent>
-
-        <TabsContent value="paid" className="space-y-4">
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="text-lg font-semibold">Paid Installments</h2>
-            <ExportButton
-              filename="installments-paid"
-              columns={paidColumns}
-              data={mapPaidForExport(paidInstallments)}
-              allData={mapPaidForExport(paidInstallments)}
-            />
-          </div>
-          <>
-            <div className="space-y-3 pb-6 md:hidden">
-              {paidInstallments.map((i) => {
-                const customer = i.plan?.customer as Customer | null | undefined;
-                const car = i.plan?.car as Car | null | undefined;
-                return (
-                  <div
-                    key={i.id}
-                    className="rounded-xl border border-emerald-500/30 bg-emerald-50/80 p-4 shadow-sm dark:bg-emerald-950/20"
-                  >
-                    <p className="font-semibold">
-                      {customer ? formatName(customer) : "Customer"}
-                    </p>
-                    <p
-                      className="mt-1 text-sm text-muted-foreground"
-                      title={carTitleAttr(car ?? null)}
-                    >
-                      {carLabelShort(car ?? null)}
-                    </p>
-                    <div className="mt-3 space-y-1 border-t border-border/50 pt-3 text-sm">
-                      <p>
-                        #{i.installment_no} of {i.plan?.months ?? ""}
-                      </p>
-                      <p>
-                        <span className="text-muted-foreground">Due:</span>{" "}
-                        {format(new Date(i.due_date), "dd/MM/yyyy")}
-                      </p>
-                      <p>
-                        <span className="text-muted-foreground">Paid:</span>{" "}
-                        {i.paid_at
-                          ? format(new Date(i.paid_at), "dd/MM/yyyy")
-                          : "—"}
-                      </p>
-                      <p className="font-medium text-emerald-800 dark:text-emerald-300">
-                        {currencyFormatter.format(i.paid_amount || 0)}
-                      </p>
-                      <p className="text-muted-foreground">
-                        {i.payment_method || "—"}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
-              {paidInstallments.length === 0 && (
-                <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-10 text-center text-sm text-muted-foreground">
-                  <Inbox className="mb-2 size-6" />
-                  <p className="font-medium">No paid installments yet</p>
-                  <p className="text-xs">
-                    Payments will appear here after they are recorded.
-                  </p>
-                </div>
-              )}
-            </div>
-
-            <div className="hidden overflow-x-auto rounded-lg border bg-card md:block">
-              <Table className="min-w-[880px] w-full">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Customer</TableHead>
-                    <TableHead>Car</TableHead>
-                    <TableHead>Installment</TableHead>
-                    <TableHead className="text-center">Due Date</TableHead>
-                    <TableHead className="text-center">Paid Date</TableHead>
-                    <TableHead className="text-right">Amount Paid</TableHead>
-                    <TableHead>Payment Method</TableHead>
-                    <TableHead>Marked By</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {paidInstallments.map((i) => (
-                    <TableRow
-                      key={i.id}
-                      className="bg-emerald-50 odd:bg-emerald-50 hover:bg-emerald-100"
-                    >
-                      <TableCell className="font-medium">
-                        {i.plan?.customer
-                          ? formatName(i.plan.customer as Customer)
-                          : "Customer"}
-                      </TableCell>
-                      <TableCell>
-                        {i.plan?.car
-                          ? `${(i.plan.car as Car).model} (${(i.plan.car as Car).vin})`
-                          : "—"}
-                      </TableCell>
-                      <TableCell>
-                        #{i.installment_no} of {i.plan?.months ?? ""}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {format(new Date(i.due_date), "dd/MM/yyyy")}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {i.paid_at ? format(new Date(i.paid_at), "dd/MM/yyyy") : "—"}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {currencyFormatter.format(i.paid_amount || 0)}
-                      </TableCell>
-                      <TableCell>{i.payment_method || "—"}</TableCell>
-                      <TableCell>
-                        {i.marked_paid_by
-                          ? profileNames[i.marked_paid_by] ?? "Unknown"
-                          : "—"}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {paidInstallments.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={8} className="py-10">
-                        <div className="flex flex-col items-center justify-center text-center text-sm text-muted-foreground">
-                          <Inbox className="mb-2 size-6" />
-                          <p className="font-medium">No paid installments yet</p>
-                          <p className="text-xs">
-                            Payments will appear here after they are recorded.
-                          </p>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </>
-        </TabsContent>
-
-        <TabsContent value="plans" className="space-y-4">
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="text-lg font-semibold">Payment Plans</h2>
-            <div className="flex items-center gap-2">
-              <ExportButton
-                filename="payment-plans"
-                columns={plansColumns}
-                data={mapPlansForExport(plans)}
-                allData={mapPlansForExport(plans)}
-              />
-              {canCreatePlan && (
-                <Button size="sm" onClick={openNewPlan}>
-                  <Plus className="mr-2 size-4" />
-                  New Plan
-                </Button>
-              )}
-            </div>
-          </div>
-          <>
-            <div className="space-y-3 pb-6 md:hidden">
-              {plans.map((p) => {
-                const paidCount = p.installments.filter((i) => i.status === "paid").length;
-                const totalCount = p.installments.length;
-                const pct = totalCount > 0 ? (paidCount / totalCount) * 100 : 0;
-
-                let badgeColor = "bg-emerald-100 text-emerald-800";
-                if (p.status === "completed") badgeColor = "bg-blue-100 text-blue-800";
-                if (p.status === "defaulted") badgeColor = "bg-red-100 text-red-800";
-                if (p.status === "cancelled") badgeColor = "bg-slate-100 text-slate-800";
-
-                return (
-                  <div
-                    key={p.id}
-                    className="rounded-xl border border-border/50 bg-card p-4 shadow-sm"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0 flex-1">
-                        <p className="font-semibold">
-                          {p.customer ? formatName(p.customer) : "Customer"}
-                        </p>
-                        <p
-                          className="mt-1 text-sm text-muted-foreground"
-                          title={carTitleAttr(p.car ?? null)}
-                        >
-                          {carLabelShort(p.car ?? null)}
-                        </p>
-                      </div>
-                      <Badge className={`shrink-0 ${badgeColor}`}>{p.status}</Badge>
-                    </div>
-                    <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-                      <div>
-                        <p className="text-xs text-muted-foreground">Total</p>
-                        <p className="font-medium">
-                          {currencyFormatter.format(p.total_amount)}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Monthly</p>
-                        <p className="font-medium">
-                          {currencyFormatter.format(p.monthly_amount)}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Down</p>
-                        <p>{currencyFormatter.format(p.down_payment)}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Months</p>
-                        <p>{p.months}</p>
-                      </div>
-                    </div>
-                    <div className="mt-3 space-y-1">
-                      <div className="text-xs text-muted-foreground">
-                        {paidCount} of {totalCount} paid
-                      </div>
-                      <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                        <div
-                          className="h-full rounded-full bg-emerald-500"
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                    </div>
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      Start {format(new Date(p.start_date), "dd/MM/yyyy")} · Due day{" "}
-                      {p.due_day}
-                    </p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="mt-3 w-full touch-manipulation"
-                      onClick={() => setDetailPlan(p)}
-                    >
-                      View Details
-                    </Button>
-                    {p.status === "defaulted" && isOwner && (
-                      <Button
-                        variant="default"
-                        size="sm"
-                        className="mt-2 w-full touch-manipulation"
-                        onClick={() => {
-                          setRecoverPlanId(p.id);
-                          setRecoverReason("");
-                        }}
-                      >
-                        Recover from default…
-                      </Button>
-                    )}
-                  </div>
-                );
-              })}
-              {plans.length === 0 && (
-                <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-10 text-center text-sm text-muted-foreground">
-                  <Inbox className="mb-2 size-6" />
-                  <p className="font-medium">No payment plans yet</p>
-                  <p className="text-xs">Create a payment plan to get started.</p>
-                </div>
-              )}
-            </div>
-
-            <div className="hidden overflow-x-auto rounded-lg border bg-card md:block">
-              <Table className="min-w-[1000px] w-full">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Customer</TableHead>
-                    <TableHead>Car</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
-                    <TableHead className="text-right">Down Payment</TableHead>
-                    <TableHead className="text-right">Monthly</TableHead>
-                    <TableHead className="text-center">Months</TableHead>
-                    <TableHead>Progress</TableHead>
-                    <TableHead className="text-center">Start Date</TableHead>
-                    <TableHead className="text-center">Due Day</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {plans.map((p) => {
-                    const paidCount = p.installments.filter((i) => i.status === "paid").length;
-                    const totalCount = p.installments.length;
-                    const pct = totalCount > 0 ? (paidCount / totalCount) * 100 : 0;
-
-                    let badgeColor = "bg-emerald-100 text-emerald-800";
-                    if (p.status === "completed") badgeColor = "bg-blue-100 text-blue-800";
-                    if (p.status === "defaulted") badgeColor = "bg-red-100 text-red-800";
-                    if (p.status === "cancelled") badgeColor = "bg-slate-100 text-slate-800";
-
-                    return (
-                      <TableRow key={p.id}>
-                        <TableCell className="font-medium">
-                          {p.customer ? formatName(p.customer) : "Customer"}
-                        </TableCell>
-                        <TableCell>
-                          {p.car ? `${p.car.model} (${p.car.vin})` : "—"}
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={badgeColor}>{p.status}</Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {currencyFormatter.format(p.total_amount)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {currencyFormatter.format(p.down_payment)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {currencyFormatter.format(p.monthly_amount)}
-                        </TableCell>
-                        <TableCell className="text-center">{p.months}</TableCell>
-                        <TableCell>
-                          <div className="space-y-1">
-                            <div className="text-xs">
-                              {paidCount} of {totalCount} paid
-                            </div>
-                            <div className="h-1.5 w-24 overflow-hidden rounded-full bg-muted">
-                              <div
-                                className="h-full rounded-full bg-emerald-500"
-                                style={{ width: `${pct}%` }}
-                              />
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          {format(new Date(p.start_date), "dd/MM/yyyy")}
-                        </TableCell>
-                        <TableCell className="text-center">{p.due_day}</TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setDetailPlan(p)}
-                          >
-                            View Details
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                  {plans.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={11} className="py-10">
-                        <div className="flex flex-col items-center justify-center text-center text-sm text-muted-foreground">
-                          <Inbox className="mb-2 size-6" />
-                          <p className="font-medium">No payment plans yet</p>
-                          <p className="text-xs">
-                            Create a payment plan to get started.
-                          </p>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </>
-        </TabsContent>
+        <PlansTab
+          rows={plans}
+          canCreatePlan={canCreatePlan}
+          isOwner={isOwner}
+          onNewPlan={openNewPlan}
+          onViewDetails={setDetailPlan}
+          onRecoverPlan={onRecoverPlan}
+        />
       </Tabs>
 
       <Dialog open={markPaidOpen} onOpenChange={setMarkPaidOpen}>
@@ -3094,3 +2444,761 @@ export default function InstallmentsPage() {
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Memoized tab panels.
+//
+// Each panel is wrapped in React.memo and fed already-memoized data + stable
+// (useCallback) handlers, so typing in a dialog / search box no longer re-runs
+// the list rendering for the active tab. Date and status/payment labels are
+// precomputed once per data change (useMemo) instead of in JSX on every render.
+// Business logic and markup are unchanged from the inline versions.
+// ---------------------------------------------------------------------------
+
+const DueTab = memo(function DueTab({
+  rows,
+  canMarkPaid,
+  onOpenMarkPaid,
+}: {
+  rows: InstallmentWithRelations[];
+  canMarkPaid: boolean;
+  onOpenMarkPaid: (i: InstallmentWithRelations) => void;
+}) {
+  const view = useMemo(
+    () =>
+      rows.map((i) => ({
+        i,
+        isOverdue: i.status === "overdue",
+        dueLabel: format(new Date(i.due_date), "dd/MM/yyyy"),
+        daysLateValue: i.status === "overdue" ? daysLate(i.due_date) : 0,
+      })),
+    [rows]
+  );
+  const exportRows = useMemo(() => mapDueForExport(rows), [rows]);
+
+  return (
+    <TabsContent value="due" className="space-y-4">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-lg font-semibold">Due / Overdue Installments</h2>
+        <ExportButton
+          filename="installments-due"
+          columns={dueColumns}
+          data={exportRows}
+          allData={exportRows}
+        />
+      </div>
+      <>
+        <div className="space-y-3 pb-6 md:hidden">
+          {view.map(({ i, isOverdue, dueLabel, daysLateValue }) => {
+            const customer = i.plan?.customer as Customer | null | undefined;
+            const car = i.plan?.car as Car | null | undefined;
+            const borderClass = isOverdue
+              ? "border-l-4 border-red-500 bg-red-50/80 dark:bg-red-950/20"
+              : "border-l-4 border-amber-400 bg-amber-50/50 dark:bg-amber-950/20";
+            return (
+              <div
+                key={i.id}
+                className={`rounded-xl border border-border/50 p-4 shadow-sm ${borderClass}`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold">
+                      {customer ? formatName(customer) : "Customer"}
+                    </p>
+                    {customer?.phone_primary && (
+                      <a
+                        href={`tel:${customer.phone_primary.replace(/\s/g, "")}`}
+                        className="mt-1 block text-sm text-primary hover:underline"
+                      >
+                        {customer.phone_primary}
+                      </a>
+                    )}
+                    <p
+                      className="mt-1 text-sm text-muted-foreground"
+                      title={carTitleAttr(car ?? null)}
+                    >
+                      {carLabelShort(car ?? null)}
+                    </p>
+                  </div>
+                  <Badge
+                    className={
+                      isOverdue
+                        ? "shrink-0 bg-red-100 text-red-800"
+                        : "shrink-0 bg-amber-100 text-amber-800"
+                    }
+                  >
+                    {isOverdue ? "Overdue" : "Due"}
+                  </Badge>
+                </div>
+                <div className="mt-3 space-y-1 border-t border-border/50 pt-3 text-sm">
+                  <p>
+                    <span className="text-muted-foreground">Installment:</span>{" "}
+                    #{i.installment_no} of {i.plan?.months ?? ""}
+                  </p>
+                  <p>
+                    <span className="text-muted-foreground">Due:</span> {dueLabel}
+                  </p>
+                  <p className="font-medium">
+                    {currencyFormatter.format(i.amount_due)}
+                  </p>
+                  {isOverdue && (
+                    <p className="text-destructive">{daysLateValue} days late</p>
+                  )}
+                </div>
+                {canMarkPaid && (
+                  <Button
+                    className="mt-3 w-full touch-manipulation"
+                    size="sm"
+                    onClick={() => onOpenMarkPaid(i)}
+                  >
+                    Mark Paid
+                  </Button>
+                )}
+              </div>
+            );
+          })}
+          {rows.length === 0 && (
+            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-10 text-center text-sm text-muted-foreground">
+              <CheckCircle2 className="mb-2 size-6" />
+              <p className="font-medium">No due or overdue installments</p>
+              <p className="text-xs">All payments are up to date.</p>
+            </div>
+          )}
+        </div>
+
+        <div className="hidden overflow-x-auto rounded-lg border bg-card md:block">
+          <Table className="min-w-[920px] w-full">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Customer</TableHead>
+                <TableHead>Phone</TableHead>
+                <TableHead>Car</TableHead>
+                <TableHead>Installment</TableHead>
+                <TableHead className="text-center">Due Date</TableHead>
+                <TableHead className="text-right">Amount Due</TableHead>
+                <TableHead className="text-center">Status</TableHead>
+                <TableHead className="text-center">Days Late</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {view.map(({ i, isOverdue, dueLabel, daysLateValue }) => {
+                const rowClass = isOverdue
+                  ? "border-l-4 border-red-400 bg-red-50 odd:bg-red-50"
+                  : "border-l-4 border-amber-300 odd:bg-slate-50";
+                return (
+                  <TableRow
+                    key={i.id}
+                    className={`${rowClass} hover:bg-slate-100`}
+                  >
+                    <TableCell className="font-medium">
+                      {i.plan?.customer
+                        ? formatName(i.plan.customer as Customer)
+                        : "Customer"}
+                    </TableCell>
+                    <TableCell>
+                      {i.plan?.customer
+                        ? (i.plan.customer as Customer).phone_primary
+                        : ""}
+                    </TableCell>
+                    <TableCell>
+                      {i.plan?.car
+                        ? `${(i.plan.car as Car).model} (${(i.plan.car as Car).vin})`
+                        : "—"}
+                    </TableCell>
+                    <TableCell>
+                      #{i.installment_no} of {i.plan?.months ?? ""}
+                    </TableCell>
+                    <TableCell className="text-center">{dueLabel}</TableCell>
+                    <TableCell className="text-right">
+                      {currencyFormatter.format(i.amount_due)}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Badge
+                        className={
+                          isOverdue
+                            ? "bg-red-100 text-red-800"
+                            : "bg-amber-100 text-amber-800"
+                        }
+                      >
+                        {isOverdue ? "Overdue" : "Due"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {isOverdue ? daysLateValue : 0}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {canMarkPaid && (
+                        <Button size="sm" onClick={() => onOpenMarkPaid(i)} data-tour-id="installments-due-row-mark-paid">
+                          Mark Paid
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+              {rows.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={9} className="py-10">
+                    <div className="flex flex-col items-center justify-center text-center text-sm text-muted-foreground">
+                      <CheckCircle2 className="mb-2 size-6" />
+                      <p className="font-medium">No due or overdue installments</p>
+                      <p className="text-xs">All payments are up to date.</p>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </>
+    </TabsContent>
+  );
+});
+
+const UpcomingTab = memo(function UpcomingTab({
+  rows,
+  canMarkPaid,
+  onOpenMarkPaid,
+}: {
+  rows: InstallmentWithRelations[];
+  canMarkPaid: boolean;
+  onOpenMarkPaid: (i: InstallmentWithRelations) => void;
+}) {
+  const view = useMemo(
+    () =>
+      rows.map((i) => ({
+        i,
+        dueLabel: format(new Date(i.due_date), "dd/MM/yyyy"),
+      })),
+    [rows]
+  );
+  const exportRows = useMemo(() => mapUpcomingForExport(rows), [rows]);
+
+  return (
+    <TabsContent value="upcoming" className="space-y-4">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-lg font-semibold">Upcoming Installments</h2>
+        <ExportButton
+          filename="installments-upcoming"
+          columns={upcomingColumns}
+          data={exportRows}
+          allData={exportRows}
+        />
+      </div>
+      <>
+        <div className="space-y-3 pb-6 md:hidden">
+          {view.map(({ i, dueLabel }) => {
+            const customer = i.plan?.customer as Customer | null | undefined;
+            const car = i.plan?.car as Car | null | undefined;
+            return (
+              <div
+                key={i.id}
+                className="rounded-xl border border-border/50 bg-card p-4 shadow-sm"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold">
+                      {customer ? formatName(customer) : "Customer"}
+                    </p>
+                    {customer?.phone_primary && (
+                      <a
+                        href={`tel:${customer.phone_primary.replace(/\s/g, "")}`}
+                        className="mt-1 block text-sm text-primary hover:underline"
+                      >
+                        {customer.phone_primary}
+                      </a>
+                    )}
+                    <p
+                      className="mt-1 text-sm text-muted-foreground"
+                      title={carTitleAttr(car ?? null)}
+                    >
+                      {carLabelShort(car ?? null)}
+                    </p>
+                  </div>
+                  <Badge className="shrink-0 bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-100">
+                    Upcoming
+                  </Badge>
+                </div>
+                <div className="mt-3 space-y-1 border-t border-border/50 pt-3 text-sm">
+                  <p>
+                    #{i.installment_no} of {i.plan?.months ?? ""} · Due {dueLabel}
+                  </p>
+                  <p className="font-medium">
+                    {currencyFormatter.format(i.amount_due)}
+                  </p>
+                </div>
+                {canMarkPaid && (
+                  <Button
+                    className="mt-3 w-full touch-manipulation"
+                    size="sm"
+                    onClick={() => onOpenMarkPaid(i)}
+                  >
+                    Mark Paid
+                  </Button>
+                )}
+              </div>
+            );
+          })}
+          {rows.length === 0 && (
+            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-10 text-center text-sm text-muted-foreground">
+              <Inbox className="mb-2 size-6" />
+              <p className="font-medium">No upcoming installments</p>
+              <p className="text-xs">There are no future payments scheduled.</p>
+            </div>
+          )}
+        </div>
+
+        <div className="hidden overflow-x-auto rounded-lg border bg-card md:block">
+          <Table className="min-w-[800px] w-full">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Customer</TableHead>
+                <TableHead>Phone</TableHead>
+                <TableHead>Car</TableHead>
+                <TableHead>Installment</TableHead>
+                <TableHead className="text-center">Due Date</TableHead>
+                <TableHead className="text-right">Amount</TableHead>
+                <TableHead className="text-center">Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {view.map(({ i, dueLabel }) => (
+                <TableRow
+                  key={i.id}
+                  className="odd:bg-slate-50 hover:bg-slate-100"
+                >
+                  <TableCell className="font-medium">
+                    {i.plan?.customer
+                      ? formatName(i.plan.customer as Customer)
+                      : "Customer"}
+                  </TableCell>
+                  <TableCell>
+                    {i.plan?.customer
+                      ? (i.plan.customer as Customer).phone_primary
+                      : ""}
+                  </TableCell>
+                  <TableCell>
+                    {i.plan?.car
+                      ? `${(i.plan.car as Car).model} (${(i.plan.car as Car).vin})`
+                      : "—"}
+                  </TableCell>
+                  <TableCell>
+                    #{i.installment_no} of {i.plan?.months ?? ""}
+                  </TableCell>
+                  <TableCell className="text-center">{dueLabel}</TableCell>
+                  <TableCell className="text-right">
+                    {currencyFormatter.format(i.amount_due)}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <Badge className="bg-slate-100 text-slate-800">
+                      Upcoming
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {canMarkPaid && (
+                      <Button size="sm" onClick={() => onOpenMarkPaid(i)}>
+                        Mark Paid
+                      </Button>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+              {rows.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={8} className="py-10">
+                    <div className="flex flex-col items-center justify-center text-center text-sm text-muted-foreground">
+                      <Inbox className="mb-2 size-6" />
+                      <p className="font-medium">No upcoming installments</p>
+                      <p className="text-xs">
+                        There are no future payments scheduled.
+                      </p>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </>
+    </TabsContent>
+  );
+});
+
+const PaidTab = memo(function PaidTab({
+  rows,
+  profileNames,
+}: {
+  rows: InstallmentWithRelations[];
+  profileNames: Record<string, string>;
+}) {
+  const view = useMemo(
+    () =>
+      rows.map((i) => ({
+        i,
+        dueLabel: format(new Date(i.due_date), "dd/MM/yyyy"),
+        paidLabel: i.paid_at ? format(new Date(i.paid_at), "dd/MM/yyyy") : "—",
+      })),
+    [rows]
+  );
+  const exportRows = useMemo(() => mapPaidForExport(rows), [rows]);
+
+  return (
+    <TabsContent value="paid" className="space-y-4">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-lg font-semibold">Paid Installments</h2>
+        <ExportButton
+          filename="installments-paid"
+          columns={paidColumns}
+          data={exportRows}
+          allData={exportRows}
+        />
+      </div>
+      <>
+        <div className="space-y-3 pb-6 md:hidden">
+          {view.map(({ i, dueLabel, paidLabel }) => {
+            const customer = i.plan?.customer as Customer | null | undefined;
+            const car = i.plan?.car as Car | null | undefined;
+            return (
+              <div
+                key={i.id}
+                className="rounded-xl border border-emerald-500/30 bg-emerald-50/80 p-4 shadow-sm dark:bg-emerald-950/20"
+              >
+                <p className="font-semibold">
+                  {customer ? formatName(customer) : "Customer"}
+                </p>
+                <p
+                  className="mt-1 text-sm text-muted-foreground"
+                  title={carTitleAttr(car ?? null)}
+                >
+                  {carLabelShort(car ?? null)}
+                </p>
+                <div className="mt-3 space-y-1 border-t border-border/50 pt-3 text-sm">
+                  <p>
+                    #{i.installment_no} of {i.plan?.months ?? ""}
+                  </p>
+                  <p>
+                    <span className="text-muted-foreground">Due:</span> {dueLabel}
+                  </p>
+                  <p>
+                    <span className="text-muted-foreground">Paid:</span> {paidLabel}
+                  </p>
+                  <p className="font-medium text-emerald-800 dark:text-emerald-300">
+                    {currencyFormatter.format(i.paid_amount || 0)}
+                  </p>
+                  <p className="text-muted-foreground">
+                    {i.payment_method || "—"}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+          {rows.length === 0 && (
+            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-10 text-center text-sm text-muted-foreground">
+              <Inbox className="mb-2 size-6" />
+              <p className="font-medium">No paid installments yet</p>
+              <p className="text-xs">
+                Payments will appear here after they are recorded.
+              </p>
+            </div>
+          )}
+        </div>
+
+        <div className="hidden overflow-x-auto rounded-lg border bg-card md:block">
+          <Table className="min-w-[880px] w-full">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Customer</TableHead>
+                <TableHead>Car</TableHead>
+                <TableHead>Installment</TableHead>
+                <TableHead className="text-center">Due Date</TableHead>
+                <TableHead className="text-center">Paid Date</TableHead>
+                <TableHead className="text-right">Amount Paid</TableHead>
+                <TableHead>Payment Method</TableHead>
+                <TableHead>Marked By</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {view.map(({ i, dueLabel, paidLabel }) => (
+                <TableRow
+                  key={i.id}
+                  className="bg-emerald-50 odd:bg-emerald-50 hover:bg-emerald-100"
+                >
+                  <TableCell className="font-medium">
+                    {i.plan?.customer
+                      ? formatName(i.plan.customer as Customer)
+                      : "Customer"}
+                  </TableCell>
+                  <TableCell>
+                    {i.plan?.car
+                      ? `${(i.plan.car as Car).model} (${(i.plan.car as Car).vin})`
+                      : "—"}
+                  </TableCell>
+                  <TableCell>
+                    #{i.installment_no} of {i.plan?.months ?? ""}
+                  </TableCell>
+                  <TableCell className="text-center">{dueLabel}</TableCell>
+                  <TableCell className="text-center">{paidLabel}</TableCell>
+                  <TableCell className="text-right">
+                    {currencyFormatter.format(i.paid_amount || 0)}
+                  </TableCell>
+                  <TableCell>{i.payment_method || "—"}</TableCell>
+                  <TableCell>
+                    {i.marked_paid_by
+                      ? profileNames[i.marked_paid_by] ?? "Unknown"
+                      : "—"}
+                  </TableCell>
+                </TableRow>
+              ))}
+              {rows.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={8} className="py-10">
+                    <div className="flex flex-col items-center justify-center text-center text-sm text-muted-foreground">
+                      <Inbox className="mb-2 size-6" />
+                      <p className="font-medium">No paid installments yet</p>
+                      <p className="text-xs">
+                        Payments will appear here after they are recorded.
+                      </p>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </>
+    </TabsContent>
+  );
+});
+
+const PlansTab = memo(function PlansTab({
+  rows,
+  canCreatePlan,
+  isOwner,
+  onNewPlan,
+  onViewDetails,
+  onRecoverPlan,
+}: {
+  rows: PlanWithRelations[];
+  canCreatePlan: boolean;
+  isOwner: boolean;
+  onNewPlan: () => void;
+  onViewDetails: (p: PlanWithRelations) => void;
+  onRecoverPlan: (planId: string) => void;
+}) {
+  const view = useMemo(
+    () =>
+      rows.map((p) => {
+        const paidCount = p.installments.filter(
+          (i) => i.status === "paid"
+        ).length;
+        const totalCount = p.installments.length;
+        const pct = totalCount > 0 ? (paidCount / totalCount) * 100 : 0;
+        let badgeColor = "bg-emerald-100 text-emerald-800";
+        if (p.status === "completed") badgeColor = "bg-blue-100 text-blue-800";
+        if (p.status === "defaulted") badgeColor = "bg-red-100 text-red-800";
+        if (p.status === "cancelled") badgeColor = "bg-slate-100 text-slate-800";
+        return {
+          p,
+          paidCount,
+          totalCount,
+          pct,
+          badgeColor,
+          startLabel: format(new Date(p.start_date), "dd/MM/yyyy"),
+        };
+      }),
+    [rows]
+  );
+  const exportRows = useMemo(() => mapPlansForExport(rows), [rows]);
+
+  return (
+    <TabsContent value="plans" className="space-y-4">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-lg font-semibold">Payment Plans</h2>
+        <div className="flex items-center gap-2">
+          <ExportButton
+            filename="payment-plans"
+            columns={plansColumns}
+            data={exportRows}
+            allData={exportRows}
+          />
+          {canCreatePlan && (
+            <Button size="sm" onClick={onNewPlan}>
+              <Plus className="mr-2 size-4" />
+              New Plan
+            </Button>
+          )}
+        </div>
+      </div>
+      <>
+        <div className="space-y-3 pb-6 md:hidden">
+          {view.map(({ p, paidCount, totalCount, pct, badgeColor, startLabel }) => (
+            <div
+              key={p.id}
+              className="rounded-xl border border-border/50 bg-card p-4 shadow-sm"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold">
+                    {p.customer ? formatName(p.customer) : "Customer"}
+                  </p>
+                  <p
+                    className="mt-1 text-sm text-muted-foreground"
+                    title={carTitleAttr(p.car ?? null)}
+                  >
+                    {carLabelShort(p.car ?? null)}
+                  </p>
+                </div>
+                <Badge className={`shrink-0 ${badgeColor}`}>{p.status}</Badge>
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                <div>
+                  <p className="text-xs text-muted-foreground">Total</p>
+                  <p className="font-medium">
+                    {currencyFormatter.format(p.total_amount)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Monthly</p>
+                  <p className="font-medium">
+                    {currencyFormatter.format(p.monthly_amount)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Down</p>
+                  <p>{currencyFormatter.format(p.down_payment)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Months</p>
+                  <p>{p.months}</p>
+                </div>
+              </div>
+              <div className="mt-3 space-y-1">
+                <div className="text-xs text-muted-foreground">
+                  {paidCount} of {totalCount} paid
+                </div>
+                <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-emerald-500"
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Start {startLabel} · Due day {p.due_day}
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-3 w-full touch-manipulation"
+                onClick={() => onViewDetails(p)}
+              >
+                View Details
+              </Button>
+              {p.status === "defaulted" && isOwner && (
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="mt-2 w-full touch-manipulation"
+                  onClick={() => onRecoverPlan(p.id)}
+                >
+                  Recover from default…
+                </Button>
+              )}
+            </div>
+          ))}
+          {rows.length === 0 && (
+            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-10 text-center text-sm text-muted-foreground">
+              <Inbox className="mb-2 size-6" />
+              <p className="font-medium">No payment plans yet</p>
+              <p className="text-xs">Create a payment plan to get started.</p>
+            </div>
+          )}
+        </div>
+
+        <div className="hidden overflow-x-auto rounded-lg border bg-card md:block">
+          <Table className="min-w-[1000px] w-full">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Customer</TableHead>
+                <TableHead>Car</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Total</TableHead>
+                <TableHead className="text-right">Down Payment</TableHead>
+                <TableHead className="text-right">Monthly</TableHead>
+                <TableHead className="text-center">Months</TableHead>
+                <TableHead>Progress</TableHead>
+                <TableHead className="text-center">Start Date</TableHead>
+                <TableHead className="text-center">Due Day</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {view.map(({ p, paidCount, totalCount, pct, badgeColor, startLabel }) => (
+                <TableRow key={p.id}>
+                  <TableCell className="font-medium">
+                    {p.customer ? formatName(p.customer) : "Customer"}
+                  </TableCell>
+                  <TableCell>
+                    {p.car ? `${p.car.model} (${p.car.vin})` : "—"}
+                  </TableCell>
+                  <TableCell>
+                    <Badge className={badgeColor}>{p.status}</Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {currencyFormatter.format(p.total_amount)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {currencyFormatter.format(p.down_payment)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {currencyFormatter.format(p.monthly_amount)}
+                  </TableCell>
+                  <TableCell className="text-center">{p.months}</TableCell>
+                  <TableCell>
+                    <div className="space-y-1">
+                      <div className="text-xs">
+                        {paidCount} of {totalCount} paid
+                      </div>
+                      <div className="h-1.5 w-24 overflow-hidden rounded-full bg-muted">
+                        <div
+                          className="h-full rounded-full bg-emerald-500"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-center">{startLabel}</TableCell>
+                  <TableCell className="text-center">{p.due_day}</TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onViewDetails(p)}
+                    >
+                      View Details
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {rows.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={11} className="py-10">
+                    <div className="flex flex-col items-center justify-center text-center text-sm text-muted-foreground">
+                      <Inbox className="mb-2 size-6" />
+                      <p className="font-medium">No payment plans yet</p>
+                      <p className="text-xs">
+                        Create a payment plan to get started.
+                      </p>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </>
+    </TabsContent>
+  );
+});
