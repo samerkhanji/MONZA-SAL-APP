@@ -103,17 +103,25 @@ function NotificationBellInner() {
     const list = (data as Notification[]) ?? [];
     setNotifications(list);
     setUnreadCount(list.filter((n) => !n.is_read).length);
-    // Cheap head request for the total — only the count comes back over the
-    // wire, so this stays well under the dropdown's render budget even with
-    // hundreds of active notifications.
+    // Don't let the footer claim "+N more" until we actually know the total.
+    setTotalCount((prev) => Math.max(prev, list.length));
+    initialFetchDone.current = true;
+  }, [profile?.id, supabase]);
+
+  // Exact active-notification total — used only for the dropdown's "+N more"
+  // footer. Fetched lazily when the bell opens rather than on every page load:
+  // this head count query measured 0.7–2.4s and gates nothing the user sees
+  // until they open the dropdown, so it has no business on the load path.
+  const fetchTotalCount = useCallback(async () => {
+    if (!profile?.id) return;
+    const nowIso = new Date().toISOString();
     const { count } = await supabase
       .from("notifications")
       .select("id", { count: "exact", head: true })
       .eq("user_id", profile.id)
       .is("dismissed_at", null)
       .or("snoozed_until.is.null,snoozed_until.lte." + nowIso);
-    setTotalCount(typeof count === "number" ? count : list.length);
-    initialFetchDone.current = true;
+    if (typeof count === "number") setTotalCount(count);
   }, [profile?.id, supabase]);
 
   useEffect(() => {
@@ -304,7 +312,14 @@ function NotificationBellInner() {
   }
 
   return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
+    <DropdownMenu
+      open={open}
+      onOpenChange={(v) => {
+        setOpen(v);
+        // Resolve the exact "+N more" total only when the user opens the bell.
+        if (v) void fetchTotalCount();
+      }}
+    >
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
