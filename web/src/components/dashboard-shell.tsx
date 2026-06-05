@@ -42,8 +42,7 @@ import {
 } from "lucide-react";
 import { useUser } from "@/lib/contexts/UserContext";
 import { TourProvider, dispatchTourReplay } from "@/components/tours/TourProvider";
-import { TourLauncher } from "@/components/tours/TourLauncher";
-import { AIChatWidget } from "@/components/ai-chat-widget";
+import { FloatingActionMenu } from "@/components/floating-action-menu";
 import { getTourForRole } from "@/lib/tours/registry";
 import { USER_ROLE_LABELS } from "@/lib/constants/user";
 import { Button } from "@/components/ui/button";
@@ -616,8 +615,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       />
 
       <TourProvider />
-      <TourLauncher />
-      <AIChatWidget />
+      <FloatingActionMenu />
     </div>
   );
 }

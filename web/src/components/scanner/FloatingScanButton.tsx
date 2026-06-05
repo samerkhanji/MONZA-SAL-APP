@@ -13,10 +13,26 @@ function isVin(value: string): boolean {
   return IS_VIN.test(value.toUpperCase());
 }
 
-export function FloatingScanButton() {
+export function FloatingScanButton({
+  open: openProp,
+  onOpenChange,
+  showTrigger = true,
+}: {
+  /** Controlled open state (omit for self-managed). */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  /** Render the floating trigger button. Off when driven by a parent menu. */
+  showTrigger?: boolean;
+} = {}) {
   const pathname = usePathname();
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const [openState, setOpenState] = useState(false);
+  const isControlled = openProp !== undefined;
+  const open = isControlled ? openProp : openState;
+  const setOpen = (o: boolean) => {
+    if (!isControlled) setOpenState(o);
+    onOpenChange?.(o);
+  };
   const supabase = createClient();
 
   async function handleScan(value: string) {
@@ -104,14 +120,16 @@ export function FloatingScanButton() {
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="fixed bottom-[calc(env(safe-area-inset-bottom)+4.75rem)] right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105 active:scale-95 sm:bottom-6 sm:right-6 sm:h-12 sm:w-12"
-        aria-label="Scan barcode"
-      >
-        <ScanLine className="size-7 sm:size-5" />
-      </button>
+      {showTrigger && (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="fixed bottom-[calc(env(safe-area-inset-bottom)+4.75rem)] right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105 active:scale-95 sm:bottom-6 sm:right-6 sm:h-12 sm:w-12"
+          aria-label="Scan barcode"
+        >
+          <ScanLine className="size-7 sm:size-5" />
+        </button>
+      )}
       <ScannerDialog
         open={open}
         onClose={() => setOpen(false)}

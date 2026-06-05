@@ -3,8 +3,6 @@ import { UserProvider } from "@/lib/contexts/UserContext";
 import { InstallProvider } from "@/lib/contexts/InstallContext";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { PageAccessGuard } from "@/components/PageAccessGuard";
-import { FloatingScanButton } from "@/components/scanner/FloatingScanButton";
-import { SentryFeedbackButton } from "@/components/sentry-feedback-button";
 // WarrantyNotificationChecker was removed — warranty expiry alerts are
 // produced server-side via the `detect_warranty_expiry` pg_cron job
 // (supabase/migrations/092_test_drive_and_warranty_crons.sql).
@@ -38,8 +36,6 @@ export default async function DashboardLayout({
             <FirstLoginGuard>
               <PageAccessGuard>
                 {children}
-                <FloatingScanButton />
-                <SentryFeedbackButton />
               </PageAccessGuard>
             </FirstLoginGuard>
           </DashboardShell>
