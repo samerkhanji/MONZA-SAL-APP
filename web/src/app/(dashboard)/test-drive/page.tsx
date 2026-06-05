@@ -30,6 +30,11 @@ import { formatError } from "@/lib/error-messages";
 
 const VIN_REGEX = /^[A-HJ-NPR-Z0-9]{17}$/;
 
+// Shared id for the VIN-lookup feedback toasts so each new lookup clears the
+// previous one (a stale "invalid VIN" error must not linger after a later
+// successful lookup).
+const LOOKUP_TOAST_ID = "test-drive-lookup";
+
 function statusBadgeVariant(s: string): "default" | "secondary" | "outline" | "destructive" {
   if (s === "out_for_test_drive") return "default";
   if (s === "returned") return "secondary";
@@ -90,13 +95,16 @@ export default function TestDrivePage() {
 
   const handleVinLookup = useCallback(
     async (raw: string) => {
+      // Clear any feedback from the previous lookup so a stale error/warning
+      // can't survive into a later (possibly successful) lookup.
+      toast.dismiss(LOOKUP_TOAST_ID);
       const vin = raw.trim().toUpperCase();
       if (!VIN_REGEX.test(vin)) {
-        toast.error("Enter a valid 17-character VIN.");
+        toast.error("Enter a valid 17-character VIN.", { id: LOOKUP_TOAST_ID });
         return;
       }
       if (!profile?.id) {
-        toast.error("You must be logged in.");
+        toast.error("You must be logged in.", { id: LOOKUP_TOAST_ID });
         return;
       }
 
@@ -111,10 +119,10 @@ export default function TestDrivePage() {
 
       if (carErr || !carRow) {
         if (carErr) {
-          toast.error(formatError(carErr));
+          toast.error(formatError(carErr), { id: LOOKUP_TOAST_ID });
         } else {
           setNotFoundVin(vin);
-          toast.error("No vehicle found for this VIN.");
+          toast.error("No vehicle found for this VIN.", { id: LOOKUP_TOAST_ID });
         }
         setLookupLoading(false);
         return;
@@ -145,13 +153,15 @@ export default function TestDrivePage() {
         .maybeSingle();
 
       if (tdErr) {
-        toast.error(formatError(tdErr));
+        toast.error(formatError(tdErr), { id: LOOKUP_TOAST_ID });
         setLookupLoading(false);
         return;
       }
 
       if (activeTd) {
-        toast.warning("This vehicle is already out on a test drive. Opening the active record.");
+        toast.warning("This vehicle is already out on a test drive. Opening the active record.", {
+          id: LOOKUP_TOAST_ID,
+        });
         setSheetExisting(activeTd as TestDriveWithCar);
         setSheetCar({
           id: car.id,
