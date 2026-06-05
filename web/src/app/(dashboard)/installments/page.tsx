@@ -1735,8 +1735,18 @@ export default function InstallmentsPage() {
                   data-tour-id="installments-mark-paid-amount-input"
                 />
                 {(() => {
+                  if (!selectedInstallment) return null;
                   const amt = Number(paidAmount);
-                  if (!amt || !selectedInstallment) return null;
+                  // Surface a non-positive amount inline (before submit) instead
+                  // of only catching it server-side on "Confirm Paid".
+                  if (paidAmount.trim() !== "" && !(amt > 0)) {
+                    return (
+                      <p className="text-xs text-destructive">
+                        Amount paid must be greater than 0.
+                      </p>
+                    );
+                  }
+                  if (!amt) return null;
                   const remaining =
                     selectedInstallment.amount_due -
                     (selectedInstallment.paid_amount ?? 0);
@@ -1814,7 +1824,7 @@ export default function InstallmentsPage() {
                 <Button
                   type="button"
                   onClick={handleMarkPaid}
-                  disabled={markingPaid}
+                  disabled={markingPaid || !(Number(paidAmount) > 0)}
                   data-tour-id="installments-mark-paid-confirm"
                 >
                   {markingPaid ? "Saving..." : "Confirm Paid"}
@@ -2483,7 +2493,7 @@ export default function InstallmentsPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="cash">Cash</SelectItem>
-                        <SelectItem value="bank_transfer">Bank transfer</SelectItem>
+                        <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
                         <SelectItem value="card">Card</SelectItem>
                         <SelectItem value="check">Check</SelectItem>
                         <SelectItem value="other">Other</SelectItem>
@@ -2667,9 +2677,15 @@ export default function InstallmentsPage() {
                         "create_payment_plan",
                         {
                           p_customer_id: newPlanCustomerId,
-                          // RPC requires a non-null car_id; pass empty string sentinel
-                          // when none is selected (server treats this as "no car").
-                          p_car_id: newPlanCarId || "",
+                          // car_id is nullable on payment_plans (migration 017)
+                          // and the RPC inserts it as-is, so pass real NULL when
+                          // no car is linked. Passing "" makes PostgREST try to
+                          // coerce an empty string to uuid and fail with
+                          // "invalid input syntax for type uuid". The cast only
+                          // placates the generated Args type, which marks the
+                          // param required `string` because the SQL param has no
+                          // DEFAULT — the DB itself accepts NULL fine.
+                          p_car_id: (newPlanCarId || null) as string,
                           p_total_amount: totalNum,
                           p_down_payment: downNum,
                           p_monthly_amount: monthlyNum,
