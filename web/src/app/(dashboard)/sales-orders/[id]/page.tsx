@@ -431,7 +431,7 @@ export default function SalesOrderDetailPage() {
               {car?.model_year ? ` (${car.model_year})` : ""}
             </h1>
             <p className="text-sm text-muted-foreground">
-              VIN <span className="font-mono">{car?.vin ?? "—"}</span> · created {fmtDate(order.created_at)}
+              VIN <span className="font-mono select-text">{car?.vin ?? "—"}</span> · created {fmtDate(order.created_at)}
             </p>
           </div>
         </div>
@@ -494,8 +494,8 @@ export default function SalesOrderDetailPage() {
                     {customerName(customer)}
                   </Link>
                 </div>
-                {customer.phone_primary && <div className="text-muted-foreground">📞 {customer.phone_primary}</div>}
-                {customer.email && <div className="text-muted-foreground">✉ {customer.email}</div>}
+                {customer.phone_primary && <div className="text-muted-foreground">📞 <span className="select-text">{customer.phone_primary}</span></div>}
+                {customer.email && <div className="text-muted-foreground">✉ <span className="select-text">{customer.email}</span></div>}
                 {customer.lead_status && (
                   <div>
                     <Badge variant="outline" className="text-xs">Lead: {customer.lead_status}</Badge>

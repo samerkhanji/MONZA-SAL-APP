@@ -178,13 +178,16 @@ body {
   user-select: none;
 }
 
-/* Opt selection back in where it genuinely matters: text entry, and anything
-   intentionally copyable (VINs, phone numbers, emails, plates) marked with
-   Tailwind's `select-text` utility. */
+/* Opt selection back in where it genuinely matters: text entry, contact
+   links (phone/email — so owners can copy the number or address), and
+   anything intentionally copyable (VINs, plates) marked with Tailwind's
+   `select-text` utility. */
 input,
 textarea,
 select,
 [contenteditable]:not([contenteditable="false"]),
+a[href^="tel:"],
+a[href^="mailto:"],
 .select-text,
 .select-text * {
   -webkit-user-select: text;

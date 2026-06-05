@@ -1044,7 +1044,7 @@ export function CarsInventoryClient({
                         title={pendingDeletes[car.id] ? "Pending delete request" : undefined}
                         onClick={() => router.push(`/cars/${encodeURIComponent(car.id)}`)}
                       >
-                        <td title={car.vin ?? ""} className={`${CARS_TD} font-mono`}>
+                        <td title={car.vin ?? ""} className={`${CARS_TD} font-mono select-text`}>
                           {car.vin ?? "—"}
                         </td>
                         <td title={car.brand ?? undefined} className={CARS_TD}>

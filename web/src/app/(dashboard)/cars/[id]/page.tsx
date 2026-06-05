@@ -1690,7 +1690,7 @@ export default function CarProfilePage() {
               <div className="space-y-1">
                 <p className="text-muted-foreground text-sm">Full VIN</p>
                 <p
-                  className="cursor-pointer font-mono text-sm hover:opacity-80"
+                  className="cursor-pointer font-mono text-sm hover:opacity-80 select-text"
                   onClick={(e) => {
                     e.stopPropagation();
                     copyVinToClipboard();
@@ -1722,7 +1722,7 @@ export default function CarProfilePage() {
               </div>
               <div className="space-y-1">
                 <p className="text-muted-foreground text-sm">Plate Number</p>
-                <p>{car.plate_number ?? "—"}</p>
+                <p className="select-text">{car.plate_number ?? "—"}</p>
               </div>
               <div className="space-y-1">
                 <p className="text-muted-foreground text-sm">Suffix</p>
@@ -1933,11 +1933,11 @@ export default function CarProfilePage() {
                         <div className="grid gap-1 text-xs text-muted-foreground sm:grid-cols-2">
                           <p>
                             <span className="font-medium">Phone:</span>{" "}
-                            {salesOrder.customer.phone_primary ?? "—"}
+                            <span className="select-text">{salesOrder.customer.phone_primary ?? "—"}</span>
                           </p>
                           <p>
                             <span className="font-medium">Email:</span>{" "}
-                            {salesOrder.customer.email ?? "—"}
+                            <span className="select-text">{salesOrder.customer.email ?? "—"}</span>
                           </p>
                         </div>
                       </div>
