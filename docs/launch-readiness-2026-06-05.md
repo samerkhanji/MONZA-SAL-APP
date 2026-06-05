@@ -59,7 +59,7 @@ where polrelid = 'storage.objects'::regclass
 order by polname;
 
 -- 2. CASH-01: the absurd-variance test session(s) to clean up
-select id, business_date, opening_balance, closing_actual, variance, status, note
+select id, business_date, opening_balance, closing_actual, variance, status, notes
 from cash_sessions
 where abs(coalesce(variance,0)) > 1000000
 order by abs(variance) desc;
