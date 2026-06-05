@@ -342,7 +342,7 @@ export default function SalesOrdersPage() {
                               ? `${car.brand} ${car.model}${car.model_year ? ` (${car.model_year})` : ""}`
                               : "—"}
                           </p>
-                          <p className="truncate font-mono text-xs text-muted-foreground">
+                          <p className="truncate font-mono text-xs text-muted-foreground select-text">
                             {car?.vin ?? "—"}
                           </p>
                         </div>
@@ -372,7 +372,7 @@ export default function SalesOrdersPage() {
                         </div>
                         <div className="min-w-0">
                           <dt className="text-muted-foreground">Phone</dt>
-                          <dd className="truncate text-muted-foreground">
+                          <dd className="truncate text-muted-foreground select-text">
                             {so.customers?.phone_primary ?? "—"}
                           </dd>
                         </div>
@@ -442,7 +442,7 @@ export default function SalesOrdersPage() {
                               ? `${car.brand} ${car.model}${car.model_year ? ` (${car.model_year})` : ""}`
                               : "—"}
                           </TableCell>
-                          <TableCell className="font-mono text-xs text-muted-foreground">
+                          <TableCell className="font-mono text-xs text-muted-foreground select-text">
                             {car?.vin ?? "—"}
                           </TableCell>
                           <TableCell>
@@ -461,7 +461,7 @@ export default function SalesOrdersPage() {
                               <span className="text-muted-foreground">{name}</span>
                             )}
                           </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
+                          <TableCell className="text-sm text-muted-foreground select-text">
                             {so.customers?.phone_primary ?? "—"}
                           </TableCell>
                           <TableCell>

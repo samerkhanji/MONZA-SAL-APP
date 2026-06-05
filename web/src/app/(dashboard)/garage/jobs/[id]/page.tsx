@@ -420,7 +420,7 @@ export default function JobDetailPage() {
             href={`/cars/${encodeURIComponent(car.vin ?? car.id)}`}
             className="text-primary hover:underline"
           >
-            {car.brand} {car.model} · VIN: {car.vin}
+            {car.brand} {car.model} · VIN: <span className="select-text">{car.vin}</span>
           </Link>
         </p>
       )}

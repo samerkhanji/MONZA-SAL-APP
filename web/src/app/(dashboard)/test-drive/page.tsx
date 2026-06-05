@@ -324,7 +324,7 @@ export default function TestDrivePage() {
                       <TableCell className="pl-6 font-medium">
                         {td.cars ? `${td.cars.brand} ${td.cars.model}` : "—"}
                       </TableCell>
-                      <TableCell className="font-mono text-xs">{td.vin}</TableCell>
+                      <TableCell className="font-mono text-xs select-text">{td.vin}</TableCell>
                       <TableCell>
                         {td.customer_name || td.customer_phone || "—"}
                       </TableCell>
@@ -375,7 +375,7 @@ export default function TestDrivePage() {
                       <TableCell className="pl-6 font-medium">
                         {td.cars ? `${td.cars.brand} ${td.cars.model}` : "—"}
                       </TableCell>
-                      <TableCell className="font-mono text-xs">{td.vin}</TableCell>
+                      <TableCell className="font-mono text-xs select-text">{td.vin}</TableCell>
                       <TableCell>{td.customer_name || td.customer_phone || "—"}</TableCell>
                       <TableCell className="whitespace-nowrap text-sm">
                         {td.actual_return_at

@@ -568,7 +568,7 @@ export function TestDriveFormSheet({
               <p className="font-medium">
                 {car.brand} {car.model}
               </p>
-              <p className="text-muted-foreground font-mono text-xs">{car.vin}</p>
+              <p className="text-muted-foreground font-mono text-xs select-text">{car.vin}</p>
             </div>
           )}
 
