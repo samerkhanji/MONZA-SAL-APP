@@ -208,7 +208,7 @@ async function fetchOverviewData(supabase: DashboardSupabase): Promise<OwnerOver
     // Delivered this month: rows whose delivery_date is in the current month and not cancelled.
     supabase
       .from("sales_orders")
-      .select("currency, selling_price")
+      .select("id")
       .gte("delivery_date", monthStart)
       .lte("delivery_date", today)
       .neq("status", "cancelled"),
@@ -224,13 +224,13 @@ async function fetchOverviewData(supabase: DashboardSupabase): Promise<OwnerOver
       .from("sales_orders")
       .select("status")
       .neq("status", "cancelled"),
-    // Top sales rep by revenue (view is SECURITY DEFINER so bypasses RLS).
+    // Top sales rep by deliveries (view is SECURITY DEFINER so bypasses RLS).
     supabase
       .from("report_sales_rep_performance")
       .select(
-        "sales_rep_id, sales_rep_name, deals_in_pipeline, deals_delivered, revenue_total, margin_total"
+        "sales_rep_id, sales_rep_name, deals_in_pipeline, deals_delivered"
       )
-      .order("revenue_total", { ascending: false, nullsFirst: false })
+      .order("deals_delivered", { ascending: false, nullsFirst: false })
       .limit(1),
     // Inventory aging buckets.
     supabase.from("report_inventory_aging").select("age_bucket"),
@@ -442,19 +442,10 @@ async function fetchOverviewData(supabase: DashboardSupabase): Promise<OwnerOver
 
   // ---- Phase 1: aggregate the new query results ----
 
-  // Sales MTD: sum revenue per currency, total units.
-  const salesMTDRows = (salesMTDRes.data ?? []) as {
-    currency: string | null;
-    selling_price: number | null;
-  }[];
-  const revenueByCurrency: Record<string, number> = {};
-  for (const r of salesMTDRows) {
-    const c = (r.currency ?? "USD").toUpperCase();
-    revenueByCurrency[c] = (revenueByCurrency[c] ?? 0) + Number(r.selling_price ?? 0);
-  }
+  // Sales MTD: total units delivered this month.
+  const salesMTDRows = (salesMTDRes.data ?? []) as { id: string }[];
   const salesMTD = {
     units: salesMTDRows.length,
-    revenueByCurrency,
     unitsLastMonth: salesLastMonthCountRes.count ?? 0,
   };
 
@@ -477,8 +468,6 @@ async function fetchOverviewData(supabase: DashboardSupabase): Promise<OwnerOver
         sales_rep_name: string | null;
         deals_in_pipeline: number | null;
         deals_delivered: number | null;
-        revenue_total: number | null;
-        margin_total: number | null;
       }
     | undefined;
   const topSalesRep = topRepRow
@@ -486,8 +475,6 @@ async function fetchOverviewData(supabase: DashboardSupabase): Promise<OwnerOver
         name: topRepRow.sales_rep_name ?? "Unknown",
         dealsDelivered: Number(topRepRow.deals_delivered ?? 0),
         dealsInPipeline: Number(topRepRow.deals_in_pipeline ?? 0),
-        revenueTotal: Number(topRepRow.revenue_total ?? 0),
-        marginTotal: Number(topRepRow.margin_total ?? 0),
       }
     : null;
 
