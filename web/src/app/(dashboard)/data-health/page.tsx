@@ -119,8 +119,6 @@ type SalesOrderRow = {
   id: string;
   car_id: string | null;
   customer_id: string | null;
-  selling_price: number | null;
-  currency: string | null;
   sale_date: string | null;
   status: string;
   created_at?: string | null;
@@ -394,7 +392,7 @@ export default function DataHealthPage() {
         supabase
           .from("sales_orders")
           .select(
-            "id, car_id, customer_id, selling_price, currency, sale_date, date_bought, delivery_date, reservation_date, status, created_at, updated_at"
+            "id, car_id, customer_id, sale_date, date_bought, delivery_date, reservation_date, status, created_at, updated_at"
           )
           .not("status", "eq", "cancelled")
           .limit(10000),
@@ -451,8 +449,6 @@ export default function DataHealthPage() {
       return (
         empty(so.car_id) ||
         empty(so.customer_id) ||
-        so.selling_price == null ||
-        empty(so.currency) ||
         empty(so.sale_date)
       );
     });
@@ -782,7 +778,7 @@ export default function DataHealthPage() {
   // Data health scores (location_type required; battery_percent optional, excluded)
   const carFields = ["vin", "model", "exterior_color", "interior_color", "engine_number", "location_type", "warranty_vehicle_expiry", "warranty_battery_expiry", "date_arrived"];
   const custFields = ["first_name", "last_name", "phone_primary", "email", "address"];
-  const soFields = ["car_id", "customer_id", "selling_price", "currency", "sale_date"];
+  const soFields = ["car_id", "customer_id", "sale_date"];
   const warrantyFields = ["warranty_vehicle_dms", "warranty_vehicle_expiry", "warranty_battery_expiry"];
 
   const carsScore = useMemo(() => {
@@ -1277,7 +1273,7 @@ export default function DataHealthPage() {
                 <div key={sectionId} style={{ order: idx }}>
                 <SectionCard
                   title={`${sectionNum}. Sales Orders Missing Data`}
-                  description="Sales orders where car_id, customer_id, selling_price, currency, or sale_date are NULL"
+                  description="Sales orders where car_id, customer_id, or sale_date are NULL"
                   count={filtered.length}
                   icon={FileText}
                 >
@@ -1299,8 +1295,6 @@ export default function DataHealthPage() {
                           const missing: string[] = [];
                           if (empty(so.car_id)) missing.push("car_id");
                           if (empty(so.customer_id)) missing.push("customer_id");
-                          if (so.selling_price == null) missing.push("selling_price");
-                          if (empty(so.currency)) missing.push("currency");
                           if (empty(so.sale_date)) missing.push("sale_date");
                           return (
                             <TableRow key={so.id} className={getRowSeverityClass("sales_orders_missing_data", so)}>
