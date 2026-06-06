@@ -22,31 +22,12 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-type SalesMargin = {
-  sales_order_id: string;
-  delivered_at: string | null;
-  sale_date: string | null;
-  revenue: number | null;
-  revenue_currency: string | null;
-  cost: number | null;
-  cost_currency: string | null;
-  margin: number | null;
-  margin_pct: number | null;
-  brand: string | null;
-  model: string | null;
-  model_year: number | null;
-  vin: string | null;
-  customer_id: string | null;
-};
-
 type SalesRep = {
   sales_rep_id: string;
   sales_rep_name: string | null;
   deals_in_pipeline: number;
   deals_delivered: number;
   deals_voided: number;
-  revenue_total: number | null;
-  margin_total: number | null;
   avg_days_to_close: number | null;
 };
 
@@ -57,8 +38,6 @@ type InventoryAging = {
   model: string | null;
   model_year: number | null;
   status: string;
-  price: number | null;
-  price_currency: string | null;
   entry_date: string | null;
   days_in_stock: number;
   age_bucket: "<60" | "60-90" | "90-180" | ">180" | "unknown";
@@ -102,9 +81,6 @@ const fmt = (n: number | null | undefined, currency = "USD") =>
         maximumFractionDigits: 0,
       }).format(n);
 
-const fmtPct = (n: number | null | undefined) =>
-  n == null ? "—" : `${n.toFixed(1)}%`;
-
 const fmtH = (n: number | null | undefined) =>
   n == null ? "—" : `${n.toFixed(1)}h`;
 
@@ -134,7 +110,6 @@ export default function ReportsPage() {
 function ReportsBody() {
   const supabase = createClient();
   const [loading, setLoading] = useState(true);
-  const [margin, setMargin] = useState<SalesMargin[]>([]);
   const [reps, setReps] = useState<SalesRep[]>([]);
   const [aging, setAging] = useState<InventoryAging[]>([]);
   const [receivables, setReceivables] = useState<AgedReceivable[]>([]);
@@ -143,15 +118,12 @@ function ReportsBody() {
   const load = useCallback(async () => {
     setLoading(true);
     const errs: string[] = [];
-    const [m, r, a, ar, ts] = await Promise.all([
-      supabase.from("report_sales_margin").select("*").order("delivered_at", { ascending: false }).limit(200),
-      supabase.from("report_sales_rep_performance").select("*").order("revenue_total", { ascending: false, nullsFirst: false }),
+    const [r, a, ar, ts] = await Promise.all([
+      supabase.from("report_sales_rep_performance").select("*").order("deals_delivered", { ascending: false, nullsFirst: false }),
       supabase.from("report_inventory_aging").select("*").order("days_in_stock", { ascending: false }),
       supabase.from("report_aged_receivables").select("*").order("days_overdue", { ascending: false }),
       supabase.from("report_garage_time_in_state").select("*").order("delivered_at", { ascending: false, nullsFirst: false }).limit(100),
     ]);
-    if (m.error) errs.push("Profit margin");
-    else setMargin((m.data as SalesMargin[]) ?? []);
     if (r.error) errs.push("Sales-rep performance");
     else setReps((r.data as SalesRep[]) ?? []);
     if (a.error) errs.push("Inventory aging");
@@ -167,22 +139,6 @@ function ReportsBody() {
   useEffect(() => {
     void load();
   }, [load]);
-
-  const marginSummary = useMemo(() => {
-    const validMargin = margin.filter((m) => m.margin != null);
-    const totalMargin = validMargin.reduce((s, m) => s + (m.margin ?? 0), 0);
-    const totalRevenue = validMargin.reduce((s, m) => s + (m.revenue ?? 0), 0);
-    return {
-      sales: margin.length,
-      withMargin: validMargin.length,
-      totalRevenue,
-      totalMargin,
-      avgPct:
-        validMargin.length > 0
-          ? validMargin.reduce((s, m) => s + (m.margin_pct ?? 0), 0) / validMargin.length
-          : null,
-    };
-  }, [margin]);
 
   const agingSummary = useMemo(() => {
     const buckets: Record<string, number> = { "<60": 0, "60-90": 0, "90-180": 0, ">180": 0, unknown: 0 };
@@ -230,7 +186,7 @@ function ReportsBody() {
             <ChartLine className="size-6" /> Reports
           </h1>
           <p className="text-muted-foreground text-sm">
-            Profit, sales-rep performance, inventory aging, aged receivables,
+            Sales-rep performance, inventory aging, aged receivables,
             time-in-state. Live from the database.
           </p>
         </div>
@@ -248,13 +204,6 @@ function ReportsBody() {
 
       {/* Top-of-page summary tiles */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" data-tour-id="reports-summary-tiles">
-        <SummaryTile
-          icon={DollarSign}
-          label="Margin (delivered)"
-          loading={loading}
-          value={fmt(marginSummary.totalMargin)}
-          hint={`${marginSummary.withMargin} of ${marginSummary.sales} sales · avg ${fmtPct(marginSummary.avgPct)}`}
-        />
         <SummaryTile
           icon={Package}
           label="Cars in stock"
@@ -287,89 +236,6 @@ function ReportsBody() {
         />
       </div>
 
-      {/* 1. Profit margin per sale */}
-      <Card data-tour-id="reports-margin-panel">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <DollarSign className="size-4" /> Profit margin per delivered sale
-          </CardTitle>
-          <CardDescription>
-            Cost basis comes from the car&apos;s purchase price; revenue is the
-            sale&apos;s selling price. Margin only computed when both currencies
-            match.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <Skeleton className="h-32 w-full" />
-          ) : margin.length === 0 ? (
-            <p className="text-muted-foreground text-sm">No delivered sales yet.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead className="border-b text-left text-xs uppercase text-muted-foreground">
-                  <tr>
-                    <th className="px-2 py-2">Vehicle</th>
-                    <th className="px-2 py-2">Delivered</th>
-                    <th className="px-2 py-2 text-right">Revenue</th>
-                    <th className="px-2 py-2 text-right">Cost</th>
-                    <th className="px-2 py-2 text-right">Margin</th>
-                    <th className="px-2 py-2 text-right">%</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-border divide-y">
-                  {margin.slice(0, 50).map((m) => (
-                    <tr key={m.sales_order_id}>
-                      <td className="px-2 py-2">
-                        <div className="font-medium">
-                          {m.brand} {m.model} {m.model_year ?? ""}
-                        </div>
-                        <div className="font-mono text-[11px] text-muted-foreground">
-                          {m.vin}
-                        </div>
-                      </td>
-                      <td className="px-2 py-2 text-muted-foreground">
-                        {m.delivered_at
-                          ? new Date(m.delivered_at).toLocaleDateString()
-                          : "—"}
-                      </td>
-                      <td className="px-2 py-2 text-right">
-                        {fmt(m.revenue, m.revenue_currency ?? "USD")}
-                      </td>
-                      <td className="px-2 py-2 text-right">
-                        {fmt(m.cost, m.cost_currency ?? "USD")}
-                      </td>
-                      <td
-                        className={cn(
-                          "px-2 py-2 text-right",
-                          m.margin == null
-                            ? "text-muted-foreground"
-                            : m.margin > 0
-                              ? "text-green-700"
-                              : m.margin < 0
-                                ? "text-red-700"
-                                : ""
-                        )}
-                      >
-                        {fmt(m.margin, m.revenue_currency ?? "USD")}
-                      </td>
-                      <td className="px-2 py-2 text-right">
-                        {fmtPct(m.margin_pct)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {margin.length > 50 && (
-                <p className="text-muted-foreground mt-2 text-xs">
-                  Showing 50 of {margin.length} sales.
-                </p>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
       {/* 2. Sales rep performance */}
       <Card data-tour-id="reports-sales-rep-panel">
         <CardHeader>
@@ -377,7 +243,7 @@ function ReportsBody() {
             <Users className="size-4" /> Sales rep performance
           </CardTitle>
           <CardDescription>
-            Revenue, margin, pipeline, and average days to close per active rep.
+            Pipeline, deliveries, and average days to close per active rep.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -394,8 +260,6 @@ function ReportsBody() {
                     <th className="px-2 py-2 text-right">Pipeline</th>
                     <th className="px-2 py-2 text-right">Delivered</th>
                     <th className="px-2 py-2 text-right">Voided</th>
-                    <th className="px-2 py-2 text-right">Revenue</th>
-                    <th className="px-2 py-2 text-right">Margin</th>
                     <th className="px-2 py-2 text-right">Avg close</th>
                   </tr>
                 </thead>
@@ -410,8 +274,6 @@ function ReportsBody() {
                       <td className="px-2 py-2 text-right text-muted-foreground">
                         {r.deals_voided}
                       </td>
-                      <td className="px-2 py-2 text-right">{fmt(r.revenue_total)}</td>
-                      <td className="px-2 py-2 text-right">{fmt(r.margin_total)}</td>
                       <td className="px-2 py-2 text-right">
                         {fmtD(r.avg_days_to_close)}
                       </td>
