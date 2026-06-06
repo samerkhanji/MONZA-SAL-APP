@@ -48,3 +48,6 @@ next-env.d.ts
 /playwright-report/
 /tests/.auth/
 /.env.test
+
+# Tesseract OCR runtime assets (generated at build by scripts/copy-tesseract-assets.mjs)
+/public/tesseract/

@@ -12,22 +12,75 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import type { Worker as TesseractWorker } from "tesseract.js";
 
+// VIN chars only — by spec a VIN never contains I, O or Q.
+const VIN_CHARS = "ABCDEFGHJKLMNPRSTUVWXYZ0123456789";
 const VIN_PATTERN = /[A-HJ-NPR-Z0-9]{17}/g;
+const VIN_EXACT = /^[A-HJ-NPR-Z0-9]{17}$/;
+
+// Self-hosted Tesseract assets (copied into /public by scripts/copy-tesseract-assets.mjs).
+const WORKER_PATH = "/tesseract/worker.min.js";
+const CORE_PATH = "/tesseract";
+// Language data is fetched from jsDelivr at runtime (allowed in connect-src).
+const LANG_PATH = "https://cdn.jsdelivr.net/npm/@tesseract.js-data/eng/4.0.0_best_int";
 
 /**
- * Normalises OCR output before VIN extraction.
- * Common mis-reads: O→0, I→1, Q→0.
+ * Normalises OCR output before VIN extraction. The whitelist already excludes
+ * I/O/Q, but as a safety net we still fold common look-alikes (O→0, I→1, Q→0)
+ * in case some sneak through, then keep only 17-char runs of valid VIN chars.
  */
 function extractVins(rawText: string): string[] {
   const normalised = rawText
     .toUpperCase()
     .replace(/O/g, "0")
-    .replace(/\bI\b/g, "1")
+    .replace(/I/g, "1")
     .replace(/Q/g, "0")
     .replace(/[^A-HJ-NPR-Z0-9]/g, " ");
   const matches = normalised.match(VIN_PATTERN);
   return [...new Set(matches ?? [])];
+}
+
+/**
+ * Crop the framed band, upscale, grayscale + contrast-stretch — gives Tesseract
+ * a clean, high-contrast single line which dramatically improves VIN accuracy.
+ */
+function preprocess(
+  source: CanvasImageSource,
+  sx: number,
+  sy: number,
+  sw: number,
+  sh: number
+): HTMLCanvasElement {
+  const scale = 2;
+  const out = document.createElement("canvas");
+  out.width = Math.max(1, Math.round(sw * scale));
+  out.height = Math.max(1, Math.round(sh * scale));
+  const ctx = out.getContext("2d");
+  if (!ctx) return out;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(source, sx, sy, sw, sh, 0, 0, out.width, out.height);
+
+  const img = ctx.getImageData(0, 0, out.width, out.height);
+  const d = img.data;
+  // First pass: luminance + min/max for a contrast stretch.
+  let min = 255;
+  let max = 0;
+  const lum = new Uint8Array(d.length / 4);
+  for (let i = 0, j = 0; i < d.length; i += 4, j += 1) {
+    const l = (d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114) | 0;
+    lum[j] = l;
+    if (l < min) min = l;
+    if (l > max) max = l;
+  }
+  const range = Math.max(1, max - min);
+  for (let i = 0, j = 0; i < d.length; i += 4, j += 1) {
+    const v = ((lum[j] - min) / range) * 255;
+    d[i] = d[i + 1] = d[i + 2] = v;
+  }
+  ctx.putImageData(img, 0, 0);
+  return out;
 }
 
 export interface OcrScannerDialogProps {
@@ -44,10 +97,9 @@ type Phase = "capture" | "processing" | "results";
 /**
  * OCR-based VIN scanner.
  *
- * Opens the rear camera, lets the user frame the VIN plate / sticker, captures a
- * still frame and runs Tesseract.js OCR to extract 17-character VIN strings.
- * Useful when the VIN is etched or printed as plain text (no barcode available).
- *
+ * Opens the rear camera with a guide box, captures the framed band, runs a
+ * VIN-tuned Tesseract.js worker (self-hosted core, character whitelist,
+ * single-block page-seg, image preprocessing) and extracts 17-char VINs.
  * Falls back to manual entry if OCR finds nothing or the camera is unavailable.
  */
 export function OcrScannerDialog({
@@ -60,20 +112,31 @@ export function OcrScannerDialog({
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const workerRef = useRef<TesseractWorker | null>(null);
 
   const [phase, setPhase] = useState<Phase>("capture");
   const [candidates, setCandidates] = useState<string[]>([]);
   const [manualValue, setManualValue] = useState("");
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [capturedDataUrl, setCapturedDataUrl] = useState<string | null>(null);
+  const [videoReady, setVideoReady] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [progressLabel, setProgressLabel] = useState("Reading VIN…");
 
   const stopStream = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
   }, []);
 
+  const terminateWorker = useCallback(() => {
+    const w = workerRef.current;
+    workerRef.current = null;
+    if (w) void w.terminate().catch(() => {});
+  }, []);
+
   const startStream = useCallback(async () => {
     setCameraError(null);
+    setVideoReady(false);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
@@ -85,11 +148,13 @@ export function OcrScannerDialog({
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        // iOS Safari sometimes needs an explicit play().
+        await videoRef.current.play().catch(() => {});
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Camera unavailable";
       setCameraError(
-        msg.toLowerCase().includes("permission")
+        msg.toLowerCase().includes("permission") || msg.toLowerCase().includes("denied")
           ? "Camera permission denied. Use manual entry below."
           : "Camera unavailable. Use manual entry below."
       );
@@ -99,42 +164,90 @@ export function OcrScannerDialog({
   useEffect(() => {
     if (!open) {
       stopStream();
+      terminateWorker();
       setPhase("capture");
       setCandidates([]);
       setCapturedDataUrl(null);
       setManualValue("");
       setCameraError(null);
+      setVideoReady(false);
+      setProgress(0);
       return;
     }
     void startStream();
-    return stopStream;
-  }, [open, startStream, stopStream]);
+    return () => {
+      stopStream();
+      terminateWorker();
+    };
+  }, [open, startStream, stopStream, terminateWorker]);
+
+  /** Lazily create + configure the VIN-tuned Tesseract worker (reused across retries). */
+  const getWorker = useCallback(async (): Promise<TesseractWorker> => {
+    if (workerRef.current) return workerRef.current;
+    const { createWorker, PSM } = await import("tesseract.js");
+    setProgressLabel("Loading OCR engine…");
+    const worker = await createWorker("eng", 1, {
+      workerPath: WORKER_PATH,
+      corePath: CORE_PATH,
+      langPath: LANG_PATH,
+      logger: (m: { status: string; progress: number }) => {
+        if (m.status === "recognizing text") {
+          setProgressLabel("Reading VIN…");
+          setProgress(Math.round((m.progress ?? 0) * 100));
+        }
+      },
+    });
+    await worker.setParameters({
+      tessedit_char_whitelist: VIN_CHARS,
+      // 6 = assume a single uniform block of text (our cropped VIN band).
+      tessedit_pageseg_mode: PSM.SINGLE_BLOCK,
+    });
+    workerRef.current = worker;
+    return worker;
+  }, []);
 
   async function capture() {
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas) return;
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+    if (!vw || !vh) {
+      toast.error("Camera still warming up — try again in a second.");
+      return;
+    }
 
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
-    canvas.getContext("2d")?.drawImage(video, 0, 0);
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+    // Draw the full frame for the preview thumbnail.
+    canvas.width = vw;
+    canvas.height = vh;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0, vw, vh);
+    setCapturedDataUrl(canvas.toDataURL("image/jpeg", 0.92));
 
-    setCapturedDataUrl(dataUrl);
+    setProgress(0);
     setPhase("processing");
-    stopStream();
+
+    // Crop to the centered guide band (matches the on-screen overlay), then
+    // preprocess for OCR.
+    const bandW = vw * 0.92;
+    const bandH = vh * 0.22;
+    const bandX = (vw - bandW) / 2;
+    const bandY = (vh - bandH) / 2;
+    const processed = preprocess(video, bandX, bandY, bandW, bandH);
 
     try {
-      const { default: Tesseract } = await import("tesseract.js");
-      const { data: { text } } = await Tesseract.recognize(dataUrl, "eng");
-      const found = extractVins(text);
+      const worker = await getWorker();
+      const { data } = await worker.recognize(processed);
+      const found = extractVins(data.text ?? "");
       setCandidates(found);
       if (found.length === 0) {
-        toast.warning("No VIN found. Try again with better light or a closer shot.");
+        toast.warning("No VIN found. Align the VIN inside the box, hold steady, and retake.");
       }
     } catch {
-      toast.error("OCR failed. Try again or use manual entry.");
+      toast.error("OCR failed. Retake the photo or use manual entry.");
     } finally {
+      stopStream();
       setPhase("results");
     }
   }
@@ -151,7 +264,7 @@ export function OcrScannerDialog({
       toast.error("Enter a VIN");
       return;
     }
-    if (!/^[A-HJ-NPR-Z0-9]{17}$/.test(value)) {
+    if (!VIN_EXACT.test(value)) {
       toast.error("Invalid VIN — must be 17 characters (no I, O, Q).");
       return;
     }
@@ -164,6 +277,7 @@ export function OcrScannerDialog({
   function retry() {
     setCandidates([]);
     setCapturedDataUrl(null);
+    setProgress(0);
     setPhase("capture");
     void startStream();
   }
@@ -190,14 +304,24 @@ export function OcrScannerDialog({
                   <p className="px-4 text-center text-sm text-slate-300">{cameraError}</p>
                 </div>
               ) : (
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="w-full"
-                  style={{ minHeight: 200 }}
-                />
+                <>
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    onLoadedMetadata={() => setVideoReady(true)}
+                    className="w-full"
+                    style={{ minHeight: 200 }}
+                  />
+                  {/* Guide box — align the VIN inside this band */}
+                  <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                    <div className="h-[22%] w-[92%] rounded-md border-2 border-white/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]" />
+                  </div>
+                  <p className="absolute inset-x-0 bottom-1 text-center text-[11px] text-white/90">
+                    Align the VIN inside the box
+                  </p>
+                </>
               ))}
 
             {phase === "processing" && capturedDataUrl && (
@@ -205,7 +329,10 @@ export function OcrScannerDialog({
                 <img src={capturedDataUrl} alt="Captured" className="w-full" />
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60">
                   <RefreshCw className="size-8 animate-spin text-white" />
-                  <p className="mt-2 text-sm font-medium text-white">Reading VIN…</p>
+                  <p className="mt-2 text-sm font-medium text-white">{progressLabel}</p>
+                  {progress > 0 && (
+                    <p className="text-xs text-white/80">{progress}%</p>
+                  )}
                 </div>
               </div>
             )}
@@ -219,9 +346,13 @@ export function OcrScannerDialog({
 
           {/* Capture button */}
           {phase === "capture" && !cameraError && (
-            <Button className="w-full" onClick={() => void capture()}>
+            <Button
+              className="w-full"
+              onClick={() => void capture()}
+              disabled={!videoReady}
+            >
               <Camera className="mr-2 size-4" />
-              Capture &amp; Read VIN
+              {videoReady ? "Capture & Read VIN" : "Starting camera…"}
             </Button>
           )}
 
