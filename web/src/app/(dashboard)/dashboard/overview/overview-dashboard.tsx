@@ -102,15 +102,12 @@ export type OwnerOverviewData = {
   salesMTD: {
     units: number;
     unitsLastMonth: number;
-    revenueByCurrency: Record<string, number>;
   };
   salesByStage: { stage: string; label: string; count: number }[];
   topSalesRep: {
     name: string;
     dealsDelivered: number;
     dealsInPipeline: number;
-    revenueTotal: number;
-    marginTotal: number;
   } | null;
   inventoryAging: { bucket: string; count: number }[];
   reservationsExpiring: {
@@ -397,11 +394,6 @@ function CarsByStatusChartCard({
 }
 
 function SalesRevenueCard({ data }: { data: OwnerOverviewData }) {
-  const usd = data.salesMTD.revenueByCurrency["USD"] ?? 0;
-  const otherCurrencyTotal = Object.entries(data.salesMTD.revenueByCurrency).reduce(
-    (sum, [c, v]) => (c === "USD" ? sum : sum + v),
-    0
-  );
   const unitsDelta = data.salesMTD.units - data.salesMTD.unitsLastMonth;
   const deltaLabel =
     data.salesMTD.unitsLastMonth === 0
@@ -413,11 +405,11 @@ function SalesRevenueCard({ data }: { data: OwnerOverviewData }) {
   return (
     <Card className="lg:col-span-2" data-tour-id="overview-sales-revenue-panel">
       <CardHeader>
-        <CardTitle className="text-lg">Sales &amp; revenue (month-to-date)</CardTitle>
+        <CardTitle className="text-lg">Sales (month-to-date)</CardTitle>
         <CardDescription>Delivered sales orders this month, with comparisons.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <p className="text-muted-foreground text-xs">Units delivered MTD</p>
             <p className="mt-1 text-3xl font-semibold tabular-nums">{data.salesMTD.units}</p>
@@ -431,42 +423,13 @@ function SalesRevenueCard({ data }: { data: OwnerOverviewData }) {
             </p>
           </div>
           <div>
-            <p className="text-muted-foreground text-xs">Revenue MTD</p>
-            <div className="mt-1">
-              <p className="text-2xl font-semibold tabular-nums">{USD_FORMATTER.format(usd)}</p>
-              {otherCurrencyTotal > 0 ? (
-                <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
-                  {orderedCurrencies(data.salesMTD.revenueByCurrency)
-                    .filter((c) => c !== "USD")
-                    .map((c) => (
-                      <span key={c} className="tabular-nums">
-                        {formatMoney(data.salesMTD.revenueByCurrency[c], c)}
-                      </span>
-                    ))}
-                </div>
-              ) : (
-                <p className="mt-0.5 text-xs text-muted-foreground">USD only this month</p>
-              )}
-              {data.salesMTD.units > 0 && usd + otherCurrencyTotal === 0 ? (
-                <p className="mt-1.5 rounded-md border border-amber-500/40 bg-amber-50/60 px-2 py-1 text-[11px] text-amber-700 dark:bg-amber-950/30 dark:text-amber-300">
-                  Revenue is $0 even though cars were delivered — those sales orders
-                  are missing selling prices.{" "}
-                  <Link href="/data-health" className="font-medium underline">
-                    Fix in Data Health
-                  </Link>
-                  .
-                </p>
-              ) : null}
-            </div>
-          </div>
-          <div>
             <p className="text-muted-foreground text-xs">Top sales rep</p>
             {data.topSalesRep ? (
               <>
                 <p className="mt-1 text-lg font-semibold truncate">{data.topSalesRep.name}</p>
                 <p className="mt-0.5 text-xs text-muted-foreground tabular-nums">
                   {data.topSalesRep.dealsDelivered} delivered ·{" "}
-                  {USD_FORMATTER.format(data.topSalesRep.revenueTotal)} revenue
+                  {data.topSalesRep.dealsInPipeline} in pipeline
                 </p>
               </>
             ) : (
@@ -700,8 +663,6 @@ export function OverviewDashboard({ data }: { data: OwnerOverviewData }) {
 
   const totalVehicles = data.summary.totalCars;
 
-  const revenueMTDUSD = data.salesMTD.revenueByCurrency["USD"] ?? 0;
-
   function handleRefresh() {
     startTransition(async () => {
       await refreshOwnerOverview();
@@ -819,21 +780,6 @@ export function OverviewDashboard({ data }: { data: OwnerOverviewData }) {
           <CardContent className="pt-0">
             <p className="text-muted-foreground text-xs">
               vs {data.salesMTD.unitsLastMonth} last month
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Revenue MTD (USD)</CardDescription>
-            <CardTitle className="text-2xl tabular-nums">
-              {USD_FORMATTER.format(revenueMTDUSD)}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <p className="text-muted-foreground text-xs">
-              {Object.keys(data.salesMTD.revenueByCurrency).filter((c) => c !== "USD").length > 0
-                ? "+ other currencies (see panel)"
-                : "USD only"}
             </p>
           </CardContent>
         </Card>
