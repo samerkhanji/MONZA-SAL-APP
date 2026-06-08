@@ -42,7 +42,6 @@ interface SalesOrderDetail {
   car_id: string | null;
   customer_id: string | null;
   status: SaleStatus;
-  selling_price: number | null;
   currency: string | null;
   notes: string | null;
   sale_date: string | null;
@@ -52,7 +51,6 @@ interface SalesOrderDetail {
   reserved_by: string | null;
   delivery_date: string | null;
   // Lifecycle (added in migration 056)
-  quote_amount: number | null;
   quote_currency: string | null;
   quote_sent_at: string | null;
   quote_accepted_at: string | null;
@@ -137,7 +135,6 @@ export default function SalesOrderDetailPage() {
   // Editable form state for the lifecycle blocks. Currency is shared
   // across all amounts on a single order — the DB enforces this with
   // the sales_orders_currencies_consistent CHECK (migration 078).
-  const [quoteAmount, setQuoteAmount] = useState("");
   const [orderCurrency, setOrderCurrency] = useState("USD");
   const [depositAmount, setDepositAmount] = useState("");
   const [depositMethod, setDepositMethod] = useState("");
@@ -165,7 +162,6 @@ export default function SalesOrderDetailPage() {
     }
     const row = data as unknown as SalesOrderDetail;
     setOrder(row);
-    setQuoteAmount(row.quote_amount != null ? String(row.quote_amount) : "");
     // Single currency for the whole order. Default to whichever is set,
     // or USD.
     setOrderCurrency(
@@ -235,18 +231,15 @@ export default function SalesOrderDetailPage() {
   }
 
   async function saveQuote() {
-    const amt = parseFloat(quoteAmount);
-    if (isNaN(amt) || amt <= 0) {
-      toast.error("Enter a positive quote amount");
-      return;
-    }
     const ok = await patchOrder({
-      quote_amount: amt,
-      quote_currency: orderCurrency,
       currency: orderCurrency,
+      // Keep quote_currency aligned with the order currency so the
+      // sales_orders_currencies_consistent CHECK (mig 078) holds even for
+      // orders that still carry a legacy quote_amount.
+      quote_currency: orderCurrency,
       quote_sent_at: order?.quote_sent_at ?? new Date().toISOString(),
     });
-    if (ok) toast.success("Quote saved");
+    if (ok) toast.success(order?.quote_sent_at ? "Quote updated" : "Quote sent");
   }
   async function markQuoteAccepted() {
     if (!order?.quote_sent_at) {
@@ -269,24 +262,6 @@ export default function SalesOrderDetailPage() {
     // friendlier toast here than the raw constraint violation.
     if (!order?.quote_sent_at) {
       toast.error("Quote must be sent first");
-      return;
-    }
-    // The quote lifecycle fills quote_amount; selling_price stays null until
-    // the order is finalised. Cap the deposit against whichever price is set,
-    // less any committed trade-in credit applied to this order.
-    const basePrice = order?.selling_price ?? order?.quote_amount ?? null;
-    const tradeInCredit = committedTradeIns.reduce(
-      (sum, t) => sum + (Number(t.accepted_value) || 0),
-      0
-    );
-    const priceCap =
-      basePrice != null && Number.isFinite(basePrice)
-        ? Math.max(0, basePrice - tradeInCredit)
-        : null;
-    if (priceCap != null && amt > priceCap) {
-      toast.error(
-        `Deposit (${amt.toLocaleString()}) cannot exceed the price after trade-in credit (${priceCap.toLocaleString()}).`
-      );
       return;
     }
     // Auto-advance a draft order to 'reserved' once a deposit is recorded.
@@ -508,39 +483,11 @@ export default function SalesOrderDetailPage() {
           </CardContent>
         </Card>
 
-        {/* Selling price */}
+        {/* Sale dates */}
         <Card>
-          <CardHeader><CardTitle className="text-base">Selling price</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base">Sale</CardTitle></CardHeader>
           <CardContent className="text-sm">
-            <p className="text-2xl font-semibold tabular-nums">
-              {fmtMoney(order.selling_price, order.currency)}
-            </p>
-            {committedTradeIns.length > 0 && (() => {
-              const tradeInTotal = committedTradeIns.reduce(
-                (sum, t) => sum + (Number(t.accepted_value) || 0),
-                0
-              );
-              const net =
-                order.selling_price != null
-                  ? Number(order.selling_price) - tradeInTotal
-                  : null;
-              return (
-                <div className="mt-2 space-y-0.5 border-t pt-2">
-                  <p className="text-muted-foreground">
-                    Trade-in credit:{" "}
-                    <span className="font-medium text-foreground tabular-nums">
-                      −{fmtMoney(tradeInTotal, order.currency)}
-                    </span>
-                  </p>
-                  {net != null && (
-                    <p className="text-sm font-semibold tabular-nums">
-                      Net after trade-in: {fmtMoney(net, order.currency)}
-                    </p>
-                  )}
-                </div>
-              );
-            })()}
-            <p className="mt-2 text-muted-foreground">Sale date: {fmtDate(order.sale_date)}</p>
+            <p className="text-muted-foreground">Sale date: {fmtDate(order.sale_date)}</p>
             <p className="text-muted-foreground">Planned delivery: {fmtDate(order.delivery_date)}</p>
           </CardContent>
         </Card>
@@ -595,19 +542,11 @@ export default function SalesOrderDetailPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="grid gap-3 sm:grid-cols-3">
-            <div>
-              <Label htmlFor="quote-amount">Amount</Label>
-              <Input
-                id="quote-amount" type="number" inputMode="decimal" min={0} step="any"
-                value={quoteAmount} onChange={(e) => setQuoteAmount(e.target.value)}
-                disabled={!canEdit}
-              />
-            </div>
+          <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <Label htmlFor="quote-currency">
                 Currency
-                <FieldHint text="The currency for this whole order — picking it here applies to the quote, deposit, and contract." />
+                <FieldHint text="The currency for this whole order — picking it here applies to the deposit and contract." />
               </Label>
               <Select value={orderCurrency} onValueChange={setOrderCurrency} disabled={!canEdit}>
                 <SelectTrigger id="quote-currency"><SelectValue /></SelectTrigger>
