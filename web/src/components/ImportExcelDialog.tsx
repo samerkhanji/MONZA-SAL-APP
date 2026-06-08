@@ -335,7 +335,7 @@ export function ImportExcelDialog({
 
           // 1) Batch-resolve cars by VIN.
           const reportVins = Array.from(new Set(reportRows.map((r) => r.vin)));
-          type CarLookup = { id: string; price: number | null; price_currency: string | null };
+          type CarLookup = { id: string };
           const carsByVinLookup = new Map<string, CarLookup>();
           const REPORT_CAR_CHUNK = 200;
           for (let i = 0; i < reportVins.length; i += REPORT_CAR_CHUNK) {
@@ -343,13 +343,11 @@ export function ImportExcelDialog({
             if (slice.length === 0) continue;
             const { data: carRows } = await supabase
               .from("cars")
-              .select("id, vin, price, price_currency")
+              .select("id, vin")
               .in("vin", slice);
             for (const row of (carRows ?? []) as ({ vin: string } & CarLookup)[]) {
               carsByVinLookup.set(row.vin, {
                 id: row.id,
-                price: row.price,
-                price_currency: row.price_currency,
               });
             }
           }
@@ -436,9 +434,6 @@ export function ImportExcelDialog({
               customer_id: customerId,
               status: "confirmed",
               created_by: user.id,
-              // Copy price from the car we just imported so sales reports aren't empty.
-              selling_price: carRow.price ?? null,
-              currency: carRow.price_currency ?? "USD",
             };
             if (delivery) salePayload.delivery_date = delivery;
             if (reserved) salePayload.reserved_by = reserved;

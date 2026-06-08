@@ -979,7 +979,7 @@ export default function AddCarPage() {
               <CardHeader>
                 <CardTitle>Sale Details (Optional)</CardTitle>
                 <CardDescription>
-                  Selling price, dates, deposit (for reservations)
+                  Dates, deposit (for reservations)
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
