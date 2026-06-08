@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 import type {
@@ -61,25 +61,6 @@ export function RepairProposalPanel({
   const canGm = isGarageManager || isOwner;
   const canAsst = isAssistant || isOwner;
 
-  // Owner approval threshold for repair estimates. Loaded once; falls back to
-  // a high number so we never accidentally block a flow if the row's missing.
-  const [estimateOwnerFloor, setEstimateOwnerFloor] = useState<number>(
-    Number.POSITIVE_INFINITY
-  );
-
-  useEffect(() => {
-    void supabase
-      .from("approval_thresholds")
-      .select("owner_floor")
-      .eq("id", "estimate")
-      .eq("active", true)
-      .maybeSingle()
-      .then(({ data }) => {
-        const f = (data as { owner_floor?: number } | null)?.owner_floor;
-        if (typeof f === "number") setEstimateOwnerFloor(f);
-      });
-  }, [supabase]);
-
   const load = useCallback(async () => {
     const { data: p, error: pe } = await supabase
       .from("repair_proposals")
@@ -119,27 +100,6 @@ export function RepairProposalPanel({
   useEffect(() => {
     void load();
   }, [load]);
-
-  const originalTotal = useMemo(
-    () =>
-      items.reduce(
-        (s, i) =>
-          s +
-          Math.round(
-            (Number(i.quantity) || 0) * (Number(i.unit_price) || 0) * 100
-          ) /
-            100,
-        0
-      ),
-    [items]
-  );
-  const approvedTotal = useMemo(
-    () =>
-      items
-        .filter((i) => i.customer_decision === "approved")
-        .reduce((s, i) => s + Number(i.total_price || 0), 0),
-    [items]
-  );
 
   async function createProposal() {
     setBusy(true);
@@ -221,42 +181,27 @@ export function RepairProposalPanel({
   }
 
   async function saveLineFromForm(it: RepairProposalItem) {
-    const qty = Number(it.quantity) || 0;
-    const unit = Number(it.unit_price) || 0;
-    const lineTotal = Math.round(qty * unit * 100) / 100;
     await updateItem(it.id, {
       item_type: it.item_type,
       name: it.name,
       part_number: it.part_number,
-      quantity: qty,
-      unit_price: unit,
-      total_price: lineTotal,
+      quantity: Number(it.quantity) || 0,
     });
   }
 
   async function sendToCs() {
     if (!proposal) return;
-    // Gate: if total exceeds owner threshold, route through pending_owner_approval
-    // first. Otherwise straight to CS as before.
-    const needsOwner = originalTotal >= estimateOwnerFloor;
-    const nextStatus: RepairProposalStatus = needsOwner
-      ? "pending_owner_approval"
-      : "sent_to_customer_service";
     setBusy(true);
     const { error } = await supabase
       .from("repair_proposals")
-      .update({ status: nextStatus, updated_at: new Date().toISOString() })
+      .update({ status: "sent_to_customer_service", updated_at: new Date().toISOString() })
       .eq("id", proposal.id);
     setBusy(false);
     if (error) {
       toast.error(formatError(error));
       return;
     }
-    setProposal({ ...proposal, status: nextStatus });
-    if (needsOwner) {
-      toast.success("Sent up for owner approval");
-      return;
-    }
+    setProposal({ ...proposal, status: "sent_to_customer_service" });
     const { getProfileIdsByRole } = await import("@/lib/user-lookup");
     const { createNotificationsForUsers } = await import("@/lib/notifications");
     const ids = await getProfileIdsByRole("assistant");
@@ -484,35 +429,6 @@ export function RepairProposalPanel({
                           onBlur={() => void saveLineFromForm(it)}
                         />
                       </div>
-                      <div>
-                        <Label className="text-xs">Unit price</Label>
-                        <Input
-                          className="mt-1 h-9"
-                          type="number"
-                          inputMode="decimal"
-                          step="0.01"
-                          value={it.unit_price}
-                          onChange={(e) =>
-                            setItems((prev) =>
-                              prev.map((x) =>
-                                x.id === it.id
-                                  ? { ...x, unit_price: parseFloat(e.target.value) || 0 }
-                                  : x
-                              )
-                            )
-                          }
-                          onBlur={() => void saveLineFromForm(it)}
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-xs">Line total</Label>
-                        <p className="mt-2 font-mono">
-                          {(Number(it.quantity) * Number(it.unit_price)).toLocaleString("en-US", {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}
-                        </p>
-                      </div>
                     </>
                   ) : (
                     <>
@@ -521,10 +437,7 @@ export function RepairProposalPanel({
                       <p className="font-mono text-muted-foreground text-xs">
                         {it.part_number ?? "—"}
                       </p>
-                      <p>
-                        {it.quantity} × {Number(it.unit_price).toFixed(2)} ={" "}
-                        <span className="font-mono">{Number(it.total_price).toFixed(2)}</span>
-                      </p>
+                      <p>Qty: {it.quantity}</p>
                       {canAsst && proposal.status === "sent_to_customer" && (
                         <div className="sm:col-span-2">
                           <Label className="text-xs">Customer decision</Label>
@@ -566,9 +479,7 @@ export function RepairProposalPanel({
                 Add line
               </Button>
               <Button type="button" size="sm" onClick={() => void sendToCs()} disabled={busy}>
-                {originalTotal >= estimateOwnerFloor
-                  ? "Send for owner approval"
-                  : "Send to Customer Service"}
+                Send to Customer Service
               </Button>
             </div>
           )}
@@ -587,9 +498,8 @@ export function RepairProposalPanel({
           {isOwner && proposal.status === "pending_owner_approval" && (
             <div className="space-y-2 rounded-md border border-amber-500/40 bg-amber-50/40 p-3 print:hidden dark:bg-amber-950/20">
               <p className="text-sm">
-                <strong>Total {originalTotal.toFixed(2)}</strong> is above the
-                owner approval threshold ({estimateOwnerFloor.toFixed(0)}). Approve
-                to send to Customer Service.
+                This estimate is pending owner approval. Approve to send to
+                Customer Service.
               </p>
               <div className="flex gap-2">
                 <Button
@@ -652,12 +562,6 @@ export function RepairProposalPanel({
             proposal.status === "fully_approved") &&
             canGm && (
               <div className="space-y-2 rounded-md border border-primary/30 bg-primary/5 p-3 print:hidden">
-                <p className="text-sm">
-                  Approved total:{" "}
-                  <span className="font-mono font-semibold">{approvedTotal.toFixed(2)}</span> ·
-                  Original total:{" "}
-                  <span className="font-mono">{originalTotal.toFixed(2)}</span>
-                </p>
                 <Button type="button" size="sm" onClick={() => void createWorkChecklist()} disabled={busy}>
                   <ListChecks className="mr-2 size-4" />
                   Create work checklist
@@ -665,9 +569,6 @@ export function RepairProposalPanel({
               </div>
             )}
 
-          <p className="text-muted-foreground text-xs print:text-black">
-            Original total: {originalTotal.toFixed(2)} · Approved total: {approvedTotal.toFixed(2)}
-          </p>
         </div>
       )}
     </div>
