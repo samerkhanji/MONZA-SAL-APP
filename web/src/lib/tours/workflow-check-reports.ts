@@ -3,7 +3,7 @@ import type { Tour } from "./types";
 /**
  * Workflow tour: "Read the Reports page".
  *
- * Understanding the numbers — profit, sales rep performance, aging stock,
+ * Understanding the numbers — sales rep performance, aging stock,
  * money owed, and garage timing.
  *
  * Tone: short sentences, plain English, like explaining to a beginner.
@@ -12,7 +12,7 @@ export const checkReportsWorkflowTour: Tour = {
   id: "workflow-check-reports-v1",
   kind: "workflow",
   label: "Read the Reports page",
-  description: "Understand the numbers — profit, sales, stock age, and money owed.",
+  description: "Understand the numbers — sales, stock age, and money owed.",
   estimatedMinutes: 4,
   steps: [
     {
@@ -38,15 +38,6 @@ export const checkReportsWorkflowTour: Tour = {
         "These tiles are the quick summary — the headline figures at a glance. " +
         "Start here for the overall picture before digging in.",
       side: "bottom",
-      align: "start",
-    },
-    {
-      element: '[data-tour-id="reports-margin-panel"]',
-      title: "Profit per sale",
-      description:
-        "This card shows how much profit each delivered car made. " +
-        "It's the difference between what you paid and what you sold it for.",
-      side: "top",
       align: "start",
     },
     {

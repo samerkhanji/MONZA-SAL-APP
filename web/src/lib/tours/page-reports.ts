@@ -3,9 +3,8 @@ import type { Tour } from "./types";
 /**
  * Page tour: /reports.
  *
- * The reports page — your numbers turned into tables: profit, sales-rep
- * performance, how long cars sit in stock, who owes you money, and how fast
- * the garage works.
+ * The reports page — your numbers turned into tables: sales-rep performance,
+ * how long cars sit in stock, who owes you money, and how fast the garage works.
  *
  * Tone: short sentences, plain English, like explaining to a smart 12-year-old.
  * Selectors reference `data-tour-id` attributes — see SELECTORS.md.
@@ -27,24 +26,15 @@ export const reportsPageTour: Tour = {
       element: '[data-tour-id="reports-summary-tiles"]',
       title: "The headline tiles",
       description:
-        "Four quick numbers at the top: total profit from delivered cars, how many cars are in stock, how much money customers still owe, and the average time a garage job takes.",
+        "Three quick numbers at the top: how many cars are in stock, how much money customers still owe, and the average time a garage job takes.",
       side: "bottom",
-      align: "start",
-    },
-    {
-      element: '[data-tour-id="reports-margin-panel"]',
-      title: "Profit margin per sale",
-      description:
-        "For every car you've delivered: what it cost you, what you sold it for, and the profit in between. " +
-        "This tells you which deals were actually worth it.",
-      side: "top",
       align: "start",
     },
     {
       element: '[data-tour-id="reports-sales-rep-panel"]',
       title: "Sales rep performance",
       description:
-        "Each salesperson's numbers side by side — deals in progress, deals delivered, revenue, profit, and how fast they close. " +
+        "Each salesperson's numbers side by side — deals in progress, deals delivered, and how fast they close. " +
         "Use it to see who's doing well and who needs help.",
       side: "top",
       align: "start",

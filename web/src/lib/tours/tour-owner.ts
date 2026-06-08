@@ -41,7 +41,7 @@ export const ownerWelcomeTour: Tour = {
       navigateTo: "/dashboard/overview",
       title: "Owner Overview",
       description:
-        "Only you see this page. It's the full picture — sales this month, revenue, the cash drawer, the garage, top sales rep, everything in one screen. " +
+        "Only you see this page. It's the full picture — sales this month, the cash drawer, the garage, top sales rep, everything in one screen. " +
         "Click here when you want the 30-second 'how is the business doing right now' answer.",
     },
     {
@@ -74,7 +74,7 @@ export const ownerWelcomeTour: Tour = {
       title: "Sales Orders",
       description:
         "When a customer commits to buying, you create a sales order. " +
-        "It's the contract for the deal — car, customer, price, payment plan, delivery date. Once delivered, it counts as a sale.",
+        "It's the contract for the deal — car, customer, payment plan, delivery date. Once delivered, it counts as a sale.",
     },
     {
       element: '[data-tour-id="nav-installments"]',
@@ -90,7 +90,7 @@ export const ownerWelcomeTour: Tour = {
       title: "Trade-ins",
       description:
         "When a customer trades their old car in for a new one, log the appraisal here. " +
-        "Once you agree on a price, that money comes off the new car's price automatically.",
+        "Once you agree on a value, the trade-in is recorded against the deal.",
     },
     {
       element: '[data-tour-id="nav-cash"]',
@@ -129,7 +129,7 @@ export const ownerWelcomeTour: Tour = {
       navigateTo: "/reports",
       title: "Reports",
       description:
-        "All your numbers, in chart form. Who's selling the most, which car makes the best margin, how fast the garage finishes jobs, who owes you money. " +
+        "All your numbers, in chart form. Who's selling the most, how fast the garage finishes jobs, who owes you money. " +
         "Click any chart to drill into the details.",
     },
     {
