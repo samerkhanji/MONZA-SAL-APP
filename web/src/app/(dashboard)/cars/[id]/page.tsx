@@ -668,8 +668,6 @@ export default function CarProfilePage() {
           customer_id: customerId ?? null,
           status: newOrderStatus,
           created_by: user.id,
-          selling_price: car.price ?? null,
-          currency: car.price_currency ?? "USD",
           reservation_date,
           delivery_date,
           date_bought,

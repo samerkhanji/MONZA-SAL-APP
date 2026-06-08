@@ -69,8 +69,6 @@ export function EditCarDialog({
   const [motor, setMotor] = useState("");
   const [evKm, setEvKm] = useState("");
   const [motorKm, setMotorKm] = useState("");
-  const [price, setPrice] = useState("");
-  const [priceCurrency, setPriceCurrency] = useState("USD");
   const [warrantyPerDms, setWarrantyPerDms] = useState("");
   const [warrantyBatteryDms, setWarrantyBatteryDms] = useState("");
   const [warrantyVehicleExpiry, setWarrantyVehicleExpiry] = useState("");
@@ -123,8 +121,6 @@ export function EditCarDialog({
       setMotor(carAny.motor ?? "");
       setEvKm(carAny.ev_km != null ? String(carAny.ev_km) : "");
       setMotorKm(carAny.motor_km != null ? String(carAny.motor_km) : "");
-      setPrice(car.price != null ? String(car.price) : "");
-      setPriceCurrency(car.price_currency ?? "USD");
       setWarrantyPerDms(car.warranty_per_dms ?? "");
       setWarrantyBatteryDms(
         (car as { warranty_battery_dms?: string | null }).warranty_battery_dms ?? ""
@@ -252,14 +248,6 @@ export function EditCarDialog({
         location_type: locationType,
         location_slot: locationSlot.trim() || null,
       };
-
-      const priceNum = price ? parseFloat(price) : null;
-      if (priceNum !== null && !Number.isNaN(priceNum) && priceNum >= 0) {
-        updates.price = priceNum;
-        updates.price_currency = priceCurrency;
-      } else {
-        updates.price = null;
-      }
 
       const batteryNum = batteryPercent ? parseInt(batteryPercent, 10) : null;
       if (batteryNum !== null && !Number.isNaN(batteryNum) && batteryNum >= 0 && batteryNum <= 100) {
@@ -669,38 +657,7 @@ export function EditCarDialog({
             </div>
           )}
 
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div className="space-y-2">
-              <Label htmlFor="editPrice">Price</Label>
-              <Input
-                id="editPrice"
-                type="number"
-                inputMode="decimal"
-                min={0}
-                step="0.01"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                placeholder="Optional"
-                disabled={submitting || coreLocked}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Currency</Label>
-              <Select
-                value={priceCurrency}
-                onValueChange={setPriceCurrency}
-                disabled={submitting || coreLocked}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="USD">USD</SelectItem>
-                  <SelectItem value="AED">AED</SelectItem>
-                  <SelectItem value="LBP">LBP</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="sm:max-w-xs">
             <div className="space-y-2">
               <Label>
                 Customs
