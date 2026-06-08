@@ -69,8 +69,6 @@ interface EnrichedSaleOrder {
   car_id: string;
   customer_id: string;
   status: string;
-  selling_price: number | null;
-  currency: string | null;
   sale_date: string | null;
   date_bought: string | null;
   delivery_date: string | null;
@@ -148,8 +146,6 @@ export default function CustomerDetailPage() {
         car_id,
         customer_id,
         status,
-        selling_price,
-        currency,
         sale_date,
         date_bought,
         delivery_date,
@@ -780,12 +776,6 @@ export default function CustomerDetailPage() {
                                 )}
                               </p>
                               <p>Color: {car.exterior_color ?? "—"}</p>
-                              <p>
-                                Price:{" "}
-                                {so.selling_price != null
-                                  ? `${Number(so.selling_price).toLocaleString()} ${so.currency ?? "USD"}`
-                                  : "—"}
-                              </p>
                               <p>
                                 Date Bought:{" "}
                                 {dateBoughtDisplay
