@@ -57,7 +57,6 @@ interface SaleData {
   id: string;
   customer_id: string;
   status: string;
-  selling_price: number | null;
   currency: string | null;
   sale_date: string | null;
   date_bought?: string | null;
@@ -98,7 +97,6 @@ export function StatusCustomerDialog({
   const [email, setEmail] = useState("");
   const [plateNumber, setPlateNumber] = useState("");
   const [newStatus, setNewStatus] = useState<CarStatus>("available");
-  const [sellingPrice, setSellingPrice] = useState("");
   const [currency, setCurrency] = useState("USD");
   const [paymentType, setPaymentType] = useState<"full" | "installments">("full");
   const [planTotalAmount, setPlanTotalAmount] = useState("");
@@ -153,7 +151,7 @@ export function StatusCustomerDialog({
           const { data: saleData } = await supabase
             .from("sales_orders")
             .select(
-              "id, customer_id, status, selling_price, currency, sale_date, date_bought, delivery_date, reservation_date, reserved_until, deposit_amount"
+              "id, customer_id, status, currency, sale_date, date_bought, delivery_date, reservation_date, reserved_until, deposit_amount"
             )
             .eq("car_id", car.id)
             .not("status", "eq", "cancelled")
@@ -170,7 +168,6 @@ export function StatusCustomerDialog({
 
             setSale(saleData as SaleData);
             setCustomer(custData as CustomerData | null);
-            setSellingPrice(saleData.selling_price != null ? String(saleData.selling_price) : "");
             setCurrency(saleData.currency ?? "USD");
             const bought =
               (saleData as { date_bought?: string | null }).date_bought ??
@@ -225,7 +222,6 @@ export function StatusCustomerDialog({
       setPhone("");
       setPhone2("");
       setEmail("");
-      setSellingPrice("");
       setCurrency("USD");
       setDeliveryDateStr(
         car.delivery_date ? String(car.delivery_date).slice(0, 10) : ""
@@ -402,8 +398,6 @@ export function StatusCustomerDialog({
           status: saleStatus,
           created_by: user.id,
         };
-        const priceNum = sellingPrice ? parseFloat(sellingPrice) : undefined;
-        if (priceNum !== undefined && !Number.isNaN(priceNum)) salePayload.selling_price = priceNum;
         salePayload.currency = currency;
         const dbBought = normalizeOptionalDateForDb(dateBought);
         const dbReservation = normalizeOptionalDateForDb(reservationDateStr);
@@ -423,7 +417,7 @@ export function StatusCustomerDialog({
         }
 
         if (newStatus === "sold" && paymentType === "installments") {
-          const totalNum = parseFloat(planTotalAmount || sellingPrice || "0");
+          const totalNum = parseFloat(planTotalAmount || "0");
           const downNum = parseFloat(planDownPayment || "0");
           const monthsNum = parseInt(planMonths || "0", 10);
           const monthlyNum = parseFloat(planMonthlyAmount || "0");
@@ -755,12 +749,6 @@ export function StatusCustomerDialog({
                     {sale && (
                       <div className="rounded-md border p-3 text-sm">
                         <p className="font-medium">Sale info</p>
-                        <p className="text-muted-foreground">
-                          Price:{" "}
-                          {sale.selling_price != null
-                            ? `${Number(sale.selling_price).toLocaleString("en-US", { maximumFractionDigits: 2 })} ${sale.currency ?? "USD"}`
-                            : "—"}
-                        </p>
                         {sale.delivery_date && (
                           <p className="text-muted-foreground">
                             Delivery: {new Date(sale.delivery_date).toLocaleDateString()}
@@ -798,15 +786,6 @@ export function StatusCustomerDialog({
                             sale?.sale_date ??
                             car.date_bought) as string
                         ).toLocaleDateString()}
-                      </p>
-                    )}
-                    {sale?.selling_price != null && (
-                      <p>
-                        <span className="font-medium">Price:</span>{" "}
-                        {Number(sale.selling_price).toLocaleString("en-US", {
-                          maximumFractionDigits: 2,
-                        })}{" "}
-                        {sale.currency ?? "USD"}
                       </p>
                     )}
                   </div>
@@ -870,17 +849,6 @@ export function StatusCustomerDialog({
                       />
                     </div>
                   )}
-                  <div className="space-y-2">
-                    <Label>Selling price</Label>
-                    <Input
-                      value={sellingPrice}
-                      onChange={(e) => setSellingPrice(e.target.value)}
-                      type="number"
-                      inputMode="decimal"
-                      min={0}
-                      placeholder="Optional"
-                    />
-                  </div>
                   <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     <div className="space-y-2">
                       <Label htmlFor="status-dialog-reservation-new">Reservation date</Label>
@@ -1013,21 +981,9 @@ export function StatusCustomerDialog({
                       </div>
                       <div className="grid gap-4 sm:grid-cols-2">
                         <div className="space-y-2">
-                          <Label>Selling price</Label>
-                          <Input
-                            value={sellingPrice}
-                            onChange={(e) => setSellingPrice(e.target.value)}
-                            type="number"
-                            inputMode="decimal"
-                            min={0}
-                            step="0.01"
-                            placeholder="Optional"
-                          />
-                        </div>
-                        <div className="space-y-2">
                           <Label>
                             Currency
-                            <FieldHint text="The currency used for this sale's price and payments." />
+                            <FieldHint text="The currency used for this sale's payments." />
                           </Label>
                           <Select value={currency} onValueChange={setCurrency}>
                             <SelectTrigger>
