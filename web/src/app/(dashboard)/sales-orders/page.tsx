@@ -36,8 +36,6 @@ interface SalesOrderFull {
   car_id: string;
   customer_id: string | null;
   status: string;
-  selling_price: number | null;
-  currency: string | null;
   sale_date: string | null;
   date_bought: string | null;
   delivery_date: string | null;
@@ -108,7 +106,7 @@ export default function SalesOrdersPage() {
     const { data, error } = await supabase
       .from("sales_orders")
       .select(
-        `id, car_id, customer_id, status, selling_price, currency,
+        `id, car_id, customer_id, status,
          sale_date, date_bought, delivery_date, reservation_date, reserved_by, created_at,
          cars:car_id (id, vin, brand, model, model_year, exterior_color, status),
          customers:customer_id (id, first_name, last_name, phone_primary)`
@@ -138,22 +136,12 @@ export default function SalesOrdersPage() {
     });
   }, [orders, debouncedSearch, statusFilter]);
 
-  const totalRevenue = useMemo(
-    () =>
-      filtered
-        .filter((so) => so.status !== "cancelled" && so.selling_price)
-        .reduce((s, so) => s + (so.selling_price ?? 0), 0),
-    [filtered]
-  );
-
   const exportColumns: ExportColumn[] = [
     { key: "vin", header: "VIN" },
     { key: "car", header: "Car" },
     { key: "customer", header: "Customer" },
     { key: "phone", header: "Phone" },
     { key: "status", header: "Status" },
-    { key: "selling_price", header: "Selling Price", type: "number" },
-    { key: "currency", header: "Currency" },
     { key: "sale_date", header: "Sale Date" },
     { key: "delivery_date", header: "Delivery Date" },
   ];
@@ -165,8 +153,6 @@ export default function SalesOrdersPage() {
       customer: customerName(so),
       phone: so.customers?.phone_primary ?? "",
       status: so.status,
-      selling_price: so.selling_price ?? "",
-      currency: so.currency ?? "USD",
       sale_date: so.sale_date ? new Date(so.sale_date).toLocaleDateString() : "",
       delivery_date: so.delivery_date ? new Date(so.delivery_date).toLocaleDateString() : "",
     }));
@@ -196,7 +182,7 @@ export default function SalesOrdersPage() {
             filename="Sales_Orders"
             options={{
               pageName: "Sales Orders",
-              summary: `Total: ${filtered.length} orders | Revenue (all currencies, not converted): ${totalRevenue.toLocaleString()}`,
+              summary: `Total: ${filtered.length} orders`,
             }}
             disabled={loading}
           />
@@ -231,27 +217,6 @@ export default function SalesOrdersPage() {
                 s.status === "confirmed" ||
                 s.status === "paid"
               ).length}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4">
-            <p className="text-muted-foreground text-sm">Revenue (USD)</p>
-            <p className="text-2xl font-semibold tabular-nums">
-              ${totalRevenue.toLocaleString()}
-            </p>
-            <p className="text-muted-foreground text-xs">
-              {(() => {
-                const priced = filtered.filter(
-                  (so) => so.status !== "cancelled" && (so.selling_price ?? 0) > 0
-                ).length;
-                const active = filtered.filter((so) => so.status !== "cancelled").length;
-                return active === 0
-                  ? "No active orders in view."
-                  : priced === active
-                  ? `Sum across ${priced} active orders`
-                  : `${priced} of ${active} active orders have a price set`;
-              })()}
             </p>
           </CardContent>
         </Card>
@@ -377,14 +342,6 @@ export default function SalesOrdersPage() {
                           </dd>
                         </div>
                         <div className="min-w-0">
-                          <dt className="text-muted-foreground">Price</dt>
-                          <dd className="truncate tabular-nums">
-                            {so.selling_price != null
-                              ? `${Number(so.selling_price).toLocaleString()} ${so.currency ?? "USD"}`
-                              : "—"}
-                          </dd>
-                        </div>
-                        <div className="min-w-0">
                           <dt className="text-muted-foreground">Sale date</dt>
                           <dd className="truncate text-muted-foreground">
                             {so.sale_date
@@ -418,7 +375,6 @@ export default function SalesOrdersPage() {
                       <TableHead>Customer</TableHead>
                       <TableHead>Phone</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Price</TableHead>
                       <TableHead>Sale Date</TableHead>
                       <TableHead>Delivery</TableHead>
                       <TableHead className="w-[1%] text-right">
@@ -468,11 +424,6 @@ export default function SalesOrdersPage() {
                             <Badge className={STATUS_COLORS[so.status] ?? "bg-muted text-muted-foreground"}>
                               {so.status}
                             </Badge>
-                          </TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            {so.selling_price != null
-                              ? `${Number(so.selling_price).toLocaleString()} ${so.currency ?? "USD"}`
-                              : "—"}
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
                             {so.sale_date

@@ -48,8 +48,6 @@ interface SoldCar {
   car_id: string;
   customer_id: string;
   status: string;
-  selling_price: number | null;
-  currency: string | null;
   sale_date: string | null;
   date_bought: string | null;
   delivery_date: string | null;
@@ -142,8 +140,6 @@ export default function CustomersPage() {
         car_id,
         customer_id,
         status,
-        selling_price,
-        currency,
         sale_date,
         date_bought,
         delivery_date,
@@ -632,9 +628,6 @@ export default function CustomersPage() {
                           Phone
                         </th>
                         <th scope="col" className={CRM_TH}>
-                          Price
-                        </th>
-                        <th scope="col" className={CRM_TH}>
                           Date bought
                         </th>
                         <th scope="col" className={CRM_TH}>
@@ -701,11 +694,6 @@ export default function CustomersPage() {
                               ) : (
                                 "—"
                               )}
-                            </td>
-                            <td className={`${CRM_TD} tabular-nums`}>
-                              {so.selling_price != null
-                                ? `${Number(so.selling_price).toLocaleString()} ${so.currency ?? "USD"}`
-                                : "—"}
                             </td>
                             <td className={`${CRM_TD} tabular-nums`}>
                               {dateBoughtDisplay
