@@ -42,9 +42,9 @@ export const overviewPageTour: Tour = {
     },
     {
       element: '[data-tour-id="overview-sales-revenue-panel"]',
-      title: "Sales & revenue this month",
+      title: "Sales this month",
       description:
-        "How many cars you've delivered this month, how much money came in, and which sales rep is leading. " +
+        "How many cars you've delivered this month, and which sales rep is leading. " +
         "It also shows your sales pipeline — deals at each stage from quote to delivery.",
       side: "top",
       align: "start",

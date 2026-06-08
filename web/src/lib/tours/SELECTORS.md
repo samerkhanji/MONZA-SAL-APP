@@ -30,7 +30,7 @@ Pre-existing tour IDs (not in this index, but already present in the app):
 - `overview-refresh-button` — Refresh button in the page header
 - `overview-kpi-strip` — high-level KPI strip (Vehicles, Customers, Sales orders, Pending queue, Warranties)
 - `overview-cars-by-status-panel` — "Cars by status" chart panel (with bar/horizontal/pie/line switcher)
-- `overview-sales-revenue-panel` — "Sales & revenue (month-to-date)" panel
+- `overview-sales-revenue-panel` — "Sales (month-to-date)" panel
 - `overview-fleet-logistics-panel` — "Fleet logistics" panel (aging, reservations, arrivals)
 - `overview-cash-receivables-panel` — "Cash & receivables" panel (drawer, refunds, overdue)
 
@@ -169,7 +169,7 @@ Pre-existing tour IDs (not in this index, but already present in the app):
 ## /sales-orders (list)
 
 - `sales-orders-list-refresh-button` — Refresh button
-- `sales-orders-list-kpi-bar` — KPI grid (total / in-progress / revenue)
+- `sales-orders-list-kpi-bar` — KPI grid (total / in-progress)
 - `sales-orders-list-table-panel` — All orders card
 - `sales-orders-list-search-input` — Search VIN / car / customer / phone
 - `sales-orders-list-filter-status` — Status filter select trigger
@@ -337,7 +337,6 @@ Pre-existing tour IDs (not in this index, but already present in the app):
 
 ## /reports
 
-- `reports-margin-panel` — Profit margin per delivered sale card
 - `reports-sales-rep-panel` — Sales rep performance card
 - `reports-inventory-aging-panel` — Inventory aging card
 - `reports-aged-receivables-panel` — Aged receivables card
