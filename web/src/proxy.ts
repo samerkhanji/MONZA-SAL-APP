@@ -76,6 +76,8 @@ function buildContentSecurityPolicy(nonce: string): string {
       "'self'",
       `'nonce-${nonce}'`,
       "'strict-dynamic'",
+      // Needed to instantiate the Tesseract.js OCR WASM core (VIN photo scan).
+      "'wasm-unsafe-eval'",
       // Host allowlist for browsers that don't understand 'strict-dynamic'.
       // CSP3-compliant browsers ignore these in favor of the nonce.
       plausible,
@@ -87,11 +89,17 @@ function buildContentSecurityPolicy(nonce: string): string {
       "'unsafe-inline'",
       "https:",
     ],
+    // The OCR VIN scanner (Tesseract.js) runs in a Web Worker created from a
+    // same-origin / blob URL; its self-hosted core lives under /tesseract/.
+    "worker-src": ["'self'", "blob:"],
     "style-src": ["'self'", "'unsafe-inline'"],
     "img-src": ["'self'", "data:", "blob:", supabase, "https:"],
     "font-src": ["'self'", "data:", "https://fonts.gstatic.com"],
     "connect-src": [
       "'self'",
+      "blob:",
+      // Tesseract.js OCR language data (eng.traineddata) — data fetch only.
+      "https://cdn.jsdelivr.net",
       plausible,
       supabase,
       supabase.replace(/^https:/, "wss:"),
