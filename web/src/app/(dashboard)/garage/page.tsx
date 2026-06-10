@@ -148,6 +148,19 @@ export default function GarageJobsPage() {
     toast.success(`Found: ${(car as { brand: string }).brand} ${(car as { model: string }).model}`);
   }
 
+  // Deep link: `/garage?vin=...` (e.g. the global scan "Start garage job"
+  // action) auto-opens the New Job dialog for that car, then strips the param.
+  const vinDeepLinkHandled = useRef(false);
+  useEffect(() => {
+    if (vinDeepLinkHandled.current) return;
+    const vin = searchParams.get("vin");
+    if (!vin) return;
+    vinDeepLinkHandled.current = true;
+    void handleVinScan(vin);
+    router.replace("/garage");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
   const fetchJobs = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
