@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -77,6 +77,16 @@ export default function AddCarPage() {
 
   // Section 1: Vehicle Information
   const [vin, setVin] = useState("");
+
+  // Pre-fill the VIN when arriving from a scan (e.g. the global scan button
+  // routes here as `/cars/add?vin=...` when a scanned VIN isn't in the system).
+  useEffect(() => {
+    const scanned = new URLSearchParams(window.location.search).get("vin");
+    if (scanned && VIN_REGEX.test(scanned.trim())) {
+      setVin(scanned.trim().toUpperCase());
+    }
+  }, []);
+
   const [brand, setBrand] = useState<Brand | "">("");
   const [model, setModel] = useState("");
   const [modelYear, setModelYear] = useState(String(currentYear()));

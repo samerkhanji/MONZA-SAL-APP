@@ -32,7 +32,15 @@ export function FloatingScanButton() {
         .single();
 
       if (!car) {
-        toast.error(`No car found with VIN: ${trimmed}`);
+        // Not in the system yet — offer to start a new profile with the VIN
+        // pre-filled so the user doesn't retype 17 characters.
+        toast.error(`No car found with VIN: ${trimmed}`, {
+          action: {
+            label: "Create car",
+            onClick: () =>
+              router.push(`/cars/add?vin=${encodeURIComponent(trimmed)}`),
+          },
+        });
         return;
       }
 
