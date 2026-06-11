@@ -355,3 +355,78 @@ GRANT EXECUTE ON FUNCTION public.complete_trade_in_inspection(uuid, text, numeri
 GRANT EXECUTE ON FUNCTION public.approve_trade_in(uuid, numeric) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.reject_trade_in(uuid, text) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.cancel_trade_in(uuid, text) TO authenticated;
+
+-- ------------------------------------------------------------------
+-- customers_display view (security_invoker so the customers RLS in mig 166
+-- still applies to the querying user when read through this view).
+-- ------------------------------------------------------------------
+CREATE OR REPLACE VIEW public.customers_display
+WITH (security_invoker = true) AS
+ SELECT id,
+    first_name,
+    last_name,
+    phone_primary,
+    phone_secondary,
+    email,
+    preferred_language,
+    notes,
+    created_at,
+    updated_at,
+    created_by,
+    last_visit_date,
+    lead_status,
+    lead_source,
+    company,
+    address,
+    date_of_birth,
+    deleted_at,
+    concat(first_name, ' ', COALESCE(last_name, ''::text)) AS full_name,
+        CASE lead_status
+            WHEN 'new_lead'::lead_status THEN 'New Lead'::text
+            WHEN 'contacted'::lead_status THEN 'Contacted'::text
+            WHEN 'interested'::lead_status THEN 'Interested'::text
+            WHEN 'test_drive'::lead_status THEN 'Test Drive'::text
+            WHEN 'negotiation'::lead_status THEN 'Negotiation'::text
+            WHEN 'converted'::lead_status THEN 'Converted'::text
+            WHEN 'lost'::lead_status THEN 'Lost'::text
+            ELSE lead_status::text
+        END AS status_display,
+        CASE lead_source
+            WHEN 'walk_in'::lead_source THEN 'Walk-in'::text
+            WHEN 'phone'::lead_source THEN 'Phone'::text
+            WHEN 'whatsapp'::lead_source THEN 'WhatsApp'::text
+            WHEN 'instagram'::lead_source THEN 'Instagram'::text
+            WHEN 'facebook'::lead_source THEN 'Facebook'::text
+            WHEN 'website'::lead_source THEN 'Website'::text
+            WHEN 'referral'::lead_source THEN 'Referral'::text
+            WHEN 'event'::lead_source THEN 'Event'::text
+            WHEN 'other'::lead_source THEN 'Other'::text
+            ELSE NULL::text
+        END AS source_display,
+        CASE preferred_language
+            WHEN 'en'::text THEN 'English'::text
+            WHEN 'ar'::text THEN 'Arabic'::text
+            WHEN 'fr'::text THEN 'French'::text
+            ELSE preferred_language
+        END AS language_display,
+    ( SELECT count(*) AS count
+           FROM sales_orders so
+          WHERE so.customer_id = c.id) AS total_orders,
+    ( SELECT count(*) AS count
+           FROM customer_notes cn
+          WHERE cn.customer_id = c.id) AS total_notes
+   FROM customers c
+  WHERE deleted_at IS NULL;
+
+-- ------------------------------------------------------------------
+-- cars UPDATE policy (previously only in _archive migrations). Captured
+-- verbatim — owner/garage_manager/sales_ops/assistant/hybrid; note 'sales'
+-- is intentionally excluded (junior sales cannot edit cars directly). This
+-- is a faithful capture, NOT a behavior change; column-level hardening is a
+-- separate future task.
+-- ------------------------------------------------------------------
+DROP POLICY IF EXISTS cars_update_restricted ON public.cars;
+CREATE POLICY cars_update_restricted ON public.cars
+  FOR UPDATE TO authenticated
+  USING (public.is_any_role_resolved(ARRAY['owner'::user_role,'garage_manager'::user_role,'sales_ops'::user_role,'assistant'::user_role,'hybrid'::user_role]))
+  WITH CHECK (public.is_any_role_resolved(ARRAY['owner'::user_role,'garage_manager'::user_role,'sales_ops'::user_role,'assistant'::user_role,'hybrid'::user_role]));
