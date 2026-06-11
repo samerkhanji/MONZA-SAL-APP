@@ -95,19 +95,40 @@ function preprocess(
 
   const img = ctx.getImageData(0, 0, out.width, out.height);
   const d = img.data;
-  // First pass: luminance + min/max for a contrast stretch.
-  let min = 255;
-  let max = 0;
-  const lum = new Uint8Array(d.length / 4);
+  const n = d.length / 4;
+  // Grayscale luminance + histogram.
+  const lum = new Uint8Array(n);
+  const hist = new Array<number>(256).fill(0);
   for (let i = 0, j = 0; i < d.length; i += 4, j += 1) {
     const l = (d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114) | 0;
     lum[j] = l;
-    if (l < min) min = l;
-    if (l > max) max = l;
+    hist[l] += 1;
   }
-  const range = Math.max(1, max - min);
+  // Percentile-based contrast stretch: clip the darkest/brightest ~3% so a
+  // bright neighbouring label or a deep shadow can't flatten the VIN's
+  // contrast — the failure mode on dim, mixed-brightness plates. Absolute
+  // min/max let a single bright outlier wash the faint text to mid-gray.
+  const lowCut = n * 0.03;
+  const highCut = n * 0.97;
+  let acc = 0;
+  let lo = 0;
+  for (let t = 0; t < 256; t++) {
+    acc += hist[t];
+    if (acc >= lowCut) { lo = t; break; }
+  }
+  acc = 0;
+  let hi = 255;
+  for (let t = 0; t < 256; t++) {
+    acc += hist[t];
+    if (acc >= highCut) { hi = t; break; }
+  }
+  const range = Math.max(1, hi - lo);
+  // Mild gamma (<1) lifts dark mid-tones so faint light-on-dark text pops.
+  const gamma = 0.75;
   for (let i = 0, j = 0; i < d.length; i += 4, j += 1) {
-    const v = ((lum[j] - min) / range) * 255;
+    let v = (lum[j] - lo) / range;
+    v = v < 0 ? 0 : v > 1 ? 1 : v;
+    v = Math.pow(v, gamma) * 255;
     d[i] = d[i + 1] = d[i + 2] = v;
   }
   ctx.putImageData(img, 0, 0);
