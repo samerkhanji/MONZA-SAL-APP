@@ -111,6 +111,13 @@ export default function DashboardPage() {
   // Tracks which sections failed to load so we can show a persistent
   // "Couldn't load X" banner instead of silently rendering 0s.
   const [loadErrors, setLoadErrors] = useState<string[]>([]);
+  const [approvals, setApprovals] = useState({
+    refunds: 0,
+    pos: 0,
+    estimates: 0,
+    tradeins: 0,
+  });
+  const canSeeApprovals = isOwner || isRequestManagement;
 
   const fetchData = useCallback(async () => {
     if (shouldRedirect) return;
@@ -325,6 +332,33 @@ export default function DashboardPage() {
     fetchData();
   }, [fetchData]);
 
+  // Approvals-waiting queue — one place for the owner/managers to see what's
+  // blocked on them, instead of visiting four separate pages.
+  useEffect(() => {
+    if (!canSeeApprovals) return;
+    let cancelled = false;
+    void (async () => {
+      const supabase = createClient();
+      const head = { count: "exact" as const, head: true };
+      const [r, p, e, t] = await Promise.all([
+        supabase.from("refunds").select("id", head).eq("status", "pending").is("deleted_at", null),
+        supabase.from("purchase_orders").select("id", head).eq("status", "pending_approval").is("deleted_at", null),
+        supabase.from("repair_proposals").select("id", head).eq("status", "pending_owner_approval"),
+        supabase.from("trade_ins").select("id", head).eq("status", "inspected").is("deleted_at", null),
+      ]);
+      if (cancelled) return;
+      setApprovals({
+        refunds: r.count ?? 0,
+        pos: p.count ?? 0,
+        estimates: e.count ?? 0,
+        tradeins: t.count ?? 0,
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [canSeeApprovals]);
+
   const showPendingRequestsCard =
     isRequestAssistant ||
     isRequestManagement ||
@@ -491,6 +525,39 @@ export default function DashboardPage() {
           </Link>
         ))}
       </div>
+
+      {/* Approvals waiting — visible to owner/managers who can approve. */}
+      {canSeeApprovals && (
+        <Card data-tour-id="dashboard-approvals-panel">
+          <CardHeader>
+            <CardTitle>Approvals waiting</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {[
+                { label: "Refunds", value: approvals.refunds, href: "/garage/refunds" },
+                { label: "Purchase orders", value: approvals.pos, href: "/garage/purchase-orders" },
+                { label: "Repair estimates", value: approvals.estimates, href: "/garage" },
+                { label: "Trade-ins", value: approvals.tradeins, href: "/trade-ins" },
+              ].map((a) => (
+                <Link
+                  key={a.label}
+                  href={a.href}
+                  className="rounded-lg border p-3 transition-colors hover:bg-muted/50"
+                >
+                  <p className={`text-2xl font-bold ${a.value > 0 ? "text-amber-600 dark:text-amber-400" : ""}`}>
+                    {a.value}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{a.label}</p>
+                </Link>
+              ))}
+            </div>
+            {approvals.refunds + approvals.pos + approvals.estimates + approvals.tradeins === 0 && (
+              <p className="mt-3 text-xs text-muted-foreground">Nothing waiting on you. ✅</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Middle Row: Cars by Status + Low Stock + Garage Overview */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">

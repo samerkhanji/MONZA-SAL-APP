@@ -186,7 +186,7 @@ export default function SettingsPage() {
   const [auditItems, setAuditItems] = useState<
     Array<{
       id: string;
-      type: "car" | "part" | "customer";
+      type: "car" | "part" | "customer" | "system";
       user: string;
       action: string;
       details: string;
@@ -395,21 +395,31 @@ export default function SettingsPage() {
       .select("*, profiles:created_by(full_name), customers:customer_id(first_name, last_name)")
       .order("created_at", { ascending: false })
       .limit(50);
+    // System events: role/capability changes, approval-threshold edits, etc.
+    // (owner-only via RLS). Actor lives in metadata->>'actor'.
+    const sysQuery = supabase
+      .from("system_events")
+      .select("id, event_type, message, metadata, created_at")
+      .in("event_type", ["profile.privilege_changed", "approval_threshold.changed"])
+      .order("created_at", { ascending: false })
+      .limit(50);
     if (cutoff) {
       carQuery.gte("created_at", cutoff);
       partQuery.gte("created_at", cutoff);
       noteQuery.gte("created_at", cutoff);
+      sysQuery.gte("created_at", cutoff);
     }
 
-    const [carRes, partRes, noteRes] = await Promise.all([
+    const [carRes, partRes, noteRes, sysRes] = await Promise.all([
       carQuery,
       partQuery,
       noteQuery,
+      sysQuery,
     ]);
 
     const items: Array<{
       id: string;
-      type: "car" | "part" | "customer";
+      type: "car" | "part" | "customer" | "system";
       user: string;
       action: string;
       details: string;
@@ -482,6 +492,43 @@ export default function SettingsPage() {
         details: "",
         time: n.created_at,
         link: `/customers/${n.customer_id}`,
+      });
+    });
+
+    // Resolve actor UUIDs (stored in metadata) to names in one round-trip.
+    const sysData = (sysRes.data ?? []) as Array<{
+      id: string;
+      event_type: string;
+      message: string | null;
+      metadata: { actor?: string } | null;
+      created_at: string;
+    }>;
+    const actorIds = [
+      ...new Set(sysData.map((e) => e.metadata?.actor).filter(Boolean) as string[]),
+    ];
+    let actorMap: Record<string, string> = {};
+    if (actorIds.length > 0) {
+      const { data: actors } = await supabase
+        .from("profiles")
+        .select("id, full_name")
+        .in("id", actorIds);
+      actorMap = Object.fromEntries(
+        (actors ?? []).map((p: { id: string; full_name: string | null }) => [p.id, p.full_name ?? "—"]),
+      );
+    }
+    sysData.forEach((e) => {
+      if (cutoff && e.created_at < cutoff) return;
+      const actor = e.metadata?.actor ? actorMap[e.metadata.actor] : undefined;
+      items.push({
+        id: `sys-${e.id}`,
+        type: "system",
+        user: actor ?? "System",
+        action: e.message ?? e.event_type,
+        details: "",
+        time: e.created_at,
+        link: e.event_type.startsWith("profile")
+          ? "/settings?tab=team"
+          : "/settings?tab=approval-thresholds",
       });
     });
 
@@ -1206,6 +1253,7 @@ export default function SettingsPage() {
                     <SelectItem value="car">Cars</SelectItem>
                     <SelectItem value="part">Parts</SelectItem>
                     <SelectItem value="customer">Customers</SelectItem>
+                    <SelectItem value="system">System &amp; roles</SelectItem>
                   </SelectContent>
                 </Select>
                 <Select
