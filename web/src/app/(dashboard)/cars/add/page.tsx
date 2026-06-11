@@ -1108,8 +1108,34 @@ export default function AddCarPage() {
         open={scanVinOpen}
         onClose={() => setScanVinOpen(false)}
         onScan={(value) => {
-          setVin(value.toUpperCase());
+          const scanned = value.toUpperCase();
+          setVin(scanned);
           setScanVinOpen(false);
+          // Known VIN → surface the existing car right away rather than
+          // letting the user fill the whole form and hit the duplicate
+          // error on submit.
+          if (validateVin(scanned)) {
+            void createClient()
+              .from("cars")
+              .select("id, brand, model")
+              .eq("vin", scanned.trim())
+              .is("deleted_at", null)
+              .limit(1)
+              .maybeSingle()
+              .then(({ data: existing }: { data: { id: string; brand: string; model: string } | null }) => {
+                if (existing) {
+                  toast.warning(
+                    `This car is already in the system: ${existing.brand} ${existing.model}`,
+                    {
+                      action: {
+                        label: "Open it",
+                        onClick: () => router.push(`/cars/${existing.id}`),
+                      },
+                    }
+                  );
+                }
+              });
+          }
         }}
         title="Scan VIN"
         placeholder="17-character VIN..."
