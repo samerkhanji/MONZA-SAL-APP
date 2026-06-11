@@ -62,28 +62,27 @@ export function ScannerDialog({
         const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import(
           "html5-qrcode"
         );
+        // Real VIN/part labels use a range of symbologies — not just Code128.
+        // VIN plates are commonly Code 39, but also Data Matrix, ITF, or
+        // PDF417 depending on the manufacturer; widen the set so more labels
+        // actually decode instead of silently failing.
+        const VIN_BARCODE_FORMATS = [
+          Html5QrcodeSupportedFormats.CODE_39,
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.CODE_93,
+          Html5QrcodeSupportedFormats.DATA_MATRIX,
+          Html5QrcodeSupportedFormats.ITF,
+          Html5QrcodeSupportedFormats.PDF_417,
+          Html5QrcodeSupportedFormats.QR_CODE,
+        ];
         const formats =
-          scanType === "vin"
-            ? [
-                Html5QrcodeSupportedFormats.CODE_128,
-                Html5QrcodeSupportedFormats.CODE_39,
-                Html5QrcodeSupportedFormats.QR_CODE,
-              ]
-            : scanType === "part"
-              ? [
-                  Html5QrcodeSupportedFormats.CODE_128,
-                  Html5QrcodeSupportedFormats.CODE_39,
-                  Html5QrcodeSupportedFormats.QR_CODE,
-                ]
-              : undefined;
+          scanType === "vin" || scanType === "part"
+            ? VIN_BARCODE_FORMATS
+            : undefined;
 
         const html5QrCode = new Html5Qrcode(containerId, {
           verbose: false,
-          formatsToSupport: formats ?? [
-            Html5QrcodeSupportedFormats.CODE_128,
-            Html5QrcodeSupportedFormats.CODE_39,
-            Html5QrcodeSupportedFormats.QR_CODE,
-          ],
+          formatsToSupport: formats ?? VIN_BARCODE_FORMATS,
         });
         scannerRef.current = html5QrCode;
 
