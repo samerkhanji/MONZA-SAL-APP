@@ -83,7 +83,7 @@ function preprocess(
   sw: number,
   sh: number
 ): HTMLCanvasElement {
-  const scale = 2;
+  const scale = 3;
   const out = document.createElement("canvas");
   out.width = Math.max(1, Math.round(sw * scale));
   out.height = Math.max(1, Math.round(sh * scale));
@@ -108,6 +108,70 @@ function preprocess(
   const range = Math.max(1, max - min);
   for (let i = 0, j = 0; i < d.length; i += 4, j += 1) {
     const v = ((lum[j] - min) / range) * 255;
+    d[i] = d[i + 1] = d[i + 2] = v;
+  }
+  ctx.putImageData(img, 0, 0);
+  return out;
+}
+
+/** Invert a grayscale canvas — stamped VINs are often light-on-dark, and
+ * Tesseract reads dark-on-light far more reliably. */
+function invertCanvas(src: HTMLCanvasElement): HTMLCanvasElement {
+  const out = document.createElement("canvas");
+  out.width = src.width;
+  out.height = src.height;
+  const ctx = out.getContext("2d");
+  if (!ctx) return out;
+  ctx.drawImage(src, 0, 0);
+  const img = ctx.getImageData(0, 0, out.width, out.height);
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    d[i] = 255 - d[i];
+    d[i + 1] = 255 - d[i + 1];
+    d[i + 2] = 255 - d[i + 2];
+  }
+  ctx.putImageData(img, 0, 0);
+  return out;
+}
+
+/** Otsu-threshold a grayscale canvas to pure black/white — kills uneven
+ * lighting and metal-surface texture that confuse the LSTM. */
+function binarizeCanvas(src: HTMLCanvasElement): HTMLCanvasElement {
+  const out = document.createElement("canvas");
+  out.width = src.width;
+  out.height = src.height;
+  const ctx = out.getContext("2d");
+  if (!ctx) return out;
+  ctx.drawImage(src, 0, 0);
+  const img = ctx.getImageData(0, 0, out.width, out.height);
+  const d = img.data;
+  // Histogram on the (already grayscale) red channel.
+  const hist = new Array<number>(256).fill(0);
+  const n = d.length / 4;
+  for (let i = 0; i < d.length; i += 4) hist[d[i]] += 1;
+  // Otsu: maximize between-class variance.
+  let sumAll = 0;
+  for (let t = 0; t < 256; t++) sumAll += t * hist[t];
+  let sumB = 0;
+  let wB = 0;
+  let best = 0;
+  let threshold = 127;
+  for (let t = 0; t < 256; t++) {
+    wB += hist[t];
+    if (wB === 0) continue;
+    const wF = n - wB;
+    if (wF === 0) break;
+    sumB += t * hist[t];
+    const mB = sumB / wB;
+    const mF = (sumAll - sumB) / wF;
+    const between = wB * wF * (mB - mF) * (mB - mF);
+    if (between > best) {
+      best = between;
+      threshold = t;
+    }
+  }
+  for (let i = 0; i < d.length; i += 4) {
+    const v = d[i] > threshold ? 255 : 0;
     d[i] = d[i + 1] = d[i + 2] = v;
   }
   ctx.putImageData(img, 0, 0);
@@ -172,8 +236,11 @@ export function OcrScannerDialog({
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: { ideal: "environment" },
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
+          // Ask for the highest-res frame the device offers — more pixels on
+          // the 17 characters is the cheapest accuracy win. Browsers fall
+          // back gracefully when 4K isn't available.
+          width: { ideal: 3840 },
+          height: { ideal: 2160 },
         },
       });
       streamRef.current = stream;
@@ -265,12 +332,29 @@ export function OcrScannerDialog({
     const bandH = vh * 0.22;
     const bandX = (vw - bandW) / 2;
     const bandY = (vh - bandH) / 2;
-    const processed = preprocess(video, bandX, bandY, bandW, bandH);
+    const base = preprocess(video, bandX, bandY, bandW, bandH);
 
     try {
       const worker = await getWorker();
-      const { data } = await worker.recognize(processed);
-      const found = extractVins(data.text ?? "");
+      // One tap, several automatic passes: stamped plates often read inverted
+      // (light-on-dark) or only after hard binarization. Stop at the first
+      // pass that yields a check-digit-valid VIN.
+      const variants: Array<[string, () => HTMLCanvasElement]> = [
+        ["Reading VIN…", () => base],
+        ["Trying inverted…", () => invertCanvas(base)],
+        ["Trying high-contrast…", () => binarizeCanvas(base)],
+        ["Trying inverted high-contrast…", () => invertCanvas(binarizeCanvas(base))],
+      ];
+      const found: string[] = [];
+      for (const [label, make] of variants) {
+        setProgressLabel(label);
+        setProgress(0);
+        const { data } = await worker.recognize(make());
+        for (const vin of extractVins(data.text ?? "")) {
+          if (!found.includes(vin)) found.push(vin);
+        }
+        if (found.length > 0) break;
+      }
       setCandidates(found);
       if (found.length === 0) {
         toast.warning("No VIN found. Align the VIN inside the box, hold steady, and retake.");
