@@ -19,6 +19,30 @@ const VIN_CHARS = "ABCDEFGHJKLMNPRSTUVWXYZ0123456789";
 const VIN_PATTERN = /[A-HJ-NPR-Z0-9]{17}/g;
 const VIN_EXACT = /^[A-HJ-NPR-Z0-9]{17}$/;
 
+// ISO 3779 VIN check-digit (position 9). Computed from the other 16 chars, it
+// catches OCR misreads and pure noise (e.g. a moiré read of a screen) that
+// happen to be 17 chars but aren't real VINs. Voyah/MHero VINs comply with it.
+const VIN_TRANSLITERATION: Record<string, number> = {
+  A:1,B:2,C:3,D:4,E:5,F:6,G:7,H:8,
+  J:1,K:2,L:3,M:4,N:5,P:7,R:9,
+  S:2,T:3,U:4,V:5,W:6,X:7,Y:8,Z:9,
+  "0":0,"1":1,"2":2,"3":3,"4":4,"5":5,"6":6,"7":7,"8":8,"9":9,
+};
+const VIN_WEIGHTS = [8,7,6,5,4,3,2,10,0,9,8,7,6,5,4,3,2];
+
+function vinCheckDigitValid(vin: string): boolean {
+  if (!VIN_EXACT.test(vin)) return false;
+  let sum = 0;
+  for (let i = 0; i < 17; i++) {
+    const v = VIN_TRANSLITERATION[vin[i]];
+    if (v === undefined) return false;
+    sum += v * VIN_WEIGHTS[i];
+  }
+  const remainder = sum % 11;
+  const expected = remainder === 10 ? "X" : String(remainder);
+  return vin[8] === expected;
+}
+
 // Self-hosted Tesseract assets (copied into /public by scripts/copy-tesseract-assets.mjs).
 const WORKER_PATH = "/tesseract/worker.min.js";
 const CORE_PATH = "/tesseract";
@@ -29,6 +53,13 @@ const LANG_PATH = "https://cdn.jsdelivr.net/npm/@tesseract.js-data/eng/4.0.0_bes
  * Normalises OCR output before VIN extraction. The whitelist already excludes
  * I/O/Q, but as a safety net we still fold common look-alikes (O→0, I→1, Q→0)
  * in case some sneak through, then keep only 17-char runs of valid VIN chars.
+ *
+ * Only candidates whose ISO 3779 check digit is valid are returned. This is
+ * what throws out screen-moiré garbage and OCR misreads: a real Voyah/MHero
+ * VIN passes, a wrong read almost never does. If nothing passes, we return
+ * nothing — the dialog then says "No VIN detected, retake", which is the
+ * honest result rather than offering a wrong VIN. (Manual paste stays available
+ * for the rare non-compliant VIN, e.g. an odd trade-in.)
  */
 function extractVins(rawText: string): string[] {
   const normalised = rawText
@@ -37,8 +68,8 @@ function extractVins(rawText: string): string[] {
     .replace(/I/g, "1")
     .replace(/Q/g, "0")
     .replace(/[^A-HJ-NPR-Z0-9]/g, " ");
-  const matches = normalised.match(VIN_PATTERN);
-  return [...new Set(matches ?? [])];
+  const matches = [...new Set(normalised.match(VIN_PATTERN) ?? [])];
+  return matches.filter(vinCheckDigitValid);
 }
 
 /**
