@@ -11,7 +11,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Flashlight, ScanLine } from "lucide-react";
+import { Flashlight, ScanLine, ScanText } from "lucide-react";
+import { OcrScannerDialog } from "./OcrScannerDialog";
 
 const VIN_REGEX = /^[A-HJ-NPR-Z0-9]{17}$/;
 
@@ -39,12 +40,19 @@ export function ScannerDialog({
   const [manualValue, setManualValue] = useState("");
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [flashOn, setFlashOn] = useState(false);
+  // "barcode" = html5-qrcode live scan; "ocr" = Tesseract photo capture for
+  // VINs printed as plain text (door stickers, papers) that barcodes can't read.
+  const [mode, setMode] = useState<"barcode" | "ocr">("barcode");
   const scannerRef = useRef<{ stop: () => Promise<void> } | null>(null);
   const isRunningRef = useRef(false);
   const containerId = "scanner-container";
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) setMode("barcode");
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || mode !== "barcode") return;
 
     let mounted = true;
     isRunningRef.current = false;
@@ -149,7 +157,7 @@ export function ScannerDialog({
           .finally(() => {});
       }
     };
-  }, [open, scanType, onScan, onClose]);
+  }, [open, mode, scanType, onScan, onClose]);
 
   async function toggleFlash() {
     if (!scannerRef.current) return;
@@ -181,6 +189,20 @@ export function ScannerDialog({
     onScan(value);
     setManualValue("");
     onClose();
+  }
+
+  // VIN-as-text OCR path (door stickers, printed papers — no barcode).
+  // Part OE numbers keep barcode-only: the OCR dialog is VIN-tuned (17 chars).
+  if (mode === "ocr" && scanType !== "part") {
+    return (
+      <OcrScannerDialog
+        open={open}
+        onClose={onClose}
+        onScan={onScan}
+        title="Scan VIN (photo)"
+        placeholder={placeholder}
+      />
+    );
   }
 
   return (
@@ -219,6 +241,18 @@ export function ScannerDialog({
               />
             </Button>
           </div>
+
+          {scanType !== "part" && (
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={() => setMode("ocr")}
+            >
+              <ScanText className="mr-2 size-4" />
+              VIN printed as text? Read it with a photo
+            </Button>
+          )}
 
           <div className="space-y-2">
             <Label>Or enter manually</Label>
