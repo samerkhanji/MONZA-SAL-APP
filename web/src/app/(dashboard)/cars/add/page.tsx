@@ -147,7 +147,7 @@ export default function AddCarPage() {
     const vinTrimmed = vin.trim().toUpperCase();
     if (!validateVin(vinTrimmed)) {
       toast.error(
-        "VIN must be exactly 17 characters (uppercase letters and numbers only)"
+        "VIN must be exactly 17 characters. Letters and numbers only — the letters I, O and Q are not allowed in a VIN."
       );
       return;
     }
@@ -429,7 +429,7 @@ export default function AddCarPage() {
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Exactly 17 uppercase letters and numbers
+                  Exactly 17 characters — letters and numbers, no I, O or Q
                 </p>
               </div>
               <div className="space-y-2">

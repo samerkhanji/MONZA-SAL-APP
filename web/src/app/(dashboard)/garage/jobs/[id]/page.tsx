@@ -49,7 +49,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, Plus, Check, Trash2, ScanLine } from "lucide-react";
+import { ArrowLeft, Plus, Check, Trash2, ScanLine, X } from "lucide-react";
 import { JobDocuments } from "@/components/garage/JobDocuments";
 import { FinishJobDialog } from "@/components/garage/FinishJobDialog";
 import { SetJobCategoryDialog } from "@/components/garage/SetJobCategoryDialog";
@@ -103,6 +103,8 @@ export default function JobDetailPage() {
   const [partNote, setPartNote] = useState("");
   const [partSubmitting, setPartSubmitting] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [finishOpen, setFinishOpen] = useState(false);
   const [scanPartOpen, setScanPartOpen] = useState(false);
   const [bays, setBays] = useState<GarageBay[]>([]);
@@ -453,6 +455,16 @@ export default function JobDetailPage() {
                   <Button data-tour-id="job-detail-complete" size="sm" onClick={() => setFinishOpen(true)}>
                     <Check className="mr-2 size-4" />
                     Complete
+                  </Button>
+                )}
+                {job.status !== "done" && job.status !== "cancelled" && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setCancelOpen(true)}
+                  >
+                    <X className="mr-2 size-4" />
+                    Cancel job
                   </Button>
                 )}
               </>
@@ -894,6 +906,48 @@ export default function JobDetailPage() {
         placeholder="OE number..."
         scanType="part"
       />
+
+      <AlertDialog open={cancelOpen} onOpenChange={setCancelOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel this job?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The job moves to Cancelled and any parts applied to it are
+              automatically returned to stock. It stays in history.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep job</AlertDialogCancel>
+            <Button
+              variant="destructive"
+              disabled={cancelling}
+              onClick={async () => {
+                setCancelling(true);
+                try {
+                  const { error } = await supabase
+                    .from("garage_jobs")
+                    .update({
+                      status: "cancelled",
+                      updated_at: new Date().toISOString(),
+                    })
+                    .eq("id", job.id);
+                  if (error) {
+                    toast.error(formatError(error));
+                    return;
+                  }
+                  toast.success("Job cancelled");
+                  setCancelOpen(false);
+                  void fetchJob();
+                } finally {
+                  setCancelling(false);
+                }
+              }}
+            >
+              {cancelling ? "Cancelling…" : "Cancel job"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>
