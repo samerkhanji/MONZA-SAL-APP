@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -74,6 +74,16 @@ export default function AddCarPage() {
 
   // Section 1: Vehicle Information
   const [vin, setVin] = useState("");
+
+  // Pre-fill the VIN when arriving from a scan (e.g. the global scan button
+  // routes here as `/cars/add?vin=...` when a scanned VIN isn't in the system).
+  useEffect(() => {
+    const scanned = new URLSearchParams(window.location.search).get("vin");
+    if (scanned && VIN_REGEX.test(scanned.trim())) {
+      setVin(scanned.trim().toUpperCase());
+    }
+  }, []);
+
   const [brand, setBrand] = useState<Brand | "">("");
   const [model, setModel] = useState("");
   const [modelYear, setModelYear] = useState(String(currentYear()));
@@ -1098,8 +1108,34 @@ export default function AddCarPage() {
         open={scanVinOpen}
         onClose={() => setScanVinOpen(false)}
         onScan={(value) => {
-          setVin(value.toUpperCase());
+          const scanned = value.toUpperCase();
+          setVin(scanned);
           setScanVinOpen(false);
+          // Known VIN → surface the existing car right away rather than
+          // letting the user fill the whole form and hit the duplicate
+          // error on submit.
+          if (validateVin(scanned)) {
+            void createClient()
+              .from("cars")
+              .select("id, brand, model")
+              .eq("vin", scanned.trim())
+              .is("deleted_at", null)
+              .limit(1)
+              .maybeSingle()
+              .then(({ data: existing }: { data: { id: string; brand: string; model: string } | null }) => {
+                if (existing) {
+                  toast.warning(
+                    `This car is already in the system: ${existing.brand} ${existing.model}`,
+                    {
+                      action: {
+                        label: "Open it",
+                        onClick: () => router.push(`/cars/${existing.id}`),
+                      },
+                    }
+                  );
+                }
+              });
+          }
         }}
         title="Scan VIN"
         placeholder="17-character VIN..."

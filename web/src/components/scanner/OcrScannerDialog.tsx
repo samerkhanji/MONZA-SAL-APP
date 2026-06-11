@@ -12,22 +12,191 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import type { Worker as TesseractWorker } from "tesseract.js";
 
+// VIN chars only — by spec a VIN never contains I, O or Q.
+const VIN_CHARS = "ABCDEFGHJKLMNPRSTUVWXYZ0123456789";
 const VIN_PATTERN = /[A-HJ-NPR-Z0-9]{17}/g;
+const VIN_EXACT = /^[A-HJ-NPR-Z0-9]{17}$/;
+
+// ISO 3779 VIN check-digit (position 9). Computed from the other 16 chars, it
+// catches OCR misreads and pure noise (e.g. a moiré read of a screen) that
+// happen to be 17 chars but aren't real VINs. Voyah/MHero VINs comply with it.
+const VIN_TRANSLITERATION: Record<string, number> = {
+  A:1,B:2,C:3,D:4,E:5,F:6,G:7,H:8,
+  J:1,K:2,L:3,M:4,N:5,P:7,R:9,
+  S:2,T:3,U:4,V:5,W:6,X:7,Y:8,Z:9,
+  "0":0,"1":1,"2":2,"3":3,"4":4,"5":5,"6":6,"7":7,"8":8,"9":9,
+};
+const VIN_WEIGHTS = [8,7,6,5,4,3,2,10,0,9,8,7,6,5,4,3,2];
+
+function vinCheckDigitValid(vin: string): boolean {
+  if (!VIN_EXACT.test(vin)) return false;
+  let sum = 0;
+  for (let i = 0; i < 17; i++) {
+    const v = VIN_TRANSLITERATION[vin[i]];
+    if (v === undefined) return false;
+    sum += v * VIN_WEIGHTS[i];
+  }
+  const remainder = sum % 11;
+  const expected = remainder === 10 ? "X" : String(remainder);
+  return vin[8] === expected;
+}
+
+// Self-hosted Tesseract assets (copied into /public by scripts/copy-tesseract-assets.mjs).
+const WORKER_PATH = "/tesseract/worker.min.js";
+const CORE_PATH = "/tesseract";
+// Language data is fetched from jsDelivr at runtime (allowed in connect-src).
+const LANG_PATH = "https://cdn.jsdelivr.net/npm/@tesseract.js-data/eng/4.0.0_best_int";
 
 /**
- * Normalises OCR output before VIN extraction.
- * Common mis-reads: O→0, I→1, Q→0.
+ * Normalises OCR output before VIN extraction. The whitelist already excludes
+ * I/O/Q, but as a safety net we still fold common look-alikes (O→0, I→1, Q→0)
+ * in case some sneak through, then keep only 17-char runs of valid VIN chars.
+ *
+ * Only candidates whose ISO 3779 check digit is valid are returned. This is
+ * what throws out screen-moiré garbage and OCR misreads: a real Voyah/MHero
+ * VIN passes, a wrong read almost never does. If nothing passes, we return
+ * nothing — the dialog then says "No VIN detected, retake", which is the
+ * honest result rather than offering a wrong VIN. (Manual paste stays available
+ * for the rare non-compliant VIN, e.g. an odd trade-in.)
  */
 function extractVins(rawText: string): string[] {
   const normalised = rawText
     .toUpperCase()
     .replace(/O/g, "0")
-    .replace(/\bI\b/g, "1")
+    .replace(/I/g, "1")
     .replace(/Q/g, "0")
     .replace(/[^A-HJ-NPR-Z0-9]/g, " ");
-  const matches = normalised.match(VIN_PATTERN);
-  return [...new Set(matches ?? [])];
+  const matches = [...new Set(normalised.match(VIN_PATTERN) ?? [])];
+  return matches.filter(vinCheckDigitValid);
+}
+
+/**
+ * Crop the framed band, upscale, grayscale + contrast-stretch — gives Tesseract
+ * a clean, high-contrast single line which dramatically improves VIN accuracy.
+ */
+function preprocess(
+  source: CanvasImageSource,
+  sx: number,
+  sy: number,
+  sw: number,
+  sh: number,
+  scale = 3
+): HTMLCanvasElement {
+  const out = document.createElement("canvas");
+  out.width = Math.max(1, Math.round(sw * scale));
+  out.height = Math.max(1, Math.round(sh * scale));
+  const ctx = out.getContext("2d");
+  if (!ctx) return out;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(source, sx, sy, sw, sh, 0, 0, out.width, out.height);
+
+  const img = ctx.getImageData(0, 0, out.width, out.height);
+  const d = img.data;
+  const n = d.length / 4;
+  // Grayscale luminance + histogram.
+  const lum = new Uint8Array(n);
+  const hist = new Array<number>(256).fill(0);
+  for (let i = 0, j = 0; i < d.length; i += 4, j += 1) {
+    const l = (d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114) | 0;
+    lum[j] = l;
+    hist[l] += 1;
+  }
+  // Percentile-based contrast stretch: clip the darkest/brightest ~3% so a
+  // bright neighbouring label or a deep shadow can't flatten the VIN's
+  // contrast — the failure mode on dim, mixed-brightness plates. Absolute
+  // min/max let a single bright outlier wash the faint text to mid-gray.
+  const lowCut = n * 0.03;
+  const highCut = n * 0.97;
+  let acc = 0;
+  let lo = 0;
+  for (let t = 0; t < 256; t++) {
+    acc += hist[t];
+    if (acc >= lowCut) { lo = t; break; }
+  }
+  acc = 0;
+  let hi = 255;
+  for (let t = 0; t < 256; t++) {
+    acc += hist[t];
+    if (acc >= highCut) { hi = t; break; }
+  }
+  const range = Math.max(1, hi - lo);
+  // Mild gamma (<1) lifts dark mid-tones so faint light-on-dark text pops.
+  const gamma = 0.75;
+  for (let i = 0, j = 0; i < d.length; i += 4, j += 1) {
+    let v = (lum[j] - lo) / range;
+    v = v < 0 ? 0 : v > 1 ? 1 : v;
+    v = Math.pow(v, gamma) * 255;
+    d[i] = d[i + 1] = d[i + 2] = v;
+  }
+  ctx.putImageData(img, 0, 0);
+  return out;
+}
+
+/** Invert a grayscale canvas — stamped VINs are often light-on-dark, and
+ * Tesseract reads dark-on-light far more reliably. */
+function invertCanvas(src: HTMLCanvasElement): HTMLCanvasElement {
+  const out = document.createElement("canvas");
+  out.width = src.width;
+  out.height = src.height;
+  const ctx = out.getContext("2d");
+  if (!ctx) return out;
+  ctx.drawImage(src, 0, 0);
+  const img = ctx.getImageData(0, 0, out.width, out.height);
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    d[i] = 255 - d[i];
+    d[i + 1] = 255 - d[i + 1];
+    d[i + 2] = 255 - d[i + 2];
+  }
+  ctx.putImageData(img, 0, 0);
+  return out;
+}
+
+/** Otsu-threshold a grayscale canvas to pure black/white — kills uneven
+ * lighting and metal-surface texture that confuse the LSTM. */
+function binarizeCanvas(src: HTMLCanvasElement): HTMLCanvasElement {
+  const out = document.createElement("canvas");
+  out.width = src.width;
+  out.height = src.height;
+  const ctx = out.getContext("2d");
+  if (!ctx) return out;
+  ctx.drawImage(src, 0, 0);
+  const img = ctx.getImageData(0, 0, out.width, out.height);
+  const d = img.data;
+  // Histogram on the (already grayscale) red channel.
+  const hist = new Array<number>(256).fill(0);
+  const n = d.length / 4;
+  for (let i = 0; i < d.length; i += 4) hist[d[i]] += 1;
+  // Otsu: maximize between-class variance.
+  let sumAll = 0;
+  for (let t = 0; t < 256; t++) sumAll += t * hist[t];
+  let sumB = 0;
+  let wB = 0;
+  let best = 0;
+  let threshold = 127;
+  for (let t = 0; t < 256; t++) {
+    wB += hist[t];
+    if (wB === 0) continue;
+    const wF = n - wB;
+    if (wF === 0) break;
+    sumB += t * hist[t];
+    const mB = sumB / wB;
+    const mF = (sumAll - sumB) / wF;
+    const between = wB * wF * (mB - mF) * (mB - mF);
+    if (between > best) {
+      best = between;
+      threshold = t;
+    }
+  }
+  for (let i = 0; i < d.length; i += 4) {
+    const v = d[i] > threshold ? 255 : 0;
+    d[i] = d[i + 1] = d[i + 2] = v;
+  }
+  ctx.putImageData(img, 0, 0);
+  return out;
 }
 
 export interface OcrScannerDialogProps {
@@ -44,10 +213,9 @@ type Phase = "capture" | "processing" | "results";
 /**
  * OCR-based VIN scanner.
  *
- * Opens the rear camera, lets the user frame the VIN plate / sticker, captures a
- * still frame and runs Tesseract.js OCR to extract 17-character VIN strings.
- * Useful when the VIN is etched or printed as plain text (no barcode available).
- *
+ * Opens the rear camera with a guide box, captures the framed band, runs a
+ * VIN-tuned Tesseract.js worker (self-hosted core, character whitelist,
+ * single-block page-seg, image preprocessing) and extracts 17-char VINs.
  * Falls back to manual entry if OCR finds nothing or the camera is unavailable.
  */
 export function OcrScannerDialog({
@@ -60,36 +228,52 @@ export function OcrScannerDialog({
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const workerRef = useRef<TesseractWorker | null>(null);
 
   const [phase, setPhase] = useState<Phase>("capture");
   const [candidates, setCandidates] = useState<string[]>([]);
   const [manualValue, setManualValue] = useState("");
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [capturedDataUrl, setCapturedDataUrl] = useState<string | null>(null);
+  const [videoReady, setVideoReady] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [progressLabel, setProgressLabel] = useState("Reading VIN…");
 
   const stopStream = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
   }, []);
 
+  const terminateWorker = useCallback(() => {
+    const w = workerRef.current;
+    workerRef.current = null;
+    if (w) void w.terminate().catch(() => {});
+  }, []);
+
   const startStream = useCallback(async () => {
     setCameraError(null);
+    setVideoReady(false);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: { ideal: "environment" },
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
+          // Ask for the highest-res frame the device offers — more pixels on
+          // the 17 characters is the cheapest accuracy win. Browsers fall
+          // back gracefully when 4K isn't available.
+          width: { ideal: 3840 },
+          height: { ideal: 2160 },
         },
       });
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        // iOS Safari sometimes needs an explicit play().
+        await videoRef.current.play().catch(() => {});
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Camera unavailable";
       setCameraError(
-        msg.toLowerCase().includes("permission")
+        msg.toLowerCase().includes("permission") || msg.toLowerCase().includes("denied")
           ? "Camera permission denied. Use manual entry below."
           : "Camera unavailable. Use manual entry below."
       );
@@ -99,42 +283,124 @@ export function OcrScannerDialog({
   useEffect(() => {
     if (!open) {
       stopStream();
+      terminateWorker();
       setPhase("capture");
       setCandidates([]);
       setCapturedDataUrl(null);
       setManualValue("");
       setCameraError(null);
+      setVideoReady(false);
+      setProgress(0);
       return;
     }
     void startStream();
-    return stopStream;
-  }, [open, startStream, stopStream]);
+    return () => {
+      stopStream();
+      terminateWorker();
+    };
+  }, [open, startStream, stopStream, terminateWorker]);
+
+  /** Lazily create + configure the VIN-tuned Tesseract worker (reused across retries). */
+  const getWorker = useCallback(async (): Promise<TesseractWorker> => {
+    if (workerRef.current) return workerRef.current;
+    const { createWorker, PSM } = await import("tesseract.js");
+    setProgressLabel("Loading OCR engine…");
+    const worker = await createWorker("eng", 1, {
+      workerPath: WORKER_PATH,
+      corePath: CORE_PATH,
+      langPath: LANG_PATH,
+      logger: (m: { status: string; progress: number }) => {
+        if (m.status === "recognizing text") {
+          setProgressLabel("Reading VIN…");
+          setProgress(Math.round((m.progress ?? 0) * 100));
+        }
+      },
+    });
+    await worker.setParameters({
+      tessedit_char_whitelist: VIN_CHARS,
+      // 6 = assume a single uniform block of text (our cropped VIN band).
+      tessedit_pageseg_mode: PSM.SINGLE_BLOCK,
+    });
+    workerRef.current = worker;
+    return worker;
+  }, []);
 
   async function capture() {
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas) return;
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+    if (!vw || !vh) {
+      toast.error("Camera still warming up — try again in a second.");
+      return;
+    }
 
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
-    canvas.getContext("2d")?.drawImage(video, 0, 0);
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+    // Draw the full frame for the preview thumbnail.
+    canvas.width = vw;
+    canvas.height = vh;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0, vw, vh);
+    setCapturedDataUrl(canvas.toDataURL("image/jpeg", 0.92));
 
-    setCapturedDataUrl(dataUrl);
+    // Map the on-screen guide box back to source pixels. The preview uses
+    // object-cover, so only a centered sub-rect of the frame is visible; the
+    // guide box is 94% × 66% of that. Capturing exactly this makes "what's in
+    // the box" equal "what's read". Read the element size before the phase
+    // switch unmounts the <video>.
+    const cw = video.clientWidth || vw;
+    const ch = video.clientHeight || vh;
+    const coverScale = Math.max(cw / vw, ch / vh);
+    const visW = cw / coverScale;
+    const visH = ch / coverScale;
+    const visX = (vw - visW) / 2;
+    const visY = (vh - visH) / 2;
+    const bandW = visW * 0.94;
+    const bandH = visH * 0.66;
+    const bandX = visX + (visW - bandW) / 2;
+    const bandY = visY + (visH - bandH) / 2;
+
+    setProgress(0);
     setPhase("processing");
-    stopStream();
+
+    const base = preprocess(video, bandX, bandY, bandW, bandH);
+    // Full-frame fallback (no upscale — the 4K frame already has the pixels)
+    // for when the VIN sits outside the centered guide band.
+    const full = preprocess(video, 0, 0, vw, vh, 1);
 
     try {
-      const { default: Tesseract } = await import("tesseract.js");
-      const { data: { text } } = await Tesseract.recognize(dataUrl, "eng");
-      const found = extractVins(text);
+      const worker = await getWorker();
+      // One tap, several automatic passes: stamped plates often read inverted
+      // (light-on-dark) or only after hard binarization, and the VIN isn't
+      // always centered in the box. Stop at the first pass that yields a
+      // check-digit-valid VIN. Band passes first (fast), full-frame last.
+      const variants: Array<[string, () => HTMLCanvasElement]> = [
+        ["Reading VIN…", () => base],
+        ["Trying inverted…", () => invertCanvas(base)],
+        ["Trying high-contrast…", () => binarizeCanvas(base)],
+        ["Trying inverted high-contrast…", () => invertCanvas(binarizeCanvas(base))],
+        ["Scanning whole frame…", () => full],
+        ["Scanning whole frame (inverted)…", () => invertCanvas(full)],
+      ];
+      const found: string[] = [];
+      for (const [label, make] of variants) {
+        setProgressLabel(label);
+        setProgress(0);
+        const { data } = await worker.recognize(make());
+        for (const vin of extractVins(data.text ?? "")) {
+          if (!found.includes(vin)) found.push(vin);
+        }
+        if (found.length > 0) break;
+      }
       setCandidates(found);
       if (found.length === 0) {
-        toast.warning("No VIN found. Try again with better light or a closer shot.");
+        toast.warning("No VIN found. Align the VIN inside the box, hold steady, and retake.");
       }
     } catch {
-      toast.error("OCR failed. Try again or use manual entry.");
+      toast.error("OCR failed. Retake the photo or use manual entry.");
     } finally {
+      stopStream();
       setPhase("results");
     }
   }
@@ -151,7 +417,7 @@ export function OcrScannerDialog({
       toast.error("Enter a VIN");
       return;
     }
-    if (!/^[A-HJ-NPR-Z0-9]{17}$/.test(value)) {
+    if (!VIN_EXACT.test(value)) {
       toast.error("Invalid VIN — must be 17 characters (no I, O, Q).");
       return;
     }
@@ -164,6 +430,7 @@ export function OcrScannerDialog({
   function retry() {
     setCandidates([]);
     setCapturedDataUrl(null);
+    setProgress(0);
     setPhase("capture");
     void startStream();
   }
@@ -179,39 +446,53 @@ export function OcrScannerDialog({
         </DialogHeader>
 
         <div className="space-y-4 p-4">
-          {/* Camera / captured image */}
+          {/* Camera / captured image — a slim landscape band sized for a VIN
+              strip, so the user frames just the VIN rather than the whole
+              scene. The capture crop is computed from this exact window. */}
           <div
             className="relative w-full overflow-hidden rounded-lg bg-black"
-            style={{ minHeight: 200 }}
+            style={{ height: 170 }}
           >
             {phase === "capture" &&
               (cameraError ? (
-                <div className="flex min-h-[200px] items-center justify-center">
+                <div className="flex h-full items-center justify-center">
                   <p className="px-4 text-center text-sm text-slate-300">{cameraError}</p>
                 </div>
               ) : (
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="w-full"
-                  style={{ minHeight: 200 }}
-                />
+                <>
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    onLoadedMetadata={() => setVideoReady(true)}
+                    className="h-full w-full object-cover"
+                  />
+                  {/* Guide box — align the VIN inside this band */}
+                  <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                    <div className="h-[66%] w-[94%] rounded-md border-2 border-white/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.30)]" />
+                  </div>
+                  <p className="absolute inset-x-0 bottom-1 text-center text-[11px] text-white/90">
+                    Fill the box with just the VIN
+                  </p>
+                </>
               ))}
 
             {phase === "processing" && capturedDataUrl && (
-              <div className="relative">
-                <img src={capturedDataUrl} alt="Captured" className="w-full" />
+              <div className="relative h-full">
+                <img src={capturedDataUrl} alt="Captured" className="h-full w-full object-cover" />
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60">
                   <RefreshCw className="size-8 animate-spin text-white" />
-                  <p className="mt-2 text-sm font-medium text-white">Reading VIN…</p>
+                  <p className="mt-2 text-sm font-medium text-white">{progressLabel}</p>
+                  {progress > 0 && (
+                    <p className="text-xs text-white/80">{progress}%</p>
+                  )}
                 </div>
               </div>
             )}
 
             {phase === "results" && capturedDataUrl && (
-              <img src={capturedDataUrl} alt="Captured" className="w-full opacity-40" />
+              <img src={capturedDataUrl} alt="Captured" className="h-full w-full object-cover opacity-40" />
             )}
 
             <canvas ref={canvasRef} className="hidden" />
@@ -219,9 +500,13 @@ export function OcrScannerDialog({
 
           {/* Capture button */}
           {phase === "capture" && !cameraError && (
-            <Button className="w-full" onClick={() => void capture()}>
+            <Button
+              className="w-full"
+              onClick={() => void capture()}
+              disabled={!videoReady}
+            >
               <Camera className="mr-2 size-4" />
-              Capture &amp; Read VIN
+              {videoReady ? "Capture & Read VIN" : "Starting camera…"}
             </Button>
           )}
 

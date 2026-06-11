@@ -408,7 +408,16 @@ export function CarsInventoryClient({
       return;
     }
     if (!car) {
-      toast.error(`No car found with VIN: ${vin}`);
+      // Not in the system yet — this is likely a car being added. Offer to
+      // start the Add-Car form with the VIN pre-filled instead of dead-ending.
+      toast.error(`No car found with VIN: ${normalizedVin}`, {
+        action: {
+          label: "Create car",
+          onClick: () =>
+            router.push(`/cars/add?vin=${encodeURIComponent(normalizedVin)}`),
+        },
+      });
+      setScanVinOpen(false);
       return;
     }
     toast.success(`Found: ${(car as { brand: string }).brand} ${(car as { model: string }).model}`);
