@@ -446,6 +446,9 @@ export default function CarProfilePage() {
   const [reservationDateInput, setReservationDateInput] = useState("");
   const [deliveryDateInput, setDeliveryDateInput] = useState("");
   const [dateBoughtInput, setDateBoughtInput] = useState("");
+  const [releaseOpen, setReleaseOpen] = useState(false);
+  const [releaseReason, setReleaseReason] = useState("");
+  const [releasing, setReleasing] = useState(false);
   const [saleDatesSaving, setSaleDatesSaving] = useState(false);
   const [saleDatesError, setSaleDatesError] = useState<string | null>(null);
   const [linkCustomerOpen, setLinkCustomerOpen] = useState(false);
@@ -773,6 +776,40 @@ export default function CarProfilePage() {
       return;
     }
     void saveQuickCarField({ status: ns });
+  }
+
+  async function handleReleaseReservation() {
+    if (!car) return;
+    const reason = releaseReason.trim();
+    if (!reason) {
+      toast.error("Enter a reason");
+      return;
+    }
+    setReleasing(true);
+    try {
+      // release_car_reservation is applied via migration 173; it may not be in
+      // the generated Supabase types yet, so call through a narrow cast.
+      const rpc = supabase.rpc.bind(supabase) as unknown as (
+        fn: string,
+        args: Record<string, unknown>,
+      ) => Promise<{ error: { message: string } | null }>;
+      const { error } = await rpc("release_car_reservation", {
+        p_car_id: car.id,
+        p_reason: reason,
+      });
+      if (error) {
+        toast.error(formatError(error));
+        return;
+      }
+      toast.success("Reservation released");
+      setReleaseOpen(false);
+      setReleaseReason("");
+      await fetchCar();
+      await fetchEvents();
+      router.refresh();
+    } finally {
+      setReleasing(false);
+    }
   }
 
   async function fetchCar() {
@@ -1764,6 +1801,51 @@ export default function CarProfilePage() {
                     Customer-related statuses open the status &amp; customer dialog.
                   </p>
                 )}
+                {canEditInventory &&
+                  (car.status === "reserved" || car.status === "sold") && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-2"
+                      onClick={() => setReleaseOpen(true)}
+                    >
+                      Release reservation
+                    </Button>
+                  )}
+                <AlertDialog
+                  open={releaseOpen}
+                  onOpenChange={(o) => {
+                    if (!o) {
+                      setReleaseOpen(false);
+                      setReleaseReason("");
+                    }
+                  }}
+                >
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Release reservation</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This cancels the car&apos;s active sales order and returns the
+                        car to available. A reason is required. Reservations with a
+                        deposit must go through the owner void/refund flow.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <Textarea
+                      value={releaseReason}
+                      onChange={(e) => setReleaseReason(e.target.value)}
+                      placeholder="Why is this reservation being released?"
+                    />
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <Button
+                        onClick={() => void handleReleaseReservation()}
+                        disabled={releasing}
+                      >
+                        {releasing ? "Releasing…" : "Release reservation"}
+                      </Button>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </div>
               <div className="space-y-1">
                 <p className="text-muted-foreground text-sm">Engine Number</p>
