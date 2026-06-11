@@ -457,6 +457,28 @@ export function TestDriveFormSheet({
     }
   }
 
+  // Pick the car status to restore after a test drive ends. Normally the
+  // pre-drive snapshot; if it's missing, infer from an active sales order so a
+  // reserved/sold car isn't silently freed to "available".
+  async function computeRestoreStatus(): Promise<CarStatus> {
+    const snap =
+      (carStatusBefore as CarStatus) ||
+      (existing?.car_status_before_test_drive as CarStatus | undefined);
+    if (snap && (snap as string) !== "test_drive") return snap;
+    if (carId) {
+      const { data: order } = await supabase
+        .from("sales_orders")
+        .select("status")
+        .eq("car_id", carId)
+        .not("status", "in", "(cancelled,delivered)")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (order) return order.status === "reserved" ? "reserved" : "sold";
+    }
+    return "available";
+  }
+
   async function handleCompleteReturn() {
     if (!existing?.id || !carId) return;
     const returnAt = actualReturnAt.trim()
@@ -503,8 +525,7 @@ export function TestDriveFormSheet({
       return;
     }
 
-    const restore: CarStatus =
-      (carStatusBefore as CarStatus) || (existing.car_status_before_test_drive as CarStatus) || "available";
+    const restore: CarStatus = await computeRestoreStatus();
     const { error: cErr } = await supabase
       .from("cars")
       .update({ status: restore, updated_at: now })
@@ -530,8 +551,7 @@ export function TestDriveFormSheet({
       setSaving(false);
       return;
     }
-    const restore: CarStatus =
-      (carStatusBefore as CarStatus) || (existing.car_status_before_test_drive as CarStatus) || "available";
+    const restore: CarStatus = await computeRestoreStatus();
     const { error: cErr } = await supabase
       .from("cars")
       .update({ status: restore, updated_at: now })
