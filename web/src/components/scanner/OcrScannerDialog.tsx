@@ -344,15 +344,26 @@ export function OcrScannerDialog({
     ctx.drawImage(video, 0, 0, vw, vh);
     setCapturedDataUrl(canvas.toDataURL("image/jpeg", 0.92));
 
+    // Map the on-screen guide box back to source pixels. The preview uses
+    // object-cover, so only a centered sub-rect of the frame is visible; the
+    // guide box is 94% × 66% of that. Capturing exactly this makes "what's in
+    // the box" equal "what's read". Read the element size before the phase
+    // switch unmounts the <video>.
+    const cw = video.clientWidth || vw;
+    const ch = video.clientHeight || vh;
+    const coverScale = Math.max(cw / vw, ch / vh);
+    const visW = cw / coverScale;
+    const visH = ch / coverScale;
+    const visX = (vw - visW) / 2;
+    const visY = (vh - visH) / 2;
+    const bandW = visW * 0.94;
+    const bandH = visH * 0.66;
+    const bandX = visX + (visW - bandW) / 2;
+    const bandY = visY + (visH - bandH) / 2;
+
     setProgress(0);
     setPhase("processing");
 
-    // Crop to the centered guide band (matches the on-screen overlay), then
-    // preprocess for OCR.
-    const bandW = vw * 0.92;
-    const bandH = vh * 0.22;
-    const bandX = (vw - bandW) / 2;
-    const bandY = (vh - bandH) / 2;
     const base = preprocess(video, bandX, bandY, bandW, bandH);
     // Full-frame fallback (no upscale — the 4K frame already has the pixels)
     // for when the VIN sits outside the centered guide band.
@@ -435,14 +446,16 @@ export function OcrScannerDialog({
         </DialogHeader>
 
         <div className="space-y-4 p-4">
-          {/* Camera / captured image */}
+          {/* Camera / captured image — a slim landscape band sized for a VIN
+              strip, so the user frames just the VIN rather than the whole
+              scene. The capture crop is computed from this exact window. */}
           <div
             className="relative w-full overflow-hidden rounded-lg bg-black"
-            style={{ minHeight: 200 }}
+            style={{ height: 170 }}
           >
             {phase === "capture" &&
               (cameraError ? (
-                <div className="flex min-h-[200px] items-center justify-center">
+                <div className="flex h-full items-center justify-center">
                   <p className="px-4 text-center text-sm text-slate-300">{cameraError}</p>
                 </div>
               ) : (
@@ -453,22 +466,21 @@ export function OcrScannerDialog({
                     playsInline
                     muted
                     onLoadedMetadata={() => setVideoReady(true)}
-                    className="w-full"
-                    style={{ minHeight: 200 }}
+                    className="h-full w-full object-cover"
                   />
                   {/* Guide box — align the VIN inside this band */}
                   <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                    <div className="h-[22%] w-[92%] rounded-md border-2 border-white/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]" />
+                    <div className="h-[66%] w-[94%] rounded-md border-2 border-white/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.30)]" />
                   </div>
                   <p className="absolute inset-x-0 bottom-1 text-center text-[11px] text-white/90">
-                    Align the VIN inside the box
+                    Fill the box with just the VIN
                   </p>
                 </>
               ))}
 
             {phase === "processing" && capturedDataUrl && (
-              <div className="relative">
-                <img src={capturedDataUrl} alt="Captured" className="w-full" />
+              <div className="relative h-full">
+                <img src={capturedDataUrl} alt="Captured" className="h-full w-full object-cover" />
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60">
                   <RefreshCw className="size-8 animate-spin text-white" />
                   <p className="mt-2 text-sm font-medium text-white">{progressLabel}</p>
@@ -480,7 +492,7 @@ export function OcrScannerDialog({
             )}
 
             {phase === "results" && capturedDataUrl && (
-              <img src={capturedDataUrl} alt="Captured" className="w-full opacity-40" />
+              <img src={capturedDataUrl} alt="Captured" className="h-full w-full object-cover opacity-40" />
             )}
 
             <canvas ref={canvasRef} className="hidden" />
