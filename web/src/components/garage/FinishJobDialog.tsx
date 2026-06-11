@@ -180,12 +180,18 @@ export function FinishJobDialog({
     const carVin = job.cars?.vin ?? "—";
     const workSummary = workDone ? (workDone.length > 80 ? `${workDone.slice(0, 80)}...` : workDone) : "See details";
 
-    const { getProfileIdsByRole } = await import("@/lib/user-lookup");
-    const assistantIds = await getProfileIdsByRole("assistant");
-    if (assistantIds.length > 0) {
+    const { getProfileIdsByRole, getProfileIdsByCapability } = await import("@/lib/user-lookup");
+    // Notify the sales team too, not just assistants — the salesperson waiting
+    // to deliver this car needs to know prep is done.
+    const [assistantIds, salesIds] = await Promise.all([
+      getProfileIdsByRole("assistant"),
+      getProfileIdsByCapability("sales"),
+    ]);
+    const notifyIds = Array.from(new Set([...assistantIds, ...salesIds]));
+    if (notifyIds.length > 0) {
       await import("@/lib/notifications").then((m) =>
         m.createNotificationsForUsers(
-          assistantIds,
+          notifyIds,
           "Garage job completed",
           `Garage job completed: ${job.title} for VIN ${carVin}. Work done: ${workSummary}. Parts used: ${partsList}`,
           `/garage/jobs/${job.id}`
