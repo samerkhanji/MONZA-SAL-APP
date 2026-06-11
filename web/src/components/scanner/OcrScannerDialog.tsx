@@ -81,9 +81,9 @@ function preprocess(
   sx: number,
   sy: number,
   sw: number,
-  sh: number
+  sh: number,
+  scale = 3
 ): HTMLCanvasElement {
-  const scale = 3;
   const out = document.createElement("canvas");
   out.width = Math.max(1, Math.round(sw * scale));
   out.height = Math.max(1, Math.round(sh * scale));
@@ -333,17 +333,23 @@ export function OcrScannerDialog({
     const bandX = (vw - bandW) / 2;
     const bandY = (vh - bandH) / 2;
     const base = preprocess(video, bandX, bandY, bandW, bandH);
+    // Full-frame fallback (no upscale — the 4K frame already has the pixels)
+    // for when the VIN sits outside the centered guide band.
+    const full = preprocess(video, 0, 0, vw, vh, 1);
 
     try {
       const worker = await getWorker();
       // One tap, several automatic passes: stamped plates often read inverted
-      // (light-on-dark) or only after hard binarization. Stop at the first
-      // pass that yields a check-digit-valid VIN.
+      // (light-on-dark) or only after hard binarization, and the VIN isn't
+      // always centered in the box. Stop at the first pass that yields a
+      // check-digit-valid VIN. Band passes first (fast), full-frame last.
       const variants: Array<[string, () => HTMLCanvasElement]> = [
         ["Reading VIN…", () => base],
         ["Trying inverted…", () => invertCanvas(base)],
         ["Trying high-contrast…", () => binarizeCanvas(base)],
         ["Trying inverted high-contrast…", () => invertCanvas(binarizeCanvas(base))],
+        ["Scanning whole frame…", () => full],
+        ["Scanning whole frame (inverted)…", () => invertCanvas(full)],
       ];
       const found: string[] = [];
       for (const [label, make] of variants) {
