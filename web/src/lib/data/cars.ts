@@ -60,10 +60,13 @@ export async function getCarsDisplayWith(
           .toLowerCase()
           .includes("aborted")));
 
+  // Inbound (ordered, not-yet-arrived) cars live on the Ordered Cars page, not
+  // in the physical Car Inventory list, so exclude them here.
   const primary = await supabase
     .from("cars_display")
     .select("*")
     .is("deleted_at", null)
+    .neq("status", "inbound")
     .order("created_at", { ascending: false });
 
   if (primary.error && abortedFrom(primary.error)) {
@@ -94,6 +97,7 @@ export async function getCarsDisplayWith(
     .from("cars")
     .select("*")
     .is("deleted_at", null)
+    .neq("status", "inbound")
     .order("created_at", { ascending: false });
 
   if (fallback.error) {
