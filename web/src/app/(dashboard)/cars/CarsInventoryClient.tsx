@@ -7,7 +7,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { MoreHorizontal, FileText, ScanLine, FileSpreadsheet, Plus } from "lucide-react";
+import { MoreHorizontal, FileText, ScanLine, Plus } from "lucide-react";
 import { pluralize } from "@/lib/plural";
 import { useUser } from "@/lib/contexts/UserContext";
 import { useDebouncedValue } from "@/lib/hooks/useDebouncedValue";
@@ -75,11 +75,6 @@ const EditCarDialog = dynamic(
   () => import("@/components/edit-car-dialog").then((m) => ({ default: m.EditCarDialog })),
   { ssr: false }
 );
-const ImportExcelDialog = dynamic(
-  () => import("@/components/ImportExcelDialog").then((m) => ({ default: m.ImportExcelDialog })),
-  { ssr: false }
-);
-
 function fmtSheetDate(value: string | null | undefined): string {
   if (!value) return "—";
   try {
@@ -354,7 +349,7 @@ export function CarsInventoryClient({
   const searchParams = useSearchParams();
   const statusFromUrl = searchParams.get("status");
   const locationFromUrl = searchParams.get("location");
-  const { profile, isOwner, appRole, canOpenCarEditDialog } =
+  const { profile, appRole, canOpenCarEditDialog } =
     useUser();
   const [cars, setCars] = useState<CarDisplay[]>(initialCars);
   const [pendingDeletes, setPendingDeletes] = useState<Record<string, boolean>>({});
@@ -383,7 +378,6 @@ export function CarsInventoryClient({
   const [customsDialogOpen, setCustomsDialogOpen] = useState(false);
   const [pdiDialogCar, setPdiDialogCar] = useState<CarDisplay | null>(null);
   const [pdiDialogOpen, setPdiDialogOpen] = useState(false);
-  const [importExcelOpen, setImportExcelOpen] = useState(false);
   const [moveCar, setMoveCar] = useState<CarDisplay | null>(null);
   const [editCar, setEditCar] = useState<CarDisplay | null>(null);
   const [deleteCar, setDeleteCar] = useState<CarDisplay | null>(null);
@@ -623,12 +617,6 @@ export function CarsInventoryClient({
             }}
             disabled={loading}
           />
-          {isOwner && (
-            <Button variant="outline" onClick={() => setImportExcelOpen(true)} data-tour-id="cars-list-import-excel-button">
-              <FileSpreadsheet className="mr-2 size-4" />
-              Import from Excel
-            </Button>
-          )}
           {canCreateCar && (
             <Button asChild data-tour-id="cars-list-add-button" data-tour="add-car-button">
               <Link href="/cars/add">Add Car</Link>
@@ -731,13 +719,6 @@ export function CarsInventoryClient({
                       <Plus className="mr-2 size-4" />
                       Add a car
                     </Link>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setImportExcelOpen(true)}
-                  >
-                    Import from Excel
                   </Button>
                 </div>
               </div>
@@ -1239,12 +1220,6 @@ export function CarsInventoryClient({
           setEditCar(null);
           fetchCars();
         }}
-      />
-
-      <ImportExcelDialog
-        open={importExcelOpen}
-        onOpenChange={setImportExcelOpen}
-        onSuccess={fetchCars}
       />
 
       <ScannerDialog
