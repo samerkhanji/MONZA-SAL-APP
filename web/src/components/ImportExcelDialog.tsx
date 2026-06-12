@@ -98,7 +98,7 @@ export function ImportExcelDialog({
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<{ cars: number; clients: number; updates: number } | null>(null);
   const [importing, setImporting] = useState(false);
-  const [result, setResult] = useState<{ cars: number; clients: number; updates: number; failed: number } | null>(null);
+  const [result, setResult] = useState<{ cars: number; clients: number; updates: number; failed: number; error?: string | null } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const supabase = createClient();
 
@@ -207,6 +207,12 @@ export function ImportExcelDialog({
         let clientsImported = 0;
         let recordsUpdated = 0;
         let failed = 0;
+        // Captured from the first row the database rejects, so the user sees the
+        // real reason (e.g. a drifted CHECK constraint) instead of a silent skip.
+        let firstError: string | null = null;
+        const noteError = (msg?: string | null) => {
+          if (!firstError && msg) firstError = msg;
+        };
 
         const carsByVin = new Map<string, CarInsert>();
         // Inline client (name + phone) captured per VIN so we can create
@@ -319,7 +325,10 @@ export function ImportExcelDialog({
           if (existingId) {
             const { error } = await supabase.from("cars").update(car).eq("id", existingId);
             if (!error) recordsUpdated++;
-            else failed++;
+            else {
+              noteError(error.message);
+              failed++;
+            }
           } else {
             const { data: ins, error } = await supabase
               .from("cars")
@@ -329,7 +338,37 @@ export function ImportExcelDialog({
             if (!error && ins) {
               carsImported++;
               vinToCarId.set(vin, (ins as { id: string }).id);
-            } else failed++;
+            } else {
+              // Fallback: some statuses (notably "sold"/"delivered") may be
+              // rejected by an INSERT-time guard. Land the row as inventory,
+              // then move it to its real status with an UPDATE so the car —
+              // and its buyer linkage below — is never dropped.
+              let landed = false;
+              if (car.status === "sold" || car.status === "delivered") {
+                const target = car.status;
+                const { data: ins2, error: err2 } = await supabase
+                  .from("cars")
+                  .insert({ ...car, status: "inventory" })
+                  .select("id")
+                  .single();
+                if (!err2 && ins2) {
+                  const newId = (ins2 as { id: string }).id;
+                  const { error: upErr } = await supabase
+                    .from("cars")
+                    .update({ status: target })
+                    .eq("id", newId);
+                  // Keep the car even if it can't reach "sold"; record the linkage.
+                  vinToCarId.set(vin, newId);
+                  carsImported++;
+                  landed = true;
+                  if (upErr) noteError(`status→${target}: ${upErr.message}`);
+                }
+              }
+              if (!landed) {
+                noteError(error?.message);
+                failed++;
+              }
+            }
           }
         }
 
@@ -379,7 +418,10 @@ export function ImportExcelDialog({
             if (!error && ins) {
               custId = (ins as { id: string }).id;
               clientsImported++;
-            } else failed++;
+            } else {
+              noteError(error?.message);
+              failed++;
+            }
           }
           if (custId) keyToCustId.set(key, custId);
         }
@@ -604,10 +646,11 @@ export function ImportExcelDialog({
           }
         }
 
-        setResult({ cars: carsImported, clients: clientsImported, updates: recordsUpdated, failed });
+        setResult({ cars: carsImported, clients: clientsImported, updates: recordsUpdated, failed, error: firstError });
         if (failed > 0) {
           toast.warning(
-            `Imported ${carsImported} cars, ${clientsImported} clients, ${recordsUpdated} updates — ${failed} row(s) skipped.`
+            `Imported ${carsImported} cars, ${clientsImported} clients, ${recordsUpdated} updates — ${failed} row(s) skipped.` +
+              (firstError ? ` First error: ${firstError}` : "")
           );
         } else {
           toast.success(`Imported ${carsImported} cars, ${clientsImported} clients, ${recordsUpdated} updates`);
@@ -684,6 +727,11 @@ export function ImportExcelDialog({
                 {result.cars} cars, {result.clients} clients, {result.updates} updates
                 {result.failed > 0 ? ` · ${result.failed} skipped` : ""}
               </p>
+              {result.failed > 0 && result.error && (
+                <p className="mt-2 break-words font-mono text-xs text-amber-700 dark:text-amber-300">
+                  First error: {result.error}
+                </p>
+              )}
             </div>
           )}
         </div>
