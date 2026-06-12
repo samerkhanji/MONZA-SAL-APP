@@ -60,8 +60,32 @@ async function githubSection() {
   return lines.join("\n");
 }
 
+// Fallback when no VERCEL_TOKEN is set: Vercel's GitHub integration mirrors every
+// deployment into GitHub's deployments API, so build health is readable with the
+// default GITHUB_TOKEN. Only runtime-error logs need the real Vercel token.
+async function vercelViaGithub() {
+  const lines = ["_Read from GitHub deployment data — add a `VERCEL_TOKEN` secret only if you also want runtime-error logs._"];
+  const deps = await gh(`/repos/${owner}/${repo}/deployments?per_page=50`);
+  const recent = deps.filter((d) => new Date(d.created_at).getTime() >= sinceMs);
+  const withStatus = [];
+  for (const d of recent.slice(0, 25)) {
+    const st = await gh(`/repos/${owner}/${repo}/deployments/${d.id}/statuses?per_page=1`);
+    withStatus.push({ env: d.environment, state: st[0]?.state || "unknown", url: st[0]?.environment_url });
+  }
+  const prod = withStatus.filter((d) => /prod/i.test(d.env));
+  const failed = withStatus.filter((d) => ["failure", "error"].includes(d.state));
+  lines.push(`- **Deployments (24h):** ${recent.length} total, ${prod.length} to production.`);
+  lines.push(
+    failed.length
+      ? `- 🔴 **Failed deployments:** ${failed.length} (${failed.map((f) => f.env).join(", ")})`
+      : `- ✅ No failed deployments.`
+  );
+  if (prod[0]) lines.push(`- **Latest production deploy:** ${prod[0].state}${prod[0].url ? ` — ${prod[0].url}` : ""}`);
+  return lines.join("\n");
+}
+
 async function vercelSection() {
-  if (!process.env.VERCEL_TOKEN) return "_Skipped — add a `VERCEL_TOKEN` repo secret to enable deployment checks._";
+  if (!process.env.VERCEL_TOKEN) return vercelViaGithub();
   const headers = { Authorization: `Bearer ${process.env.VERCEL_TOKEN}` };
   const lines = [];
   const d = await getJson(
