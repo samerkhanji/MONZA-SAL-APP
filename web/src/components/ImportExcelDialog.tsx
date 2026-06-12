@@ -27,6 +27,12 @@ const STATUS_MAP: Record<string, string> = {
   "sold / under registration": "sold",
   "sold": "sold",
   "delivered": "delivered",
+  "inventory": "inventory",
+  "in stock": "in_stock",
+  "available": "available",
+  "reserved": "reserved",
+  "sent to dealership": "sent_to_sub_dealer",
+  "dealership": "sent_to_sub_dealer",
   "automena display": "demo",
   "fares south car display": "demo",
   "black motors display": "demo",
@@ -60,6 +66,24 @@ function safeNum(v: unknown): number | null {
   if (typeof v === "number" && !Number.isNaN(v)) return v;
   const n = parseFloat(String(v));
   return Number.isNaN(n) ? null : n;
+}
+
+// Excel often stores phone numbers as floats ("9613701829.0"); strip the
+// artifact and keep digits/leading +.
+function cleanPhone(v: unknown): string {
+  let s = safeStr(v).replace(/\.0+$/, "");
+  s = s.replace(/[^\d+]/g, "");
+  return s;
+}
+
+// Map a free-text customs cell ("Yes"/"No"/…) to the app's customs_status.
+function mapCustoms(v: unknown): string | null {
+  const s = safeStr(v).toLowerCase();
+  if (!s) return null;
+  if (/^(y|yes|cleared|done|paid|ok)/.test(s)) return "cleared";
+  if (/^(n|no|pending|not)/.test(s)) return "pending";
+  if (/exempt/.test(s)) return "exempt";
+  return null;
 }
 
 export function ImportExcelDialog({
@@ -129,21 +153,28 @@ export function ImportExcelDialog({
 
   function countRows(wb: XLSX.WorkBook): { cars: number; clients: number; updates: number } {
     let cars = 0;
+    const clientNames = new Set<string>();
     for (const name of wb.SheetNames) {
       const parsed = extractVinSheet(wb.Sheets[name]);
       if (!parsed) continue;
       const vinIdx = parsed.headers.findIndex((h) => /vin/i.test(h));
-      cars += parsed.rows.filter((r) => {
-        const vin = safeStr((r as unknown[])[vinIdx]).toUpperCase();
-        return vin.length === 17;
-      }).length;
+      const clientIdx = parsed.headers.findIndex((h) => /^client$|client name/i.test(h));
+      for (const r of parsed.rows) {
+        const row = r as unknown[];
+        if (safeStr(row[vinIdx]).toUpperCase().length !== 17) continue;
+        cars++;
+        if (clientIdx >= 0) {
+          const nm = safeStr(row[clientIdx]).trim().toLowerCase();
+          if (nm) clientNames.add(nm);
+        }
+      }
     }
+    let clients = clientNames.size;
     const clientsSheet = wb.Sheets["Voyah Clients"];
-    let clients = 0;
     if (clientsSheet) {
       const json = XLSX.utils.sheet_to_json(clientsSheet, { header: 1, defval: "" });
       const rows = (json as unknown[][])?.slice(4) ?? [];
-      clients = rows.filter((r) => r && (r as unknown[]).some((c) => c)).length;
+      clients += rows.filter((r) => r && (r as unknown[]).some((c) => c)).length;
     }
     const reportSheet = wb.Sheets["Voyah Report"];
     const soldSheet = wb.Sheets["Voyah Sold"];
@@ -178,6 +209,9 @@ export function ImportExcelDialog({
         let failed = 0;
 
         const carsByVin = new Map<string, CarInsert>();
+        // Inline client (name + phone) captured per VIN so we can create
+        // customers and link each car to its buyer/holder via cars.customer_id.
+        const clientByVin = new Map<string, { name: string; phone: string }>();
 
         for (const sheetName of wb.SheetNames) {
           const parsed = extractVinSheet(wb.Sheets[sheetName]);
@@ -195,35 +229,68 @@ export function ImportExcelDialog({
           const engineIdx = headers.findIndex((h) => /engine/i.test(String(h ?? "")));
           const swIdx = headers.findIndex((h) => /software/i.test(String(h ?? "")));
           const dongleIdx = headers.findIndex((h) => /dongle/i.test(String(h ?? "")));
-          const soldIdx = headers.findIndex((h) => /sold/i.test(String(h ?? "")));
+          const soldIdx = headers.findIndex((h) => /^sold$/i.test(String(h ?? "")));
+          // Extra columns present in the real fleet file.
+          const plateIdx = headers.findIndex((h) => /plate/i.test(String(h ?? "")));
+          const notesIdx = headers.findIndex((h) => /^note|notes/i.test(String(h ?? "")));
+          const locIdx = headers.findIndex((h) => /location/i.test(String(h ?? "")));
+          const customsIdx = headers.findIndex((h) => /customs/i.test(String(h ?? "")));
+          const arrivalIdx = headers.findIndex((h) => /arrival/i.test(String(h ?? "")));
+          const regIdx = headers.findIndex((h) => /registration/i.test(String(h ?? "")));
+          const deliveryIdx = headers.findIndex((h) => /delivery/i.test(String(h ?? "")));
+          const blIdx = headers.findIndex((h) => /bl issue|b\.l|bill of lading/i.test(String(h ?? "")));
+          const wVdmsIdx = headers.findIndex((h) => /warranty v\.?d/i.test(String(h ?? "")));
+          const wVmIdx = headers.findIndex((h) => /warranty v\.?m/i.test(String(h ?? "")));
+          const wBdmsIdx = headers.findIndex((h) => /warranty b\.?d/i.test(String(h ?? "")));
+          const wBmIdx = headers.findIndex((h) => /warranty b\.?m/i.test(String(h ?? "")));
+          const clientIdx = headers.findIndex((h) => /^client$|client name/i.test(String(h ?? "")));
+          const clientPhoneIdx = headers.findIndex((h) => /client number|client phone|^phone/i.test(String(h ?? "")));
 
+          const at = (i: number) => (i >= 0 ? arr[i] : undefined);
+          let arr: unknown[] = [];
           for (const row of rows) {
-            const arr = row as unknown[];
+            arr = row as unknown[];
             const vin = safeStr(arr[vinIdx] ?? arr[headers.findIndex((h) => String(h).toUpperCase().includes("VIN"))]).toUpperCase();
             if (!vin || vin.length !== 17) continue;
 
-            const status = mapStatus(arr[statusIdx] as string);
-            const carModel = safeStr(arr[modelIdx]) || "—";
-            // Legacy fields client_name/client_phone are read-only fallback; use customers + sales_orders instead
+            const status = mapStatus(safeStr(at(statusIdx)));
+            const carModel = safeStr(at(modelIdx)) || "—";
             const car: CarInsert = {
               vin,
               brand: inferBrand(carModel),
               model: carModel,
-              model_year: safeNum(arr[yearIdx]),
-              exterior_color: safeStr(arr[extIdx]) || null,
-              interior_color: safeStr(arr[intIdx]) || null,
+              model_year: safeNum(at(yearIdx)),
+              exterior_color: safeStr(at(extIdx)) || null,
+              interior_color: safeStr(at(intIdx)) || null,
               status: status as CarInsert["status"],
               location_type: "storage",
-              issue: safeStr(arr[issueIdx]) || null,
-              engine_number: safeStr(arr[engineIdx]) || null,
-              suffix: safeStr(arr[suffixIdx]) || null,
-              software_update: safeStr(arr[swIdx]) || null,
-              dongle: safeStr(arr[dongleIdx]) || null,
-              sold_marker: /x|yes|1|sold/i.test(safeStr(arr[soldIdx])) ? "X" : "",
+              location_slot: safeStr(at(locIdx)) || null,
+              issue: safeStr(at(issueIdx)) || null,
+              engine_number: safeStr(at(engineIdx)) || null,
+              suffix: safeStr(at(suffixIdx)) || null,
+              plate_number: safeStr(at(plateIdx)) || null,
+              notes: safeStr(at(notesIdx)) || null,
+              customs_status: mapCustoms(at(customsIdx)),
+              date_arrived: safeDate(at(arrivalIdx)),
+              registration_date: safeDate(at(regIdx)),
+              delivery_date: safeDate(at(deliveryIdx)),
+              bl_issue_date: safeDate(at(blIdx)),
+              warranty_per_dms: safeStr(at(wVdmsIdx)) || null,
+              warranty_vehicle_expiry: safeDate(at(wVmIdx)),
+              warranty_battery_dms: safeStr(at(wBdmsIdx)) || null,
+              warranty_battery_expiry: safeDate(at(wBmIdx)),
+              software_update: safeStr(at(swIdx)) || null,
+              dongle: safeStr(at(dongleIdx)) || null,
+              sold_marker: status === "sold" ? "X" : "",
               created_by: user.id,
             };
-
             carsByVin.set(vin, car);
+
+            const clientName = safeStr(at(clientIdx));
+            const clientPhone = cleanPhone(at(clientPhoneIdx));
+            if (clientName || clientPhone) {
+              clientByVin.set(vin, { name: clientName, phone: clientPhone });
+            }
           }
         }
 
@@ -246,6 +313,7 @@ export function ImportExcelDialog({
           }
         }
 
+        const vinToCarId = new Map<string, string>(existingByVin);
         for (const [vin, car] of carsByVin) {
           const existingId = existingByVin.get(vin);
           if (existingId) {
@@ -253,9 +321,75 @@ export function ImportExcelDialog({
             if (!error) recordsUpdated++;
             else failed++;
           } else {
-            const { error } = await supabase.from("cars").insert(car);
-            if (!error) carsImported++;
-            else failed++;
+            const { data: ins, error } = await supabase
+              .from("cars")
+              .insert(car)
+              .select("id")
+              .single();
+            if (!error && ins) {
+              carsImported++;
+              vinToCarId.set(vin, (ins as { id: string }).id);
+            } else failed++;
+          }
+        }
+
+        // ── Customers from the inline Client column, linked to their car ──
+        // Dedupe by normalized name (one "AUTOMENA DISPLAY" customer even though
+        // it appears on many cars); reuse an existing customer when the phone
+        // already matches one. Cars get linked via cars.customer_id.
+        const custData = new Map<string, { name: string; phone: string; converted: boolean }>();
+        for (const [vin, c] of clientByVin) {
+          const key = c.name ? c.name.trim().toLowerCase() : `phone:${c.phone}`;
+          if (!key) continue;
+          const carStatus = carsByVin.get(vin)?.status;
+          const converted = carStatus === "sold" || carStatus === "delivered";
+          const prev = custData.get(key);
+          if (!prev) custData.set(key, { name: c.name || c.phone, phone: c.phone, converted });
+          else {
+            if (!prev.phone && c.phone) prev.phone = c.phone;
+            if (converted) prev.converted = true;
+          }
+        }
+        const keyToCustId = new Map<string, string>();
+        for (const [key, d] of custData) {
+          let custId: string | null = null;
+          if (d.phone) {
+            const { data: ex } = await supabase
+              .from("customers")
+              .select("id")
+              .eq("phone_primary", d.phone)
+              .limit(1)
+              .maybeSingle();
+            if (ex) custId = (ex as { id: string }).id;
+          }
+          if (!custId) {
+            const parts = d.name.trim().split(/\s+/);
+            const { data: ins, error } = await supabase
+              .from("customers")
+              .insert({
+                first_name: parts[0] || d.name,
+                last_name: parts.slice(1).join(" ") || null,
+                phone_primary: d.phone || null,
+                lead_status: d.converted ? "converted" : "interested",
+                lead_source: "other",
+                created_by: user.id,
+              })
+              .select("id")
+              .single();
+            if (!error && ins) {
+              custId = (ins as { id: string }).id;
+              clientsImported++;
+            } else failed++;
+          }
+          if (custId) keyToCustId.set(key, custId);
+        }
+        // Link each car to its customer.
+        for (const [vin, c] of clientByVin) {
+          const key = c.name ? c.name.trim().toLowerCase() : `phone:${c.phone}`;
+          const custId = keyToCustId.get(key);
+          const carId = vinToCarId.get(vin);
+          if (custId && carId) {
+            await supabase.from("cars").update({ customer_id: custId }).eq("id", carId);
           }
         }
 
