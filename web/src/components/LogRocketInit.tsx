@@ -33,7 +33,6 @@ export function LogRocketInit() {
     const host = window.location.hostname;
     const isProdHost =
       host === "monzasal.vercel.app" ||
-      host === "monzacrm.vercel.app" ||
       host === "web-dun-beta-59.vercel.app";
     if (!isProdHost) return;
 
