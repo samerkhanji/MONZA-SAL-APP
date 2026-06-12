@@ -33,7 +33,7 @@ export const salesOrdersPageTour: Tour = {
       element: '[data-tour-id="sales-orders-list-table-panel"]',
       title: "All orders",
       description:
-        "Every car sale, one per row — car, customer, status, and price. Click a row to open the full order and walk it through to delivery.",
+        "Every car sale, one per row — car, customer, and status. Click a row to open the full order and walk it through to delivery.",
       side: "top",
       align: "start",
     },

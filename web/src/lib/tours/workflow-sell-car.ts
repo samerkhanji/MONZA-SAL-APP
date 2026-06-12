@@ -61,7 +61,7 @@ export const sellCarWorkflowTour: Tour = {
       title: "Set the buyer and status",
       description:
         "In the edit window, change the status to 'reserved' or 'sold', then pick the customer " +
-        "(or add a new one). Fill in the price. Click Save when you're done — " +
+        "(or add a new one). Click Save when you're done — " +
         "the system creates a sales order for this deal.",
     },
     {
@@ -100,7 +100,7 @@ export const sellCarWorkflowTour: Tour = {
     {
       title: "Save the quote",
       description:
-        "First, agree the price with the customer and save the quote. " +
+        "First, record that the quote was sent to the customer. " +
         "Fill in the numbers in the quote section, then click 'Save quote'.",
     },
     {
