@@ -324,6 +324,7 @@ export default function InstallmentsPage() {
     model_year: number | null;
     exterior_color: string | null;
   } | null>(null);
+  const [mainSearch, setMainSearch] = useState("");
   const [customerSearch, setCustomerSearch] = useState("");
   const [, setCarSearch] = useState("");
   const [customerCarOptions, setCustomerCarOptions] = useState<
@@ -425,6 +426,30 @@ export default function InstallmentsPage() {
     loadData();
   }, [supabase]);
 
+  // Free-text filter across the installment lists — by customer name/phone or
+  // car VIN/plate/model — so staff aren't scrolling hundreds of rows.
+  const matchesMainSearch = useCallback(
+    (i: InstallmentWithRelations) => {
+      const q = mainSearch.trim().toLowerCase();
+      if (!q) return true;
+      const c = i.plan?.customer as
+        | { first_name?: string | null; last_name?: string | null; phone_primary?: string | null; phone_secondary?: string | null }
+        | undefined;
+      const car = i.plan?.car as
+        | { vin?: string | null; model?: string | null; brand?: string | null; plate_number?: string | null }
+        | undefined;
+      return [
+        c?.first_name, c?.last_name, c?.phone_primary, c?.phone_secondary,
+        car?.vin, car?.model, car?.brand, car?.plate_number,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(q);
+    },
+    [mainSearch]
+  );
+
   const dueInstallments = useMemo(
     () =>
       installments
@@ -434,28 +459,31 @@ export default function InstallmentsPage() {
             i.status === "overdue" ||
             i.status === "partial"
         )
+        .filter(matchesMainSearch)
         .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime()),
-    [installments]
+    [installments, matchesMainSearch]
   );
 
   const upcomingInstallments = useMemo(
     () =>
       installments
         .filter((i) => i.status === "upcoming")
+        .filter(matchesMainSearch)
         .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime()),
-    [installments]
+    [installments, matchesMainSearch]
   );
 
   const paidInstallments = useMemo(
     () =>
       installments
         .filter((i) => i.status === "paid")
+        .filter(matchesMainSearch)
         .sort(
           (a, b) =>
             new Date(b.paid_at || b.updated_at).getTime() -
             new Date(a.paid_at || a.updated_at).getTime()
         ),
-    [installments]
+    [installments, matchesMainSearch]
   );
 
   useEffect(() => {
@@ -966,6 +994,15 @@ export default function InstallmentsPage() {
           </CardContent>
         </Card>
         </div>
+      </div>
+
+      <div className="max-w-sm">
+        <Input
+          value={mainSearch}
+          onChange={(e) => setMainSearch(e.target.value)}
+          placeholder="Search by customer, phone, VIN or plate…"
+          aria-label="Search installments"
+        />
       </div>
 
       <Tabs defaultValue={defaultTab} className="space-y-4">
