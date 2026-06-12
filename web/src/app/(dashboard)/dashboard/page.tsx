@@ -87,16 +87,25 @@ export default function DashboardPage() {
     isKareem,
     isHoussam,
     isOwner,
+    appRole,
   } = useUser();
 
-  useEffect(() => {
-    if (profileLoading) return;
-    if (isRequestAssistant && !isOwner) {
-      router.replace("/assistant-dashboard");
-    }
-  }, [profileLoading, isRequestAssistant, isOwner, router]);
+  // The operational dashboard is for the owner and the hybrid showroom manager
+  // (Khalil, who runs the showroom + parts→garage→admin pipeline). Everyone
+  // else is sent to their own landing so the page isn't a dead-end / they don't
+  // see a view that isn't theirs.
+  const canSeeDashboard =
+    isOwner || appRole === "hybrid" || appRole === "khalil_hybrid";
 
-  const shouldRedirect = !profileLoading && isRequestAssistant && !isOwner;
+  useEffect(() => {
+    if (profileLoading || canSeeDashboard) return;
+    if (appRole === "assistant") router.replace("/assistant-dashboard");
+    else if (appRole === "garage_manager" || appRole === "garage_staff")
+      router.replace("/garage");
+    else router.replace("/requests");
+  }, [profileLoading, canSeeDashboard, appRole, router]);
+
+  const shouldRedirect = !profileLoading && !canSeeDashboard;
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [totalCars, setTotalCars] = useState<number>(0);

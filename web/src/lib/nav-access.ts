@@ -27,6 +27,10 @@ export function canAccessNavHref(href: string, user: NavAccessUser): boolean {
     case "/assistant-dashboard":
       return inRoles(appRole, ["assistant", "owner", "hybrid", "khalil_hybrid"]);
     case "/dashboard":
+      // Operational dashboard (showroom + parts→garage→admin pipeline).
+      // Owner and the hybrid showroom manager (Khalil); everyone else is
+      // redirected to their own landing by the page itself.
+      return inRoles(appRole, ["owner", "hybrid", "khalil_hybrid"]);
     case "/dashboard/overview":
     case "/settings":
       return appRole === "owner";
