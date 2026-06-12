@@ -353,9 +353,12 @@ export function ImportExcelDialog({
                   .single();
                 if (!err2 && ins2) {
                   const newId = (ins2 as { id: string }).id;
+                  // sold_marker='X' is required by the cars_sold_marker_when_sold
+                  // CHECK constraint whenever status='sold'; set it on the same
+                  // UPDATE so the move can't trip the constraint.
                   const { error: upErr } = await supabase
                     .from("cars")
-                    .update({ status: target })
+                    .update({ status: target, sold_marker: target === "sold" ? "X" : "" })
                     .eq("id", newId);
                   // Keep the car even if it can't reach "sold"; record the linkage.
                   vinToCarId.set(vin, newId);
