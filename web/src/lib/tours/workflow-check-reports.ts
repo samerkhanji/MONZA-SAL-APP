@@ -54,7 +54,7 @@ export const checkReportsWorkflowTour: Tour = {
       title: "Inventory aging",
       description:
         "This card shows how long cars have been sitting unsold. " +
-        "Cars that have been on the lot a long time may need a price review.",
+        "Cars that have been on the lot a long time may need extra sales attention.",
       side: "top",
       align: "start",
     },

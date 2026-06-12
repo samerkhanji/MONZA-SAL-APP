@@ -25,7 +25,7 @@ export const salesOrderDetailPageTour: Tour = {
       element: '[data-tour-id="sales-order-detail-save-quote"]',
       title: "Send the quote",
       description:
-        "Type the price you're offering, then click here to record the quote. This is the first real step of the sale.",
+        "Click here to record that the quote was sent to the customer. This is the first real step of the sale.",
       side: "top",
       align: "start",
     },

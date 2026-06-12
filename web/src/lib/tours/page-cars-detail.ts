@@ -17,7 +17,7 @@ export const carsDetailPageTour: Tour = {
       element: '[data-tour-id="cars-detail-edit-button"]',
       title: "Edit the car",
       description:
-        "Click here to change any of this car's details — price, color, mileage, and more.",
+        "Click here to change any of this car's details — color, mileage, and more.",
       side: "bottom",
       align: "end",
     },

@@ -114,7 +114,7 @@ export const carsPageTour: Tour = {
       element: '[data-tour-id="cars-list-row-actions-edit"]',
       title: "Edit the car",
       description:
-        "Fix a typo or update a detail — price, color, mileage — without leaving the list.",
+        "Fix a typo or update a detail — color, mileage — without leaving the list.",
       side: "left",
       align: "start",
     },
