@@ -106,16 +106,37 @@ export function ImportExcelDialog({
     reader.readAsArrayBuffer(f);
   }
 
+  // Find the header row + data rows in ANY sheet that has a VIN column, so the
+  // importer works regardless of tab names or which row the header sits on.
+  function extractVinSheet(
+    sheet: XLSX.WorkSheet | undefined
+  ): { headers: string[]; rows: unknown[][] } | null {
+    if (!sheet) return null;
+    const json = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" }) as unknown[][];
+    for (let r = 0; r < Math.min(json.length, 8); r++) {
+      const row = (json[r] ?? []) as unknown[];
+      if (row.some((c) => /vin/i.test(String(c ?? "")))) {
+        return { headers: row.map((c) => String(c ?? "")), rows: json.slice(r + 1) };
+      }
+    }
+    return null;
+  }
+
+  // Brand isn't a column in the fleet sheet; infer it from the model name.
+  function inferBrand(model: string): string {
+    return /hero/i.test(model) ? "MHero" : "Voyah";
+  }
+
   function countRows(wb: XLSX.WorkBook): { cars: number; clients: number; updates: number } {
     let cars = 0;
-    const carSheets = ["Voyah 2023 & 2024 & 2025YM", "Voyah 2026YM", "Sent to Customs"];
-    for (const name of carSheets) {
-      const sheet = wb.Sheets[name];
-      if (sheet) {
-        const json = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
-        const rows = (json as unknown[][])?.slice(2) ?? [];
-        cars += rows.filter((r) => r && (r as unknown[]).some((c) => c)).length;
-      }
+    for (const name of wb.SheetNames) {
+      const parsed = extractVinSheet(wb.Sheets[name]);
+      if (!parsed) continue;
+      const vinIdx = parsed.headers.findIndex((h) => /vin/i.test(h));
+      cars += parsed.rows.filter((r) => {
+        const vin = safeStr((r as unknown[])[vinIdx]).toUpperCase();
+        return vin.length === 17;
+      }).length;
     }
     const clientsSheet = wb.Sheets["Voyah Clients"];
     let clients = 0;
@@ -158,12 +179,11 @@ export function ImportExcelDialog({
 
         const carsByVin = new Map<string, CarInsert>();
 
-        for (const sheetName of ["Voyah 2023 & 2024 & 2025YM", "Voyah 2026YM", "Sent to Customs"]) {
-          const sheet = wb.Sheets[sheetName];
-          if (!sheet) continue;
-          const json = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" }) as unknown[][];
-          const headers = (json[1] ?? []) as string[];
-          const rows = json.slice(2) ?? [];
+        for (const sheetName of wb.SheetNames) {
+          const parsed = extractVinSheet(wb.Sheets[sheetName]);
+          if (!parsed) continue;
+          const headers = parsed.headers;
+          const rows = parsed.rows;
           const statusIdx = headers.findIndex((h) => /status/i.test(String(h ?? "")));
           const issueIdx = headers.findIndex((h) => /issue/i.test(String(h ?? "")));
           const modelIdx = headers.findIndex((h) => /model/i.test(String(h ?? "")));
@@ -183,11 +203,12 @@ export function ImportExcelDialog({
             if (!vin || vin.length !== 17) continue;
 
             const status = mapStatus(arr[statusIdx] as string);
+            const carModel = safeStr(arr[modelIdx]) || "—";
             // Legacy fields client_name/client_phone are read-only fallback; use customers + sales_orders instead
             const car: CarInsert = {
               vin,
-              brand: "Voyah",
-              model: safeStr(arr[modelIdx]) || "—",
+              brand: inferBrand(carModel),
+              model: carModel,
               model_year: safeNum(arr[yearIdx]),
               exterior_color: safeStr(arr[extIdx]) || null,
               interior_color: safeStr(arr[intIdx]) || null,
