@@ -54,11 +54,46 @@ function safeStr(v: unknown): string {
   return "";
 }
 
+// Convert an Excel serial date (days since 1899-12-30) to a JS Date.
+function excelSerialToDate(serial: number): Date | null {
+  if (!Number.isFinite(serial) || serial <= 0 || serial > 80000) return null;
+  const d = new Date(Math.round((serial - 25569) * 86400 * 1000));
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 function safeDate(v: unknown): string | null {
+  if (v == null || v === "") return null;
+  let d: Date | null = null;
+  if (v instanceof Date) {
+    d = Number.isNaN(v.getTime()) ? null : v;
+  } else if (typeof v === "number") {
+    // SheetJS returns date cells as serial numbers, NOT "year" strings —
+    // `new Date("45699")` would be read as the year 45699 (Postgres rejects it).
+    d = excelSerialToDate(v);
+  } else {
+    const s = String(v).trim();
+    if (!s) return null;
+    // A bare numeric string is an Excel serial, not a calendar year.
+    if (/^\d+(\.\d+)?$/.test(s)) {
+      d = excelSerialToDate(parseFloat(s));
+    } else {
+      const parsed = new Date(s);
+      d = Number.isNaN(parsed.getTime()) ? null : parsed;
+    }
+  }
+  if (!d) return null;
+  const year = d.getUTCFullYear();
+  if (year < 1900 || year > 2100) return null; // guard against absurd dates
+  return d.toISOString().slice(0, 10);
+}
+
+// For text columns that hold a date in the sheet (e.g. the warranty "DMS"
+// cells): render a clean YYYY-MM-DD when it's a date/serial, else the raw text.
+function safeDateText(v: unknown): string | null {
+  const asDate = safeDate(v);
+  if (asDate) return asDate;
   const s = safeStr(v);
-  if (!s) return null;
-  const d = new Date(s);
-  return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
+  return s || null;
 }
 
 function safeNum(v: unknown): number | null {
@@ -281,9 +316,9 @@ export function ImportExcelDialog({
               registration_date: safeDate(at(regIdx)),
               delivery_date: safeDate(at(deliveryIdx)),
               bl_issue_date: safeDate(at(blIdx)),
-              warranty_per_dms: safeStr(at(wVdmsIdx)) || null,
+              warranty_per_dms: safeDateText(at(wVdmsIdx)),
               warranty_vehicle_expiry: safeDate(at(wVmIdx)),
-              warranty_battery_dms: safeStr(at(wBdmsIdx)) || null,
+              warranty_battery_dms: safeDateText(at(wBdmsIdx)),
               warranty_battery_expiry: safeDate(at(wBmIdx)),
               software_update: safeStr(at(swIdx)) || null,
               dongle: safeStr(at(dongleIdx)) || null,
