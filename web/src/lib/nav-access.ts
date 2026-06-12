@@ -63,7 +63,7 @@ export function canAccessNavHref(href: string, user: NavAccessUser): boolean {
         hasCapability("manage_team")
       );
     case "/sales-orders":
-      return inRoles(appRole, ["owner", "assistant", "sales_ops", "sales"]);
+      return inRoles(appRole, ["owner", "assistant", "sales_ops", "sales", "hybrid", "khalil_hybrid"]);
     case "/trade-ins":
       return (
         appRole === "owner" ||
