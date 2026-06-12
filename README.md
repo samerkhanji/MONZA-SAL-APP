@@ -91,3 +91,8 @@ For open source projects, say how it is licensed.
 
 ## Project status
 If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+
+## Bulk data loads
+Bulk data (fleet, customers, parts) is loaded via reviewed SQL scripts run in the
+Supabase SQL editor — not through an in-app Excel importer (the importer button
+was removed; the dialog component remains in the codebase if ever needed again).
