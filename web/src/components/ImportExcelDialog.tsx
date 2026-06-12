@@ -411,7 +411,11 @@ export function ImportExcelDialog({
               .insert({
                 first_name: parts[0] || d.name,
                 last_name: parts.slice(1).join(" ") || null,
-                phone_primary: d.phone || null,
+                // phone_primary is NOT NULL; the fleet sheet rarely carries a
+                // phone, so fall back to an empty string (the unique-phone index
+                // is partial and ignores empty/blank phones, so this never
+                // collides across the many phoneless imported customers).
+                phone_primary: d.phone || "",
                 lead_status: d.converted ? "converted" : "interested",
                 lead_source: "other",
                 created_by: user.id,
