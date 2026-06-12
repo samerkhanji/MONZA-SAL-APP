@@ -42,6 +42,8 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Monza S.A.L.",
   description: "Monza S.A.L. - Vehicle & Business Management",
+  // Internal company tool — never index, never cache in search results.
+  robots: { index: false, follow: false, nocache: true },
 };
 
 export default async function RootLayout({
