@@ -70,6 +70,19 @@ function currentYear(): number {
 export default function AddCarPage() {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
+  const [dirty, setDirty] = useState(false);
+
+  // Warn before losing a part-filled form on refresh/close/external nav. (App
+  // back-button is SPA history; this covers the hard-navigation cases.)
+  useEffect(() => {
+    if (!dirty || submitting) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [dirty, submitting]);
   const [scanVinOpen, setScanVinOpen] = useState(false);
 
   // Section 1: Vehicle Information
@@ -388,7 +401,12 @@ export default function AddCarPage() {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6" data-tour-id="cars-add-form">
+      <form
+        onSubmit={handleSubmit}
+        onChange={() => { if (!dirty) setDirty(true); }}
+        className="space-y-6"
+        data-tour-id="cars-add-form"
+      >
         {/* Section 1: Vehicle Information */}
         <Card data-tour-id="cars-add-vehicle-info-panel">
           <CardHeader>
