@@ -30,6 +30,12 @@ export const ownerWelcomeTour: Tour = {
         "Hit 'Next' to start, or close this window to skip — you can replay it anytime from the ? button in the bottom-right corner.",
     },
     {
+      title: "How it all connects 🔗",
+      description:
+        "Before the map, the story. A car arrives → it sits in your Inventory (incoming ones wait on Ordered Cars). A buyer shows interest → they become a Customer (a lead). Book a Test Drive, then create a Sales Order to sell — that turns the lead into a buyer and marks the car sold. Money paid over time lives in Installments. When any car needs service it becomes a Garage job, which pulls Parts from your stock. Everything rolls up into Reports and your Owner Overview. That's the whole loop — the rest of this tour walks you to each stop.",
+      type: "section",
+    },
+    {
       element: '[data-tour-id="nav-dashboard"]',
       navigateTo: "/dashboard",
       title: "Your Dashboard",
@@ -49,15 +55,15 @@ export const ownerWelcomeTour: Tour = {
       navigateTo: "/cars",
       title: "Inventory",
       description:
-        "Every car you own. New arrivals, the ones for sale, the ones already sold, the ones in the garage. " +
-        "Use the 'Add Car' button when a new vehicle arrives. Click any row to see that car's full story.",
+        "Every car physically with you — for sale, sold, at a sub-dealer, in the garage. Cars still on the way (ordered, not arrived) live on the separate Ordered Cars page, not here. " +
+        "Each car is tagged EREV or Pure EV. Use 'Add Car' when a vehicle arrives; click any row for that car's full story.",
     },
     {
       element: '[data-tour-id="nav-customers"]',
       navigateTo: "/customers",
       title: "Customers",
       description:
-        "Everyone who's talked to you about buying — and everyone you've sold to. " +
+        "Everyone who's talked to you about buying — and everyone you've sold to. Tabs split them into buyers (Sold Cars), sub-dealer holders, and leads to follow up. Remember: one customer can hold several cars, so the people count and car count differ. " +
         "Add new leads here. Click a customer to see what they bought, what they owe, and every message you've exchanged.",
     },
     {
@@ -112,8 +118,8 @@ export const ownerWelcomeTour: Tour = {
       navigateTo: "/garage",
       title: "The Garage",
       description:
-        "Everything that happens in your service bays. " +
-        "Jobs being worked on right now, tasks for each mechanic, the parts you have in stock, warranty claims, recalls. " +
+        "Everything that happens in your service bays — jobs in progress, each mechanic's tasks, warranty claims, recalls, and your Parts store. " +
+        "Parts can be viewed three ways (by part, by shelf location, or as totals with a reorder list), and jobs pull parts straight from that stock. " +
         "Hover this menu to see all the sub-pages — there are about 10.",
     },
     {
