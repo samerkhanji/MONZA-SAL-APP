@@ -57,6 +57,7 @@ export const garageWelcomeTour: Tour = {
       title: "5. Warranty claims",
       description:
         "If a repair is covered by the manufacturer's warranty, open a warranty case here so the cost goes back to the maker, not the customer. Attach the parts used and the paperwork.",
+      requiredCapabilities: ["garage"],
     },
     {
       element: '[data-tour-id="nav-recalls"]',
@@ -64,6 +65,7 @@ export const garageWelcomeTour: Tour = {
       title: "6. Recalls",
       description:
         "When the maker recalls a model for a fix, the affected cars are tracked here. As each car comes in and gets the fix, mark it done so you know which cars are still outstanding.",
+      requiredCapabilities: ["garage"],
     },
     {
       element: '[data-tour-id="nav-requests"]',
