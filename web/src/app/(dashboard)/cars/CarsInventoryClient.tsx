@@ -315,6 +315,11 @@ const CARS_TH =
   "sticky top-0 z-10 box-border min-w-0 max-w-full border-b-2 border-r border-border bg-[var(--table-header)] px-2 py-2 text-left align-middle text-[11px] font-semibold text-[var(--table-header-text)] whitespace-nowrap overflow-hidden text-ellipsis";
 const CARS_TD =
   "box-border min-w-0 max-w-full border-b border-r border-border bg-transparent px-2 py-2 text-left align-middle text-xs whitespace-nowrap overflow-hidden text-ellipsis";
+// Frozen first column (VIN): stays put while scrolling sideways. Corner header
+// at z-30; body cells get a solid bg-card surface at z-20.
+const CARS_TH_FIRST = `${CARS_TH} left-0 z-30`;
+const CARS_TD_FIRST =
+  "sticky left-0 z-20 box-border min-w-0 max-w-full border-b border-r border-border bg-card px-2 py-2 text-left align-middle text-xs whitespace-nowrap overflow-hidden text-ellipsis";
 
 function matchesSearch(
   car: CarDisplay,
@@ -811,7 +816,7 @@ export function CarsInventoryClient({
                       sortKey={sortKey}
                       sortDir={sortDir}
                       onToggle={toggleSort}
-                      className="font-mono"
+                      className={`font-mono ${CARS_TH_FIRST}`}
                     >
                       VIN
                     </InventorySortTh>
@@ -1034,7 +1039,7 @@ export function CarsInventoryClient({
                         title={pendingDeletes[car.id] ? "Pending delete request" : undefined}
                         onClick={() => router.push(`/cars/${encodeURIComponent(car.id)}`)}
                       >
-                        <td title={car.vin ?? ""} className={`${CARS_TD} font-mono select-text`}>
+                        <td title={car.vin ?? ""} className={`${CARS_TD_FIRST} font-mono select-text`}>
                           {car.vin ?? "—"}
                         </td>
                         <td title={car.brand ?? undefined} className={CARS_TD}>

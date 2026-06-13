@@ -94,6 +94,12 @@ const CRM_TH =
   "sticky top-0 z-10 box-border min-w-0 max-w-full border-b-2 border-r border-border bg-[var(--table-header)] px-2 py-2 text-left align-middle text-[11px] font-semibold text-[var(--table-header-text)] whitespace-nowrap overflow-hidden text-ellipsis";
 const CRM_TD =
   "box-border min-w-0 max-w-full border-b border-r border-border bg-transparent px-2 py-2 text-left align-middle text-xs whitespace-nowrap overflow-hidden text-ellipsis";
+// Frozen first column: stays visible while scrolling sideways. The header
+// corner sits above everything (z-30); body cells use a solid bg-card surface
+// (z-20) so scrolled content can't bleed through.
+const CRM_TH_FIRST = `${CRM_TH} left-0 z-30`;
+const CRM_TD_FIRST =
+  "sticky left-0 z-20 box-border min-w-0 max-w-full border-b border-r border-border bg-card px-2 py-2 text-left align-middle text-xs whitespace-nowrap overflow-hidden text-ellipsis";
 
 export default function CustomersPage() {
   const router = useRouter();
@@ -337,7 +343,7 @@ export default function CustomersPage() {
           </colgroup>
           <thead>
             <tr>
-              <th scope="col" className={CRM_TH}>
+              <th scope="col" className={CRM_TH_FIRST}>
                 Name
               </th>
               <th scope="col" className={CRM_TH}>
@@ -375,7 +381,7 @@ export default function CustomersPage() {
                   className="cursor-pointer odd:bg-gray-50 even:bg-white dark:odd:bg-muted/30 dark:even:bg-transparent"
                   onClick={() => router.push(`/customers/${customer.id}`)}
                 >
-                  <td title={fullName || undefined} className={`${CRM_TD} font-medium`}>
+                  <td title={fullName || undefined} className={`${CRM_TD_FIRST} font-medium`}>
                     {fullName || "—"}
                   </td>
                   <td className={CRM_TD}>
@@ -667,7 +673,7 @@ export default function CustomersPage() {
                     </colgroup>
                     <thead>
                       <tr>
-                        <th scope="col" className={CRM_TH}>
+                        <th scope="col" className={CRM_TH_FIRST}>
                           Vehicle
                         </th>
                         <th scope="col" className={`${CRM_TH} font-mono`}>
@@ -710,7 +716,7 @@ export default function CustomersPage() {
                         const orderStatusText = so.status ?? "—";
                         return (
                           <tr key={so.id} className="odd:bg-gray-50 even:bg-white dark:odd:bg-muted/30 dark:even:bg-transparent">
-                            <td title={vehicleTitle} className={`${CRM_TD} font-medium`}>
+                            <td title={vehicleTitle} className={`${CRM_TD_FIRST} font-medium`}>
                               {vehicleTitle}
                             </td>
                             <td
@@ -825,7 +831,7 @@ export default function CustomersPage() {
                     </colgroup>
                     <thead>
                       <tr>
-                        <th scope="col" className={CRM_TH}>
+                        <th scope="col" className={CRM_TH_FIRST}>
                           Vehicle
                         </th>
                         <th scope="col" className={`${CRM_TH} font-mono`}>
@@ -869,7 +875,7 @@ export default function CustomersPage() {
                         const orderStatusText = so.status ?? "—";
                         return (
                           <tr key={so.id} className="odd:bg-gray-50 even:bg-white dark:odd:bg-muted/30 dark:even:bg-transparent">
-                            <td title={vehicleTitle} className={`${CRM_TD} font-medium`}>
+                            <td title={vehicleTitle} className={`${CRM_TD_FIRST} font-medium`}>
                               {vehicleTitle}
                             </td>
                             <td
