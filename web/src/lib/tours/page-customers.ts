@@ -26,7 +26,16 @@ export const customersPageTour: Tour = {
       element: '[data-tour-id="customers-list-tabs"]',
       title: "Customer tabs",
       description:
-        "Three views of the same people. Use these tabs to flip between all customers, the ones who bought, and the leads.",
+        "Four views of the same people: everyone, the ones who bought a car, the ones holding cars at a sub-dealer, and the leads to follow up. Same customers — just sliced different ways.",
+      side: "bottom",
+      align: "start",
+    },
+    {
+      element: '[data-tour-id="customers-list-breakdown"]',
+      title: "Why the numbers differ",
+      description:
+        "Important logic: a customer can own or hold more than one car, so the people count and the car count are not the same. This line spells it out — e.g. '136 customers linked to 156 cars: 128 sold, 22 at sub-dealers, 6 other holdings'. 'Sold' = a real sale; 'sub-dealer' = a car parked at a partner/display, not a sale.",
+      type: "section",
       side: "bottom",
       align: "start",
     },
@@ -34,7 +43,7 @@ export const customersPageTour: Tour = {
       element: '[data-tour-id="customers-list-tab-all"]',
       title: "All customers",
       description:
-        "Everyone in the system — leads and buyers together. This is the full list.",
+        "Everyone in the system — buyers, sub-dealer holders, and leads together. This is the full head-count of people.",
       side: "bottom",
       align: "start",
     },
@@ -42,7 +51,15 @@ export const customersPageTour: Tour = {
       element: '[data-tour-id="customers-list-tab-sold"]',
       title: "Sold cars",
       description:
-        "Customers who actually bought a car. Open this when you want your real buyer list.",
+        "Your real buyers — customers whose car is actually sold. The badge counts bought customers; the list shows each sold car and who bought it (a buyer with two cars counts once on the badge but shows two rows). This is your buyer list.",
+      side: "bottom",
+      align: "start",
+    },
+    {
+      element: '[data-tour-id="customers-list-tab-subdealer"]',
+      title: "Sub Dealer",
+      description:
+        "Cars parked at a sub-dealer or display partner (e.g. AUTOMENA DISPLAY) — held, not sold. Each row is a held car and who holds it, with the date it went there. These never count as sales — that's the difference between this tab and Sold Cars.",
       side: "bottom",
       align: "start",
     },
@@ -50,7 +67,7 @@ export const customersPageTour: Tour = {
       element: '[data-tour-id="customers-list-tab-leads"]',
       title: "Leads",
       description:
-        "People who showed interest but haven't bought yet. These are the ones to follow up with.",
+        "Prospects who showed interest but haven't bought yet (status 'new lead'). These are the ones to follow up with. Empty for now — it fills as you add walk-ins and inquiries.",
       side: "bottom",
       align: "start",
     },

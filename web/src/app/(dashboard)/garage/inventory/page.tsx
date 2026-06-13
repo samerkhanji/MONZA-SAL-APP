@@ -346,10 +346,10 @@ export default function GarageInventoryPage() {
       )}
 
       <Tabs defaultValue="part" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="part">By Part Number</TabsTrigger>
-          <TabsTrigger value="location">By Location</TabsTrigger>
-          <TabsTrigger value="totals">Totals</TabsTrigger>
+        <TabsList data-tour-id="inventory-view-tabs">
+          <TabsTrigger value="part" data-tour-id="inventory-view-part">By Part Number</TabsTrigger>
+          <TabsTrigger value="location" data-tour-id="inventory-view-location">By Location</TabsTrigger>
+          <TabsTrigger value="totals" data-tour-id="inventory-view-totals">Totals</TabsTrigger>
         </TabsList>
 
         <TabsContent value="part">

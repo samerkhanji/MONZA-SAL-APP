@@ -15,6 +15,39 @@ export const garageInventoryPageTour: Tour = {
   page: "/garage/inventory",
   steps: [
     {
+      element: '[data-tour-id="inventory-view-tabs"]',
+      title: "Three ways to view your stock",
+      description:
+        "The same parts, shown three ways. Pick the view that fits the job: looking up one part, walking the shelves, or getting the big picture. Flip between them any time — nothing changes, just how it's laid out.",
+      type: "section",
+      side: "bottom",
+      align: "start",
+    },
+    {
+      element: '[data-tour-id="inventory-view-part"]',
+      title: "By Part Number",
+      description:
+        "The main list — one row per part with its total quantity, where it's stored, supplier, and stock status. Use this to look up a specific part, stock it in/out, or edit it. This is the working view.",
+      side: "bottom",
+      align: "start",
+    },
+    {
+      element: '[data-tour-id="inventory-view-location"]',
+      title: "By Location",
+      description:
+        "Walk the warehouse on screen. Parts are grouped under each shelf location (e.g. Z0COL6S1ST1), showing what sits where and how many — including any 'used' units taken from that spot. Use this when you're physically at the shelves or doing a stock-take.",
+      side: "bottom",
+      align: "start",
+    },
+    {
+      element: '[data-tour-id="inventory-view-totals"]',
+      title: "Totals & reorder",
+      description:
+        "The owner's overview: how many distinct parts, total units, locations, and how many are in / low / out of stock — plus a 'Parts to reorder' list of everything at or below its minimum. This is your needed-parts calculation: open it to see exactly what to buy and where each part lives.",
+      side: "bottom",
+      align: "start",
+    },
+    {
       element: '[data-tour-id="inventory-add-part"]',
       title: "Add New Part",
       description:
