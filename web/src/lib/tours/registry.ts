@@ -1,6 +1,8 @@
 import type { AppRole } from "@/lib/permissions";
 import type { Tour } from "./types";
 import { ownerWelcomeTour } from "./tour-owner";
+import { salesWelcomeTour } from "./tour-sales";
+import { garageWelcomeTour } from "./tour-garage";
 
 // Workflow tours — cross-page interactive journeys.
 import { addCarWorkflowTour } from "./workflow-add-car";
@@ -88,6 +90,14 @@ import { orderedCarsPageTour } from "./page-ordered-cars";
 // ============================================================================
 const WELCOME_TOURS: Partial<Record<AppRole, Tour>> = {
   owner: ownerWelcomeTour,
+  // Employee welcome tours — same hand-held, step-by-step style as the owner's,
+  // scoped to each group's daily flow.
+  sales: salesWelcomeTour,
+  sales_ops: salesWelcomeTour,
+  hybrid: salesWelcomeTour,
+  khalil_hybrid: salesWelcomeTour,
+  garage_manager: garageWelcomeTour,
+  garage_staff: garageWelcomeTour,
 };
 
 // ============================================================================
