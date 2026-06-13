@@ -3,6 +3,8 @@ import type { Tour } from "./types";
 import { ownerWelcomeTour } from "./tour-owner";
 import { salesWelcomeTour } from "./tour-sales";
 import { garageWelcomeTour } from "./tour-garage";
+import { assistantWelcomeTour } from "./tour-assistant";
+import { itWelcomeTour } from "./tour-it";
 
 // Workflow tours — cross-page interactive journeys.
 import { addCarWorkflowTour } from "./workflow-add-car";
@@ -98,6 +100,8 @@ const WELCOME_TOURS: Partial<Record<AppRole, Tour>> = {
   khalil_hybrid: salesWelcomeTour,
   garage_manager: garageWelcomeTour,
   garage_staff: garageWelcomeTour,
+  assistant: assistantWelcomeTour,
+  it: itWelcomeTour,
 };
 
 // ============================================================================

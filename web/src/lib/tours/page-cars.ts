@@ -23,14 +23,6 @@ export const carsPageTour: Tour = {
       align: "end",
     },
     {
-      element: '[data-tour-id="cars-list-import-excel-button"]',
-      title: "Import from Excel",
-      description:
-        "Got a whole spreadsheet of cars? Upload it here and the system adds them all at once, instead of typing each one by hand.",
-      side: "bottom",
-      align: "end",
-    },
-    {
       element: '[data-tour-id="cars-list-filters-panel"]',
       title: "Filters",
       description:

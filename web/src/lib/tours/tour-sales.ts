@@ -74,6 +74,7 @@ export const salesWelcomeTour: Tour = {
       title: "7. Trade-ins (if they have an old car)",
       description:
         "If the customer is giving you their old car as part of the deal, log it here: record the car and the value you agreed. Once saved, it's attached to their deal. Skip this if there's no trade-in.",
+      requiredCapabilities: ["sales"],
     },
     {
       element: '[data-tour-id="nav-documents"]',
