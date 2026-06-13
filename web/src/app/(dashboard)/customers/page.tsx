@@ -476,7 +476,7 @@ export default function CustomersPage() {
             {loading ? "Loading..." : pluralize(filteredCustomers.length, "contact")}
           </p>
           {!loading && !soldLoading && (
-            <p className="mt-1 max-w-2xl text-xs text-muted-foreground">
+            <p data-tour-id="customers-list-breakdown" className="mt-1 max-w-2xl text-xs text-muted-foreground">
               <span className="font-medium text-foreground">{customers.length} customers</span>{" "}
               are linked to{" "}
               <span className="font-medium text-foreground">{soldCars.length} cars</span> —{" "}
