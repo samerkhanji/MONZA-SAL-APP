@@ -202,6 +202,33 @@ export default function CustomersPage() {
     return ids;
   }, [convertedSoldCars]);
 
+  // Cars sitting at a sub-dealer / display partner (a holding, not a sale).
+  const subDealerCars = useMemo(
+    () => soldCars.filter((so) => so.cars?.status === "sent_to_sub_dealer"),
+    [soldCars]
+  );
+
+  const subDealerCustomerIds = useMemo(() => {
+    const ids = new Set<string>();
+    subDealerCars.forEach((so) => {
+      if (so.customer_id) ids.add(so.customer_id);
+    });
+    return ids;
+  }, [subDealerCars]);
+
+  // Any remaining linked cars that are neither sold nor at a sub-dealer
+  // (e.g. a held inventory or company car with a named client).
+  const otherHoldingCars = useMemo(
+    () =>
+      soldCars.filter(
+        (so) =>
+          so.cars?.status !== "sold" &&
+          so.cars?.status !== "delivered" &&
+          so.cars?.status !== "sent_to_sub_dealer"
+      ),
+    [soldCars]
+  );
+
   const exclusiveLeadCustomers = useMemo(
     () => leadCustomers.filter((c) => !soldCustomerIds.has(c.id)),
     [leadCustomers, soldCustomerIds]
@@ -448,6 +475,16 @@ export default function CustomersPage() {
           <p className="text-muted-foreground">
             {loading ? "Loading..." : pluralize(filteredCustomers.length, "contact")}
           </p>
+          {!loading && !soldLoading && (
+            <p className="mt-1 max-w-2xl text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">{customers.length} customers</span>{" "}
+              are linked to{" "}
+              <span className="font-medium text-foreground">{soldCars.length} cars</span> —{" "}
+              {convertedSoldCars.length} sold, {subDealerCars.length} at sub-dealers
+              {otherHoldingCars.length > 0 ? `, ${otherHoldingCars.length} other holdings` : ""}.
+              The customer and car totals differ because a customer can have more than one car.
+            </p>
+          )}
         </div>
         <div className="flex gap-2">
           <ExportButton
@@ -484,6 +521,14 @@ export default function CustomersPage() {
             {!soldLoading && (
               <Badge variant="secondary" className="ml-2">
                 {convertedSoldCars.length}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="subdealer" data-tour-id="customers-list-tab-subdealer">
+            Sub Dealer
+            {!soldLoading && (
+              <Badge variant="secondary" className="ml-2">
+                {subDealerCars.length}
               </Badge>
             )}
           </TabsTrigger>
@@ -705,6 +750,165 @@ export default function CustomersPage() {
                             <td className={`${CRM_TD} tabular-nums`}>
                               {dateBoughtDisplay
                                 ? new Date(dateBoughtDisplay).toLocaleDateString()
+                                : "—"}
+                            </td>
+                            <td className={`${CRM_TD} tabular-nums`}>
+                              {so.delivery_date
+                                ? new Date(so.delivery_date).toLocaleDateString()
+                                : "—"}
+                            </td>
+                            <td title={orderStatusText} className={CRM_TD}>
+                              {orderStatusText}
+                            </td>
+                            <td className={`${CRM_TD} overflow-hidden text-right`}>
+                              <span className="inline-flex max-w-full flex-nowrap items-center justify-end gap-0.5 overflow-hidden">
+                                {customer && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 shrink-0 px-1.5 text-[10px]"
+                                    onClick={() => router.push(`/customers/${customer.id}`)}
+                                  >
+                                    Cust.
+                                  </Button>
+                                )}
+                                {car && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 shrink-0 px-1.5 text-[10px]"
+                                    onClick={() =>
+                                      router.push(`/cars/${encodeURIComponent(car.vin ?? so.car_id)}`)
+                                    }
+                                  >
+                                    Car
+                                  </Button>
+                                )}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="subdealer" className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Sub-Dealer Cars</CardTitle>
+              <CardDescription>
+                {soldLoading
+                  ? "Loading..."
+                  : `${pluralize(subDealerCustomerIds.size, "sub-dealer")} · ${pluralize(subDealerCars.length, "car")} held (not sold)`}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="min-w-0 overflow-hidden">
+              {soldLoading ? (
+                <p className="text-muted-foreground">Loading...</p>
+              ) : subDealerCars.length === 0 ? (
+                <p className="text-muted-foreground">No sub-dealer cars found.</p>
+              ) : (
+                <div className="scrollbar-thick w-full min-w-0 max-h-[min(72vh,calc(100dvh-14rem))] overflow-x-auto overflow-y-auto rounded-md border border-border bg-card [-webkit-overflow-scrolling:touch]">
+                  <table className="w-max min-w-full table-fixed border-collapse">
+                    <colgroup>
+                      {SOLD_TABLE_COL_PX.map((w, i) => (
+                        <col key={i} style={{ width: `${w}px` }} />
+                      ))}
+                    </colgroup>
+                    <thead>
+                      <tr>
+                        <th scope="col" className={CRM_TH}>
+                          Vehicle
+                        </th>
+                        <th scope="col" className={`${CRM_TH} font-mono`}>
+                          VIN
+                        </th>
+                        <th scope="col" className={CRM_TH}>
+                          Color
+                        </th>
+                        <th scope="col" className={CRM_TH}>
+                          Sub-dealer
+                        </th>
+                        <th scope="col" className={CRM_TH}>
+                          Phone
+                        </th>
+                        <th scope="col" className={CRM_TH}>
+                          Since
+                        </th>
+                        <th scope="col" className={CRM_TH}>
+                          Delivery Date
+                        </th>
+                        <th scope="col" className={CRM_TH}>
+                          Status
+                        </th>
+                        <th scope="col" className={`${CRM_TH} text-right`}>
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {subDealerCars.map((so) => {
+                        const car = so.cars;
+                        const customer = so.customers;
+                        const fullName = customer
+                          ? `${customer.first_name} ${customer.last_name ?? ""}`.trim()
+                          : "—";
+                        const sinceDisplay =
+                          so.reservation_date ?? so.date_bought ?? so.sale_date;
+                        const vehicleTitle = car
+                          ? `${car.brand} ${car.model}${car.model_year ? ` (${car.model_year})` : ""}`
+                          : "—";
+                        const orderStatusText = so.status ?? "—";
+                        return (
+                          <tr key={so.id} className="odd:bg-gray-50 even:bg-white dark:odd:bg-muted/30 dark:even:bg-transparent">
+                            <td title={vehicleTitle} className={`${CRM_TD} font-medium`}>
+                              {vehicleTitle}
+                            </td>
+                            <td
+                              title={car?.vin ?? ""}
+                              className={`${CRM_TD} font-mono text-[10px] text-muted-foreground`}
+                            >
+                              {car?.vin ?? "—"}
+                            </td>
+                            <td
+                              title={car?.exterior_color ?? undefined}
+                              className={`${CRM_TD} text-muted-foreground`}
+                            >
+                              {car?.exterior_color ?? "—"}
+                            </td>
+                            <td className={CRM_TD}>
+                              {customer ? (
+                                <button
+                                  type="button"
+                                  className="block max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-left text-primary hover:underline"
+                                  onClick={() => router.push(`/customers/${customer.id}`)}
+                                >
+                                  {fullName}
+                                </button>
+                              ) : (
+                                <span className="text-muted-foreground">—</span>
+                              )}
+                            </td>
+                            <td className={CRM_TD}>
+                              {customer?.phone_primary?.trim() ? (
+                                <a
+                                  href={`tel:${customer.phone_primary}`}
+                                  className="block max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-primary hover:underline"
+                                >
+                                  {customer.phone_primary}
+                                </a>
+                              ) : (
+                                "—"
+                              )}
+                            </td>
+                            <td className={`${CRM_TD} tabular-nums`}>
+                              {sinceDisplay
+                                ? new Date(sinceDisplay).toLocaleDateString()
                                 : "—"}
                             </td>
                             <td className={`${CRM_TD} tabular-nums`}>
