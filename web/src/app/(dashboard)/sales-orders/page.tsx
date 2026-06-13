@@ -367,7 +367,7 @@ export default function SalesOrdersPage() {
 
               {/* Desktop / tablet: table (>640px) */}
               <div className="hidden overflow-x-auto rounded-lg border border-border/50 sm:block">
-                <Table className="min-w-[900px] w-full">
+                <Table className="min-w-[900px] w-full" stickyFirstColumn>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Car</TableHead>
