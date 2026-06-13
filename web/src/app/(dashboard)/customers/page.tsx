@@ -180,8 +180,15 @@ export default function CustomersPage() {
     [customers]
   );
 
+  // Actual sold cars: the car itself is sold/delivered (excludes dealership/
+  // display "holding" allocations, whose cars are not sold).
   const convertedSoldCars = useMemo(
-    () => soldCars.filter((so) => so.customers?.lead_status === "converted"),
+    () =>
+      soldCars.filter(
+        (so) =>
+          so.customers?.lead_status === "converted" &&
+          (so.cars?.status === "sold" || so.cars?.status === "delivered")
+      ),
     [soldCars]
   );
 
@@ -476,7 +483,7 @@ export default function CustomersPage() {
             Sold Cars
             {!soldLoading && (
               <Badge variant="secondary" className="ml-2">
-                {soldCustomerIds.size}
+                {convertedSoldCars.length}
               </Badge>
             )}
           </TabsTrigger>
@@ -594,7 +601,7 @@ export default function CustomersPage() {
               <CardDescription>
                 {soldLoading
                   ? "Loading..."
-                  : `${pluralize(soldCustomerIds.size, "bought customer")} · ${pluralize(convertedSoldCars.length, "car")}`}
+                  : `${pluralize(soldCustomerIds.size, "customer")} · ${pluralize(convertedSoldCars.length, "sold car")}`}
               </CardDescription>
             </CardHeader>
             <CardContent className="min-w-0 overflow-hidden">
