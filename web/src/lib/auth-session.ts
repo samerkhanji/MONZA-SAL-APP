@@ -5,15 +5,27 @@ export const LAST_ACTIVITY_KEY = "monza_last_activity";
 
 /**
  * Client-side idle sign-out (in addition to Supabase JWT expiry).
- * 0 = disabled (default): session length follows Supabase / refresh token only.
- * Set NEXT_PUBLIC_IDLE_LOGOUT_MINUTES to a positive number (e.g. 15) to re-enable.
+ * Defaults to 30 minutes for this shared business app: after 30 minutes of
+ * inactivity the user is signed out and must log in again. An explicit
+ * NEXT_PUBLIC_IDLE_LOGOUT_MINUTES env value overrides the default; set it to 0
+ * to disable idle logout entirely.
  */
+const DEFAULT_IDLE_LOGOUT_MINUTES = 30;
+
 function parseIdleLogoutMs(): number {
   const raw = process.env.NEXT_PUBLIC_IDLE_LOGOUT_MINUTES;
-  if (raw === undefined || raw === "") return 0;
-  const n = Number(raw);
-  if (!Number.isFinite(n) || n <= 0) return 0;
-  const ms = n * 60 * 1000;
+  let minutes = DEFAULT_IDLE_LOGOUT_MINUTES;
+  if (raw !== undefined && raw !== "") {
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed)) {
+      minutes = DEFAULT_IDLE_LOGOUT_MINUTES;
+    } else if (parsed <= 0) {
+      return 0; // explicit opt-out
+    } else {
+      minutes = parsed;
+    }
+  }
+  const ms = minutes * 60 * 1000;
   const cap = 24 * 60 * 60 * 1000;
   return Math.min(ms, cap);
 }
