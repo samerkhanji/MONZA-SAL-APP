@@ -323,7 +323,10 @@ export default function CustomersPage() {
   const canCreateCustomer = canPerform("customers", "create", appRole ?? null);
   const canEditCustomer = canPerform("customers", "edit", appRole ?? null);
 
-  function CustomerTable({ list }: { list: CustomerDisplay[] }) {
+  // Render helper (not a nested component): defining a component inside render
+  // gives it a fresh identity every render, which remounts the table and drops
+  // its scroll/state. Calling it as a function inlines the elements instead.
+  function renderCustomerTable(list: CustomerDisplay[]) {
     return (
       <div className="scrollbar-thick w-full min-w-0 max-h-[min(72vh,calc(100dvh-14rem))] overflow-x-auto overflow-y-auto rounded-md border border-border bg-card [-webkit-overflow-scrolling:touch]">
         <table className="w-max min-w-full table-fixed border-collapse">
@@ -633,7 +636,7 @@ export default function CustomersPage() {
                   </div>
                 )
               ) : (
-                <CustomerTable list={filteredCustomers} />
+                renderCustomerTable(filteredCustomers)
               )}
             </CardContent>
           </Card>
@@ -980,7 +983,7 @@ export default function CustomersPage() {
                   )}
                 </div>
               ) : (
-                <CustomerTable list={exclusiveLeadCustomers} />
+                renderCustomerTable(exclusiveLeadCustomers)
               )}
             </CardContent>
           </Card>
