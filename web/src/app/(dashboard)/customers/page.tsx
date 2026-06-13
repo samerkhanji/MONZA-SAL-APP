@@ -476,7 +476,7 @@ export default function CustomersPage() {
             Sold Cars
             {!soldLoading && (
               <Badge variant="secondary" className="ml-2">
-                {convertedSoldCars.length}
+                {soldCustomerIds.size}
               </Badge>
             )}
           </TabsTrigger>
@@ -594,7 +594,7 @@ export default function CustomersPage() {
               <CardDescription>
                 {soldLoading
                   ? "Loading..."
-                  : `${pluralize(convertedSoldCars.length, "sold car")} (converted)`}
+                  : `${pluralize(soldCustomerIds.size, "bought customer")} · ${pluralize(convertedSoldCars.length, "car")}`}
               </CardDescription>
             </CardHeader>
             <CardContent className="min-w-0 overflow-hidden">
