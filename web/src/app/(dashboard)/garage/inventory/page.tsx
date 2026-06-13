@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -75,6 +76,24 @@ function matchesSearch(p: Part, q: string): boolean {
   );
 }
 
+// A part's storage_zone holds every location it sits in, e.g.
+// "Z0COL6S1ST1 x7 (5 used), Z1COL1S2ST5 x8". Split it into structured entries.
+type ZoneEntry = { loc: string; qty: number; used: number };
+function parseZones(storageZone: string | null | undefined): ZoneEntry[] {
+  if (!storageZone) return [];
+  return storageZone
+    .split(",")
+    .map((seg) => {
+      const s = seg.trim();
+      if (!s) return null;
+      const loc = (s.match(/^(\S+)/)?.[1] ?? s).trim();
+      const qty = Number(s.match(/x(\d+)/)?.[1] ?? 0);
+      const used = Number(s.match(/\((\d+)\s*used\)/i)?.[1] ?? 0);
+      return { loc, qty, used };
+    })
+    .filter((z): z is ZoneEntry => z != null && z.loc.length > 0);
+}
+
 export default function GarageInventoryPage() {
   const searchParams = useSearchParams();
   const { profile, appRole } = useUser();
@@ -82,6 +101,7 @@ export default function GarageInventoryPage() {
   const [pendingDeletes, setPendingDeletes] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [locationSearch, setLocationSearch] = useState("");
   const [scanPartOpen, setScanPartOpen] = useState(false);
   const [supplierFilter, setSupplierFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -182,6 +202,68 @@ export default function GarageInventoryPage() {
     setStatusFilter("low_or_out");
   };
 
+  // ── By Location view: group parts by each physical location ──
+  const locationGroups = useMemo(() => {
+    const q = locationSearch.trim().toLowerCase();
+    const map = new Map<string, { part: Part; qty: number; used: number }[]>();
+    for (const p of parts) {
+      for (const z of parseZones(p.storage_zone)) {
+        if (
+          q &&
+          !z.loc.toLowerCase().includes(q) &&
+          !(p.part_name ?? "").toLowerCase().includes(q) &&
+          !(p.oe_number ?? "").toLowerCase().includes(q)
+        ) {
+          continue;
+        }
+        const arr = map.get(z.loc) ?? [];
+        arr.push({ part: p, qty: z.qty, used: z.used });
+        map.set(z.loc, arr);
+      }
+    }
+    return [...map.entries()]
+      .map(([loc, rows]) => ({
+        loc,
+        rows,
+        inStock: rows.reduce((s, r) => s + r.qty, 0),
+        used: rows.reduce((s, r) => s + r.used, 0),
+      }))
+      .sort((a, b) => a.loc.localeCompare(b.loc, undefined, { numeric: true }));
+  }, [parts, locationSearch]);
+
+  // ── Totals view: portfolio-level numbers ──
+  const partTotals = useMemo(() => {
+    const locs = new Set<string>();
+    let usedUnits = 0;
+    const byBrand = new Map<string, number>();
+    for (const p of parts) {
+      for (const z of parseZones(p.storage_zone)) {
+        locs.add(z.loc);
+        usedUnits += z.used;
+      }
+      const b = p.car_model?.trim() || "Unspecified";
+      byBrand.set(b, (byBrand.get(b) ?? 0) + 1);
+    }
+    return {
+      parts: parts.length,
+      units: parts.reduce((s, p) => s + (p.quantity ?? 0), 0),
+      inStock: parts.filter((p) => p.status === "in_stock").length,
+      low: parts.filter((p) => p.status === "low_stock").length,
+      out: parts.filter((p) => p.status === "out_of_stock").length,
+      locations: locs.size,
+      usedUnits,
+      byBrand: [...byBrand.entries()].sort((a, b) => b[1] - a[1]),
+    };
+  }, [parts]);
+
+  const reorderList = useMemo(
+    () =>
+      parts
+        .filter((p) => p.status === "low_stock" || p.status === "out_of_stock")
+        .sort((a, b) => a.quantity - b.quantity),
+    [parts]
+  );
+
   const canDeletePart = canPerform("parts", "delete", appRole ?? null);
 
   async function handleDelete() {
@@ -263,6 +345,14 @@ export default function GarageInventoryPage() {
         </button>
       )}
 
+      <Tabs defaultValue="part" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="part">By Part Number</TabsTrigger>
+          <TabsTrigger value="location">By Location</TabsTrigger>
+          <TabsTrigger value="totals">Totals</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="part">
       <Card>
         <CardHeader>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -656,6 +746,176 @@ export default function GarageInventoryPage() {
           )}
         </CardContent>
       </Card>
+        </TabsContent>
+
+        {/* ───────────────── BY LOCATION ───────────────── */}
+        <TabsContent value="location">
+          <Card>
+            <CardHeader>
+              <CardTitle>By Location</CardTitle>
+              <CardDescription>
+                {partTotals.locations} locations · {partTotals.units} units in stock — browse what sits where
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Input
+                placeholder="Search location, part name, OE number…"
+                value={locationSearch}
+                onChange={(e) => setLocationSearch(e.target.value)}
+                className="min-h-11 w-full text-base sm:max-w-sm sm:text-sm"
+              />
+              {loading ? (
+                <p className="text-muted-foreground py-8">Loading...</p>
+              ) : locationGroups.length === 0 ? (
+                <p className="text-muted-foreground py-8">No locations match.</p>
+              ) : (
+                <div className="scrollbar-thick max-h-[70vh] space-y-4 overflow-y-auto pr-1">
+                  {locationGroups.map((g) => (
+                    <div key={g.loc} className="rounded-lg border border-border/50">
+                      <div className="flex items-center justify-between gap-2 border-b border-border/50 bg-muted/40 px-3 py-2">
+                        <span className="font-mono text-sm font-semibold">{g.loc}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {g.rows.length} part{g.rows.length === 1 ? "" : "s"} · {g.inStock} in stock
+                          {g.used > 0 ? ` · ${g.used} used` : ""}
+                        </span>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full min-w-[480px] text-sm">
+                          <thead>
+                            <tr className="text-left text-xs text-muted-foreground">
+                              <th className="px-3 py-1.5 font-medium">Part</th>
+                              <th className="px-3 py-1.5 font-medium">OE Number</th>
+                              <th className="px-3 py-1.5 text-right font-medium">In stock</th>
+                              <th className="px-3 py-1.5 text-right font-medium">Used</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {g.rows.map(({ part, qty, used }) => (
+                              <tr
+                                key={`${g.loc}-${part.id}`}
+                                className="cursor-pointer border-t border-border/40 hover:bg-muted/40"
+                                onClick={() => setHistoryPart(part)}
+                              >
+                                <td className="px-3 py-1.5">{part.part_name}</td>
+                                <td className="px-3 py-1.5 font-mono text-xs text-muted-foreground">
+                                  {part.oe_number ?? "—"}
+                                </td>
+                                <td className="px-3 py-1.5 text-right tabular-nums">{qty}</td>
+                                <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground">
+                                  {used || "—"}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ───────────────── TOTALS ───────────────── */}
+        <TabsContent value="totals">
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              {[
+                { label: "Distinct parts", value: partTotals.parts },
+                { label: "Units in stock", value: partTotals.units },
+                { label: "Locations", value: partTotals.locations },
+                { label: "Used (taken)", value: partTotals.usedUnits },
+                { label: "In stock", value: partTotals.inStock, tone: "text-green-600 dark:text-green-400" },
+                { label: "Low stock", value: partTotals.low, tone: "text-amber-600 dark:text-amber-400" },
+                { label: "Out of stock", value: partTotals.out, tone: "text-red-600 dark:text-red-400" },
+                { label: "To reorder", value: partTotals.low + partTotals.out, tone: "text-amber-700 dark:text-amber-300" },
+              ].map((s) => (
+                <Card key={s.label}>
+                  <CardContent className="p-4">
+                    <p className="text-xs text-muted-foreground">{s.label}</p>
+                    <p className={`mt-1 text-2xl font-semibold tabular-nums ${s.tone ?? ""}`}>
+                      {s.value}
+                    </p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">By brand</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <table className="w-full text-sm">
+                    <tbody>
+                      {partTotals.byBrand.map(([brand, n]) => (
+                        <tr key={brand} className="border-t border-border/40">
+                          <td className="py-1.5">{brand}</td>
+                          <td className="py-1.5 text-right tabular-nums">{n}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">
+                    Parts to reorder
+                    <Badge variant="secondary" className="ml-2">{reorderList.length}</Badge>
+                  </CardTitle>
+                  <CardDescription>At or below their minimum quantity</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {reorderList.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Nothing needs reordering. 🎉</p>
+                  ) : (
+                    <div className="scrollbar-thick max-h-[50vh] overflow-y-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="text-left text-xs text-muted-foreground">
+                            <th className="py-1.5 font-medium">Part</th>
+                            <th className="py-1.5 font-medium">OE</th>
+                            <th className="py-1.5 text-right font-medium">Qty</th>
+                            <th className="py-1.5 text-right font-medium">Min</th>
+                            <th className="py-1.5 font-medium">Location</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {reorderList.map((p) => (
+                            <tr
+                              key={p.id}
+                              className="cursor-pointer border-t border-border/40 hover:bg-muted/40"
+                              onClick={() => setHistoryPart(p)}
+                            >
+                              <td className="py-1.5">{p.part_name}</td>
+                              <td className="py-1.5 font-mono text-xs text-muted-foreground">
+                                {formatOeShort(p.oe_number)}
+                              </td>
+                              <td className={`py-1.5 text-right tabular-nums ${quantityColor(p)}`}>
+                                {p.quantity}
+                              </td>
+                              <td className="py-1.5 text-right tabular-nums text-muted-foreground">
+                                {p.min_quantity}
+                              </td>
+                              <td className="py-1.5 font-mono text-xs text-muted-foreground">
+                                {parseZones(p.storage_zone)[0]?.loc ?? "—"}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </TabsContent>
+      </Tabs>
 
       <AddPartDialog
         open={addOpen}
