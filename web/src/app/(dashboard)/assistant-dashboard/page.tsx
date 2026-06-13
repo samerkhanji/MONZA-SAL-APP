@@ -586,9 +586,9 @@ export default function AssistantDashboardPage() {
         data-tour-id="assistant-dashboard-summary-cards"
         className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6"
       >
-        {cards.map((card, i) => (
+        {cards.map((card) => (
           <KpiCard
-            key={card.href ?? `card-${i}`}
+            key={card.label}
             label={card.label}
             value={loading ? "—" : card.value}
             icon={card.icon}
