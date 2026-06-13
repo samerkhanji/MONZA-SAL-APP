@@ -2,8 +2,11 @@ name: Daily Health Briefing
 
 on:
   schedule:
-    # 07:00 UTC = 10:00 Beirut (EEST). Note: in winter (EET, UTC+2) this lands at 09:00 Beirut.
-    - cron: "0 7 * * *"
+    # 06:42 UTC ~= 09:42 Beirut (EEST). Note: in winter (EET, UTC+2) this lands ~08:42.
+    # Deliberately off the top of the hour: GitHub's shared cron runners are most
+    # congested at :00, where scheduled jobs are heavily delayed or silently dropped.
+    # An odd minute well before the hour gives the most reliable ~on-time delivery.
+    - cron: "42 6 * * *"
   workflow_dispatch: {}
 
 permissions:
